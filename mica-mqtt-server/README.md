@@ -22,6 +22,8 @@ MqttServer mqttServer = MqttServer.create()
     .heartbeatTimeout(120_1000L)
     // ssl 配置
     .useSsl("", "", "")
+    // 开启代理协议，支持 nginx 开启 tcp proxy_protocol on; 时转发源 ip 信息。2.4.1 版本开始支持
+    .proxyProtocolEnable()
     // 自定义客户端上下线监听
     .connectStatusListener(new IMqttConnectStatusListener() {
         @Override
