@@ -39,6 +39,7 @@ mqtt:
       password: mica            # mqtt 认证密码
     debug: true                 # 如果开启 prometheus 指标收集建议关闭
     stat-enable: true           # 开启指标收集，debug 和 prometheus 开启时需要打开，默认开启，关闭节省内存
+    proxy-protocol-enable: false   # 代理协议支持，nginx 可开启 tcp proxy_protocol on; 时转发源 ip 信息。2.4.1 版本开始支持
     web-port: 8083              # http、websocket 端口，默认：8083
     websocket-enable: true      # 是否开启 websocket，默认： true
     http-enable: false          # 是否开启 http api，默认： false
