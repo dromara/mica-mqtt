@@ -24,8 +24,8 @@
         <mica.version>2.7.18.9</mica.version>
         <spring.boot.version>2.7.18</spring.boot.version>
         <gson.version>2.11.0</gson.version>
-        <solon.version>3.0.4.1</solon.version>
-        <jfinal.version>5.2.3</jfinal.version>
+        <solon.version>3.0.5</solon.version>
+        <jfinal.version>5.2.4</jfinal.version>
         <tinylog.version>2.7.0</tinylog.version>
     </properties>
 
@@ -309,7 +309,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
-                        <version>3.11.1</version>
+                        <version>3.11.2</version>
                         <executions>
                             <execution>
                                 <phase>package</phase>
@@ -343,7 +343,7 @@
                     <plugin>
                         <groupId>org.sonatype.central</groupId>
                         <artifactId>central-publishing-maven-plugin</artifactId>
-                        <version>0.6.0</version>
+                        <version>0.7.0</version>
                         <extensions>true</extensions>
                         <configuration>
                             <publishingServerId>central</publishingServerId>
