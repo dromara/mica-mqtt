@@ -31,16 +31,18 @@ public class MqttClientConnectListener implements IMqttClientConnectListener {
 
 	@Override
 	public void onConnected(ChannelContext context, boolean isReconnect) {
+		String clientId = context.getId();
 		if (isReconnect) {
-			logger.info("重连 mqtt 服务器重连成功...");
+			logger.info("重连 mqtt 服务器重连成功... clientId:{}", clientId);
 		} else {
-			logger.info("连接 mqtt 服务器成功...");
+			logger.info("连接 mqtt 服务器成功... clientId:{}", clientId);
 		}
 	}
 
 	@Override
-	public void onDisconnect(ChannelContext channelContext, Throwable throwable, String remark, boolean isRemove) {
-		logger.error("mqtt 链接断开 remark:{} isRemove:{}", remark, isRemove, throwable);
+	public void onDisconnect(ChannelContext context, Throwable throwable, String remark, boolean isRemove) {
+		String clientId = context.getId();
+		logger.error("mqtt 链接断开 remark:{} isRemove:{} clientId:{}", remark, isRemove, clientId, throwable);
 	}
 
 }

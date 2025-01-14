@@ -599,6 +599,8 @@ public final class MqttClientCreator {
 		if (this.debug) {
 			clientConfig.debug = true;
 		}
+		// 绑定 clientId 到 context 上，可以 context.getId() 获取
+		clientConfig.setTioUuid(new MqttClientId(this));
 		// 11. 自定义处理
 		if (this.tioConfigCustomize != null) {
 			this.tioConfigCustomize.accept(clientConfig);
