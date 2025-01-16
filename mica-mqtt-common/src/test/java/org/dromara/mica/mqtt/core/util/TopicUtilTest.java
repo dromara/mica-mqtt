@@ -16,7 +16,6 @@
 
 package org.dromara.mica.mqtt.core.util;
 
-import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
