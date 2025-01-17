@@ -30,7 +30,7 @@ import org.dromara.mica.mqtt.core.server.interceptor.IMqttMessageInterceptor;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerAuthHandler;
-import org.dromara.mica.mqtt.spring.server.MqttServerCustomizer;
+import org.dromara.mica.mqtt.core.server.MqttServerCustomizer;
 import org.dromara.mica.mqtt.spring.server.MqttServerTemplate;
 import org.dromara.mica.mqtt.spring.server.event.SpringEventMqttConnectStatusListener;
 import org.dromara.mica.mqtt.spring.server.event.SpringEventMqttMessageListener;

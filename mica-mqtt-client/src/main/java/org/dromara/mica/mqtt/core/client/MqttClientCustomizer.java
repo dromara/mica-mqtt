@@ -14,23 +14,21 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.server.solon;
-
-import org.dromara.mica.mqtt.core.server.MqttServerCreator;
+package org.dromara.mica.mqtt.core.client;
 
 /**
- * MqttServer 配置自定义
+ * MqttClient 配置自定义
  *
  * @author L.cm
  */
 @FunctionalInterface
-public interface MqttServerCustomizer {
+public interface MqttClientCustomizer {
 
 	/**
 	 * MqttServerCreator 自定义扩展
 	 *
-	 * @param creator MqttServerCreator
+	 * @param creator MqttClientCreator
 	 */
-	void customize(MqttServerCreator creator);
+	void customize(MqttClientCreator creator);
 
 }
