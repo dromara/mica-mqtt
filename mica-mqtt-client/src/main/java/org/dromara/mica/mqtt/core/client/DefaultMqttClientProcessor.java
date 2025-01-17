@@ -124,7 +124,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		if (globalSubscribe != null && !globalSubscribe.isEmpty()) {
 			globalReSendSubscription(context, globalSubscribe);
 		}
-		List<MqttClientSubscription> reSubscriptionList = clientSession.getAndCleanSubscription();
+		List<MqttClientSubscription> reSubscriptionList = clientSession.getSubscriptions();
 		// 1. 判断是否为空
 		if (reSubscriptionList.isEmpty()) {
 			return;

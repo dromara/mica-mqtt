@@ -104,7 +104,7 @@ public interface IMqttClientSession {
 	 *
 	 * @return 订阅集合
 	 */
-	List<MqttClientSubscription> getAndCleanSubscription();
+	List<MqttClientSubscription> getSubscriptions();
 
 	/**
 	 * 获取匹配的订阅
