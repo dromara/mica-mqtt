@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
  *
  * @author L.cm
  */
-public final class DefaultMqttClientSession implements IMqttClientSession {
+public class DefaultMqttClientSession implements IMqttClientSession {
 	private static final Logger logger = LoggerFactory.getLogger(DefaultMqttClientSession.class);
 	/**
 	 * 订阅的数据承载
