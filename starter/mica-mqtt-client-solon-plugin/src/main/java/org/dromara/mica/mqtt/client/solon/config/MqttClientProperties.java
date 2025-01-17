@@ -117,6 +117,10 @@ public class MqttClientProperties {
 	 */
 	private boolean cleanSession = true;
 	/**
+	 * 开启保留 session 时，session 的有效期，默认：0
+	 */
+	private int sessionExpiryIntervalSecs = 0;
+	/**
 	 * ByteBuffer Allocator，支持堆内存和堆外内存，默认为：堆内存
 	 */
 	private ByteBufferAllocator bufferAllocator = ByteBufferAllocator.HEAP;

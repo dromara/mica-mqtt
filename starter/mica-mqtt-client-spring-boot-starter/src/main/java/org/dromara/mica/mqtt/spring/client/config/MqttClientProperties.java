@@ -26,6 +26,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.unit.DataSize;
 import org.tio.utils.buffer.ByteBufferAllocator;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -118,6 +119,10 @@ public class MqttClientProperties {
 	 * </p>
 	 */
 	private boolean cleanSession = true;
+	/**
+	 * 开启保留 session 时，session 的有效期，默认：0
+	 */
+	private int sessionExpiryIntervalSecs = 0;
 	/**
 	 * ByteBuffer Allocator，支持堆内存和堆外内存，默认为：堆内存
 	 */

@@ -60,6 +60,7 @@ public class MqttClientConfiguration {
 			.reSubscribeBatchSize(properties.getReSubscribeBatchSize())
 			.version(properties.getVersion())
 			.cleanSession(properties.isCleanSession())
+			.sessionExpiryIntervalSecs(properties.getSessionExpiryIntervalSecs())
 			.bufferAllocator(properties.getBufferAllocator())
 			.statEnable(properties.isStatEnable());
 		Integer timeout = properties.getTimeout();
