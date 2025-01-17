@@ -7,6 +7,7 @@
 - :sparkles: mica-mqtt client solon 和 spring boot 插件添加 MQTT5.0 的 sessionExpiryIntervalSecs 配置 gitee #IBIE27  感谢 `@cyber` 反馈。
 - :sparkles: mica-mqtt client DefaultMqttClientSession 移除 final 修饰，方便继承自定义。
 - :sparkles: mica-mqtt client 将 clientId 绑定到 context 上，可以使用 `context.getId()` 获取，gitee #IBHHB1 感谢 `@cv` 反馈。
+- :sparkles: 将 MqttServerCustomizer 和 MqttClientCustomizer 抽到 mica-mqtt-server、mica-mqtt-client 方便组件封装 gitee #IBIJDF 感谢 `@cyber` 反馈
 
 ### v2.4.1 - 2025-01-04
 - :sparkles: mqtt server 统一 topic 订阅、发布认证日志方便排查问题。
