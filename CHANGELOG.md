@@ -2,7 +2,7 @@
 
 ## 发行版本
 
-### v2.4.2 - 2025-01-17
+### v2.4.2-M1 - 2025-01-17
 - :sparkles: mica-mqtt client 调整重连重新订阅的逻辑 gitee #IBIE27 感谢 `@cyber` 反馈。
 - :sparkles: mica-mqtt client solon 和 spring boot 插件添加 MQTT5.0 的 sessionExpiryIntervalSecs 配置 gitee #IBIE27  感谢 `@cyber` 反馈。
 - :sparkles: mica-mqtt client DefaultMqttClientSession 移除 final 修饰，方便继承自定义。
