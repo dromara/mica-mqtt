@@ -70,12 +70,16 @@ public class MqttClientConfiguration {
 		if (properties.isDebug()) {
 			clientCreator.debug();
 		}
+		// mqtt 线程数
+		Integer mqttThreadPoolSize = properties.getMqttThreadPoolSize();
+		if (mqttThreadPoolSize != null && mqttThreadPoolSize > 0) {
+			clientCreator.mqttThreadPoolSize(mqttThreadPoolSize);
+		}
 		// 开启 ssl
 		MqttClientProperties.Ssl ssl = properties.getSsl();
 		if (ssl.isEnabled()) {
 			clientCreator.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass());
 		}
-
 		// 构造遗嘱消息
 		MqttClientProperties.WillMessage willMessage = properties.getWillMessage();
 		if (willMessage != null && hasText(willMessage.getTopic())) {

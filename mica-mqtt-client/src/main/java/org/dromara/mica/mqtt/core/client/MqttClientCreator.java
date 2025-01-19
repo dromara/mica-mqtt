@@ -532,6 +532,13 @@ public final class MqttClientCreator {
 		return this;
 	}
 
+	public MqttClientCreator mqttThreadPoolSize(int poolSize) {
+		if (poolSize <= 0) {
+			throw new IllegalArgumentException("poolSize must be greater than zero.");
+		}
+		return mqttExecutor(ThreadUtils.getBizExecutor(poolSize));
+	}
+
 	public MqttClientCreator taskService(TimerTaskService taskService) {
 		this.taskService = taskService;
 		return this;
