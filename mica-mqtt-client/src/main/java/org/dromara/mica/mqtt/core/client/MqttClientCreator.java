@@ -532,7 +532,7 @@ public final class MqttClientCreator {
 		return this;
 	}
 
-	public MqttClientCreator mqttThreadPoolSize(int poolSize) {
+	public MqttClientCreator bizThreadPoolSize(int poolSize) {
 		if (poolSize <= 0) {
 			throw new IllegalArgumentException("poolSize must be greater than zero.");
 		}

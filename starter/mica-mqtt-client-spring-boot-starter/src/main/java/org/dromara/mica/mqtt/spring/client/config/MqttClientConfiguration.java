@@ -89,10 +89,10 @@ public class MqttClientConfiguration {
 		if (properties.isDebug()) {
 			clientCreator.debug();
 		}
-		// mqtt 线程数
-		Integer mqttThreadPoolSize = properties.getMqttThreadPoolSize();
-		if (mqttThreadPoolSize != null && mqttThreadPoolSize > 0) {
-			clientCreator.mqttThreadPoolSize(mqttThreadPoolSize);
+		// mqtt 业务线程数
+		Integer bizThreadPoolSize = properties.getBizThreadPoolSize();
+		if (bizThreadPoolSize != null && bizThreadPoolSize > 0) {
+			clientCreator.bizThreadPoolSize(bizThreadPoolSize);
 		}
 		// 开启 ssl
 		MqttClientProperties.Ssl ssl = properties.getSsl();
