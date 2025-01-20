@@ -128,7 +128,7 @@ public class MqttClientConfiguration {
 	}
 
 	@Bean
-	public MqttClientSubscribeDetector mqttClientSubscribeDetector(ApplicationContext applicationContext) {
+	public static MqttClientSubscribeDetector mqttClientSubscribeDetector(ApplicationContext applicationContext) {
 		return new MqttClientSubscribeDetector(applicationContext);
 	}
 
