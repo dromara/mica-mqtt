@@ -2,6 +2,11 @@
 
 ## 发行版本
 
+### v2.4.2-M2 - 2025-01-21
+- :sparkles: mica-mqtt-client Spring boot stater 和 solon 添加工作线程数配置 `bizThreadPoolSize` 。
+- :sparkles: mica-mqtt-server proxy 代理简化，已测底抽象到 mica-net。
+- :bug: mica-mqtt-client-spring-boot-starter 修复 Spring boot3.3.2 启动时出现警告 gitee #IBITP5 感谢 `@cyber` 反馈。
+
 ### v2.4.2-M1 - 2025-01-17
 - :sparkles: mica-mqtt client 调整重连重新订阅的逻辑 gitee #IBIE27 感谢 `@cyber` 反馈。
 - :sparkles: mica-mqtt client solon 和 spring boot 插件添加 MQTT5.0 的 sessionExpiryIntervalSecs 配置 gitee #IBIE27  感谢 `@cyber` 反馈。
