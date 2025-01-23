@@ -33,8 +33,8 @@ Dromara `mica-mqtt` **低延迟**、**高性能**的 `mqtt` 物联网组件。�
 - [x] 支持 MQTT v3.1、v3.1.1 以及 v5.0 协议。
 - [x] 支持 websocket mqtt 子协议（支持 mqtt.js）。
 - [x] 支持 http rest api，[http api 文档详见](docs/http-api.md)。
-- [x] 支持 MQTT client 客户端。
-- [x] 支持 MQTT server 服务端。
+- [x] 支持 MQTT client 客户端，支持 Android。
+- [x] 支持 MQTT server 服务端，支持 Android。
 - [x] 支持 MQTT client、server 共享订阅支持。
 - [x] 支持 MQTT 遗嘱消息。
 - [x] 支持 MQTT 保留消息。
@@ -42,6 +42,7 @@ Dromara `mica-mqtt` **低延迟**、**高性能**的 `mqtt` 物联网组件。�
 - [x] MQTT 客户端 **阿里云 mqtt**、**华为云 mqtt** 连接 demo 示例。
 - [x] 支持 GraalVM 编译成本机可执行程序。
 - [x] 支持 Spring boot、Solon 和 JFinal 项目快速接入。
+- [x] Spring boot、Solon client 插件支持保留 session。
 - [x] 支持对接 Prometheus + Grafana 实现监控。
 - [x] 基于 redis stream 实现集群，详见 [mica-mqtt-broker 模块](mica-mqtt-broker)。
 
