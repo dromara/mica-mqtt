@@ -97,8 +97,8 @@ MqttClient client = MqttClient.create()
 android {
     // ... 其他配置
     packagingOptions {
-    // 排除 INDEX.LIST 文件
-    exclude 'META-INF/INDEX.LIST'
+        // 排除 INDEX.LIST 文件
+        exclude 'META-INF/INDEX.LIST'
     }
 }
 ```
