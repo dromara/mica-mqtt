@@ -13,7 +13,7 @@
     </parent>
 
     <properties>
-        <graalvm.version>24.1.1</graalvm.version>
+        <graalvm.version>24.1.2</graalvm.version>
         <mainClass.server>org.dromara.mica.mqtt.server.MqttServerTest</mainClass.server>
         <mainClass.client>org.dromara.mica.mqtt.client.MqttClientTest</mainClass.client>
     </properties>
