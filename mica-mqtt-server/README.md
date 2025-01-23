@@ -1,6 +1,17 @@
 # 使用文档
 
+## 添加依赖
+
+```xml
+<dependency>
+  <groupId>org.dromara.mica-mqtt</groupId>
+  <artifactId>mica-mqtt-server</artifactId>
+  <version>${mica-mqtt.version}</version>
+</dependency>
+```
+
 ## 服务端使用
+
 ```java
 // 注意：为了能接受更多链接（降低内存），请添加 jvm 参数 -Xss129k
 MqttServer mqttServer = MqttServer.create()

@@ -27,6 +27,19 @@ mica-mqtt 支持两种**共享订阅**方式：
 **注意：** 如果发布的 `topic` 以 `/` 开头，例如：`/topic/test`，需要订阅 `$share/group1//topic/test`，另外 mica-mqtt 默认随机消息路由，共享订阅的多个客户端会随机收到消息。
 
 ## 客户端使用
+
+### 添加依赖
+
+```xml
+<dependency>
+  <groupId>org.dromara.mica-mqtt</groupId>
+  <artifactId>mica-mqtt-client</artifactId>
+  <version>${mica-mqtt.version}</version>
+</dependency>
+```
+
+## 客户端使用
+
 ```java
 // 初始化 mqtt 客户端
 MqttClient client = MqttClient.create()
@@ -75,6 +88,25 @@ MqttClient client = MqttClient.create()
     client.reconnect();
     // 停止
     client.stop();
+```
+
+## 在 Android 中使用
+
+### 排除 INDEX.LIST 文件
+```groovy
+android {
+    // ... 其他配置
+    packagingOptions {
+    // 排除 INDEX.LIST 文件
+    exclude 'META-INF/INDEX.LIST'
+    }
+}
+```
+
+### 添加依赖
+
+```groovy
+implementation 'org.dromara.mica-mqtt:mica-mqtt-client:${micaMqttVersion}' // 使用 2.4.2 或以上版本
 ```
 
 ## 全局订阅（2.2.9开始支持）
