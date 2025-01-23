@@ -8,6 +8,7 @@
 - :sparkles: mica-mqtt-common 调整 TopicUtil，支持原生 Android，gitee #IBJBFL 感谢 `@DeanNode` 反馈。
 - :sparkles: mica-mqtt-server nodeName 改为随机 nanoId ，支持原生 Android，gitee #IBJBFL 感谢 `@DeanNode` 反馈。
 - :bug: mica-mqtt-client-spring-boot-starter 修复 Spring Boot 3.2 启动时出现警告 gitee #IBITP5 感谢 `@cyber` 反馈。
+- :arrow_up: 升级 mica-net 到 1.0.12，tcp server 如果非 debug 不开启版本信息等打印，方便支持 Android（Android 下没有 ManagementFactory）
 
 ### v2.4.2-M1 - 2025-01-17
 - :sparkles: mica-mqtt client 调整重连重新订阅的逻辑 gitee #IBIE27 感谢 `@cyber` 反馈。
