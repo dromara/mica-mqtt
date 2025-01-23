@@ -7,7 +7,7 @@
 - :sparkles: mica-mqtt-server proxy 代理简化，已测底抽象到 mica-net。
 - :sparkles: mica-mqtt-common 调整 TopicUtil，支持原生 Android，gitee #IBJBFL 感谢 `@DeanNode` 反馈。
 - :sparkles: mica-mqtt-server nodeName 改为随机 nanoId ，支持原生 Android，gitee #IBJBFL 感谢 `@DeanNode` 反馈。
-- :bug: mica-mqtt-client-spring-boot-starter 修复 Spring boot3.3.2 启动时出现警告 gitee #IBITP5 感谢 `@cyber` 反馈。
+- :bug: mica-mqtt-client-spring-boot-starter 修复 Spring Boot 3.2 启动时出现警告 gitee #IBITP5 感谢 `@cyber` 反馈。
 
 ### v2.4.2-M1 - 2025-01-17
 - :sparkles: mica-mqtt client 调整重连重新订阅的逻辑 gitee #IBIE27 感谢 `@cyber` 反馈。
