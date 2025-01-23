@@ -17,10 +17,10 @@
 package org.dromara.mica.mqtt.core.util;
 
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
+import org.tio.utils.hutool.StrUtil;
 
 import java.util.List;
 import java.util.StringTokenizer;
-import java.util.regex.Pattern;
 
 /**
  * Mqtt Topic 工具
@@ -29,7 +29,6 @@ import java.util.regex.Pattern;
  */
 public final class TopicUtil {
 	public static final String TOPIC_LAYER = "/";
-	public static final Pattern VAR_PATTERN = Pattern.compile("\\$\\{(.*?)}");
 
 	/**
 	 * 校验 topicFilter
@@ -169,7 +168,6 @@ public final class TopicUtil {
 		return topicFilterLength + wildcardCharLen + 1 > topicNameLength;
 	}
 
-
 	/**
 	 * 获取处理完成之后的 topic，需要考虑 test/${abc}123 也要替换成 test/+ 而非 test/+123
 	 *
@@ -185,13 +183,29 @@ public final class TopicUtil {
 			token = tokenizer.nextToken();
 			if (TOPIC_LAYER.equals(token)) {
 				topicFilterBuilder.append(token);
-			} else if (VAR_PATTERN.matcher(token).find()) {
+			} else if (hasVariable(token)) {
 				topicFilterBuilder.append(MqttCodecUtil.TOPIC_WILDCARDS_ONE);
 			} else {
 				topicFilterBuilder.append(token);
 			}
 		}
 		return topicFilterBuilder.toString();
+	}
+
+	/**
+	 * 判断是否含有 ${x} 这样的变量
+	 *
+	 * @param input input
+	 * @return 是否含有变量
+	 */
+	public static boolean hasVariable(String input) {
+		if (StrUtil.isBlank(input)) {
+			return false;
+		}
+		int startIndex = input.indexOf("${");
+		int endIndex = input.indexOf("}", startIndex);
+		// 检查是否同时存在 "${" 和 "}"，并且 "}" 在 "${" 之后
+		return startIndex != -1 && endIndex != -1 && endIndex > startIndex + 2;
 	}
 
 }
