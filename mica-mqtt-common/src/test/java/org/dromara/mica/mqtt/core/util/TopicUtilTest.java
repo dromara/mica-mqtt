@@ -97,4 +97,15 @@ class TopicUtilTest {
 		Assertions.assertDoesNotThrow(() -> TopicUtil.validateTopicFilter("/iot/test/+/"));
 	}
 
+	@Test
+	void test4() {
+		String test1 = "Hello, ${name}!";
+		String test2 = "No variable here";
+		String test3 = "Invalid ${variable";
+		String test4 = "${name}!";
+		Assertions.assertTrue(TopicUtil.hasVariable(test1));
+		Assertions.assertFalse(TopicUtil.hasVariable(test2));
+		Assertions.assertFalse(TopicUtil.hasVariable(test3));
+		Assertions.assertTrue(TopicUtil.hasVariable(test4));
+	}
 }
