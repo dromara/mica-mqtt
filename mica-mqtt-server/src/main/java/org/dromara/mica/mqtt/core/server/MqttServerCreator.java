@@ -15,6 +15,7 @@
  */
 
 package org.dromara.mica.mqtt.core.server;
+
 import org.dromara.mica.mqtt.codec.MqttConstant;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerPublishPermission;
@@ -55,7 +56,6 @@ import org.tio.utils.timer.DefaultTimerTaskService;
 import org.tio.utils.timer.TimerTaskService;
 
 import java.io.InputStream;
-import java.lang.management.ManagementFactory;
 import java.util.concurrent.ExecutorService;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -588,7 +588,7 @@ public class MqttServerCreator {
 	public MqttServer build() {
 		// 默认的节点名称，用于集群
 		if (StrUtil.isBlank(this.nodeName)) {
-			this.nodeName = ManagementFactory.getRuntimeMXBean().getName() + ':' + port;
+			this.nodeName = StrUtil.getNanoId();
 		}
 		if (this.uniqueIdService == null) {
 			this.uniqueIdService = new DefaultMqttServerUniqueIdServiceImpl();
