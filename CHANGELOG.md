@@ -3,7 +3,7 @@
 ## 发行版本
 
 ### v2.4.2 - 2025-01-24
-- :sparkles: mica-mqtt-client Spring Boot stater 和 solon 插件添加工作线程数配置 `bizThreadPoolSize` (默认：2，如果消息量比较大，处理较慢，例如做 emqx 消息转发，可以调大此参数)。
+- :sparkles: mica-mqtt-client Spring Boot stater 和 solon 插件添加工作线程数配置 `bizThreadPoolSize` (默认：2，如果消息量大，业务复杂处理慢，例如做emqx消息转发处理，可调大此配置)。
 - :sparkles: mica-mqtt client Spring Boot stater 和 solon 插件添加 MQTT5.0 的 `sessionExpiryIntervalSecs` 配置 gitee #IBIE27 感谢 `@cyber` 反馈。
 - :sparkles: mica-mqtt client 调整重连重新订阅的逻辑，保留 session 重连时不丢失消息 gitee #IBIE27 感谢 `@cyber` 反馈。
 - :sparkles: mica-mqtt client DefaultMqttClientSession 移除 `final` 修饰，方便继承自定义。
