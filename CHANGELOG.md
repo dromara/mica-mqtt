@@ -5,12 +5,12 @@
 ### v2.4.2 - 2025-01-24
 - :sparkles: mica-mqtt-client Spring Boot stater 和 solon 插件添加工作线程数配置 `bizThreadPoolSize` (默认：2，如果消息量比较大，处理较慢，例如做 emqx 消息转发，可以调大此参数)。
 - :sparkles: mica-mqtt client Spring Boot stater 和 solon 插件添加 MQTT5.0 的 `sessionExpiryIntervalSecs` 配置 gitee #IBIE27 感谢 `@cyber` 反馈。
-- :sparkles: mica-mqtt client 调整重连重新订阅的逻辑，保留 session 重连不丢失消息 gitee #IBIE27 感谢 `@cyber` 反馈。
+- :sparkles: mica-mqtt client 调整重连重新订阅的逻辑，保留 session 重连时不丢失消息 gitee #IBIE27 感谢 `@cyber` 反馈。
 - :sparkles: mica-mqtt client DefaultMqttClientSession 移除 `final` 修饰，方便继承自定义。
-- :sparkles: mica-mqtt client 将 clientId 绑定到 context 上，可以使用 `context.getId()` 获取，gitee #IBHHB1 感谢 `@cv` 反馈。
-- :sparkles: mica-mqtt-server proxy 协议代理简化，已测底抽象到 mica-net。
+- :sparkles: mica-mqtt client 将 clientId 绑定到 context 上，可以使用 `context.getId()` 获取，方便多 mqtt client 实例下使用，gitee #IBHHB1 感谢 `@cv` 反馈。
+- :sparkles: mica-mqtt-server proxy 代理协议简化，已测底抽象到 mica-net。
 - :sparkles: mica-mqtt-common 调整 `TopicUtil`，支持原生 Android，gitee #IBJBFL 感谢 `@DeanNode` 反馈。
-- :sparkles: mica-mqtt-server nodeName 改为随机 `nanoId` ，支持原生 Android，gitee #IBJBFL 感谢 `@DeanNode` 反馈。
+- :sparkles: mica-mqtt-server 默认的 nodeName 改为随机 `nanoId`，支持原生 Android，gitee #IBJBFL 感谢 `@DeanNode` 反馈。
 - :sparkles: 将 MqttServerCustomizer 和 MqttClientCustomizer 抽到 mica-mqtt-server、mica-mqtt-client 方便组件封装，需要调整包名，请先将老的包导入删除，idea 会自动引入新的包。
 - :bug: mica-mqtt-client-spring-boot-starter 修复 Spring Boot 3.2 启动时出现警告 gitee #IBITP5 感谢 `@cyber` 反馈。
 
