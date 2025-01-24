@@ -40,6 +40,8 @@ mqtt:
     buffer-allocator: heap      # 堆内存和堆外内存，默认：堆内存
     keep-alive-secs: 60         # keep-alive 时间，单位：秒
     clean-session: true         # mqtt clean session，默认：true
+    session-expiry-interval-secs: 0 # 开启保留 session 时，session 的有效期，默认：0（2.4.2 开始支持）
+    biz-thread-pool-size: 2     # mqtt 工作线程数，默认：2，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数（2.4.2 开始支持）
     ssl:
       enabled: false            # 是否开启 ssl 认证，2.1.0 开始支持双向认证
       keystore-path:            # 可选参数：ssl 双向认证 keystore 目录，支持 classpath:/ 路径。
