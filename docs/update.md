@@ -2,6 +2,16 @@
 
 **mica-mqtt** 尽量减少对 api 的改动已保证老版本的平滑升级，但是有些大版本不得不改动。希望此文档对大家有所帮助。
 
+## 迁移到 mica-mqtt 2.4.2
+
+注意：2.4.2 将 MqttServerCustomizer 和 MqttClientCustomizer 抽到 mica-mqtt-server、mica-mqtt-client。Spring Boot 和 Solon 插入如果有使用到，请先将老的包导入删除，idea 会自动引入新的包。
+
+**客户端替换包导入：**
+- 替换成 `import org.dromara.mica.mqtt.core.client.MqttClientCustomizer;`
+
+**服务端替换包导入：**
+- 替换成 `import org.dromara.mica.mqtt.core.server.MqttServerCustomizer;`
+
 ## 迁移到 mica-mqtt 2.4.x 以上版本
 
 - :truck: 调整 maven groupId `net.dreamlu` 到新的 `org.dromara.mica-mqtt`。
