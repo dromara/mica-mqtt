@@ -10,6 +10,8 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    commit-message:
+      prefix: ":arrow_up:"  # 提交信息前缀
     ignore:
       - dependency-name: "org.springframework.*"
       - dependency-name: "net.dreamlu:mica-bom"
