@@ -14,6 +14,10 @@
     <dependencies>
         <dependency>
             <groupId>org.dromara.mica-mqtt</groupId>
+            <artifactId>mica-mqtt-codec</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara.mica-mqtt</groupId>
             <artifactId>mica-mqtt-common</artifactId>
         </dependency>
         <dependency>
@@ -23,7 +27,7 @@
         <dependency>
             <groupId>net.dreamlu</groupId>
             <artifactId>mica-net-http</artifactId>
-            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
