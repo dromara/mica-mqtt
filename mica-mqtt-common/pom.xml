@@ -15,12 +15,10 @@
         <dependency>
             <groupId>org.dromara.mica-mqtt</groupId>
             <artifactId>mica-mqtt-codec</artifactId>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>net.dreamlu</groupId>
             <artifactId>mica-net-core</artifactId>
-            <scope>provided</scope>
         </dependency>
         <!-- tinylog 用于测试  -->
         <dependency>

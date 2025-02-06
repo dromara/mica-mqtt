@@ -14,15 +14,7 @@
     <dependencies>
         <dependency>
             <groupId>org.dromara.mica-mqtt</groupId>
-            <artifactId>mica-mqtt-codec</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.dromara.mica-mqtt</groupId>
             <artifactId>mica-mqtt-common</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>net.dreamlu</groupId>
-            <artifactId>mica-net-core</artifactId>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
