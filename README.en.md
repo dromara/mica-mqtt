@@ -125,9 +125,6 @@ Dromara `mica-mqtt` is a **low-latency** and **high-performance** `mqtt` Interne
 - `Avue`: A Vue-based configurable front-end framework: [https://gitcode.com/superwei/avue](https://gitcode.com/superwei/avue)
 - `Pig`: Microservice framework featured on CCTV (architectural essential): [https://gitcode.com/pig-mesh/pig](https://gitcode.com/pig-mesh/pig)
 - `SpringBlade`: Enterprise-level solution (essential for enterprise development): [https://gitcode.com/bladex/SpringBlade](https://gitcode.com/bladex/SpringBlade)
-- `IJPay`: Payment SDK, making payment accessible: [https://gitee.com/javen205/IJPay](https://gitee.com/javen205/IJPay)
-- `JustAuth`: The most comprehensive third-party login open-source library ever: [https://github.com/zhangyd-c/JustAuth](https://github.com/zhangyd-c/JustAuth)
-- `spring-boot-demo`: Spring Boot in-depth learning in practice: [https://github.com/xkcoding/spring-boot-demo](https://github.com/xkcoding/spring-boot-demo)
 
 ## 💚 Acknowledgements
 Thanks to JetBrains for providing a free open-source license:
