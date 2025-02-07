@@ -170,11 +170,6 @@ Dromara `mica-mqtt` **低延迟**、**高性能**的 `mqtt` 物联网组件。�
 - `pig` 上央视的微服务框架（架构必备）：[https://gitcode.com/pig-mesh/pig](https://gitcode.com/pig-mesh/pig)
 - `SpringBlade` 企业级解决方案（企业开发必备）：[https://gitcode.com/bladex/SpringBlade](https://gitcode.com/bladex/SpringBlade)
 
-## 💚 鸣谢
-感谢 JetBrains 提供的免费开源 License：
-
-[![JetBrains](docs/img/jetbrains.png)](https://www.jetbrains.com/?from=mica-mqtt)
-
 ## 📱 微信
 
 ![如梦技术](docs/img/dreamlu-weixin.jpg)
