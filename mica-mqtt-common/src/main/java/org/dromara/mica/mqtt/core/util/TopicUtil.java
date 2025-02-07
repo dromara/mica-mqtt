@@ -176,7 +176,7 @@ public final class TopicUtil {
 	 */
 	public static String getTopicFilter(String topicTemplate) {
 		// 替换 ${name} 为 +
-		StringTokenizer tokenizer = new StringTokenizer(topicTemplate, "/", true);
+		StringTokenizer tokenizer = new StringTokenizer(topicTemplate, TOPIC_LAYER, true);
 		String token;
 		StringBuilder topicFilterBuilder = new StringBuilder();
 		while (tokenizer.hasMoreTokens()) {
