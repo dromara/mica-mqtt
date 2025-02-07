@@ -123,10 +123,9 @@ Dromara `mica-mqtt` is a **low-latency** and **high-performance** `mqtt` Interne
 - [Mqttx: An Elegant Cross-platform MQTT 5.0 Client Tool](https://mqttx.app)
 
 ## 🍻 Open Source Recommendations
-- `Avue`: A Vue-based configurable front-end framework: [https://gitee.com/smallweigit/avue](https://gitee.com/smallweigit/avue)
-- `Pig`: Microservice framework featured on CCTV (architectural essential): [https://gitee.com/log4j/pig](https://gitee.com/log4j/pig)
-- `SpringBlade`: Enterprise-level solution (essential for enterprise development): [https://gitee.com/smallc/SpringBlade](https://gitee.com/smallc/SpringBlade)
-- `smart-mqtt`: High-performance MQTT broker (surpassing EMQX): [https://gitee.com/smartboot/smart-mqtt](https://gitee.com/smartboot/smart-mqtt)
+- `Avue`: A Vue-based configurable front-end framework: [https://gitcode.com/superwei/avue](https://gitcode.com/superwei/avue)
+- `Pig`: Microservice framework featured on CCTV (architectural essential): [https://gitcode.com/pig-mesh/pig](https://gitcode.com/pig-mesh/pig)
+- `SpringBlade`: Enterprise-level solution (essential for enterprise development): [https://gitcode.com/bladex/SpringBlade](https://gitcode.com/bladex/SpringBlade)
 - `IJPay`: Payment SDK, making payment accessible: [https://gitee.com/javen205/IJPay](https://gitee.com/javen205/IJPay)
 - `JustAuth`: The most comprehensive third-party login open-source library ever: [https://github.com/zhangyd-c/JustAuth](https://github.com/zhangyd-c/JustAuth)
 - `spring-boot-demo`: Spring Boot in-depth learning in practice: [https://github.com/xkcoding/spring-boot-demo](https://github.com/xkcoding/spring-boot-demo)
