@@ -121,11 +121,6 @@ Dromara `mica-mqtt` is a **low-latency** and **high-performance** `mqtt` Interne
 - `Pig`: Microservice framework featured on CCTV (architectural essential): [https://gitcode.com/pig-mesh/pig](https://gitcode.com/pig-mesh/pig)
 - `SpringBlade`: Enterprise-level solution (essential for enterprise development): [https://gitcode.com/bladex/SpringBlade](https://gitcode.com/bladex/SpringBlade)
 
-## 💚 Acknowledgements
-Thanks to JetBrains for providing a free open-source license:
-
-[![JetBrains](docs/img/jetbrains.png)](https://www.jetbrains.com/?from=mica-mqtt)
-
 ## 📱 WeChat
 
 ![DreamLuTech](docs/img/dreamlu-weixin.jpg)
