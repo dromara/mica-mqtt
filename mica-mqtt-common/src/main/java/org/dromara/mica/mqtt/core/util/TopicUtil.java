@@ -203,7 +203,7 @@ public final class TopicUtil {
 			return false;
 		}
 		int startIndex = input.indexOf("${");
-		int endIndex = input.indexOf("}", startIndex);
+		int endIndex = input.indexOf('}', startIndex);
 		// 检查是否同时存在 "${" 和 "}"，并且 "}" 在 "${" 之后
 		return startIndex != -1 && endIndex != -1 && endIndex > startIndex + 2;
 	}
