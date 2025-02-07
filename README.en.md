@@ -111,7 +111,6 @@ Dromara `mica-mqtt` is a **low-latency** and **high-performance** `mqtt` Interne
 - [mica-mqtt HTTP API Documentation](docs/http-api.md)
 - [Frequently Asked Questions about mica-mqtt Usage](https://gitee.com/596392912/mica-mqtt/issues/I45GO7)
 - [mica-mqtt Release Versions](CHANGELOG.md)
-- [MQTT Protocol Documentation](https://github.com/mcxiaoke/mqtt)
 
 ## 💡 References
 - [Netty Codec MQTT](https://github.com/netty/netty/tree/4.1/codec-mqtt)
