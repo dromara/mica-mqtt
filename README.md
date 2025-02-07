@@ -162,12 +162,6 @@ Dromara `mica-mqtt` **低延迟**、**高性能**的 `mqtt` 物联网组件。�
 - [mica-mqtt 发行版本](https://mica-mqtt.dromara.org/version/changelog.html)
 - [mica-mqtt 老版本迁移指南](https://mica-mqtt.dromara.org/version/update.html)
 
-## 💡 参考vs借鉴
-- [netty codec mqtt](https://github.com/netty/netty/tree/4.1/codec-mqtt)
-- [jmqtt](https://github.com/Cicizz/jmqtt)
-- [iot-mqtt-server](https://gitee.com/recallcode/iot-mqtt-server)
-- [netty-mqtt-client](https://github.com/jetlinks/netty-mqtt-client)
-
 ## 🏗️ mqtt 桌面工具
 - [mqttx 优雅的跨平台 MQTT 5.0 GUI工具](https://mqttx.app)
 
