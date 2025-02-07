@@ -31,20 +31,21 @@ Dromara `mica-mqtt` is a **low-latency** and **high-performance** `mqtt` Interne
 - [x] Support for MQTT v3.1, v3.1.1, and v5.0 protocols.
 - [x] Support for WebSocket MQTT sub-protocol (compatible with mqtt.js).
 - [x] Support for HTTP REST API, see [HTTP API Documentation](docs/http-api.md) for details.
-- [x] Support for MQTT client.
-- [x] Support for MQTT server.
+- [x] Support for MQTT client, support Android native.
+- [x] Support for MQTT server, support Android native.
 - [x] Support for MQTT Will messages.
 - [x] Support for MQTT Retained messages.
 - [x] Support for custom message (MQ) processing and forwarding to achieve clustering.
 - [x] MQTT client **Alibaba Cloud MQTT**、**HuaWei MQTT** connection demo.
 - [x] Support for GraalVM compilation into native executable programs.
 - [x] Support for rapid access to Spring Boot、Solon and JFinal projects.
+- [x] Spring boot and Solon client plugins support session retention.
 - [x] Support for integration with Prometheus + Grafana for monitoring.
 - [x] Cluster implementation based on Redis pub/sub, see [mica-mqtt-broker module](mica-mqtt-broker) for details.
 
 ## 🌱 To-do
 
-- [ ] Optimize the processing of MQTT sessions and support v5.0
+- [ ] Optimize the handling of MQTT server sessions and simplify the use of MQTT v5.0.
 - [ ] Implement rule engine based on easy-rule + druid sql parsing.
 
 ## 🚨 Default Ports

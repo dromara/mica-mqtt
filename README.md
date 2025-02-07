@@ -48,7 +48,7 @@ Dromara `mica-mqtt` **低延迟**、**高性能**的 `mqtt` 物联网组件。�
 
 ## 🌱 待办
 
-- [ ] 优化处理 mqtt session，以及支持 v5.0 
+- [ ] 优化处理 mqtt 服务端 session，以及简化 mqtt v5.0 使用。
 - [ ] 基于 easy-rule + druid sql 解析，实现规则引擎。
 
 ## 🚨 默认端口
