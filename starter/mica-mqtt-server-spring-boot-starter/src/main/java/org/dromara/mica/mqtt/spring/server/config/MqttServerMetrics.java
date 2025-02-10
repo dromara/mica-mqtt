@@ -80,8 +80,8 @@ public class MqttServerMetrics implements ApplicationListener<ApplicationStarted
 	private MeterRegistry getMeterRegistry(ApplicationContext applicationContext) {
 		try {
 			return applicationContext.getBean(MeterRegistry.class);
-		} catch (NoSuchBeanDefinitionException ig) {
-			log.warn(ig.getMessage());
+		} catch (NoSuchBeanDefinitionException e) {
+			log.warn(e.getMessage());
 			return null;
 		}
 	}
