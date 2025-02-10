@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.spring.server.config;
 
-import io.micrometer.core.instrument.binder.MeterBinder;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -35,7 +35,7 @@ import org.springframework.context.annotation.Configuration;
 	name = "enabled",
 	havingValue = "true"
 )
-@ConditionalOnClass(MeterBinder.class)
+@ConditionalOnClass(MeterRegistry.class)
 @AutoConfigureAfter(MqttServerConfiguration.class)
 public class MqttServerMetricsConfiguration {
 

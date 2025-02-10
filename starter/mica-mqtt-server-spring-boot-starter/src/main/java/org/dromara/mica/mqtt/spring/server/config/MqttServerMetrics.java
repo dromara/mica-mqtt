@@ -20,10 +20,12 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.core.server.MqttServer;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
-import org.springframework.context.ConfigurableApplicationContext;
 import org.tio.core.Tio;
 import org.tio.server.ServerGroupStat;
 import org.tio.server.TioServerConfig;
@@ -35,6 +37,7 @@ import java.util.Collections;
  *
  * @author L.cm
  */
+@Slf4j
 @RequiredArgsConstructor
 public class MqttServerMetrics implements ApplicationListener<ApplicationStartedEvent> {
 	/**
@@ -65,11 +68,22 @@ public class MqttServerMetrics implements ApplicationListener<ApplicationStarted
 
 	@Override
 	public void onApplicationEvent(ApplicationStartedEvent event) {
-		ConfigurableApplicationContext applicationContext = event.getApplicationContext();
-		MqttServer mqttServer = applicationContext.getBean(MqttServer.class);
-		MeterRegistry registry = applicationContext.getBean(MeterRegistry.class);
-		TioServerConfig serverConfig = mqttServer.getServerConfig();
-		bindTo(registry, serverConfig);
+		ApplicationContext applicationContext = event.getApplicationContext();
+		MeterRegistry registry = getMeterRegistry(applicationContext);
+		if (registry != null) {
+			MqttServer mqttServer = applicationContext.getBean(MqttServer.class);
+			TioServerConfig serverConfig = mqttServer.getServerConfig();
+			bindTo(registry, serverConfig);
+		}
+	}
+
+	private MeterRegistry getMeterRegistry(ApplicationContext applicationContext) {
+		try {
+			return applicationContext.getBean(MeterRegistry.class);
+		} catch (NoSuchBeanDefinitionException ig) {
+			log.warn(ig.getMessage());
+			return null;
+		}
 	}
 
 	private void bindTo(MeterRegistry meterRegistry, TioServerConfig serverConfig) {
