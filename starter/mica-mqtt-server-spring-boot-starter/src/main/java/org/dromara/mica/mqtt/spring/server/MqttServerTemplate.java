@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.spring.server;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.MqttServer;
@@ -34,6 +35,7 @@ import java.util.concurrent.Executor;
  *
  * @author wsq（冷月宫主）
  */
+@Getter
 @RequiredArgsConstructor
 public class MqttServerTemplate {
 	private final MqttServer mqttServer;
