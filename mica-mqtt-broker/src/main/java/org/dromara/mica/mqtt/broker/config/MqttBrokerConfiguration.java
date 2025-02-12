@@ -25,6 +25,7 @@ import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.serializer.IMessageSerializer;
+import org.dromara.mica.mqtt.core.server.serializer.JsonMessageSerializer;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -40,7 +41,7 @@ public class MqttBrokerConfiguration {
 
 	@Bean
 	public IMessageSerializer messageSerializer() {
-		return new JacksonMessageSerializer();
+		return new JsonMessageSerializer();
 	}
 
 	@Bean
