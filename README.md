@@ -85,7 +85,7 @@ Dromara `mica-mqtt` **低延迟**、**高性能**的 `mqtt` 物联网组件。�
 
 **配置详见**：[mica-mqtt-server-spring-boot-starter 使用文档](starter/mica-mqtt-server-spring-boot-starter/README.md)
 
-### solon 项目
+### Solon 项目
 **客户端：**
 ```xml
 <dependency>
