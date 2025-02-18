@@ -24,6 +24,7 @@ import org.tio.core.ChannelContext;
  *
  * @author L.cm
  */
+@FunctionalInterface
 public interface IMqttClientGlobalMessageListener {
 
 	/**

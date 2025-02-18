@@ -21,6 +21,7 @@ package org.dromara.mica.mqtt.core.client;
  *
  * @author L.cm
  */
+@FunctionalInterface
 public interface IMqttClientMessageIdGenerator {
 
 	/**
