@@ -2,6 +2,12 @@
 
 ## 发行版本
 
+### v2.4.3 - 2025-03-02
+- :sparkles: Central Portal 开始支持 Snapshots（仅存储90天，需尽快切到最新的正式版），dev 分支提交后 Github action 自动发布快照版。
+- :sparkles: 精简，删除没有用到的代码，下沉到 mica-net。
+- :sparkles: mica-mqtt-server-spring-boot-starter MqttServerTemplate 暴露 `getMqttServer()` 方法，方便使用。
+- :sparkles: mica-mqtt-server-spring-boot-starter 兼容存在 `MeterRegistry` 类，但是 `MeterRegistry` bean 不存在的情况。gitee #IBLBCY 感谢 `@xxg` 反馈。
+
 ### v2.4.2 - 2025-01-24
 - :sparkles: mica-mqtt-client Spring Boot stater 和 solon 插件添加工作线程数配置 `bizThreadPoolSize` (默认：2，如果消息量大，业务复杂处理慢，例如做emqx消息转发处理，可调大此配置)。
 - :sparkles: mica-mqtt-client Spring Boot stater 和 solon 插件添加 MQTT5.0 的 `sessionExpiryIntervalSecs` 配置 gitee #IBIE27 感谢 `@cyber` 反馈。
