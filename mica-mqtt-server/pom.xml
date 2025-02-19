@@ -19,7 +19,6 @@
         <dependency>
             <groupId>net.dreamlu</groupId>
             <artifactId>mica-net-http</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
