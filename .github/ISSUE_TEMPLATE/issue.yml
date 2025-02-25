@@ -12,7 +12,7 @@ body:
     validations:
       required: true
   - type: dropdown
-    id: version
+    id: component
     attributes:
       label: 使用的组件
       options:

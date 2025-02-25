@@ -1,4 +1,4 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
   - name: PIG AI（mica-mqtt技术手册）！
     url: https://home.pig4cloud.com:38443/bot/index.html#/0/1809133293843144705/chat
