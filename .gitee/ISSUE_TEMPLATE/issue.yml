@@ -1,5 +1,6 @@
 name: "问题咨询"
 description: "请尽可能详细的描述问题，提供足够的上下文"
+labels: ["bug"]
 body:
   - type: dropdown
     id: version
@@ -27,17 +28,10 @@ body:
         - "其他"
     validations:
       required: true
-  - type: input
-    id: usage-scenarios
-    attributes:
-      label: 具体版本号和使用场景
-      description: 简述具体版本号和使用场景
-    validations:
-      required: true
   - type: textarea
     id: desired-solution
     attributes:
-      label: 问题描述（注意：描述不清一句话问题直接关闭）
-      description: 详细问题，提供相应截图和日志
+      label: 问题描述（具体版本号和使用场景，注意：描述不清一句话问题直接关闭）
+      description: 详细问题，具体版本号和使用场景，提供相应截图和日志
     validations:
       required: true
