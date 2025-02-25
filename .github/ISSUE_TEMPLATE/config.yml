@@ -1,4 +1,4 @@
-blank_issues_enabled: false # 不允许用户创建空白 Issue
+blank_issues_enabled: true
 contact_links:
   - name: PIG AI（mica-mqtt技术手册）！
     url: https%3a%2f%2fhome.pig4cloud.com%3a38443%2fbot%2findex.html%23%2f0%2f1809133293843144705%2fchat
