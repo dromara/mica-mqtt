@@ -1,4 +1,4 @@
-# Security Policy
+# Security Policy（安全策略）
 
 ## Supported Versions（支持的版本）
 
