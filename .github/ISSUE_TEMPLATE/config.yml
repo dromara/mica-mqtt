@@ -1,0 +1,11 @@
+blank_issues_enabled: false # 不允许用户创建空白 Issue
+contact_links:
+  - name: PIG AI（mica-mqtt技术手册）！
+    url: https%3a%2f%2fhome.pig4cloud.com%3a38443%2fbot%2findex.html%23%2f0%2f1809133293843144705%2fchat
+    about: 有问题先问 PIG AI，响应更及时！！！
+  - name: 遇到问题请先看《使用中常见问题汇总》！谢谢！！！
+    url: https://gitee.com/596392912/mica-mqtt/issues/I45GO7
+    about: 该文档可以解决你90%的疑惑
+  - name: 老版本用户建议升级到新版，详见《发行版本》！谢谢！！！
+    url: https://gitee.com/596392912/mica-mqtt/blob/master/CHANGELOG.md
+    about: 完整的《发行版本》记录

@@ -1,0 +1,43 @@
+name: 问题咨询
+description: "请尽可能详细的描述问题，提供足够的上下文"
+body:
+  - type: dropdown
+    id: version
+    attributes:
+      label: mica-mqtt版本
+      options:
+        - "2.4.x"
+        - "老版本建议先升级"
+    validations:
+      required: true
+  - type: dropdown
+    id: version
+    attributes:
+      label: 使用的组件
+      options:
+        - "mica-mqtt-client"
+        - "mica-mqtt-server"
+        - "mica-mqtt-client-spring-boot-starter"
+        - "mica-mqtt-server-spring-boot-starter"
+        - "mica-mqtt-client-solon-plugin"
+        - "mica-mqtt-server-solon-plugin"
+        - "mica-mqtt-client-jfinal-plugin"
+        - "mica-mqtt-server-jfinal-plugin"
+        - "mica-mqtt-broker 仅供参考"
+        - "其他"
+    validations:
+      required: true
+  - type: input
+    id: usage-scenarios
+    attributes:
+      label: 具体版本号和使用场景
+      description: 简述具体版本号和使用场景
+    validations:
+      required: true
+  - type: textarea
+    id: desired-solution
+    attributes:
+      label: 问题描述（注意：描述不清一句话问题直接关闭）
+      description: 详细问题，提供相应截图和日志
+    validations:
+      required: true
