@@ -1,4 +1,4 @@
-name: 问题咨询
+name: "问题咨询"
 description: "请尽可能详细的描述问题，提供足够的上下文"
 body:
   - type: dropdown
@@ -11,7 +11,7 @@ body:
     validations:
       required: true
   - type: dropdown
-    id: version
+    id: component
     attributes:
       label: 使用的组件
       options:
