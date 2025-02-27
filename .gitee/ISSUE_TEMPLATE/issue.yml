@@ -1,6 +1,6 @@
-name: "问题咨询"
+name: "问题咨询|反馈"
 description: "请尽可能详细的描述问题，提供足够的上下文"
-labels: ["bug"]
+labels: ["question"]
 body:
   - type: dropdown
     id: version
