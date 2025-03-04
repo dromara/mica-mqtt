@@ -1,6 +1,5 @@
 package org.dromara.mica.mqtt.core.common;
 
-import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
