@@ -1,4 +1,4 @@
-package org.dromara.mica.mqtt.client.solon.listener;
+package org.dromara.mica.mqtt.client.solon.test.listener;
 
 import org.dromara.mica.mqtt.client.solon.MqttClientSubscribe;
 import org.dromara.mica.mqtt.codec.MqttPublishMessage;

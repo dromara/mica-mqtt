@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.client.solon.listener;
+package org.dromara.mica.mqtt.client.solon.test.listener;
 
 import org.dromara.mica.mqtt.client.solon.event.MqttDisconnectEvent;
 import org.dromara.mica.mqtt.core.client.MqttClientCreator;
