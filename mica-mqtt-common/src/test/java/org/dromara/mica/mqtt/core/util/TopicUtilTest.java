@@ -66,16 +66,16 @@ class TopicUtilTest {
 		String s1 = "$SYS/brokers/${node}/clients/${clientId}/disconnected";
 		String s2 = "$SYS/brokers/+/clients/+/disconnected";
 		String s3 = TopicUtil.getTopicFilter(s1);
-		Assertions.assertEquals(s3, s2);
+		Assertions.assertEquals(s2, s3);
 		s1 = "$SYS/brokers/${node}/clients/${clientId}abc/disconnected";
 		s3 = TopicUtil.getTopicFilter(s1);
-		Assertions.assertEquals(s3, s2);
+		Assertions.assertEquals(s2, s3);
 		s1 = "$SYS/brokers/${node}/clients/${clientId}abc${x}/disconnected";
 		s3 = TopicUtil.getTopicFilter(s1);
-		Assertions.assertEquals(s3, s2);
+		Assertions.assertEquals(s2, s3);
 		s1 = "$SYS/brokers/${node}/clients/abc${clientId}abc${x}123/disconnected";
 		s3 = TopicUtil.getTopicFilter(s1);
-		Assertions.assertEquals(s3, s2);
+		Assertions.assertEquals(s2, s3);
 	}
 
 	@Test
