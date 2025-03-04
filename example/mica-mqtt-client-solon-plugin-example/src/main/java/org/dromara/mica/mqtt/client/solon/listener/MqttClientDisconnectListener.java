@@ -38,10 +38,10 @@ public class MqttClientDisconnectListener implements EventListener<MqttDisconnec
 
 	@Override
 	public void onEvent(MqttDisconnectEvent mqttDisconnectEvent) throws Throwable {
-			logger.info("MqttDisconnectEvent:{}", mqttDisconnectEvent);
-			// 在断线时更新 clientId、username、password
-			mqttClientCreator.clientId("newClient" + System.currentTimeMillis())
-				.username("newUserName")
-				.password("newPassword");
+		logger.info("MqttDisconnectEvent:{}", mqttDisconnectEvent);
+		// 在断线时更新 clientId、username、password，只能改这 3 个，不可调用其他方法。
+//		mqttClientCreator.clientId("newClient" + System.currentTimeMillis())
+//			.username("newUserName")
+//			.password("newPassword");
 	}
 }
