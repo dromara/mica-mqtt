@@ -1,4 +1,4 @@
-package org.dromara.mica.mqtt.noear;
+package org.dromara.mica.mqtt.client.solon.test;
 
 import org.dromara.mica.mqtt.client.solon.MqttClientTemplate;
 import org.noear.solon.Solon;
@@ -23,7 +23,7 @@ public class ClientTest implements EventListener<AppLoadEndEvent> {
 	}
 
 	@Inject
-    MqttClientTemplate client;
+	MqttClientTemplate client;
 
 	@Override
 	public void onEvent(AppLoadEndEvent event) throws Throwable {
