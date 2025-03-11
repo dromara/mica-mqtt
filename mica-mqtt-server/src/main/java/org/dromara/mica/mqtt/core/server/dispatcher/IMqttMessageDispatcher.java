@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.core.server.dispatcher;
 
+import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.server.model.Message;
 
 /**
@@ -28,10 +29,21 @@ public interface IMqttMessageDispatcher {
 	/**
 	 * 发送消息
 	 *
-	 * @param message 消息
+	 * @param publishMessage MqttPublishMessage
+	 * @param message        消息
 	 * @return 是否成功
 	 */
-	boolean send(Message message);
+	boolean send(MqttPublishMessage publishMessage, Message message);
+
+	/**
+	 * 发送消息
+	 *
+	 * @param message        消息
+	 * @return 是否成功
+	 */
+	default boolean send(Message message) {
+		return send((MqttPublishMessage) null, message);
+	}
 
 	/**
 	 * 发送消息
