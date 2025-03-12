@@ -22,6 +22,7 @@ import org.tio.client.TioClient;
 import org.tio.client.TioClientConfig;
 import org.tio.client.intf.TioClientHandler;
 import org.tio.client.intf.TioClientListener;
+import org.tio.client.task.HeartbeatTimeoutStrategy;
 import org.tio.core.Node;
 import org.tio.core.TioConfig;
 import org.tio.core.ssl.SslConfig;
@@ -83,6 +84,14 @@ public final class MqttClientCreator {
 	 * Keep Alive (s)，如果用户不希望框架层面做心跳相关工作，请把此值设为0或负数
 	 */
 	private int keepAliveSecs = DEFAULT_KEEP_ALIVE_SECS;
+	/**
+	 * 心跳检测模式，默认：最后请求时间
+	 */
+	private HeartbeatMode heartbeatMode = HeartbeatMode.LAST_REQ;
+	/**
+	 * 心跳超时策略，默认：发送 ping
+	 */
+	private HeartbeatTimeoutStrategy heartbeatTimeoutStrategy = HeartbeatTimeoutStrategy.PING;
 	/**
 	 * SSL配置
 	 */
@@ -224,6 +233,14 @@ public final class MqttClientCreator {
 		return keepAliveSecs;
 	}
 
+	public HeartbeatMode getHeartbeatMode() {
+		return heartbeatMode;
+	}
+
+	public HeartbeatTimeoutStrategy getHeartbeatTimeoutStrategy() {
+		return heartbeatTimeoutStrategy;
+	}
+
 	public SslConfig getSslConfig() {
 		return sslConfig;
 	}
@@ -361,6 +378,16 @@ public final class MqttClientCreator {
 
 	public MqttClientCreator keepAliveSecs(int keepAliveSecs) {
 		this.keepAliveSecs = keepAliveSecs;
+		return this;
+	}
+
+	public MqttClientCreator heartbeatMode(HeartbeatMode heartbeatMode) {
+		this.heartbeatMode = heartbeatMode;
+		return this;
+	}
+
+	public MqttClientCreator heartbeatTimeoutStrategy(HeartbeatTimeoutStrategy heartbeatTimeoutStrategy) {
+		this.heartbeatTimeoutStrategy = heartbeatTimeoutStrategy;
 		return this;
 	}
 
@@ -579,6 +606,10 @@ public final class MqttClientCreator {
 		if (this.taskService == null) {
 			this.taskService = new DefaultTimerTaskService();
 		}
+		// heartbeatMode
+		if (this.heartbeatMode == null) {
+			this.heartbeatMode = HeartbeatMode.LAST_REQ;
+		}
 		IMqttClientProcessor processor = new DefaultMqttClientProcessor(this);
 		// 4. 初始化 mqtt 处理器
 		TioClientHandler clientAioHandler = new MqttClientAioHandler(this, processor);
@@ -594,7 +625,8 @@ public final class MqttClientCreator {
 		// 7. 心跳超时时间
 		clientConfig.setHeartbeatTimeout(TimeUnit.SECONDS.toMillis(this.keepAliveSecs));
 		// 设置心跳检测模式为 LAST_REQ，keepAliveSecs 周期内，最后发送的时间差
-		clientConfig.setHeartbeatMode(HeartbeatMode.LAST_REQ);
+		clientConfig.setHeartbeatMode(this.heartbeatMode);
+		clientConfig.setHeartbeatTimeoutStrategy(this.heartbeatTimeoutStrategy);
 		// 8. mqtt 消息最大长度，小于 1 则使用默认的，可通过 property tio.default.read.buffer.size 设置默认大小
 		if (this.readBufferSize > 0) {
 			clientConfig.setReadBufferSize(this.readBufferSize);
