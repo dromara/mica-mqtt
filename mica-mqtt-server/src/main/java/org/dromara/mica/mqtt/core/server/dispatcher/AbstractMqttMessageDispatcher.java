@@ -58,7 +58,7 @@ public abstract class AbstractMqttMessageDispatcher implements org.dromara.mica.
 	public abstract void sendAll(Message message);
 
 	@Override
-	public boolean send(MqttPublishMessage publishMessage, Message message) {
+	public boolean send(Message message) {
 		Objects.requireNonNull(mqttServer, "MqttServer require not Null.");
 		// 1. 先发送到本服务
 		MessageType messageType = message.getMessageType();

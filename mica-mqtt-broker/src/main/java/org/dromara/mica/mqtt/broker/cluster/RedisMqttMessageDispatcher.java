@@ -17,7 +17,6 @@
 package org.dromara.mica.mqtt.broker.cluster;
 
 import net.dreamlu.mica.redis.stream.RStreamTemplate;
-import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.serializer.IMessageSerializer;
@@ -43,7 +42,7 @@ public class RedisMqttMessageDispatcher implements IMqttMessageDispatcher {
 	}
 
 	@Override
-	public boolean send(MqttPublishMessage publishMessage, Message message) {
+	public boolean send(Message message) {
 		// 手动序列化和反序列化，避免 redis 序列化不一致问题
 		String topic = message.getTopic();
 		String key = topic == null ? message.getClientId() : topic;
