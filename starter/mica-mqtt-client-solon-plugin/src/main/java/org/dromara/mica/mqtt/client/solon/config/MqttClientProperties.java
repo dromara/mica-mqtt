@@ -23,6 +23,8 @@ import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.noear.solon.annotation.Configuration;
 import org.noear.solon.annotation.Inject;
+import org.tio.client.task.HeartbeatTimeoutStrategy;
+import org.tio.core.task.HeartbeatMode;
 import org.tio.utils.buffer.ByteBufferAllocator;
 
 /**
@@ -88,6 +90,14 @@ public class MqttClientProperties {
 	 * Keep Alive (s)
 	 */
 	private int keepAliveSecs = 60;
+	/**
+	 * 心跳模式，支持最后发送或接收心跳时间来计算心跳，默认：最后发送心跳的时间
+	 */
+	private HeartbeatMode heartbeatMode = HeartbeatMode.LAST_REQ;
+	/**
+	 * 心跳超时策略，支持发送 PING 和 CLOSE 断开连接，默认：最大努力发送 PING
+	 */
+	private HeartbeatTimeoutStrategy heartbeatTimeoutStrategy = HeartbeatTimeoutStrategy.PING;
 	/**
 	 * 自动重连
 	 */

@@ -73,6 +73,8 @@ public class MqttClientConfiguration {
 			.maxBytesInMessage((int) properties.getMaxBytesInMessage().toBytes())
 			.maxClientIdLength(properties.getMaxClientIdLength())
 			.keepAliveSecs(properties.getKeepAliveSecs())
+			.heartbeatMode(properties.getHeartbeatMode())
+			.heartbeatTimeoutStrategy(properties.getHeartbeatTimeoutStrategy())
 			.reconnect(properties.isReconnect())
 			.reInterval(properties.getReInterval())
 			.retryCount(properties.getRetryCount())
