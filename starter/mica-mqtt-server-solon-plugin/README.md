@@ -144,6 +144,7 @@ public class MqttConnectOfflineListener implements EventListener<MqttClientOffli
    }
 }
 ```
+
 ```java
 @Component
 public class MqttConnectOnlineListener implements EventListener<MqttClientOnlineEvent> {
