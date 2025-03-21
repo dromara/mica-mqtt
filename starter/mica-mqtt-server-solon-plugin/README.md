@@ -120,7 +120,7 @@ public class MqttServerCustomizerConfiguration {
 ```java
 @Component
 public class ServerService {
-   @Autowired
+   @Inject
    private MqttServerTemplate server;
 
    public boolean publish(String body) {
