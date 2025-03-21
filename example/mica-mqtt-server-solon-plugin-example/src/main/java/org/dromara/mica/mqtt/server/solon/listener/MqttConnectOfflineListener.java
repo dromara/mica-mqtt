@@ -23,7 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * mqtt 连接状态，使用 spring boot event 方式，性能有损耗
+ * mqtt 连接状态，使用 solon event 方式，性能有损耗
  *
  * @author L.cm
  */
