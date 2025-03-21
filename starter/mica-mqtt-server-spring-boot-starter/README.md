@@ -130,22 +130,38 @@ public class ServerService {
 ```
 
 ### 2.6 客户端上下线监听
-使用 Spring event 解耦客户端上下线监听，注意： `1.3.4` 开始支持。会跟自定义的 `IMqttConnectStatusListener` 实现冲突，取一即可。
+使用 solon event 解耦客户端上下线监听，会跟自定义的 `IMqttConnectStatusListener` 实现冲突，取一种即可。
 
 ```java
+/**
+ * mqtt 连接状态，使用 solon event 方式，性能有损耗
+ *
+ * @author L.cm
+ */
 @Component
-public class MqttConnectStatusListener {
-	private static final Logger logger = LoggerFactory.getLogger(MqttConnectStatusListener.class);
+public class MqttConnectOfflineListener implements EventListener<MqttClientOfflineEvent> {
+    private static final Logger logger = LoggerFactory.getLogger(MqttConnectOfflineListener.class);
 
-	@EventListener
-	public void online(MqttClientOnlineEvent event) {
-		logger.info("MqttClientOnlineEvent:{}", event);
+    @Override
+    public void onEvent(MqttClientOfflineEvent mqttClientOfflineEvent) throws Throwable {
+        logger.info("MqttClientOnlineEvent:{}", mqttClientOfflineEvent);
+    }
+}
+```
+
+```java
+/**
+ * mqtt 连接状态，使用 solon event 方式，性能有损耗
+ *
+ * @author L.cm
+ */
+@Component
+public class MqttConnectOnlineListener implements EventListener<MqttClientOnlineEvent> {
+	private static final Logger logger = LoggerFactory.getLogger(MqttConnectOnlineListener.class);
+
+	@Override
+	public void onEvent(MqttClientOnlineEvent mqttClientOnlineEvent) throws Throwable {
+		logger.info("MqttClientOnlineEvent:{}", mqttClientOnlineEvent);
 	}
-
-	@EventListener
-	public void offline(MqttClientOfflineEvent event) {
-		logger.info("MqttClientOfflineEvent:{}", event);
-	}
-
 }
 ```
