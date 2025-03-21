@@ -114,17 +114,12 @@ public class MqttServerCustomizerConfiguration {
 ### 2.5 MqttServerTemplate 使用示例
 
 ```java
-
-import org.dromara.mica.mqtt.spring.server.MqttServerTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 /**
  * @author wsq
  */
-@Service
+@Component
 public class ServerService {
-    @Autowired
+    @Inject
     private MqttServerTemplate server;
 
     public boolean publish(String body) {
@@ -138,7 +133,7 @@ public class ServerService {
 使用 Spring event 解耦客户端上下线监听，注意： `1.3.4` 开始支持。会跟自定义的 `IMqttConnectStatusListener` 实现冲突，取一即可。
 
 ```java
-@Service
+@Component
 public class MqttConnectStatusListener {
 	private static final Logger logger = LoggerFactory.getLogger(MqttConnectStatusListener.class);
 
@@ -154,32 +149,3 @@ public class MqttConnectStatusListener {
 
 }
 ```
-
-### 2.7 基于 mq 消息广播集群处理
-
-详见: [mica-mqtt-broker](../../mica-mqtt-broker)
-
-### 2.8 Prometheus + Grafana 监控对接
-```xml
-<!-- 开启 prometheus 指标收集 -->
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-actuator</artifactId>
-</dependency>
-<dependency>
-    <groupId>io.micrometer</groupId>
-    <artifactId>micrometer-registry-prometheus</artifactId>
-</dependency>
-```
-
-| 支持得指标                     | 说明             |
-| ------------------------------ | ---------------- |
-| mqtt_connections_accepted      | 共接受过连接数   |
-| mqtt_connections_closed        | 关闭过的连接数   |
-| mqtt_connections_size          | 当前连接数       |
-| mqtt_messages_handled_packets  | 已处理消息数     |
-| mqtt_messages_handled_bytes    | 已处理消息字节数  |
-| mqtt_messages_received_packets | 已接收消息数      |
-| mqtt_messages_received_bytes   | 已处理消息字节数 |
-| mqtt_messages_send_packets     | 已发送消息数      |
-| mqtt_messages_send_bytes       | 已发送消息字节数  |
