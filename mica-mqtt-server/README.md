@@ -77,7 +77,7 @@ mqttServer.publishAll("/test/123", "mica最牛皮".getBytes(StandardCharsets.UTF
 mqttServer.stop();
 ```
 
-## http 和 websocket 依赖：
+## http 和 websocket 依赖（2.4.2或之前版本需要该步骤）：
 
 开启 http 或 websocket 需要添加 mica-net-http 依赖，如果不需要 http、websocket 把它们可以使用 `.httpEnable(false)` 和 `.websocketEnable(false)` 关掉就不需要该依赖了。
 
