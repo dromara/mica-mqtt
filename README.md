@@ -7,6 +7,7 @@
 [![star](https://gitcode.com/dromara/mica-mqtt/star/badge.svg)](https://gitcode.com/dromara/mica-mqtt)
 [![star](https://gitee.com/dromara/mica-mqtt/badge/star.svg?theme=dark)](https://gitee.com/dromara/mica-mqtt/stargazers)
 [![GitHub Repo stars](https://img.shields.io/github/stars/dromara/mica-mqtt?label=Github%20Stars)](https://github.com/dromara/mica-mqtt)
+[![libs.tech recommends](https://libs.tech/project/295092573/badge.svg)](https://libs.tech/project/295092573/mica-mqtt)
 
 ---
 
