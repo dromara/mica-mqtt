@@ -155,7 +155,6 @@ public class MqttWsMsgHandler implements IWsMsgHandler {
 	 */
 	@Override
 	public Object onClose(WsRequest wsRequest, byte[] bytes, ChannelContext context) {
-		Tio.remove(context, "Mqtt websocket close.");
 		return null;
 	}
 
