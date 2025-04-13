@@ -2,6 +2,9 @@
 
 ## 发行版本
 
+### v2.4.4 - 2025-04-13
+- :sparkles: mica-mqtt-server，更好的兼容 Android 环境。github #81 感谢 `@KittenBall` 的联调测试。
+
 ### v2.4.3 - 2025-03-23
 - :sparkles: Central Portal 开始支持 Snapshots（仅存储90天，需尽快切到最新的正式版），dev 分支提交后 Github action 自动发布快照版。
 - :sparkles: 精简，删除没有用到的代码，下沉到 mica-net。
