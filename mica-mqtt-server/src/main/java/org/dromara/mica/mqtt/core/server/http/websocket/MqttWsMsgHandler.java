@@ -16,13 +16,12 @@
 
 package org.dromara.mica.mqtt.core.server.http.websocket;
 
+import org.dromara.mica.mqtt.codec.MqttMessage;
 import org.dromara.mica.mqtt.core.server.MqttMessageInterceptors;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
-import org.dromara.mica.mqtt.codec.MqttMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tio.core.ChannelContext;
-import org.tio.core.Tio;
 import org.tio.core.TioConfig;
 import org.tio.core.intf.Packet;
 import org.tio.core.intf.TioHandler;
@@ -155,6 +154,7 @@ public class MqttWsMsgHandler implements IWsMsgHandler {
 	 */
 	@Override
 	public Object onClose(WsRequest wsRequest, byte[] bytes, ChannelContext context) {
+		context.remove(MQTT_WS_MSG_BODY_KEY);
 		return null;
 	}
 
