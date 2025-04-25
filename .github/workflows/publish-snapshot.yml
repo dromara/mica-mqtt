@@ -1,5 +1,6 @@
 name: Publish Snapshot
-
+permissions:
+  contents: read
 on:
   push:
     branches: [ dev ]
