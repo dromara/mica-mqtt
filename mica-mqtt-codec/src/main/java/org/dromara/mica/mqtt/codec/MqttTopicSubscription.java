@@ -24,7 +24,7 @@ package org.dromara.mica.mqtt.codec;
  */
 public final class MqttTopicSubscription {
 
-	private final String topicFilter;
+	private String topicFilter;
 	private final MqttSubscriptionOption option;
 
 	public MqttTopicSubscription(String topicFilter) {
@@ -41,8 +41,22 @@ public final class MqttTopicSubscription {
 		this.option = option;
 	}
 
-	public String topicName() {
+	public String topicFilter() {
 		return topicFilter;
+	}
+
+	/**
+	 * Rewrite topic filter.
+	 * <p>
+	 *
+	 * Many IoT devices do not support reconfiguration or upgrade, so it is hard to
+	 * change their subscribed topics. To resolve this issue, MQTT server may offer
+	 * topic rewrite capability.
+	 *
+	 * @param topicFilter Topic to rewrite to
+	 */
+	public void setTopicFilter(String topicFilter) {
+		this.topicFilter = topicFilter;
 	}
 
 	public MqttQoS qualityOfService() {

@@ -338,7 +338,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		List<String> subscribedTopicList = new ArrayList<>();
 		boolean enableSubscribeValidator = subscribeValidator != null;
 		for (MqttTopicSubscription subscription : topicSubscriptionList) {
-			String topicFilter = subscription.topicName();
+			String topicFilter = subscription.topicFilter();
 			// 校验 topicFilter 是否合法
 			TopicUtil.validateTopicFilter(topicFilter);
 			MqttQoS mqttQoS = subscription.qualityOfService();

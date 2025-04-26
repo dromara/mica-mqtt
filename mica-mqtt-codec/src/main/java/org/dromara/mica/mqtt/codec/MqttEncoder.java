@@ -230,9 +230,9 @@ public final class MqttEncoder {
 		MqttSubscribePayload payload = message.payload();
 
 		for (MqttTopicSubscription topic : payload.topicSubscriptions()) {
-			String topicName = topic.topicName();
-			byte[] topicNameBytes = encodeStringUtf8(topicName);
-			payloadBufferSize += 2 + topicNameBytes.length;
+			String topicFilter = topic.topicFilter();
+			byte[] topicFilterBytes = encodeStringUtf8(topicFilter);
+			payloadBufferSize += 2 + topicFilterBytes.length;
 			payloadBufferSize += 1;
 		}
 
@@ -250,11 +250,11 @@ public final class MqttEncoder {
 
 		// Payload
 		for (MqttTopicSubscription topic : payload.topicSubscriptions()) {
-			// topicName
-			String topicName = topic.topicName();
-			byte[] topicNameBytes = encodeStringUtf8(topicName);
-			buf.putShort((short) topicNameBytes.length);
-			buf.put(topicNameBytes, 0, topicNameBytes.length);
+			// topicFilter
+			String topicFilter = topic.topicFilter();
+			byte[] topicFilterBytes = encodeStringUtf8(topicFilter);
+			buf.putShort((short) topicFilterBytes.length);
+			buf.put(topicFilterBytes, 0, topicFilterBytes.length);
 			if (mqttVersion == MqttVersion.MQTT_3_1_1 || mqttVersion == MqttVersion.MQTT_3_1) {
 				buf.put((byte) topic.qualityOfService().value());
 			} else {
