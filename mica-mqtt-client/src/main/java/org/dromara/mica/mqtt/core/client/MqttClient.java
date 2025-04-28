@@ -355,7 +355,8 @@ public final class MqttClient {
 			logger.error("MQTT client publish fail, TCP not connected.");
 			return false;
 		}
-		// 如果已经连接成功，但是还没有 mqtt 认证，则进行休眠等待
+		// 如果已经连接成功，但是还没有 mqtt 认证，不进行休眠等待（避免大批量数据，卡死）
+		// https://gitee.com/dromara/mica-mqtt/issues/IC4DWT
 		if (!clientContext.isAccepted()) {
 			logger.error("TCP is connected but mqtt is not accepted.");
 			return false;
