@@ -356,11 +356,9 @@ public final class MqttClient {
 			return false;
 		}
 		// 如果已经连接成功，但是还没有 mqtt 认证，则进行休眠等待
-		if (!clientContext.isClosed()) {
-			while (!clientContext.isAccepted()) {
-				logger.warn("TCP is connected but mqtt is not accepted sleep 10 ms");
-				ThreadUtils.sleep(10);
-			}
+		if (!clientContext.isAccepted()) {
+			logger.error("TCP is connected but mqtt is not accepted.");
+			return false;
 		}
 		// 如果是高版本的 qos
 		if (isHighLevelQoS) {
