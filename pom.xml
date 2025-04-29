@@ -27,6 +27,8 @@
         <solon.version>3.2.1</solon.version>
         <jfinal.version>5.2.4</jfinal.version>
         <tinylog.version>2.7.0</tinylog.version>
+        <undertow.version>2.2.37.Final</undertow.version>
+        <snakeyaml.version>1.33</snakeyaml.version>
     </properties>
 
     <modules>
@@ -47,6 +49,57 @@
                 <version>${spring.boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-web</artifactId>
+                <version>${spring.boot.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-tomcat</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <!-- undertow -->
+            <dependency>
+                <groupId>io.undertow</groupId>
+                <artifactId>undertow-core</artifactId>
+                <version>${undertow.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.undertow</groupId>
+                <artifactId>undertow-servlet</artifactId>
+                <version>${undertow.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <artifactId>jboss-servlet-api_4.0_spec</artifactId>
+                        <groupId>org.jboss.spec.javax.servlet</groupId>
+                    </exclusion>
+                    <exclusion>
+                        <artifactId>jboss-annotations-api_1.3_spec</artifactId>
+                        <groupId>org.jboss.spec.javax.annotation</groupId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>io.undertow</groupId>
+                <artifactId>undertow-websockets-jsr</artifactId>
+                <version>${undertow.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <artifactId>jboss-websocket-api_1.1_spec</artifactId>
+                        <groupId>org.jboss.spec.javax.websocket</groupId>
+                    </exclusion>
+                    <exclusion>
+                        <artifactId>jboss-servlet-api_4.0_spec</artifactId>
+                        <groupId>org.jboss.spec.javax.servlet</groupId>
+                    </exclusion>
+                    <exclusion>
+                        <artifactId>jboss-annotations-api_1.3_spec</artifactId>
+                        <groupId>org.jboss.spec.javax.annotation</groupId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>net.dreamlu</groupId>
@@ -151,6 +204,11 @@
                 <groupId>org.tinylog</groupId>
                 <artifactId>tinylog-impl</artifactId>
                 <version>${tinylog.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>${snakeyaml.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
