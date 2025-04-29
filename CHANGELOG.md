@@ -2,6 +2,12 @@
 
 ## 发行版本
 
+### v2.4.5 - 2025-05-05
+- :sparkles: 依赖调整，减少 example 示例项目的安全提示
+- :sparkles: 升级 mica-net 到 1.1.6，解决 eclipse paho mqtt websocket client 连接 mica-mqtt server 报错
+- :bug: 解决服务端重启时 client有消息发送，导致 client 无法正常重连 gitee #IC4DWT 感谢 `@wtjperi2003` 反馈
+- :bug: 同步 netty mqtt codec Fix the assignment error of maxQoS parameter in ConnAck Properties
+
 ### v2.4.4 - 2025-04-13
 - :sparkles: mica-mqtt-server，更好的兼容 Android 环境。github #81 感谢 `@KittenBall` 的联调测试。
 
