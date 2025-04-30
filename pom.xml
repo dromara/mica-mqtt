@@ -27,7 +27,7 @@
         <solon.version>3.2.1</solon.version>
         <jfinal.version>5.2.4</jfinal.version>
         <tinylog.version>2.7.0</tinylog.version>
-        <undertow.version>2.2.37.Final</undertow.version>
+        <undertow.version>2.3.18.Final</undertow.version>
         <snakeyaml.version>1.33</snakeyaml.version>
     </properties>
 
