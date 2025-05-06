@@ -13,5 +13,7 @@ updates:
     commit-message:
       prefix: ":arrow_up:"  # 提交信息前缀
     ignore:
+      - dependency-name: "io.undertow.*"
       - dependency-name: "org.springframework.*"
+      - dependency-name: "rg.yaml:snakeyaml"
       - dependency-name: "net.dreamlu:mica-bom"
