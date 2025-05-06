@@ -130,7 +130,8 @@ public class MqttClientConfiguration {
 	}
 
 	@Bean
-	public static MqttClientSubscribeDetector mqttClientSubscribeDetector(ApplicationContext applicationContext) {
+	@ConditionalOnMissingBean
+	public MqttClientSubscribeDetector mqttClientSubscribeDetector(ApplicationContext applicationContext) {
 		return new MqttClientSubscribeDetector(applicationContext);
 	}
 
