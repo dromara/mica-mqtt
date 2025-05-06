@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 /**
  * 客户端消息监听
@@ -25,6 +26,11 @@ public class MqttClientSubscribeListener {
 	@MqttClientSubscribe(value = "/qos1/#", qos = MqttQoS.QOS1)
 	public void subQos1(String topic, byte[] payload) {
 		logger.info("topic:{} payload:{}", topic, new String(payload, StandardCharsets.UTF_8));
+	}
+
+	@MqttClientSubscribe("/test/json")
+	public void testJson(String topic, Map<String, Object> data) {
+		logger.info("topic:{} json data:{}", topic, data);
 	}
 
 	@MqttClientSubscribe("/sys/${productKey}/${deviceName}/thing/sub/register")
