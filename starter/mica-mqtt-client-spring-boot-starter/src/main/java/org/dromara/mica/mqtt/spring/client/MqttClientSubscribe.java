@@ -17,6 +17,8 @@
 package org.dromara.mica.mqtt.spring.client;
 
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
+import org.dromara.mica.mqtt.core.deserialize.MqttJsonDeserializer;
 
 import java.lang.annotation.*;
 
@@ -43,6 +45,13 @@ public @interface MqttClientSubscribe {
 	 * @return MqttQoS
 	 */
 	MqttQoS qos() default MqttQoS.QOS0;
+
+	/**
+	 * mqtt 消息反序列化
+	 *
+	 * @return 反序列化
+	 */
+	Class<? extends MqttDeserializer> deserialize() default MqttJsonDeserializer.class;
 
 	/**
 	 * 客户端 bean 名称

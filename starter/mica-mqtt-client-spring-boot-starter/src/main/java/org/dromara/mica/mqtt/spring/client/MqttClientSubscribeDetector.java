@@ -18,9 +18,12 @@ package org.dromara.mica.mqtt.spring.client;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.dromara.mica.mqtt.core.client.IMqttClientSession;
+import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.context.ApplicationContext;
@@ -30,7 +33,9 @@ import org.springframework.lang.NonNull;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 /**
@@ -100,9 +105,14 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 				// 4. 订阅
 				IMqttClientSession clientSession = getMqttClientSession(subscribe.clientTemplateBean());
 				String[] topicFilters = getTopicFilters(subscribe.value());
-				clientSession.addSubscriptionList(topicFilters, subscribe.qos(), (context, topic, message, payload) ->
-						ReflectionUtils.invokeMethod(method, bean, topic, payload)
-				);
+				// 5. 自定义的反序列化
+				Class<? extends MqttDeserializer> deserialized = subscribe.deserialize();
+				clientSession.addSubscriptionList(topicFilters, subscribe.qos(), (context, topic, message, payload) -> {
+					// 获取方法参数
+					Object[] args = getMethodParameters(method, topic, message, payload, deserialized);
+					// 反射执行方法
+					ReflectionUtils.invokeMethod(method, bean, args);
+				});
 			}
 		}, ReflectionUtils.USER_DECLARED_METHODS);
 	}
@@ -115,6 +125,17 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 	 */
 	protected IMqttClientSession getMqttClientSession(String beanName) {
 		return applicationContext.getBean(beanName, MqttClientTemplate.class).getClientCreator().getClientSession();
+	}
+
+	/**
+	 * 获取解码器
+	 *
+	 * @param deserializerType deserializerType
+	 * @return 解码器
+	 */
+	protected MqttDeserializer getMqttDeserializer(Class<MqttDeserializer> deserializerType) {
+		return applicationContext.getBeanProvider(deserializerType)
+			.getIfAvailable(() -> BeanUtils.instantiateClass(deserializerType));
 	}
 
 	/**
@@ -133,4 +154,36 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 			.toArray(String[]::new);
 	}
 
+	/**
+	 * 获取反射参数
+	 *
+	 * @param method         Method
+	 * @param topic          topic
+	 * @param message        message
+	 * @param payload        payload
+	 * @return Object array
+	 */
+	protected Object[] getMethodParameters(Method method, String topic,
+										   MqttPublishMessage message, byte[] payload,
+										   Class<? extends MqttDeserializer> deserializerType) {
+		int paramCount = method.getParameterCount();
+		Class<?>[] parameterTypes = method.getParameterTypes();
+		Object[] parameters = new Object[paramCount];
+		for (int i = 0; i < parameterTypes.length; i++) {
+			Class<?> parameterType = parameterTypes[i];
+			if (parameterType == String.class) {
+				parameters[i] = topic;
+			} else if (parameterType == MqttPublishMessage.class) {
+				parameters[i] = message;
+			} else if (parameterType == byte[].class) {
+				parameters[i] = payload;
+			} else if (parameterType == ByteBuffer.class) {
+				parameters[i] = ByteBuffer.wrap(payload);
+			} else {
+				MqttDeserializer deserializer = getMqttDeserializer((Class<MqttDeserializer>) deserializerType);
+				parameters[i] = deserializer.deserialize(payload, parameterType);
+			}
+		}
+		return parameters;
+	}
 }
