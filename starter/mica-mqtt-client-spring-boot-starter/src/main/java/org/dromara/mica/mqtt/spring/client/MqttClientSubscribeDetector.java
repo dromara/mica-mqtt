@@ -90,10 +90,10 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 				if (!Modifier.isPublic(modifiers)) {
 					throw new IllegalArgumentException("@MqttClientSubscribe on method " + method + " must public.");
 				}
-				// 2. 校验 method 入参数必须等于2
+				// 2. 校验 method 入参数支持 2 ~ 3 个
 				int paramCount = method.getParameterCount();
-				if (paramCount != 2) {
-					throw new IllegalArgumentException("@MqttClientSubscribe on method " + method + " parameter count must equal to 2.");
+				if (paramCount < 2 || paramCount > 3) {
+					throw new IllegalArgumentException("@MqttClientSubscribe on method " + method + " parameter count must 2 ~ 3.");
 				}
 				// 3. 订阅
 				IMqttClientSession clientSession = getMqttClientSession(subscribe.clientTemplateBean());
