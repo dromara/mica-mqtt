@@ -25,6 +25,7 @@ import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
+import org.springframework.core.env.Environment;
 import org.springframework.lang.NonNull;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
@@ -62,8 +63,8 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 	protected void processClassLevelSubscription(Class<?> userClass, Object bean) {
 		MqttClientSubscribe subscribe = AnnotationUtils.findAnnotation(userClass, MqttClientSubscribe.class);
 		if (subscribe != null) {
-			IMqttClientSession clientSession = getMqttClientSession(applicationContext, subscribe.clientTemplateBean());
-			String[] topicFilters = getTopicFilters(applicationContext, subscribe.value());
+			IMqttClientSession clientSession = getMqttClientSession(subscribe.clientTemplateBean());
+			String[] topicFilters = getTopicFilters(subscribe.value());
 			clientSession.addSubscriptionList(topicFilters, subscribe.qos(), (IMqttClientMessageListener) bean);
 		}
 	}
@@ -97,8 +98,8 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 					throw new IllegalArgumentException("@MqttClientSubscribe on method " + method + " parameter type must String topic and byte[] payload.");
 				}
 				// 4. 订阅
-				IMqttClientSession clientSession = getMqttClientSession(applicationContext, subscribe.clientTemplateBean());
-				String[] topicFilters = getTopicFilters(applicationContext, subscribe.value());
+				IMqttClientSession clientSession = getMqttClientSession(subscribe.clientTemplateBean());
+				String[] topicFilters = getTopicFilters(subscribe.value());
 				clientSession.addSubscriptionList(topicFilters, subscribe.qos(), (context, topic, message, payload) ->
 						ReflectionUtils.invokeMethod(method, bean, topic, payload)
 				);
@@ -109,19 +110,25 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 	/**
 	 * 读取 IMqttClientSession
 	 *
-	 * @param applicationContext ApplicationContext
 	 * @param beanName           beanName
 	 * @return IMqttClientSession
 	 */
-	protected IMqttClientSession getMqttClientSession(ApplicationContext applicationContext, String beanName) {
+	protected IMqttClientSession getMqttClientSession(String beanName) {
 		return applicationContext.getBean(beanName, MqttClientTemplate.class).getClientCreator().getClientSession();
 	}
 
-	protected String[] getTopicFilters(ApplicationContext applicationContext, String[] values) {
+	/**
+	 * 转换 topic filter
+	 *
+	 * @param topicTemplates 订阅含有变量的 topicTemplate
+	 * @return topic filter
+	 */
+	protected String[] getTopicFilters(String[] topicTemplates) {
 		// 1. 替换 Spring boot env 变量
 		// 2. 替换订阅中的其他变量
-		return Arrays.stream(values)
-			.map(applicationContext.getEnvironment()::resolvePlaceholders)
+		Environment environment = applicationContext.getEnvironment();
+		return Arrays.stream(topicTemplates)
+			.map(environment::resolvePlaceholders)
 			.map(TopicUtil::getTopicFilter)
 			.toArray(String[]::new);
 	}
