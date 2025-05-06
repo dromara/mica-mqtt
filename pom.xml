@@ -28,7 +28,7 @@
         <jfinal.version>5.2.4</jfinal.version>
         <tinylog.version>2.7.0</tinylog.version>
         <undertow.version>2.2.37.Final</undertow.version>
-        <snakeyaml.version>1.33</snakeyaml.version>
+        <snakeyaml.version>2.0</snakeyaml.version>
     </properties>
 
     <modules>
