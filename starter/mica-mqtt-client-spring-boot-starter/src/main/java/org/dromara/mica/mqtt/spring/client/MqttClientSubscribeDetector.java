@@ -95,17 +95,10 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 				if (paramCount != 2) {
 					throw new IllegalArgumentException("@MqttClientSubscribe on method " + method + " parameter count must equal to 2.");
 				}
-				// 3. 校验 method 入参类型必须为 String、ByteBuffer
-				Class<?>[] parameterTypes = method.getParameterTypes();
-				Class<?> topicParamType = parameterTypes[0];
-				Class<?> payloadParamType = parameterTypes[1];
-				if (String.class != topicParamType || byte[].class != payloadParamType) {
-					throw new IllegalArgumentException("@MqttClientSubscribe on method " + method + " parameter type must String topic and byte[] payload.");
-				}
-				// 4. 订阅
+				// 3. 订阅
 				IMqttClientSession clientSession = getMqttClientSession(subscribe.clientTemplateBean());
 				String[] topicFilters = getTopicFilters(subscribe.value());
-				// 5. 自定义的反序列化
+				// 4. 自定义的反序列化
 				Class<? extends MqttDeserializer> deserialized = subscribe.deserialize();
 				clientSession.addSubscriptionList(topicFilters, subscribe.qos(), (context, topic, message, payload) -> {
 					// 获取方法参数
