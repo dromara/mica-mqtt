@@ -1,5 +1,6 @@
 package org.dromara.mica.mqtt.client.listener;
 
+import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.spring.client.MqttClientSubscribe;
 import org.slf4j.Logger;
@@ -29,7 +30,7 @@ public class MqttClientSubscribeListener {
 	}
 
 	@MqttClientSubscribe("/test/json")
-	public void testJson(String topic, Map<String, Object> data) {
+	public void testJson(String topic, MqttPublishMessage message, Map<String, Object> data) {
 		logger.info("topic:{} json data:{}", topic, data);
 	}
 
