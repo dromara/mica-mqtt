@@ -3,6 +3,7 @@
 ## 发行版本
 
 ### v2.4.5 - 2025-05-06
+- :sparkles: mica-mqtt-client-spring-boot-starter 的 `@MqttClientSubscribe` 注解支持自定义反序列化。
 - :sparkles: 优化代码 Spring Boot Client 可以自定义 MqttClientSubscribeDetector github #90 感谢 `@galaxy-sea` 贡献
 - :sparkles: 升级 mica-net 到 1.1.6，解决 eclipse paho mqtt websocket client 连接 mica-mqtt server 报错
 - :sparkles: 依赖调整，减少 example 示例项目的安全提示
