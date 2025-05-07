@@ -89,7 +89,7 @@ public class MqttServerProperties {
 	 */
 	private boolean websocketEnable = true;
 	/**
-	 * 开启 http 服务，默认：true
+	 * 开启 http 服务，默认：false
 	 */
 	private boolean httpEnable = false;
 	/**
