@@ -9,7 +9,6 @@
   "packageRules": [
     {
       "matchPackagePatterns": [
-        "^org.yaml:snakeyaml$",
         "^com.alibaba:fastjson$",
         "^net.dreamlu:mica-bom$",
         "^io.undertow:undertow-core$",

@@ -15,5 +15,4 @@ updates:
     ignore:
       - dependency-name: "io.undertow.*"
       - dependency-name: "org.springframework.*"
-      - dependency-name: "org.yaml:snakeyaml"
       - dependency-name: "net.dreamlu:mica-bom"
