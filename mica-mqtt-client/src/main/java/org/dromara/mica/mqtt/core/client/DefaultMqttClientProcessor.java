@@ -207,6 +207,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 				subscribedList.addAll(subscriptionList);
 			}
 		} else {
+			// MQTT 5.0 要求 Broker 对批量订阅中的每个主题返回独立的 reason code（原因码），与订阅请求中的主题顺序一一对应
 			for (int i = 0; i < subscriptionList.size(); i++) {
 				MqttClientSubscription subscription = subscriptionList.get(i);
 				String topicFilter = subscription.getTopicFilter();
