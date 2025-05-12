@@ -200,10 +200,8 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		// MQTT 3.1.1 协议未明确规定批量订阅的返回格式，批量可能只返回一个 reasonCode
 		if (reasonCodeListSize == 1) {
 			Integer reasonCode = reasonCodeList.get(0);
-			// reasonCodes 范围
-			if (reasonCode == null || reasonCode < 0 || reasonCode > 2) {
-				logger.error("MqttClient subscriptionList:{} subscribe failed reasonCodes:{} packetId:{}", subscriptionList, reasonCode, packetId);
-			} else {
+			// reasonCodes 范围，0 ~ 2
+			if (reasonCode != null && reasonCode >= 0 && reasonCode <= 2) {
 				subscribedList.addAll(subscriptionList);
 			}
 		} else {
@@ -219,7 +217,13 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 					subscribedList.add(subscription);
 				}
 			}
-			logger.info("MQTT subscriptionList:{} subscribed successfully packetId:{}", subscribedList, packetId);
+		}
+		// 判断订阅结果，对于没有订阅成功的，使其触发重试
+		if (subscribedList.isEmpty()) {
+			logger.error("MqttClient subscriptionList:{} subscribe failed packetId:{}", subscriptionList, packetId);
+			return;
+		} else {
+			logger.info("MQTT subscribed:{} successfully packetId:{}", subscribedList, packetId);
 		}
 		paddingSubscribe.onSubAckReceived();
 		clientSession.removePaddingSubscribe(packetId);
