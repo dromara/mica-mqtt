@@ -194,20 +194,32 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			logger.error("MqttClient subscriptionList:{} subscribe failed reasonCodes is empty packetId:{}", subscriptionList, packetId);
 			return;
 		}
+		int reasonCodeListSize = reasonCodeList.size();
 		// 找出订阅成功的数据
 		List<MqttClientSubscription> subscribedList = new ArrayList<>();
-		for (int i = 0; i < subscriptionList.size(); i++) {
-			MqttClientSubscription subscription = subscriptionList.get(i);
-			String topicFilter = subscription.getTopicFilter();
-			Integer reasonCode = reasonCodeList.get(i);
+		// MQTT 3.1.1 协议未明确规定批量订阅的返回格式，批量可能只返回一个 reasonCode
+		if (reasonCodeListSize == 1) {
+			Integer reasonCode = reasonCodeList.get(0);
 			// reasonCodes 范围
 			if (reasonCode == null || reasonCode < 0 || reasonCode > 2) {
-				logger.error("MqttClient topicFilter:{} subscribe failed reasonCodes:{} packetId:{}", topicFilter, reasonCode, packetId);
+				logger.error("MqttClient subscriptionList:{} subscribe failed reasonCodes:{} packetId:{}", subscriptionList, reasonCode, packetId);
 			} else {
-				subscribedList.add(subscription);
+				subscribedList.addAll(subscriptionList);
 			}
+		} else {
+			for (int i = 0; i < subscriptionList.size(); i++) {
+				MqttClientSubscription subscription = subscriptionList.get(i);
+				String topicFilter = subscription.getTopicFilter();
+				Integer reasonCode = reasonCodeList.get(i);
+				// reasonCodes 范围
+				if (reasonCode == null || reasonCode < 0 || reasonCode > 2) {
+					logger.error("MqttClient topicFilter:{} subscribe failed reasonCodes:{} packetId:{}", topicFilter, reasonCode, packetId);
+				} else {
+					subscribedList.add(subscription);
+				}
+			}
+			logger.info("MQTT subscriptionList:{} subscribed successfully packetId:{}", subscribedList, packetId);
 		}
-		logger.info("MQTT subscriptionList:{} subscribed successfully packetId:{}", subscribedList, packetId);
 		paddingSubscribe.onSubAckReceived();
 		clientSession.removePaddingSubscribe(packetId);
 		clientSession.addSubscriptionList(subscribedList);
