@@ -237,7 +237,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 				try {
 					subscriptionListener.onSubscribed(context, topicFilter, mqttQoS, message);
 				} catch (Throwable e) {
-					logger.error("MQTT topicFilter:{} subscribed onSubscribed event error.", subscribedList, e);
+					logger.error("MQTT topicFilter:{} subscribed onSubscribed event error.", topicFilter, e);
 				}
 			});
 		});
