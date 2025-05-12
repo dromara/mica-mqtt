@@ -4,6 +4,7 @@ import org.dromara.mica.mqtt.spring.client.MqttClientTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -14,7 +15,11 @@ import java.nio.charset.StandardCharsets;
 @Service
 public class ClientService {
 	private static final Logger logger = LoggerFactory.getLogger(ClientService.class);
+	/**
+	 * 使用 默认的 mqtt client
+	 */
 	@Autowired
+	@Qualifier(MqttClientTemplate.DEFAULT_CLIENT_TEMPLATE_BEAN)
 	private MqttClientTemplate client;
 
 	public boolean publish(String body) {
@@ -24,7 +29,7 @@ public class ClientService {
 
 	public boolean sub() {
 		client.subQos0("/test/#", (context, topic, message, payload) -> {
-			logger.info(topic + '\t' + new String(payload, StandardCharsets.UTF_8));
+			logger.info("{}\t{}", topic, new String(payload, StandardCharsets.UTF_8));
 		});
 		return true;
 	}
