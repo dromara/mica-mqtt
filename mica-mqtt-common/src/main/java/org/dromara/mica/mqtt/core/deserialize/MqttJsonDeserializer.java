@@ -16,17 +16,38 @@
 
 package org.dromara.mica.mqtt.core.deserialize;
 
-import org.tio.utils.json.JsonUtil;
+
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
+import java.lang.reflect.Type;
 
 /**
  * mqtt 消息反序列化
  *
  * @author L.cm
+ * @author ChangJin Wei(魏昌进)
  */
 public class MqttJsonDeserializer implements MqttDeserializer {
 
-	@Override
-	public <T> T deserialize(byte[] bytes, Class<T> clazz) {
-		return JsonUtil.readValue(bytes, clazz);
+	private final ObjectMapper objectMapper;
+
+    public MqttJsonDeserializer() {
+		this(new ObjectMapper());
+    }
+
+	public MqttJsonDeserializer(ObjectMapper objectMapper) {
+		this.objectMapper = new ObjectMapper();
 	}
+
+    @Override
+	public <T> T deserialize(byte[] bytes, Type type) {
+		JavaType javaType = objectMapper.getTypeFactory().constructType(type);
+        try {
+            return objectMapper.readValue(bytes, javaType);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

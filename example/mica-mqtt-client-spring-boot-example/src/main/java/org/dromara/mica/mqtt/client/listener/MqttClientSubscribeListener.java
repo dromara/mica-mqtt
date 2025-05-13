@@ -14,6 +14,7 @@ import java.util.Map;
  * 客户端消息监听
  *
  * @author L.cm
+ * @author ChangJin Wei(魏昌进)
  */
 @Service
 public class MqttClientSubscribeListener {
@@ -29,8 +30,13 @@ public class MqttClientSubscribeListener {
 		logger.info("topic:{} payload:{}", topic, new String(payload, StandardCharsets.UTF_8));
 	}
 
-	@MqttClientSubscribe("/test/json")
+	@MqttClientSubscribe(value = "/test/json")
 	public void testJson(String topic, MqttPublishMessage message, Map<String, Object> data) {
+		logger.info("topic:{} json data:{}", topic, data);
+	}
+
+	@MqttClientSubscribe(value = "/test/object")
+	public void testJson(String topic, MqttPublishMessage message, User<User> data) {
 		logger.info("topic:{} json data:{}", topic, data);
 	}
 
@@ -41,5 +47,14 @@ public class MqttClientSubscribeListener {
 		logger.info("topic:{} payload:{}", topic, new String(payload, StandardCharsets.UTF_8));
 	}
 
+	public static class User<T>{
+		private String name;
+		private T girlfriend;
+		public String getName() {return name;}
+		public void setName(String name) {this.name = name;}
+		public T getGirlfriend() {return girlfriend;}
+
+		public void setGirlfriend(T girlfriend) {this.girlfriend = girlfriend;}
+	}
 }
 

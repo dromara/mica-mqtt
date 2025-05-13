@@ -16,10 +16,13 @@
 
 package org.dromara.mica.mqtt.core.deserialize;
 
+import java.lang.reflect.Type;
+
 /**
  * mqtt 消息反序列化
  *
  * @author L.cm
+ * @author ChangJin Wei(魏昌进)
  */
 public interface MqttDeserializer {
 
@@ -27,10 +30,10 @@ public interface MqttDeserializer {
 	 * 反序列化
 	 *
 	 * @param bytes bytes
-	 * @param clazz clazz
+	 * @param type type
 	 * @param <T>   泛型
 	 * @return T
 	 */
-	<T> T deserialize(byte[] bytes, Class<T> clazz);
+	<T> T deserialize(byte[] bytes, Type type);
 
 }
