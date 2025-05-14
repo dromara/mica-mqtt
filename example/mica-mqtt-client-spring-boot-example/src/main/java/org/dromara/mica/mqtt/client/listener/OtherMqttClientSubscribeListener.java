@@ -5,9 +5,6 @@ import org.dromara.mica.mqtt.spring.client.MqttClientSubscribe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.tio.utils.buffer.ByteBufferUtil;
-
-import java.nio.ByteBuffer;
 
 /**
  * 客户端消息监听，注解在方法上
@@ -25,8 +22,8 @@ public class OtherMqttClientSubscribeListener {
 		},
 		clientTemplateBean = "mqttClientTemplate1"
 	)
-	public void sub(String topic, MqttPublishMessage message, ByteBuffer payload) {
-		logger.info("topic:{} payload:{}", topic,  ByteBufferUtil.toString(payload));
+	public void sub(String topic, MqttPublishMessage message, byte[] payload) {
+		logger.info("topic:{} payload:{}", topic, new String(payload));
 	}
 
 }

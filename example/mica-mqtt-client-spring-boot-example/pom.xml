@@ -38,6 +38,11 @@
             <groupId>net.dreamlu</groupId>
             <artifactId>mica-openapi</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
     <build>

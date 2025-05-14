@@ -1,5 +1,6 @@
 package org.dromara.mica.mqtt.client.listener;
 
+import org.dromara.mica.mqtt.client.pojo.User;
 import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.spring.client.MqttClientSubscribe;
@@ -47,14 +48,6 @@ public class MqttClientSubscribeListener {
 		logger.info("topic:{} payload:{}", topic, new String(payload, StandardCharsets.UTF_8));
 	}
 
-	public static class User<T>{
-		private String name;
-		private T girlfriend;
-		public String getName() {return name;}
-		public void setName(String name) {this.name = name;}
-		public T getGirlfriend() {return girlfriend;}
 
-		public void setGirlfriend(T girlfriend) {this.girlfriend = girlfriend;}
-	}
 }
 
