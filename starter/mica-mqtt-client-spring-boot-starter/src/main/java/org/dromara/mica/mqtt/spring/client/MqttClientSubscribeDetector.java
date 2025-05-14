@@ -18,7 +18,6 @@ package org.dromara.mica.mqtt.spring.client;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.dromara.mica.mqtt.core.client.IMqttClientSession;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
@@ -33,10 +32,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
 
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.Type;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 /**
@@ -97,17 +93,18 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 				if (paramCount < 2 || paramCount > 3) {
 					throw new IllegalArgumentException("@MqttClientSubscribe on method " + method + " parameter count must 2 ~ 3.");
 				}
-				// 3. 订阅
+				// 3. 订阅存储，保存后，连接成功后会自动订阅
 				IMqttClientSession clientSession = getMqttClientSession(subscribe.clientTemplateBean());
+				// 4. 订阅的 topic 转换
 				String[] topicFilters = getTopicFilters(subscribe.value());
-				// 4. 自定义的反序列化
+				// 5. 自定义的反序列化，支持 Spring bean 或者 无参构造器初始化
 				Class<? extends MqttDeserializer> deserialized = subscribe.deserialize();
-				clientSession.addSubscriptionList(topicFilters, subscribe.qos(), (context, topic, message, payload) -> {
-					// 获取方法参数
-					Object[] args = getMethodParameters(method, topic, message, payload, deserialized);
-					// 反射执行方法
-					ReflectionUtils.invokeMethod(method, bean, args);
-				});
+				@SuppressWarnings("unchecked")
+				MqttDeserializer deserializer = getMqttDeserializer((Class<MqttDeserializer>) deserialized);
+				// 6. 构造监听器
+				MqttClientSubscribeListener listener = new MqttClientSubscribeListener(bean, method, deserializer);
+				// 7. mqtt 订阅
+				clientSession.addSubscriptionList(topicFilters, subscribe.qos(), listener);
 			}
 		}, ReflectionUtils.USER_DECLARED_METHODS);
 	}
@@ -149,36 +146,4 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 			.toArray(String[]::new);
 	}
 
-	/**
-	 * 获取反射参数
-	 *
-	 * @param method         Method
-	 * @param topic          topic
-	 * @param message        message
-	 * @param payload        payload
-	 * @return Object array
-	 */
-	protected Object[] getMethodParameters(Method method, String topic,
-										   MqttPublishMessage message, byte[] payload,
-										   Class<? extends MqttDeserializer> deserializerType) {
-		int paramCount = method.getParameterCount();
-		Type[] parameterTypes = method.getGenericParameterTypes();
-		Object[] parameters = new Object[paramCount];
-		for (int i = 0; i < parameterTypes.length; i++) {
-			Type parameterType = parameterTypes[i];
-			if (parameterType == String.class) {
-				parameters[i] = topic;
-			} else if (parameterType == MqttPublishMessage.class) {
-				parameters[i] = message;
-			} else if (parameterType == byte[].class) {
-				parameters[i] = payload;
-			} else if (parameterType == ByteBuffer.class) {
-				parameters[i] = ByteBuffer.wrap(payload);
-			} else {
-				MqttDeserializer deserializer = getMqttDeserializer((Class<MqttDeserializer>) deserializerType);
-				parameters[i] = deserializer.deserialize(payload, parameterType);
-			}
-		}
-		return parameters;
-	}
 }
