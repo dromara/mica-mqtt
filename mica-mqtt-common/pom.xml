@@ -20,10 +20,6 @@
             <groupId>net.dreamlu</groupId>
             <artifactId>mica-net-core</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
         <!-- tinylog 用于测试  -->
         <dependency>
             <groupId>org.tinylog</groupId>
