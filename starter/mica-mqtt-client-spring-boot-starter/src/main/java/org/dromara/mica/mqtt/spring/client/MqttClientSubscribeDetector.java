@@ -35,6 +35,7 @@ import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -42,6 +43,7 @@ import java.util.Arrays;
  * MqttClient 订阅监听器
  *
  * @author L.cm
+ * @author ChangJin Wei(魏昌进)
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -160,10 +162,10 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 										   MqttPublishMessage message, byte[] payload,
 										   Class<? extends MqttDeserializer> deserializerType) {
 		int paramCount = method.getParameterCount();
-		Class<?>[] parameterTypes = method.getParameterTypes();
+		Type[] parameterTypes = method.getGenericParameterTypes();
 		Object[] parameters = new Object[paramCount];
 		for (int i = 0; i < parameterTypes.length; i++) {
-			Class<?> parameterType = parameterTypes[i];
+			Type parameterType = parameterTypes[i];
 			if (parameterType == String.class) {
 				parameters[i] = topic;
 			} else if (parameterType == MqttPublishMessage.class) {
