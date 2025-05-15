@@ -161,7 +161,6 @@ public class MqttConnectStatusListener {
 
 ### 2.8 Prometheus + Grafana 监控对接
 ```xml
-<!-- 开启 prometheus 指标收集 -->
 <dependency>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-actuator</artifactId>
@@ -172,8 +171,8 @@ public class MqttConnectStatusListener {
 </dependency>
 ```
 
-| 支持得指标                     | 说明             |
-| ------------------------------ | ---------------- |
+| 支持的指标                          | 说明             |
+|--------------------------------| ---------------- |
 | mqtt_connections_accepted      | 共接受过连接数   |
 | mqtt_connections_closed        | 关闭过的连接数   |
 | mqtt_connections_size          | 当前连接数       |
