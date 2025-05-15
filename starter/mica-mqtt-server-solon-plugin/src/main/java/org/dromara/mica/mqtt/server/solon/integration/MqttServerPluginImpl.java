@@ -34,6 +34,7 @@ import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerAuthHandler;
 import org.dromara.mica.mqtt.server.solon.MqttServerTemplate;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerConfiguration;
+import org.dromara.mica.mqtt.server.solon.config.MqttServerMetricsConfiguration;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerProperties;
 import org.noear.solon.core.AppContext;
 import org.noear.solon.core.Plugin;
@@ -138,7 +139,9 @@ public class MqttServerPluginImpl implements Plugin {
 			MqttServer mqttServer = serverCreator.build();
 			MqttServerTemplate mqttServerTemplate = new MqttServerTemplate(mqttServer);
 			context.wrapAndPut(MqttServerTemplate.class, mqttServerTemplate);
-
+			// Metrics
+			context.wrapAndPut(MqttServerMetricsConfiguration.class);
+			// 启动
 			if (properties.isEnabled() && !running) {
 				running = mqttServerTemplate.getMqttServer().start();
 				log.info("mqtt server start...");

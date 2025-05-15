@@ -29,6 +29,16 @@
             <groupId>org.noear</groupId>
             <artifactId>solon.logging.simple</artifactId>
         </dependency>
+        <!-- metrics 指标 开始 -->
+        <dependency>
+            <groupId>org.noear</groupId>
+            <artifactId>solon-cloud-metrics</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <!-- metrics 指标 结束 -->
     </dependencies>
 
 </project>

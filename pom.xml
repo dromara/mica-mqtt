@@ -150,6 +150,11 @@
                 <version>${solon.version}</version>
             </dependency>
             <dependency>
+                <groupId>org.noear</groupId>
+                <artifactId>solon-cloud-metrics</artifactId>
+                <version>${solon.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>com.jfinal</groupId>
                 <artifactId>jfinal</artifactId>
                 <version>${jfinal.version}</version>

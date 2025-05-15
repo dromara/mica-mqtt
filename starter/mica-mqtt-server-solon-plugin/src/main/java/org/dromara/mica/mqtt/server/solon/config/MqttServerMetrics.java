@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.spring.server.config;
+package org.dromara.mica.mqtt.server.solon.config;
 
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.mica.mqtt.core.server.MqttServer;
-import org.springframework.beans.factory.NoSuchBeanDefinitionException;
-import org.springframework.boot.context.event.ApplicationStartedEvent;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationListener;
 import org.tio.core.Tio;
 import org.tio.server.ServerGroupStat;
 import org.tio.server.TioServerConfig;
@@ -39,7 +34,7 @@ import java.util.Collections;
  */
 @Slf4j
 @RequiredArgsConstructor
-public class MqttServerMetrics implements ApplicationListener<ApplicationStartedEvent> {
+public class MqttServerMetrics {
 	/**
 	 * Prefix used for all mica-mqtt metric names.
 	 */
@@ -66,27 +61,7 @@ public class MqttServerMetrics implements ApplicationListener<ApplicationStarted
 		this(Collections.emptyList());
 	}
 
-	@Override
-	public void onApplicationEvent(ApplicationStartedEvent event) {
-		ApplicationContext applicationContext = event.getApplicationContext();
-		MeterRegistry registry = getMeterRegistry(applicationContext);
-		if (registry != null) {
-			MqttServer mqttServer = applicationContext.getBean(MqttServer.class);
-			TioServerConfig serverConfig = mqttServer.getServerConfig();
-			bindTo(registry, serverConfig);
-		}
-	}
-
-	private MeterRegistry getMeterRegistry(ApplicationContext applicationContext) {
-		try {
-			return applicationContext.getBean(MeterRegistry.class);
-		} catch (NoSuchBeanDefinitionException e) {
-			log.warn(e.getMessage());
-			return null;
-		}
-	}
-
-	private void bindTo(MeterRegistry meterRegistry, TioServerConfig serverConfig) {
+	public void bindTo(MeterRegistry meterRegistry, TioServerConfig serverConfig) {
 		// 连接统计
 		Gauge.builder(MQTT_CONNECTIONS_ACCEPTED, serverConfig, (config) -> ((ServerGroupStat) config.getGroupStat()).accepted.sum())
 			.description("Mqtt server connections accepted")

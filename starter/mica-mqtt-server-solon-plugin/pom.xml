@@ -22,6 +22,12 @@
             <artifactId>solon</artifactId>
             <scope>provided</scope>
         </dependency>
+        <!-- 对接 micrometer 方便指标收集 begin -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <!-- 简单的本地定时任务调度 -->
         <dependency>
             <groupId>org.noear</groupId>
