@@ -104,8 +104,7 @@ public class MqttClientPluginImpl implements Plugin {
 			String[] topicFilters = getTopicFilters(anno);
 			// 自定义的反序列化，支持 solon bean 或者 无参构造器初始化
 			Class<? extends MqttDeserializer> deserialized = anno.deserialize();
-			@SuppressWarnings("unchecked")
-			MqttDeserializer deserializer = getMqttDeserializer((Class<MqttDeserializer>) deserialized);
+			MqttDeserializer deserializer = getMqttDeserializer(deserialized);
 			// 构造监听器
 			MqttClientSubscribeListener listener = new MqttClientSubscribeListener(each.getBw().get(), each.getMethod(), deserializer);
 			clientTemplate.addSubscriptionList(topicFilters, anno.qos(), listener);
@@ -128,7 +127,7 @@ public class MqttClientPluginImpl implements Plugin {
 	 * @param deserializerType deserializerType
 	 * @return 解码器
 	 */
-	private MqttDeserializer getMqttDeserializer(Class<MqttDeserializer> deserializerType) {
+	private MqttDeserializer getMqttDeserializer(Class<?> deserializerType) {
 		BeanWrap beanWrap = context.getWrap(deserializerType);
 		if (beanWrap == null) {
 			return ClassUtil.newInstance(deserializerType);
