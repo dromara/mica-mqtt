@@ -140,7 +140,7 @@ public class MqttServerPluginImpl implements Plugin {
 			MqttServerTemplate mqttServerTemplate = new MqttServerTemplate(mqttServer);
 			context.wrapAndPut(MqttServerTemplate.class, mqttServerTemplate);
 			// Metrics
-			context.wrapAndPut(MqttServerMetricsConfiguration.class);
+			context.beanMake(MqttServerMetricsConfiguration.class);
 			// 启动
 			if (properties.isEnabled() && !running) {
 				running = mqttServerTemplate.getMqttServer().start();
