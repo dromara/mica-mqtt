@@ -5,6 +5,8 @@
 ### v2.4.6 - 2025-05-31
 - :sparkles: mica-mqtt-client-spring-boot-starter MqttDeserializer 接口重写，支持泛型调用 (github #95) 感谢 `@galaxy-sea` 贡献
 - :sparkles: mica-mqtt-client 批量订阅兼容 mqtt 3.1.1 部分 broker 只返回一个 reasonCode 的情况。感谢 `@Jacky` 反馈
+- :sparkles: mica-mqtt-server-solon-plugin 添加对 metrics 指标的支持
+- :sparkles: mica-mqtt-client-solon-plugin 注解订阅支持自定义序列化（默认 json 序列化）和泛型
 
 ### v2.4.5 - 2025-05-06
 - :sparkles: mica-mqtt-client-spring-boot-starter 的 `@MqttClientSubscribe` 注解支持自定义反序列化。
