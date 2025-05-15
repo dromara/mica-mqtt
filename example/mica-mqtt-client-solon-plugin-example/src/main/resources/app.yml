@@ -5,11 +5,11 @@ mqtt:
   client:
     enabled: true               # 是否开启客户端，默认：true
     ip: 127.0.0.1               # 连接的服务端 ip ，默认：127.0.0.1
-    port: 18889                  # 端口：默认：1883
+    port: 1883                  # 端口：默认：1883
     name: Mica-Mqtt-Client      # 名称，默认：Mica-Mqtt-Client
     clientId: 000001            # 客户端Id（非常重要，一般为设备 sn，不可重复）
     user-name: mica             # 认证的用户名
-    password: mica            # 认证的密码
+    password: mica              # 认证的密码
     timeout: 5                  # 超时时间，单位：秒，默认：5秒
     reconnect: true             # 是否重连，默认：true
     re-interval: 5000           # 重连时间，默认 5000 毫秒

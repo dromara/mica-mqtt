@@ -23,6 +23,11 @@
             <groupId>org.noear</groupId>
             <artifactId>solon.logging.simple</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
 </project>

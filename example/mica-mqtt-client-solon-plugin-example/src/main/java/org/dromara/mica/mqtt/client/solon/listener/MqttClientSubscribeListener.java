@@ -1,12 +1,16 @@
 package org.dromara.mica.mqtt.client.solon.listener;
 
 import org.dromara.mica.mqtt.client.solon.MqttClientSubscribe;
+import org.dromara.mica.mqtt.client.solon.pojo.User;
+import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.core.deserialize.MqttJsonDeserializer;
 import org.noear.solon.annotation.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 /**
  * 客户端消息监听
@@ -25,6 +29,25 @@ public class MqttClientSubscribeListener {
 	@MqttClientSubscribe(value = "/qos1/#", qos = MqttQoS.QOS1)
 	public void subQos1(String topic, byte[] payload) {
 		logger.info("topic:{} payload:{}", topic, new String(payload, StandardCharsets.UTF_8));
+	}
+
+	@MqttClientSubscribe(
+		value = "/test/json",
+		deserialize = MqttJsonDeserializer.class // 2.4.5 开始支持 自定义序列化，默认 json 序列化
+	)
+	public void testJson(String topic, MqttPublishMessage message, Map<String, Object> data) {
+		// 2.4.5 开始支持，支持 2 到 3 个参数，字段类型映射规则如下
+		// String 字符串会默认映射到 topic，
+		// MqttPublishMessage 会默认映射到 原始的消息，可以拿到 mqtt5 的 props 参数
+		// byte[] 会映射到 mqtt 消息内容 payload
+		// ByteBuffer 会映射到 mqtt 消息内容 payload
+		// 其他类型会走序列化，确保消息能够序列化，默认为 json 序列化
+		logger.info("topic:{} json data:{}", topic, data);
+	}
+
+	@MqttClientSubscribe(value = "/test/object")
+	public void testJson(String topic, MqttPublishMessage message, User<User> data) {
+		logger.info("topic:{} json data:{}", topic, data);
 	}
 
 	@MqttClientSubscribe("/sys/${productKey}/${deviceName}/thing/sub/register")

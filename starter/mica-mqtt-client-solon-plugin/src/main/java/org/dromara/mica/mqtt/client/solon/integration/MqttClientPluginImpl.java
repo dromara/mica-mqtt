@@ -6,18 +6,20 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.client.solon.MqttClientSubscribe;
+import org.dromara.mica.mqtt.client.solon.MqttClientSubscribeListener;
 import org.dromara.mica.mqtt.client.solon.MqttClientTemplate;
 import org.dromara.mica.mqtt.client.solon.config.MqttClientConfiguration;
 import org.dromara.mica.mqtt.client.solon.config.MqttClientProperties;
 import org.dromara.mica.mqtt.core.client.*;
+import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.noear.solon.Solon;
 import org.noear.solon.core.AppContext;
 import org.noear.solon.core.BeanWrap;
 import org.noear.solon.core.Plugin;
+import org.noear.solon.core.util.ClassUtil;
 import org.tio.core.ssl.SSLEngineCustomizer;
 import org.tio.core.ssl.SslConfig;
-import org.tio.utils.mica.ExceptionUtils;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -87,26 +89,26 @@ public class MqttClientPluginImpl implements Plugin {
 	}
 
 	private void subscribeDetector() {
+		// 类级别的注解订阅
 		subscribeClassTags.forEach(each -> {
 			MqttClientSubscribe anno = each.getAnno();
 			MqttClientTemplate clientTemplate = getMqttClientTemplate(anno);
 			String[] topicFilters = getTopicFilters(anno);
-			IMqttClientMessageListener iMqttClientMessageListener = each.getBeanWrap().get();
-			clientTemplate.addSubscriptionList(topicFilters, anno.qos(), iMqttClientMessageListener);
+			IMqttClientMessageListener clientMessageListener = each.getBeanWrap().get();
+			clientTemplate.addSubscriptionList(topicFilters, anno.qos(), clientMessageListener);
 		});
-
+		// 方法级别的注解订阅
 		subscribeMethodTags.forEach(each -> {
 			MqttClientSubscribe anno = each.getAnno();
 			MqttClientTemplate clientTemplate = getMqttClientTemplate(anno);
 			String[] topicFilters = getTopicFilters(anno);
-			clientTemplate.addSubscriptionList(topicFilters, anno.qos(), (ctx, topic, message, payload) -> {
-					try {
-						each.getMethod().invoke(each.getBw().get(), topic, payload);
-					} catch (Throwable e) {
-						throw ExceptionUtils.unchecked(e);
-					}
-				}
-			);
+			// 自定义的反序列化，支持 Spring bean 或者 无参构造器初始化
+			Class<? extends MqttDeserializer> deserialized = anno.deserialize();
+			@SuppressWarnings("unchecked")
+			MqttDeserializer deserializer = getMqttDeserializer((Class<MqttDeserializer>) deserialized);
+			// 构造监听器
+			MqttClientSubscribeListener listener = new MqttClientSubscribeListener(each.getBw().get(), each.getMethod(), deserializer);
+			clientTemplate.addSubscriptionList(topicFilters, anno.qos(), listener);
 		});
 	}
 
@@ -118,6 +120,16 @@ public class MqttClientPluginImpl implements Plugin {
 
 	private MqttClientTemplate getMqttClientTemplate(MqttClientSubscribe anno) {
 		return context.getBean(anno.clientTemplateBean());
+	}
+
+	/**
+	 * 获取解码器
+	 *
+	 * @param deserializerType deserializerType
+	 * @return 解码器
+	 */
+	private MqttDeserializer getMqttDeserializer(Class<MqttDeserializer> deserializerType) {
+		return context.getBeanOrDefault(deserializerType, ClassUtil.newInstance(deserializerType));
 	}
 
 	private String[] getTopicFilters(MqttClientSubscribe anno) {
