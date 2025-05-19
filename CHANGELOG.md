@@ -2,7 +2,7 @@
 
 ## 发行版本
 
-### v2.4.6 - 2025-05-31
+### v2.4.6 - 2025-05-19
 - :sparkles: mica-mqtt-client-spring-boot-starter MqttDeserializer 接口重写，支持泛型调用 (github #95) 感谢 `@galaxy-sea` 贡献
 - :sparkles: mica-mqtt-client 批量订阅兼容 mqtt 3.1.1 部分 broker 只返回一个 reasonCode 的情况。感谢 `@Jacky` 反馈
 - :sparkles: mica-mqtt-server-solon-plugin 添加对 metrics 指标的支持
