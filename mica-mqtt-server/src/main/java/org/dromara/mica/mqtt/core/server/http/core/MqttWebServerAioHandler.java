@@ -321,7 +321,7 @@ public class MqttWebServerAioHandler implements TioServerHandler {
 		if (packet == null) {
 			return null;
 		} else if (packet instanceof HttpResponse) {
-			return HttpResponseEncoder.encode((HttpResponse) packet, tioConfig, channelContext);
+			return HttpResponseEncoder.encode((HttpResponse) packet);
 		}
 		// 处理 websocket 子协议
 		WsResponse wsResponse;
@@ -335,7 +335,7 @@ public class MqttWebServerAioHandler implements TioServerHandler {
 		if (wsResponse.isHandShake()) {
 			WsSessionContext imSessionContext = channelContext.get(WsSessionContext.WS_SESSION_CONTEXT_KEY);
 			HttpResponse handshakeResponse = imSessionContext.getHandshakeResponse();
-			return HttpResponseEncoder.encode(handshakeResponse, tioConfig, channelContext);
+			return HttpResponseEncoder.encode(handshakeResponse);
 		}
 		return WsServerEncoder.encode(wsResponse);
 	}

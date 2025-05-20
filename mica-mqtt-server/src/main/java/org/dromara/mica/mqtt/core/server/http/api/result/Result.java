@@ -123,7 +123,7 @@ public final class Result {
 	}
 
 	private static HttpResponse result(HttpResponse response, ResultCode resultCode, Object value) {
-		response.addHeader(HeaderName.Content_Type, HeaderValue.Content_Type.TEXT_PLAIN_JSON);
+		response.addHeader(HeaderName.Content_Type, HeaderValue.Content_Type.APPLICATION_JSON);
 		response.setStatus(resultCode.getStatusCode());
 		response.setBody(JsonUtil.toJsonString(value).getBytes(HttpConst.CHARSET));
 		response.setCharset(HttpConst.CHARSET);
