@@ -356,6 +356,7 @@
     </licenses>
 
     <repositories>
+        <!-- 拉取快照版本的 mica-net -->
         <repository>
             <name>Central Portal Snapshots</name>
             <id>central-portal-snapshots</id>
