@@ -41,6 +41,7 @@ import java.util.function.Consumer;
  * mqtt client 模板
  *
  * @author wsq（冷月宫主）
+ * @author ChangJin Wei (魏昌进)
  */
 public class MqttClientTemplate implements ApplicationContextAware, SmartInitializingSingleton, InitializingBean, DisposableBean, Ordered {
 	public static final String DEFAULT_CLIENT_TEMPLATE_BEAN = "mqttClientTemplate";
@@ -196,7 +197,7 @@ public class MqttClientTemplate implements ApplicationContextAware, SmartInitial
 	 * @param payload 消息内容
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, byte[] payload) {
+	public boolean publish(String topic, Object payload) {
 		return client.publish(topic, payload, MqttQoS.QOS0);
 	}
 
@@ -208,7 +209,7 @@ public class MqttClientTemplate implements ApplicationContextAware, SmartInitial
 	 * @param qos     MqttQoS
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, byte[] payload, MqttQoS qos) {
+	public boolean publish(String topic, Object payload, MqttQoS qos) {
 		return client.publish(topic, payload, qos);
 	}
 
@@ -220,7 +221,7 @@ public class MqttClientTemplate implements ApplicationContextAware, SmartInitial
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, byte[] payload, boolean retain) {
+	public boolean publish(String topic, Object payload, boolean retain) {
 		return client.publish(topic, payload, retain);
 	}
 
@@ -233,7 +234,7 @@ public class MqttClientTemplate implements ApplicationContextAware, SmartInitial
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, byte[] payload, MqttQoS qos, boolean retain) {
+	public boolean publish(String topic, Object payload, MqttQoS qos, boolean retain) {
 		return client.publish(topic, payload, qos, retain);
 	}
 
@@ -247,7 +248,7 @@ public class MqttClientTemplate implements ApplicationContextAware, SmartInitial
 	 * @param properties MqttProperties
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, byte[] payload, MqttQoS qos, boolean retain, MqttProperties properties) {
+	public boolean publish(String topic, Object payload, MqttQoS qos, boolean retain, MqttProperties properties) {
 		return client.publish(topic, payload, qos, retain, properties);
 	}
 
@@ -260,7 +261,7 @@ public class MqttClientTemplate implements ApplicationContextAware, SmartInitial
 	 * @param builder PublishBuilder
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, byte[] payload, MqttQoS qos, Consumer<MqttMessageBuilders.PublishBuilder> builder) {
+	public boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttMessageBuilders.PublishBuilder> builder) {
 		return client.publish(topic, payload, qos, builder);
 	}
 

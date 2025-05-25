@@ -17,6 +17,8 @@
 package org.dromara.mica.mqtt.core.server;
 
 import org.dromara.mica.mqtt.codec.MqttConstant;
+import org.dromara.mica.mqtt.core.serializer.MqttJsonSerializer;
+import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerPublishPermission;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
@@ -64,6 +66,7 @@ import java.util.function.Consumer;
  * mqtt 服务端参数构造
  *
  * @author L.cm
+ * @author ChangJin Wei (魏昌进)
  */
 public class MqttServerCreator {
 	private static final Logger logger = LoggerFactory.getLogger(MqttServerCreator.class);
@@ -218,6 +221,8 @@ public class MqttServerCreator {
 	 * 开启代理协议支持
 	 */
 	private boolean proxyProtocolOn = false;
+
+	private MqttSerializer mqttSerializer;
 
 	public String getName() {
 		return name;
@@ -585,6 +590,15 @@ public class MqttServerCreator {
 		return this;
 	}
 
+	public MqttSerializer getMqttSerializer() {
+		return mqttSerializer;
+	}
+
+	public MqttServerCreator mqttSerializer(MqttSerializer mqttSerializer) {
+		this.mqttSerializer = mqttSerializer;
+		return this;
+	}
+
 	public MqttServer build() {
 		// 默认的节点名称，用于集群
 		if (StrUtil.isBlank(this.nodeName)) {
@@ -612,6 +626,10 @@ public class MqttServerCreator {
 		// 业务线程池
 		if (this.mqttExecutor == null) {
 			this.mqttExecutor = ThreadUtils.getBizExecutor(ThreadUtils.MAX_POOL_SIZE_FOR_TIO);
+		}
+		// 序列化
+		if (this.mqttSerializer == null) {
+			this.mqttSerializer = new MqttJsonSerializer();
 		}
 		// AckService
 		DefaultMqttServerProcessor serverProcessor = new DefaultMqttServerProcessor(this, this.taskService, mqttExecutor);

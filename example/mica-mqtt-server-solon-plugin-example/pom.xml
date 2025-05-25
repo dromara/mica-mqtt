@@ -39,6 +39,11 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
         <!-- metrics 指标 结束 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
 </project>

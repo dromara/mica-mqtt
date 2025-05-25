@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.core.client;
 
 import org.dromara.mica.mqtt.codec.*;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
+import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +28,6 @@ import org.tio.client.TioClientConfig;
 import org.tio.core.ChannelContext;
 import org.tio.core.Node;
 import org.tio.core.Tio;
-import org.tio.utils.thread.ThreadUtils;
 import org.tio.utils.timer.TimerTask;
 import org.tio.utils.timer.TimerTaskService;
 
@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
  * mqtt 客户端
  *
  * @author L.cm
+ * @author ChangJin Wei (魏昌进)
  */
 public final class MqttClient {
 	private static final Logger logger = LoggerFactory.getLogger(MqttClient.class);
@@ -52,6 +53,7 @@ public final class MqttClient {
 	private final TimerTaskService taskService;
 	private final ExecutorService mqttExecutor;
 	private final IMqttClientMessageIdGenerator messageIdGenerator;
+	private final MqttSerializer mqttSerializer;
 	private ClientChannelContext context;
 
 	public static MqttClientCreator create() {
@@ -66,7 +68,8 @@ public final class MqttClient {
 		this.mqttExecutor = config.getMqttExecutor();
 		this.clientSession = config.getClientSession();
 		this.messageIdGenerator = config.getMessageIdGenerator();
-	}
+        this.mqttSerializer = config.getMqttSerializer();
+    }
 
 	/**
 	 * 订阅
@@ -271,7 +274,7 @@ public final class MqttClient {
 	 * @param payload 消息内容
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, byte[] payload) {
+	public boolean publish(String topic, Object payload) {
 		return publish(topic, payload, MqttQoS.QOS0);
 	}
 
@@ -283,7 +286,7 @@ public final class MqttClient {
 	 * @param qos     MqttQoS
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, byte[] payload, MqttQoS qos) {
+	public boolean publish(String topic, Object payload, MqttQoS qos) {
 		return publish(topic, payload, qos, false);
 	}
 
@@ -295,7 +298,7 @@ public final class MqttClient {
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, byte[] payload, boolean retain) {
+	public boolean publish(String topic, Object payload, boolean retain) {
 		return publish(topic, payload, MqttQoS.QOS0, retain);
 	}
 
@@ -308,7 +311,7 @@ public final class MqttClient {
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, byte[] payload, MqttQoS qos, boolean retain) {
+	public boolean publish(String topic, Object payload, MqttQoS qos, boolean retain) {
 		return publish(topic, payload, qos, (publishBuilder) -> publishBuilder.retained(retain));
 	}
 
@@ -322,7 +325,7 @@ public final class MqttClient {
 	 * @param properties MqttProperties
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, byte[] payload, MqttQoS qos, boolean retain, MqttProperties properties) {
+	public boolean publish(String topic, Object payload, MqttQoS qos, boolean retain, MqttProperties properties) {
 		return publish(topic, payload, qos, (publishBuilder) -> publishBuilder.retained(retain).properties(properties));
 	}
 
@@ -335,18 +338,20 @@ public final class MqttClient {
 	 * @param builder PublishBuilder
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, byte[] payload, MqttQoS qos, Consumer<MqttMessageBuilders.PublishBuilder> builder) {
+	public boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttMessageBuilders.PublishBuilder> builder) {
 		// 校验 topic
 		TopicUtil.validateTopicName(topic);
 		// qos 判断
 		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
 		int messageId = isHighLevelQoS ? messageIdGenerator.getId() : -1;
 		MqttMessageBuilders.PublishBuilder publishBuilder = MqttMessageBuilders.publish();
+		// 序列化
+		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
 		// 自定义配置
 		builder.accept(publishBuilder);
 		// 内置配置
 		publishBuilder.topicName(topic)
-			.payload(payload)
+			.payload(newPayload)
 			.messageId(messageId)
 			.qos(qos);
 		MqttPublishMessage message = publishBuilder.build();
@@ -363,7 +368,7 @@ public final class MqttClient {
 		}
 		// 如果是高版本的 qos
 		if (isHighLevelQoS) {
-			MqttPendingPublish pendingPublish = new MqttPendingPublish(payload, message, qos);
+			MqttPendingPublish pendingPublish = new MqttPendingPublish(newPayload, message, qos);
 			clientSession.addPendingPublish(messageId, pendingPublish);
 			pendingPublish.startPublishRetransmissionTimer(taskService, clientContext);
 		}

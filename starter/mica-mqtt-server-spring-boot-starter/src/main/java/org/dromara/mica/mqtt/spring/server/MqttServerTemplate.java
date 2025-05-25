@@ -34,6 +34,7 @@ import java.util.concurrent.Executor;
  * mqtt Server 模板
  *
  * @author wsq（冷月宫主）
+ * @author ChangJin Wei (魏昌进)
  */
 @Getter
 @RequiredArgsConstructor
@@ -48,7 +49,7 @@ public class MqttServerTemplate {
 	 * @param payload  消息体
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String clientId, String topic, byte[] payload) {
+	public boolean publish(String clientId, String topic, Object payload) {
 		return mqttServer.publish(clientId, topic, payload);
 	}
 
@@ -61,7 +62,7 @@ public class MqttServerTemplate {
 	 * @param qos      MqttQoS
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String clientId, String topic, byte[] payload, MqttQoS qos) {
+	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos) {
 		return mqttServer.publish(clientId, topic, payload, qos);
 	}
 
@@ -74,7 +75,7 @@ public class MqttServerTemplate {
 	 * @param retain   是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String clientId, String topic, byte[] payload, boolean retain) {
+	public boolean publish(String clientId, String topic, Object payload, boolean retain) {
 		return mqttServer.publish(clientId, topic, payload, retain);
 	}
 
@@ -88,7 +89,7 @@ public class MqttServerTemplate {
 	 * @param retain   是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String clientId, String topic, byte[] payload, MqttQoS qos, boolean retain) {
+	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos, boolean retain) {
 		return mqttServer.publish(clientId, topic, payload, qos, retain);
 	}
 
@@ -99,7 +100,7 @@ public class MqttServerTemplate {
 	 * @param payload 消息体
 	 * @return 是否发送成功
 	 */
-	public boolean publishAll(String topic, byte[] payload) {
+	public boolean publishAll(String topic, Object payload) {
 		return mqttServer.publishAll(topic, payload);
 	}
 
@@ -111,7 +112,7 @@ public class MqttServerTemplate {
 	 * @param qos     MqttQoS
 	 * @return 是否发送成功
 	 */
-	public boolean publishAll(String topic, byte[] payload, MqttQoS qos) {
+	public boolean publishAll(String topic, Object payload, MqttQoS qos) {
 		return mqttServer.publishAll(topic, payload, qos);
 	}
 
@@ -123,7 +124,7 @@ public class MqttServerTemplate {
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publishAll(String topic, byte[] payload, boolean retain) {
+	public boolean publishAll(String topic, Object payload, boolean retain) {
 		return mqttServer.publishAll(topic, payload, retain);
 	}
 
@@ -136,7 +137,7 @@ public class MqttServerTemplate {
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publishAll(String topic, byte[] payload, MqttQoS qos, boolean retain) {
+	public boolean publishAll(String topic, Object payload, MqttQoS qos, boolean retain) {
 		return mqttServer.publishAll(topic, payload, qos, retain);
 	}
 

@@ -17,6 +17,8 @@
 package org.dromara.mica.mqtt.core.client;
 
 import org.dromara.mica.mqtt.codec.*;
+import org.dromara.mica.mqtt.core.serializer.MqttJsonSerializer;
+import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.tio.client.ReconnConf;
 import org.tio.client.TioClient;
 import org.tio.client.TioClientConfig;
@@ -46,6 +48,7 @@ import java.util.stream.Collectors;
  * mqtt 客户端构造器
  *
  * @author L.cm
+ * @author ChangJin Wei (魏昌进)
  */
 public final class MqttClientCreator {
 	/**
@@ -201,6 +204,11 @@ public final class MqttClientCreator {
 	 */
 	private Consumer<TioConfig> tioConfigCustomize;
 
+	/**
+	 * 序列化
+	 */
+	private MqttSerializer mqttSerializer;
+
 	public String getName() {
 		return name;
 	}
@@ -339,6 +347,10 @@ public final class MqttClientCreator {
 
 	public TimerTaskService getTaskService() {
 		return taskService;
+	}
+
+	public MqttSerializer getMqttSerializer() {
+		return mqttSerializer;
 	}
 
 	public MqttClientCreator name(String name) {
@@ -576,6 +588,11 @@ public final class MqttClientCreator {
 		return this;
 	}
 
+	public MqttClientCreator mqttJsonSerializer(MqttSerializer mqttSerializer) {
+		this.mqttSerializer = mqttSerializer;
+		return this;
+	}
+
 	private MqttClient build() {
 		// 1. clientId 为空，生成默认的 clientId
 		if (StrUtil.isBlank(this.clientId)) {
@@ -609,6 +626,9 @@ public final class MqttClientCreator {
 		// heartbeatMode
 		if (this.heartbeatMode == null) {
 			this.heartbeatMode = HeartbeatMode.LAST_REQ;
+		}
+		if (this.mqttSerializer == null) {
+			this.mqttSerializer = new MqttJsonSerializer();
 		}
 		IMqttClientProcessor processor = new DefaultMqttClientProcessor(this);
 		// 4. 初始化 mqtt 处理器
