@@ -20,6 +20,7 @@ import org.dromara.mica.mqtt.codec.MqttMessageBuilders;
 import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
+import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.http.core.MqttWebServer;
 import org.dromara.mica.mqtt.core.server.model.ClientInfo;
@@ -54,6 +55,7 @@ import java.util.stream.Collectors;
  * mqtt 服务端
  *
  * @author L.cm
+ * @author ChangJin Wei (魏昌进)
  */
 public final class MqttServer {
 	private static final Logger logger = LoggerFactory.getLogger(MqttServer.class);
@@ -62,6 +64,7 @@ public final class MqttServer {
 	private final MqttServerCreator serverCreator;
 	private final IMqttSessionManager sessionManager;
 	private final IMqttMessageStore messageStore;
+	private final MqttSerializer mqttSerializer;
 	/**
 	 * taskService
 	 */
@@ -77,6 +80,7 @@ public final class MqttServer {
 		this.sessionManager = serverCreator.getSessionManager();
 		this.messageStore = serverCreator.getMessageStore();
 		this.taskService = taskService;
+		this.mqttSerializer = serverCreator.getMqttSerializer();
 	}
 
 	public static MqttServerCreator create() {
@@ -127,7 +131,7 @@ public final class MqttServer {
 	 * @param payload  消息体
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String clientId, String topic, byte[] payload) {
+	public boolean publish(String clientId, String topic, Object payload) {
 		return publish(clientId, topic, payload, MqttQoS.QOS0);
 	}
 
@@ -140,7 +144,7 @@ public final class MqttServer {
 	 * @param qos      MqttQoS
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String clientId, String topic, byte[] payload, MqttQoS qos) {
+	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos) {
 		return publish(clientId, topic, payload, qos, false);
 	}
 
@@ -153,7 +157,7 @@ public final class MqttServer {
 	 * @param retain   是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String clientId, String topic, byte[] payload, boolean retain) {
+	public boolean publish(String clientId, String topic, Object payload, boolean retain) {
 		return publish(clientId, topic, payload, MqttQoS.QOS0, retain);
 	}
 
@@ -167,7 +171,7 @@ public final class MqttServer {
 	 * @param retain   是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String clientId, String topic, byte[] payload, MqttQoS qos, boolean retain) {
+	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos, boolean retain) {
 		// 校验 topic
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
@@ -200,19 +204,20 @@ public final class MqttServer {
 	 * @param retain   是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	private boolean publish(ChannelContext context, String clientId, String topic, byte[] payload, MqttQoS qos, boolean retain) {
+	private boolean publish(ChannelContext context, String clientId, String topic, Object payload, MqttQoS qos, boolean retain) {
 		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
 		int messageId = isHighLevelQoS ? sessionManager.getMessageId(clientId) : -1;
+		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
 		MqttPublishMessage message = MqttMessageBuilders.publish()
 			.topicName(topic)
-			.payload(payload)
+			.payload(newPayload)
 			.qos(qos)
 			.retained(retain)
 			.messageId(messageId)
 			.build();
 		// 先启动高 qos 的重试
 		if (isHighLevelQoS) {
-			MqttPendingPublish pendingPublish = new MqttPendingPublish(payload, message, qos);
+			MqttPendingPublish pendingPublish = new MqttPendingPublish(newPayload, message, qos);
 			sessionManager.addPendingPublish(clientId, messageId, pendingPublish);
 			pendingPublish.startPublishRetransmissionTimer(taskService, context);
 		}
@@ -229,7 +234,7 @@ public final class MqttServer {
 	 * @param payload 消息体
 	 * @return 是否发送成功
 	 */
-	public boolean publishAll(String topic, byte[] payload) {
+	public boolean publishAll(String topic, Object payload) {
 		return publishAll(topic, payload, MqttQoS.QOS0);
 	}
 
@@ -241,7 +246,7 @@ public final class MqttServer {
 	 * @param qos     MqttQoS
 	 * @return 是否发送成功
 	 */
-	public boolean publishAll(String topic, byte[] payload, MqttQoS qos) {
+	public boolean publishAll(String topic, Object payload, MqttQoS qos) {
 		return publishAll(topic, payload, qos, false);
 	}
 
@@ -253,7 +258,7 @@ public final class MqttServer {
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publishAll(String topic, byte[] payload, boolean retain) {
+	public boolean publishAll(String topic, Object payload, boolean retain) {
 		return publishAll(topic, payload, MqttQoS.QOS0, retain);
 	}
 
@@ -266,7 +271,7 @@ public final class MqttServer {
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publishAll(String topic, byte[] payload, MqttQoS qos, boolean retain) {
+	public boolean publishAll(String topic, Object payload, MqttQoS qos, boolean retain) {
 		// 校验 topic
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
@@ -318,11 +323,11 @@ public final class MqttServer {
 	 * @param mqttQoS MqttQoS
 	 * @param payload ByteBuffer
 	 */
-	private void saveRetainMessage(String topic, MqttQoS mqttQoS, byte[] payload) {
+	private void saveRetainMessage(String topic, MqttQoS mqttQoS, Object payload) {
 		Message retainMessage = new Message();
 		retainMessage.setTopic(topic);
 		retainMessage.setQos(mqttQoS.value());
-		retainMessage.setPayload(payload);
+		retainMessage.setPayload(payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload));
 		retainMessage.setMessageType(MessageType.DOWN_STREAM);
 		retainMessage.setRetain(true);
 		retainMessage.setDup(false);

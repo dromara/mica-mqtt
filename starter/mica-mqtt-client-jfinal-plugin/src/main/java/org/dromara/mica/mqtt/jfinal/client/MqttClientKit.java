@@ -34,6 +34,7 @@ import java.util.function.Consumer;
  * mica mqtt client kit
  *
  * @author L.cm
+ * @author ChangJin Wei (魏昌进)
  */
 public class MqttClientKit {
 	private static MqttClient client;
@@ -226,7 +227,7 @@ public class MqttClientKit {
 	 * @param payload 消息内容
 	 * @return 是否发送成功
 	 */
-	public static boolean publish(String topic, byte[] payload) {
+	public static boolean publish(String topic, Object payload) {
 		return client.publish(topic, payload);
 	}
 
@@ -238,7 +239,7 @@ public class MqttClientKit {
 	 * @param qos     MqttQoS
 	 * @return 是否发送成功
 	 */
-	public static boolean publish(String topic, byte[] payload, MqttQoS qos) {
+	public static boolean publish(String topic, Object payload, MqttQoS qos) {
 		return client.publish(topic, payload, qos);
 	}
 
@@ -250,7 +251,7 @@ public class MqttClientKit {
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public static boolean publish(String topic, byte[] payload, boolean retain) {
+	public static boolean publish(String topic, Object payload, boolean retain) {
 		return client.publish(topic, payload, retain);
 	}
 
@@ -263,7 +264,7 @@ public class MqttClientKit {
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public static boolean publish(String topic, byte[] payload, MqttQoS qos, boolean retain) {
+	public static boolean publish(String topic, Object payload, MqttQoS qos, boolean retain) {
 		return client.publish(topic, payload, qos, retain);
 	}
 
@@ -276,7 +277,7 @@ public class MqttClientKit {
 	 * @param builder PublishBuilder
 	 * @return 是否发送成功
 	 */
-	public static boolean publish(String topic, byte[] payload, MqttQoS qos, Consumer<MqttMessageBuilders.PublishBuilder> builder) {
+	public static boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttMessageBuilders.PublishBuilder> builder) {
 		return client.publish(topic, payload, qos, builder);
 	}
 
