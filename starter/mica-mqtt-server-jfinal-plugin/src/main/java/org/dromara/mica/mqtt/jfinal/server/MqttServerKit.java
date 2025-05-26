@@ -24,6 +24,7 @@ import org.tio.core.ChannelContext;
  * mica mqtt server kit
  *
  * @author L.cm
+ * @author ChangJin Wei (魏昌进)
  */
 public class MqttServerKit {
 	private static MqttServer mqttServer;
@@ -44,7 +45,7 @@ public class MqttServerKit {
 	 * @param payload  消息体
 	 * @return 是否发送成功
 	 */
-	public static boolean publish(String clientId, String topic, byte[] payload) {
+	public static boolean publish(String clientId, String topic, Object payload) {
 		return mqttServer.publish(clientId, topic, payload);
 	}
 
@@ -57,7 +58,7 @@ public class MqttServerKit {
 	 * @param qos      MqttQoS
 	 * @return 是否发送成功
 	 */
-	public static boolean publish(String clientId, String topic, byte[] payload, MqttQoS qos) {
+	public static boolean publish(String clientId, String topic, Object payload, MqttQoS qos) {
 		return mqttServer.publish(clientId, topic, payload, qos);
 	}
 
@@ -70,7 +71,7 @@ public class MqttServerKit {
 	 * @param retain   是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public static boolean publish(String clientId, String topic, byte[] payload, boolean retain) {
+	public static boolean publish(String clientId, String topic, Object payload, boolean retain) {
 		return mqttServer.publish(clientId, topic, payload, retain);
 	}
 
@@ -84,7 +85,7 @@ public class MqttServerKit {
 	 * @param retain   是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public static boolean publish(String clientId, String topic, byte[] payload, MqttQoS qos, boolean retain) {
+	public static boolean publish(String clientId, String topic, Object payload, MqttQoS qos, boolean retain) {
 		return mqttServer.publish(clientId, topic, payload, qos, retain);
 	}
 
@@ -95,7 +96,7 @@ public class MqttServerKit {
 	 * @param payload 消息体
 	 * @return 是否发送成功
 	 */
-	public static boolean publishAll(String topic, byte[] payload) {
+	public static boolean publishAll(String topic, Object payload) {
 		return mqttServer.publishAll(topic, payload, MqttQoS.QOS0, false);
 	}
 
@@ -107,7 +108,7 @@ public class MqttServerKit {
 	 * @param qos     MqttQoS
 	 * @return 是否发送成功
 	 */
-	public static boolean publishAll(String topic, byte[] payload, MqttQoS qos) {
+	public static boolean publishAll(String topic, Object payload, MqttQoS qos) {
 		return mqttServer.publishAll(topic, payload, qos, false);
 	}
 
@@ -119,7 +120,7 @@ public class MqttServerKit {
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public static boolean publishAll(String topic, byte[] payload, boolean retain) {
+	public static boolean publishAll(String topic, Object payload, boolean retain) {
 		return mqttServer.publishAll(topic, payload, MqttQoS.QOS0, retain);
 	}
 
@@ -132,7 +133,7 @@ public class MqttServerKit {
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public static boolean publishAll(String topic, byte[] payload, MqttQoS qos, boolean retain) {
+	public static boolean publishAll(String topic, Object payload, MqttQoS qos, boolean retain) {
 		return mqttServer.publishAll(topic, payload, qos, retain);
 	}
 
