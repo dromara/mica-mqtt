@@ -2,6 +2,12 @@
 
 ## 发行版本
 
+### v2.4.7 - 2025-05-31
+- :sparkles: mica-mqtt-client、mica-mqtt-server publish相关接口支持object发送 (github #98) 感谢 `@galaxy-sea` 贡献
+- :wrench: mica-mqtt-common 更新 `module-info.java` 添加序列化模块
+- :sparkles: mica-net-http http api 响应头 name 不转换成小写
+- :bug: mica-net-utils DefaultThreadFactory 不应该共用。
+
 ### v2.4.6 - 2025-05-19
 - :sparkles: mica-mqtt-client-spring-boot-starter MqttDeserializer 接口重写，支持泛型调用 (github #95) 感谢 `@galaxy-sea` 贡献
 - :sparkles: mica-mqtt-client 批量订阅兼容 mqtt 3.1.1 部分 broker 只返回一个 reasonCode 的情况。感谢 `@Jacky` 反馈
