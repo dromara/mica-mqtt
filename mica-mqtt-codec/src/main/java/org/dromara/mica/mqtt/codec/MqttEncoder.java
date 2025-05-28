@@ -597,8 +597,8 @@ public final class MqttEncoder {
 
 	private static void writeVariableLengthInt(ByteBuffer buf, int num) {
 		do {
-			int digit = num % 128;
-			num /= 128;
+			int digit = num & 0x7F;
+			num >>>= 7;
 			if (num > 0) {
 				digit |= 0x80;
 			}
@@ -609,7 +609,7 @@ public final class MqttEncoder {
 	private static int getVariableLengthInt(int num) {
 		int count = 0;
 		do {
-			num /= 128;
+			num >>>= 7;
 			count++;
 		} while (num > 0);
 		return count;
