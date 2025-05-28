@@ -54,8 +54,9 @@ public final class MqttCodecUtil {
 	 * @return 是否 topic filter
 	 */
 	public static boolean isTopicFilter(String topicFilter) {
-		char[] topicFilterChars = topicFilter.toCharArray();
-		for (char ch : topicFilterChars) {
+		// 从尾部开始遍历，因为 + # 一般出现在 topicFilter 的尾部
+		for (int i = topicFilter.length() - 1; i >= 0; i--) {
+			char ch = topicFilter.charAt(i);
 			if (TOPIC_WILDCARDS_ONE == ch || TOPIC_WILDCARDS_MORE == ch) {
 				return true;
 			}
