@@ -483,16 +483,19 @@ public final class MqttClient {
 	public boolean reconnect(Node serverNode) {
 		// 更新 ip 和端口
 		this.config.ip(serverNode.getIp()).port(serverNode.getPort());
-		// 获取老的
+		// 获取老的，老的有可能为 null，因为已经关闭，进入 closes 里：https://gitee.com/dromara/mica-mqtt/issues/IBY5LQ
 		ClientChannelContext oldContext = getContext();
-		if (oldContext != null) {
-			Tio.remove(context, "切换服务地址：" + serverNode);
-		}
-		try {
-			this.context = tioClient.connect(serverNode, config.getTimeout());
-			return true;
-		} catch (Exception e) {
-			logger.error("mqtt client reconnect error", e);
+		if (oldContext == null) {
+			// 如果是已经关闭的连接，设置 serverNode，下一次重连触发就会使用新的 serverNode
+			Set<ChannelContext> closedSet = clientTioConfig.closeds;
+			if (closedSet != null && !closedSet.isEmpty()) {
+				ChannelContext closedContext = closedSet.iterator().next();
+				closedContext.setServerNode(serverNode);
+			}
+		} else {
+			// 切换 serverNode，关闭连接，触发重连任务去连接新的 serverNode
+			oldContext.setServerNode(serverNode);
+			Tio.close(oldContext, "切换服务地址：" + serverNode);
 		}
 		return false;
 	}
