@@ -4,10 +4,11 @@
 
 ### v2.4.7 - 2025-05-31
 - :sparkles: mica-mqtt-client、mica-mqtt-server publish相关接口支持object发送 (github #98) 感谢 `@galaxy-sea` 贡献
-- :wrench: mica-mqtt-common 更新 `module-info.java` 添加序列化模块
-- :sparkles: mica-net-http http api 响应头 name 不转换成小写
+- :sparkles: mica-mqtt-client 调整 MqttClient#reconnect 策略，（gitee #IBY5LQ）感谢 `@拉风的CC` 反馈。
 - :sparkles: mica-mqtt-codec MqttCodecUtil#isTopicFilter 代码优化改为逆序循环
 - :sparkles: mica-mqtt-codec 代码优化详见： https://github.com/netty/netty/pull/15227
+- :sparkles: mica-net-http http api 响应头 name 不转换成小写
+- :wrench: mica-mqtt-common 更新 `module-info.java` 添加序列化模块
 - :bug: mica-net-utils DefaultThreadFactory 不应该共用。
 
 ### v2.4.6 - 2025-05-19
