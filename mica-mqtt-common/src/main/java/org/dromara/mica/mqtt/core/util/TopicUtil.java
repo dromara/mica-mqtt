@@ -21,8 +21,6 @@ import org.tio.utils.hutool.StrUtil;
 
 import java.util.List;
 import java.util.StringTokenizer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Mqtt Topic 工具
@@ -94,15 +92,13 @@ public final class TopicUtil {
 	 * @param topicName topicName
 	 */
 	public static String[] retainTopicName(String topicName) {
-		Pattern pattern = Pattern.compile("^\\$retain/(\\d+)/(.*)$");
-		Matcher matcher = pattern.matcher(topicName);
-		String topic = topicName;
-		if (matcher.find()) {
-			String timeout = matcher.group(1);
-			topic = matcher.group(2);
-			return new String[]{topic, timeout};
+		if (topicName.startsWith("$retain/")) {
+			String[] retainArray = topicName.split("/", 3);
+			if (retainArray.length == 3) {
+				return new String[]{retainArray[2], retainArray[1]};
+			}
 		}
-		return new String[]{topic, "-1"};
+		return new String[]{topicName, "-1"};
 	}
 
 	/**
@@ -226,26 +222,5 @@ public final class TopicUtil {
 		int endIndex = input.indexOf('}', startIndex);
 		// 检查是否同时存在 "${" 和 "}"，并且 "}" 在 "${" 之后
 		return startIndex != -1 && endIndex != -1 && endIndex > startIndex + 2;
-	}
-
-
-	public static void main(String[] args) {
-		testParser("$retain/3600/dsdfd");       // 有效：3600, dsdfd
-		testParser("$retain/86400/sensor/data"); // 有效：86400, sensor/data
-		testParser("$retain/abc/invalid");       // 无效（数字部分非纯数字）
-		testParser("$retai/86400/123/234314/3242");       // 无效（数字部分非纯数字）
-		testParser("invalid/format");            // 无效（前缀不匹配）
-	}
-
-	private static void testParser(String input) {
-		Pattern pattern = Pattern.compile("^\\$retain/(\\d+)/(.*)$");
-		Matcher matcher = pattern.matcher(input);
-
-		if (matcher.find()) {
-			System.out.printf("Valid: %s → Interval=%s, Topic=%s%n",
-				input, matcher.group(1), matcher.group(2));
-		} else {
-			System.out.println("Invalid: " + input);
-		}
 	}
 }
