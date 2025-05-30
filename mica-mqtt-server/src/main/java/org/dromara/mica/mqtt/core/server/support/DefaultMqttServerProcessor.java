@@ -459,16 +459,22 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	private void invokeListenerForPublish(ChannelContext context, String clientId, MqttQoS mqttQoS,
 										  String topicName, MqttPublishMessage publishMessage) {
 		MqttFixedHeader fixedHeader = publishMessage.fixedHeader();
+		Node clientNode = context.getClientNode();
 		boolean isRetain = fixedHeader.isRetain();
 		byte[] payload = publishMessage.payload();
+
+		String[] retainTopicName = TopicUtil.retainTopicName(topicName);
+		String newTopic = retainTopicName[2];
+		boolean store = false;
+
 		// 1. retain 消息逻辑
 		if (isRetain) {
 			// qos == 0 or payload is none,then clear previous retain message
 			if (MqttQoS.QOS0 == mqttQoS || payload == null || payload.length == 0) {
-				this.messageStore.clearRetainMessage(topicName);
+				this.messageStore.clearRetainMessage(newTopic);
 			} else {
 				Message retainMessage = new Message();
-				retainMessage.setTopic(topicName);
+				retainMessage.setTopic(newTopic);
 				retainMessage.setQos(mqttQoS.value());
 				retainMessage.setPayload(payload);
 				retainMessage.setFromClientId(clientId);
@@ -476,11 +482,12 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 				retainMessage.setRetain(true);
 				retainMessage.setDup(fixedHeader.isDup());
 				retainMessage.setTimestamp(System.currentTimeMillis());
-				Node clientNode = context.getClientNode();
 				// 客户端 ip:端口
 				retainMessage.setPeerHost(clientNode.getPeerHost());
 				retainMessage.setNode(serverCreator.getNodeName());
-				this.messageStore.addRetainMessage(topicName, -1,retainMessage);
+				this.messageStore.addRetainMessage(newTopic, Long.parseLong(retainTopicName[1]), retainMessage);
+				retainMessage.setStore(true);
+				store = true;
 			}
 		}
 		// 2. message
@@ -491,16 +498,16 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		message.setId(packetId);
 		// 注意：broker 消息转发是不需要设置 toClientId 而是应该按 topic 找到订阅的客户端进行发送
 		message.setFromClientId(clientId);
-		message.setTopic(topicName);
+		message.setTopic(newTopic);
 		message.setQos(mqttQoS.value());
 		if (payload != null) {
 			message.setPayload(payload);
 		}
 		message.setMessageType(MessageType.UP_STREAM);
 		message.setRetain(isRetain);
+		message.setStore(store);
 		message.setDup(fixedHeader.isDup());
 		message.setTimestamp(System.currentTimeMillis());
-		Node clientNode = context.getClientNode();
 		// 客户端 ip:端口
 		message.setPeerHost(clientNode.getPeerHost());
 		message.setNode(serverCreator.getNodeName());
@@ -508,7 +515,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		if (messageListener != null) {
 			executor.submit(() -> {
 				try {
-					messageListener.onMessage(context, clientId, topicName, mqttQoS, publishMessage, message);
+					messageListener.onMessage(context, clientId, newTopic, mqttQoS, publishMessage, message);
 				} catch (Throwable e) {
 					logger.error(e.getMessage(), e);
 				}
