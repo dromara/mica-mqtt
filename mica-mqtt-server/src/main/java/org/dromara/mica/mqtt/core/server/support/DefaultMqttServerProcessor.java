@@ -480,7 +480,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 				// 客户端 ip:端口
 				retainMessage.setPeerHost(clientNode.getPeerHost());
 				retainMessage.setNode(serverCreator.getNodeName());
-				this.messageStore.addRetainMessage(topicName, retainMessage);
+				this.messageStore.addRetainMessage(topicName, -1,retainMessage);
 			}
 		}
 		// 2. message

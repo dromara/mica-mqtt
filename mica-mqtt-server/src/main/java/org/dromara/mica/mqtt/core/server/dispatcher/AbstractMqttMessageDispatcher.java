@@ -16,14 +16,14 @@
 
 package org.dromara.mica.mqtt.core.server.dispatcher;
 
+import org.dromara.mica.mqtt.codec.MqttMessageBuilders;
+import org.dromara.mica.mqtt.codec.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
-import org.dromara.mica.mqtt.codec.MqttMessageBuilders;
-import org.dromara.mica.mqtt.codec.MqttPublishMessage;
-import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tio.core.ChannelContext;
@@ -74,7 +74,7 @@ public abstract class AbstractMqttMessageDispatcher implements org.dromara.mica.
 			String topic = message.getTopic();
 			// http rest api 消息也会转发到此
 			MqttQoS mqttQoS = MqttQoS.valueOf(message.getQos());
-			mqttServer.publishAll(topic, message.getPayload(), mqttQoS, message.isRetain());
+			mqttServer.publishAll(topic, message.getPayload(), mqttQoS, message.isRetain(), false);
 			// 触发消息
 			try {
 				onHttpApiMessage(topic, mqttQoS, message);

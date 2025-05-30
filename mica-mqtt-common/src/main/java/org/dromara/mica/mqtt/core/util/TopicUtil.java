@@ -21,6 +21,8 @@ import org.tio.utils.hutool.StrUtil;
 
 import java.util.List;
 import java.util.StringTokenizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Mqtt Topic 工具
@@ -87,6 +89,23 @@ public final class TopicUtil {
 	}
 
 	/**
+	 * 解析保留消息主题， topicName
+	 *
+	 * @param topicName topicName
+	 */
+	public static String[] retainTopicName(String topicName) {
+		Pattern pattern = Pattern.compile("^\\$retain/(\\d+)/(.*)$");
+		Matcher matcher = pattern.matcher(topicName);
+		String topic = topicName;
+		if (matcher.find()) {
+			String timeout = matcher.group(1);
+			topic = matcher.group(2);
+			return new String[]{topic, timeout};
+		}
+		return new String[]{topic, "-1"};
+	}
+
+	/**
 	 * 判断 topicFilter topicName 是否匹配
 	 *
 	 * @param topicFilter topicFilter
@@ -104,7 +123,8 @@ public final class TopicUtil {
 		// 是否进入 + 号层级通配符
 		boolean inLayerWildcard = false;
 		int wildcardCharLen = 0;
-		topicFilterLoop: for (int i = 0; i < topicFilterLength; i++) {
+		topicFilterLoop:
+		for (int i = 0; i < topicFilterLength; i++) {
 			ch = topicFilterChars[i];
 			if (ch == MqttCodecUtil.TOPIC_WILDCARDS_MORE) {
 				// 校验: # 通配符只能在最后一位
@@ -208,4 +228,24 @@ public final class TopicUtil {
 		return startIndex != -1 && endIndex != -1 && endIndex > startIndex + 2;
 	}
 
+
+	public static void main(String[] args) {
+		testParser("$retain/3600/dsdfd");       // 有效：3600, dsdfd
+		testParser("$retain/86400/sensor/data"); // 有效：86400, sensor/data
+		testParser("$retain/abc/invalid");       // 无效（数字部分非纯数字）
+		testParser("$retai/86400/123/234314/3242");       // 无效（数字部分非纯数字）
+		testParser("invalid/format");            // 无效（前缀不匹配）
+	}
+
+	private static void testParser(String input) {
+		Pattern pattern = Pattern.compile("^\\$retain/(\\d+)/(.*)$");
+		Matcher matcher = pattern.matcher(input);
+
+		if (matcher.find()) {
+			System.out.printf("Valid: %s → Interval=%s, Topic=%s%n",
+				input, matcher.group(1), matcher.group(2));
+		} else {
+			System.out.println("Invalid: " + input);
+		}
+	}
 }
