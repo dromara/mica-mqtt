@@ -7,7 +7,6 @@ import org.dromara.mica.mqtt.core.client.MqttPayload;
 
 /**
  * @author ChangJin Wei (魏昌进)
- * @since 2025/5/31
  */
 public class DeviceD {
 

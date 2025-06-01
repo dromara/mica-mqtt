@@ -28,15 +28,14 @@ import java.util.function.Consumer;
 
 /**
  * @author ChangJin Wei (魏昌进)
- * @since 2025/5/30
  */
-public class MqttInvocationHandler implements InvocationHandler {
+public class MqttInvocationHandler<T extends IMqttClient> implements InvocationHandler {
 
-    private final MqttClient mqttClient;
+    private final T mqttClient;
 
     private final Class<?> targetInterface;
 
-    public MqttInvocationHandler(MqttClient mqttClient, Class<?> targetInterface) {
+    public MqttInvocationHandler(T mqttClient, Class<?> targetInterface) {
         this.mqttClient = mqttClient;
         this.targetInterface = targetInterface;
     }
@@ -78,9 +77,9 @@ public class MqttInvocationHandler implements InvocationHandler {
         boolean retain = mqttPublish.retain();
 
         if (builder == null) {
-            return mqttClient.publish(topic, payload, qos, retain, properties);
+            return mqttClient.getMqttClient().publish(topic, payload, qos, retain, properties);
         } else {
-            return mqttClient.publish(topic, payload, qos, builder);
+            return mqttClient.getMqttClient().publish(topic, payload, qos, retain, properties);
         }
     }
 

@@ -45,7 +45,7 @@ import java.util.stream.Collectors;
  * @author L.cm
  * @author ChangJin Wei (魏昌进)
  */
-public final class MqttClient {
+public final class MqttClient implements IMqttClient {
 	private static final Logger logger = LoggerFactory.getLogger(MqttClient.class);
 	private final TioClient tioClient;
 	private final MqttClientCreator config;
@@ -613,13 +613,8 @@ public final class MqttClient {
 		return !isConnected();
 	}
 
-	// 增加一个代理接口方法
-	public <T> T getInterface(Class<T> clientClass) {
-		return (T) Proxy.newProxyInstance(
-				clientClass.getClassLoader(),
-				new Class<?>[]{clientClass},
-				new MqttInvocationHandler(this, clientClass)
-		);
+	@Override
+	public MqttClient getMqttClient() {
+		return this;
 	}
-
 }

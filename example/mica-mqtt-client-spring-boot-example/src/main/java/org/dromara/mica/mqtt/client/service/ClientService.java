@@ -22,8 +22,24 @@ public class ClientService {
 	@Qualifier(MqttClientTemplate.DEFAULT_CLIENT_TEMPLATE_BEAN)
 	private MqttClientTemplate client;
 
+	@Autowired
+	private HelloInterfaceA helloInterfaceA;
+
+	@Autowired
+	private HelloInterfaceB helloInterfaceB;
+
 	public boolean publish(String body) {
 		client.publish("/test/client", body.getBytes(StandardCharsets.UTF_8));
+		return true;
+	}
+
+	public boolean publishHelloInterfaceA(String body) {
+		helloInterfaceA.sayHello(body.getBytes(StandardCharsets.UTF_8));
+		return true;
+	}
+
+	public boolean publishHelloInterfaceB(String body) {
+		helloInterfaceB.sayHello(body.getBytes(StandardCharsets.UTF_8));
 		return true;
 	}
 

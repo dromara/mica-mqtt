@@ -17,7 +17,10 @@ public class ClientController {
 	@Operation(summary = "publish")
 	@PostMapping("/publish")
 	public boolean publish(@RequestBody String body) {
-		return service.publish(body);
+		service.publish(body);
+		service.publishHelloInterfaceA(body);
+		service.publishHelloInterfaceB(body);
+		return true;
 	}
 
 	@Operation(summary = "sub")
