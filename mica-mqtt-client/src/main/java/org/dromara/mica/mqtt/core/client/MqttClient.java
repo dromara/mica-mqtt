@@ -31,6 +31,7 @@ import org.tio.core.Tio;
 import org.tio.utils.timer.TimerTask;
 import org.tio.utils.timer.TimerTaskService;
 
+import java.lang.reflect.Proxy;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -610,6 +611,15 @@ public final class MqttClient {
 	 */
 	public boolean isDisconnected() {
 		return !isConnected();
+	}
+
+	// 增加一个代理接口方法
+	public <T> T getInterface(Class<T> clientClass) {
+		return (T) Proxy.newProxyInstance(
+				clientClass.getClassLoader(),
+				new Class<?>[]{clientClass},
+				new MqttInvocationHandler(this, clientClass)
+		);
 	}
 
 }

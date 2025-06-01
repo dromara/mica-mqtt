@@ -30,7 +30,7 @@ public class Server {
 	 * 客户端 B 模拟 web 网页端 mqtt.js 订阅 `/a/door/open`，
 	 * Mqtt 服务端实现 `IMqttMessageListener`，将消息转交给 `AbstractMqttMessageDispatcher`（自定义实现）处理。
 	 * 客户端 C 定时上报转态给 `/a/door/open`
-	 * 结果：A 和 B 将收到 C 发布的消息，并完成相应的效果展示。
+	 * 结果：A 和 B 将收到 C 或 D 发布的消息，并完成相应的效果展示。
 	 */
 	public static void main(String[] args) {
 		// 启动服务，mica-mqtt 1.3.x 已经默认为 broker 模式
