@@ -22,9 +22,9 @@ import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.annotation.MqttClientPublish;
 import org.dromara.mica.mqtt.core.annotation.MqttPayload;
 import org.dromara.mica.mqtt.core.annotation.MqttRetain;
+import org.dromara.mica.mqtt.core.util.TopicUtil;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.util.function.Consumer;
@@ -77,44 +77,13 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
             }
         }
 
-        String topic = resolveTopic(mqttPublish.value(), payload);
+        String topic = TopicUtil.resolveTopic(mqttPublish.value(), payload);
         MqttQoS qos = mqttPublish.qos();
 
         if (builder == null) {
             return mqttClient.getMqttClient().publish(topic, payload, qos, retain, properties);
         } else {
             return mqttClient.getMqttClient().publish(topic, payload, qos, builder);
-        }
-    }
-
-    private String resolveTopic(String topicTemplate, Object payload) {
-        if (payload == null || !topicTemplate.contains("${")) {
-            return topicTemplate;
-        }
-
-        String resolved = topicTemplate;
-        while (resolved.contains("${")) {
-            int start = resolved.indexOf("${");
-            int end = resolved.indexOf("}", start);
-            if (end == -1) {
-                break;
-            }
-
-            String fieldName = resolved.substring(start + 2, end);
-            Object value = getFieldValue(payload, fieldName);
-
-            resolved = resolved.substring(0, start) + (value != null ? value.toString() : "") + resolved.substring(end + 1);
-        }
-        return resolved;
-    }
-
-    private Object getFieldValue(Object obj, String fieldName) {
-        try {
-            Field field = obj.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            return field.get(obj);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Failed to resolve field: " + fieldName + " from payload object", e);
         }
     }
 }
