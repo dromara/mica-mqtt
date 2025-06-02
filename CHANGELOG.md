@@ -2,7 +2,7 @@
 
 ## 发行版本
 
-### v2.4.7 - 2025-05-31
+### v2.4.7 - 2025-06-02
 - :sparkles: mica-mqtt-client、mica-mqtt-server publish相关接口支持object发送 (github #98) 感谢 `@galaxy-sea` 贡献
 - :sparkles: mica-mqtt-client 调整 MqttClient#reconnect 策略，（gitee #IBY5LQ）感谢 `@拉风的CC` 反馈。
 - :sparkles: mica-mqtt-codec MqttCodecUtil#isTopicFilter 代码优化改为逆序循环
