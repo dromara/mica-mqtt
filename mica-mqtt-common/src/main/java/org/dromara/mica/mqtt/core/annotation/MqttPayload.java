@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.core.client;
-
-import org.dromara.mica.mqtt.codec.MqttQoS;
+package org.dromara.mica.mqtt.core.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -24,32 +22,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * 客户端发布注解
- *
  * @author ChangJin Wei (魏昌进)
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
-public @interface MqttClientPublish {
+@Target(ElementType.PARAMETER)
+public @interface MqttPayload {
 
-    /**
-     * 订阅的 topic
-     *
-     * @return topic
-     */
-    String value();
-
-    /**
-     * 发布的 qos
-     *
-     * @return MqttQoS
-     */
-    MqttQoS qos() default MqttQoS.QOS0;
-
-    /**
-     * 是否在服务器上保留消息
-     *
-     * @return 是否保留消息
-     */
-    boolean retain() default false;
 }

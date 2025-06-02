@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.client.service;
 
-import org.dromara.mica.mqtt.core.client.MqttClientPublish;
-import org.dromara.mica.mqtt.core.client.MqttPayload;
+import org.dromara.mica.mqtt.core.annotation.MqttClientPublish;
+import org.dromara.mica.mqtt.core.annotation.MqttPayload;
 import org.dromara.mica.mqtt.spring.client.annotation.MqttClient;
 
 /**

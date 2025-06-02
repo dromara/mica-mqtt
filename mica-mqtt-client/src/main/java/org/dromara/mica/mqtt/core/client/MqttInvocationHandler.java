@@ -19,6 +19,9 @@ package org.dromara.mica.mqtt.core.client;
 import org.dromara.mica.mqtt.codec.MqttMessageBuilders;
 import org.dromara.mica.mqtt.codec.MqttProperties;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.core.annotation.MqttClientPublish;
+import org.dromara.mica.mqtt.core.annotation.MqttPayload;
+import org.dromara.mica.mqtt.core.annotation.MqttRetain;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -49,6 +52,7 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 
         Object payload = null;
         MqttProperties properties = null;
+        boolean retain = false;
         Consumer<MqttMessageBuilders.PublishBuilder> builder = null;
 
         Annotation[][] paramAnnotations = method.getParameterAnnotations();
@@ -59,7 +63,8 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
             for (Annotation annotation : annotations) {
                 if (annotation instanceof MqttPayload) {
                     payload = arg;
-                    break;
+                } else if (annotation instanceof MqttRetain) {
+                    retain = Boolean.TRUE.equals(arg);
                 }
             }
 
@@ -74,12 +79,11 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 
         String topic = resolveTopic(mqttPublish.value(), payload);
         MqttQoS qos = mqttPublish.qos();
-        boolean retain = mqttPublish.retain();
 
         if (builder == null) {
             return mqttClient.getMqttClient().publish(topic, payload, qos, retain, properties);
         } else {
-            return mqttClient.getMqttClient().publish(topic, payload, qos, retain, properties);
+            return mqttClient.getMqttClient().publish(topic, payload, qos, builder);
         }
     }
 

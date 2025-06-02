@@ -1,9 +1,10 @@
 package org.dromara.mica.mqtt.broker;
 
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.core.annotation.MqttRetain;
 import org.dromara.mica.mqtt.core.client.MqttClient;
-import org.dromara.mica.mqtt.core.client.MqttClientPublish;
-import org.dromara.mica.mqtt.core.client.MqttPayload;
+import org.dromara.mica.mqtt.core.annotation.MqttClientPublish;
+import org.dromara.mica.mqtt.core.annotation.MqttPayload;
 
 /**
  * @author ChangJin Wei (魏昌进)
@@ -23,13 +24,13 @@ public class DeviceD {
         DoorClient doorClient = client.getInterface(DoorClient.class);
 
         client.schedule(() -> {
-            doorClient.sendMessage("open");
+            doorClient.sendMessage("open", false);
         }, 1000);
     }
 
     public interface DoorClient {
 
-        @MqttClientPublish(value = "/a/door/open", qos = MqttQoS.QOS0, retain = true)
-        void sendMessage(@MqttPayload String message);
+        @MqttClientPublish(value = "/a/door/open", qos = MqttQoS.QOS0)
+        void sendMessage(@MqttPayload String message, @MqttRetain boolean retain);
     }
 }
