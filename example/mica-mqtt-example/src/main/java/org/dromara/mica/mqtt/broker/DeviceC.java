@@ -37,7 +37,8 @@ public class DeviceC {
 			.connectSync();
 
 		client.schedule(() -> {
-			client.publish("/a/door/open", "open".getBytes(StandardCharsets.UTF_8));
+			client.publish("/a/door/open", null);
+
 		}, 5000);
 	}
 

@@ -1,5 +1,6 @@
 package org.dromara.mica.mqtt.client;
 
+import org.dromara.mica.mqtt.spring.client.annotation.EnableMqttClients;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -7,6 +8,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @author wsq
  */
 @SpringBootApplication
+@EnableMqttClients
 public class MqttClientApplication {
 
 	/**

@@ -31,6 +31,7 @@ import org.tio.core.Tio;
 import org.tio.utils.timer.TimerTask;
 import org.tio.utils.timer.TimerTaskService;
 
+import java.lang.reflect.Proxy;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -44,7 +45,7 @@ import java.util.stream.Collectors;
  * @author L.cm
  * @author ChangJin Wei (魏昌进)
  */
-public final class MqttClient {
+public final class MqttClient implements IMqttClient {
 	private static final Logger logger = LoggerFactory.getLogger(MqttClient.class);
 	private final TioClient tioClient;
 	private final MqttClientCreator config;
@@ -612,4 +613,8 @@ public final class MqttClient {
 		return !isConnected();
 	}
 
+	@Override
+	public MqttClient getMqttClient() {
+		return this;
+	}
 }

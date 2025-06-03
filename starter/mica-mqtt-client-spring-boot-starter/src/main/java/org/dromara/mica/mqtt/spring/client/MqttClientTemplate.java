@@ -43,7 +43,7 @@ import java.util.function.Consumer;
  * @author wsq（冷月宫主）
  * @author ChangJin Wei (魏昌进)
  */
-public class MqttClientTemplate implements ApplicationContextAware, SmartInitializingSingleton, InitializingBean, DisposableBean, Ordered {
+public class MqttClientTemplate implements ApplicationContextAware, SmartInitializingSingleton, InitializingBean, DisposableBean, Ordered, IMqttClient {
 	public static final String DEFAULT_CLIENT_TEMPLATE_BEAN = "mqttClientTemplate";
 	@Getter
 	private final MqttClientCreator clientCreator;
@@ -388,6 +388,7 @@ public class MqttClientTemplate implements ApplicationContextAware, SmartInitial
 	 *
 	 * @return MqttClient
 	 */
+	@Override
 	public MqttClient getMqttClient() {
 		return client;
 	}

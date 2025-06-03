@@ -19,6 +19,7 @@ package org.dromara.mica.mqtt.core.util;
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.tio.utils.hutool.StrUtil;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.StringTokenizer;
 
@@ -206,6 +207,38 @@ public final class TopicUtil {
 		int endIndex = input.indexOf('}', startIndex);
 		// 检查是否同时存在 "${" 和 "}"，并且 "}" 在 "${" 之后
 		return startIndex != -1 && endIndex != -1 && endIndex > startIndex + 2;
+	}
+
+
+	public static String resolveTopic(String topicTemplate, Object payload) {
+		if (payload == null || !topicTemplate.contains("${")) {
+			return topicTemplate;
+		}
+
+		String resolved = topicTemplate;
+		while (resolved.contains("${")) {
+			int start = resolved.indexOf("${");
+			int end = resolved.indexOf("}", start);
+			if (end == -1) {
+				break;
+			}
+
+			String fieldName = resolved.substring(start + 2, end);
+			Object value = getFieldValue(payload, fieldName);
+
+			resolved = resolved.substring(0, start) + (value != null ? value.toString() : "") + resolved.substring(end + 1);
+		}
+		return resolved;
+	}
+
+	public static Object getFieldValue(Object obj, String fieldName) {
+		try {
+			Field field = obj.getClass().getDeclaredField(fieldName);
+			field.setAccessible(true);
+			return field.get(obj);
+		} catch (Exception e) {
+			throw new IllegalArgumentException("Failed to resolve field: " + fieldName + " from payload object", e);
+		}
 	}
 
 }
