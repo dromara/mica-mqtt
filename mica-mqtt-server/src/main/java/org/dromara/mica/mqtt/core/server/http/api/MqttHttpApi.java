@@ -28,7 +28,6 @@ import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRoutes;
 import org.dromara.mica.mqtt.core.server.model.ClientInfo;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
-import org.dromara.mica.mqtt.core.util.PayloadEncode;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.tio.core.ChannelContext;
 import org.tio.core.Tio;
@@ -39,6 +38,7 @@ import org.tio.http.common.Method;
 import org.tio.server.TioServerConfig;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.json.JsonUtil;
+import org.tio.utils.mica.PayloadEncode;
 
 import java.util.List;
 import java.util.function.Function;

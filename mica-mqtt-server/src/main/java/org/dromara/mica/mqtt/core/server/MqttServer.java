@@ -171,6 +171,20 @@ public final class MqttServer {
 	 * @param retain   是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
+	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos, boolean retain) {
+		return publish(clientId, topic, payload, qos, retain, retain);
+	}
+
+	/**
+	 * 发布消息
+	 *
+	 * @param clientId clientId
+	 * @param topic    topic
+	 * @param payload  消息体
+	 * @param qos      MqttQoS
+	 * @param retain   是否在服务器上保留消息
+	 * @return 是否发送成功
+	 */
 	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos, boolean retain, boolean store) {
 		// 校验 topic
 		TopicUtil.validateTopicName(topic);
@@ -262,6 +276,19 @@ public final class MqttServer {
 	 */
 	public boolean publishAll(String topic, Object payload, boolean retain) {
 		return publishAll(topic, payload, MqttQoS.QOS0, retain, false);
+	}
+
+	/**
+	 * 发布消息给所以的在线设备
+	 *
+	 * @param topic   topic
+	 * @param payload 消息体
+	 * @param qos     MqttQoS
+	 * @param retain  是否在服务器上保留消息
+	 * @return 是否发送成功
+	 */
+	public boolean publishAll(String topic, Object payload, MqttQoS qos, boolean retain) {
+		return publishAll(topic, payload, qos, retain, retain);
 	}
 
 	/**
