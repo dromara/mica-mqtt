@@ -88,6 +88,21 @@ public final class TopicUtil {
 	}
 
 	/**
+	 * 解析保留消息主题， topicName
+	 *
+	 * @param topicName topicName
+	 */
+	public static String[] retainTopicName(String topicName) {
+		if (topicName.startsWith("$retain/")) {
+			String[] retainArray = topicName.split("/", 3);
+			if (retainArray.length == 3) {
+				return new String[]{retainArray[2], retainArray[1]};
+			}
+		}
+		return new String[]{topicName, "-1"};
+	}
+
+	/**
 	 * 判断 topicFilter topicName 是否匹配
 	 *
 	 * @param topicFilter topicFilter
@@ -105,7 +120,8 @@ public final class TopicUtil {
 		// 是否进入 + 号层级通配符
 		boolean inLayerWildcard = false;
 		int wildcardCharLen = 0;
-		topicFilterLoop: for (int i = 0; i < topicFilterLength; i++) {
+		topicFilterLoop:
+		for (int i = 0; i < topicFilterLength; i++) {
 			ch = topicFilterChars[i];
 			if (ch == MqttCodecUtil.TOPIC_WILDCARDS_MORE) {
 				// 校验: # 通配符只能在最后一位

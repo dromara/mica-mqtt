@@ -19,11 +19,13 @@ package org.dromara.mica.mqtt.core.server.store;
 
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
+import org.tio.utils.cache.TimedCache;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * message store
@@ -36,9 +38,9 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 	 */
 	private final ConcurrentMap<String, Message> willStore = new ConcurrentHashMap<>();
 	/**
-	 * 保持消息 topic: Message
+	 * 带有有效期的保持消息 topic: Message
 	 */
-	private final ConcurrentMap<String, Message> retainStore = new ConcurrentHashMap<>();
+	private final TimedCache<String, Message> retainStore = new TimedCache<>(Long.MAX_VALUE);
 
 	@Override
 	public boolean addWillMessage(String clientId, Message message) {
@@ -58,8 +60,12 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 	}
 
 	@Override
-	public boolean addRetainMessage(String topic, Message message) {
-		retainStore.put(topic, message);
+	public boolean addRetainMessage(String topic, long timeout, Message message) {
+		if (timeout <= 0) {
+			retainStore.put(topic, message);
+		} else {
+			retainStore.put(topic, message, TimeUnit.SECONDS.toMillis(timeout));
+		}
 		return true;
 	}
 
@@ -72,11 +78,11 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 	@Override
 	public List<Message> getRetainMessage(String topicFilter) {
 		List<Message> retainMessageList = new ArrayList<>();
-		retainStore.forEach((topic, message) -> {
+		for (String topic : retainStore.keySet()) {
 			if (TopicUtil.match(topicFilter, topic)) {
-				retainMessageList.add(message);
+				retainMessageList.add(retainStore.get(topic));
 			}
-		});
+		}
 		return retainMessageList;
 	}
 

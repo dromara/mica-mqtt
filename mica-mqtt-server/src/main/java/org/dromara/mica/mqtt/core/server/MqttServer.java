@@ -145,7 +145,7 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos) {
-		return publish(clientId, topic, payload, qos, false);
+		return publish(clientId, topic, payload, qos, false, false);
 	}
 
 	/**
@@ -158,7 +158,7 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publish(String clientId, String topic, Object payload, boolean retain) {
-		return publish(clientId, topic, payload, MqttQoS.QOS0, retain);
+		return publish(clientId, topic, payload, MqttQoS.QOS0, retain, false);
 	}
 
 	/**
@@ -171,12 +171,14 @@ public final class MqttServer {
 	 * @param retain   是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos, boolean retain) {
+	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos, boolean retain, boolean store) {
 		// 校验 topic
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
-		if (retain) {
-			this.saveRetainMessage(topic, qos, payload);
+		if (retain && !store) {
+			String[] retainTopicName = TopicUtil.retainTopicName(topic);
+			topic = retainTopicName[0];
+			this.saveRetainMessage(topic, Long.parseLong(retainTopicName[1]), qos, payload);
 		}
 		// 获取 context
 		ChannelContext context = Tio.getByBsId(getServerConfig(), clientId);
@@ -247,7 +249,7 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publishAll(String topic, Object payload, MqttQoS qos) {
-		return publishAll(topic, payload, qos, false);
+		return publishAll(topic, payload, qos, false, false);
 	}
 
 	/**
@@ -259,7 +261,7 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publishAll(String topic, Object payload, boolean retain) {
-		return publishAll(topic, payload, MqttQoS.QOS0, retain);
+		return publishAll(topic, payload, MqttQoS.QOS0, retain, false);
 	}
 
 	/**
@@ -271,12 +273,14 @@ public final class MqttServer {
 	 * @param retain  是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	public boolean publishAll(String topic, Object payload, MqttQoS qos, boolean retain) {
+	public boolean publishAll(String topic, Object payload, MqttQoS qos, boolean retain, boolean store) {
 		// 校验 topic
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
-		if (retain) {
-			this.saveRetainMessage(topic, qos, payload);
+		if (retain && !store) {
+			String[] retainTopicName = TopicUtil.retainTopicName(topic);
+			topic = retainTopicName[0];
+			this.saveRetainMessage(topic, Long.parseLong(retainTopicName[1]), qos, payload);
 		}
 		// 查找订阅该 topic 的客户端
 		List<Subscribe> subscribeList = sessionManager.searchSubscribe(topic);
@@ -310,9 +314,9 @@ public final class MqttServer {
 		String clientId = message.getClientId();
 		MqttQoS mqttQoS = MqttQoS.valueOf(message.getQos());
 		if (StrUtil.isBlank(clientId)) {
-			return publishAll(topic, message.getPayload(), mqttQoS, message.isRetain());
+			return publishAll(topic, message.getPayload(), mqttQoS, message.isRetain(), message.isStore());
 		} else {
-			return publish(clientId, topic, message.getPayload(), mqttQoS, message.isRetain());
+			return publish(clientId, topic, message.getPayload(), mqttQoS, message.isRetain(), message.isStore());
 		}
 	}
 
@@ -323,7 +327,7 @@ public final class MqttServer {
 	 * @param mqttQoS MqttQoS
 	 * @param payload ByteBuffer
 	 */
-	private void saveRetainMessage(String topic, MqttQoS mqttQoS, Object payload) {
+	private void saveRetainMessage(String topic, long timeout, MqttQoS mqttQoS, Object payload) {
 		Message retainMessage = new Message();
 		retainMessage.setTopic(topic);
 		retainMessage.setQos(mqttQoS.value());
@@ -333,7 +337,9 @@ public final class MqttServer {
 		retainMessage.setDup(false);
 		retainMessage.setTimestamp(System.currentTimeMillis());
 		retainMessage.setNode(serverCreator.getNodeName());
-		this.messageStore.addRetainMessage(topic, retainMessage);
+		if (this.messageStore.addRetainMessage(topic, timeout, retainMessage)) {
+			retainMessage.setStore(true);
+		}
 	}
 
 	/**

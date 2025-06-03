@@ -74,6 +74,10 @@ public class Message implements Serializable {
 	 */
 	private boolean retain;
 	/**
+	 * store retain=true时 是否完成持久化
+	 */
+	private boolean store;
+	/**
 	 * 消息内容
 	 */
 	private byte[] payload;
@@ -176,6 +180,14 @@ public class Message implements Serializable {
 
 	public void setRetain(boolean retain) {
 		this.retain = retain;
+	}
+
+	public boolean isStore() {
+		return store;
+	}
+
+	public void setStore(boolean store) {
+		this.store = store;
 	}
 
 	public byte[] getPayload() {
