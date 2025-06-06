@@ -46,10 +46,7 @@ public final class Result {
 	 * @return HttpResponse
 	 */
 	public static HttpResponse ok(HttpResponse response) {
-		ResultCode resultCode = ResultCode.SUCCESS;
-		Map<String, Object> json = new HashMap<>(2);
-		json.put("code", resultCode.getResultCode());
-		return result(response, resultCode, json);
+		return result(response, ResultCode.SUCCESS);
 	}
 
 	/**
@@ -117,6 +114,10 @@ public final class Result {
 	 * @return HttpResponse
 	 */
 	public static HttpResponse fail(HttpResponse response, ResultCode resultCode) {
+		return result(response, resultCode);
+	}
+
+	private static HttpResponse result(HttpResponse response, ResultCode resultCode) {
 		Map<String, Object> json = new HashMap<>(2);
 		json.put("code", resultCode.getResultCode());
 		return result(response, resultCode, json);

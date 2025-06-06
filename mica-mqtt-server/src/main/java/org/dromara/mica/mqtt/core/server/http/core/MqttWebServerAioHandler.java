@@ -247,7 +247,6 @@ public class MqttWebServerAioHandler implements TioServerHandler {
 		this.wsMsgHandler = wsMsgHandler;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Packet decode(ByteBuffer buffer, int limit, int position, int readableLength, ChannelContext context) throws TioDecodeException {
 		WsSessionContext wsSessionContext = context.get(WsSessionContext.WS_SESSION_CONTEXT_KEY);
@@ -317,7 +316,7 @@ public class MqttWebServerAioHandler implements TioServerHandler {
 	}
 
 	@Override
-	public ByteBuffer encode(Packet packet, TioConfig tioConfig, ChannelContext channelContext) {
+	public ByteBuffer encode(Packet packet, TioConfig tioConfig, ChannelContext context) {
 		if (packet == null) {
 			return null;
 		} else if (packet instanceof HttpResponse) {
@@ -328,12 +327,12 @@ public class MqttWebServerAioHandler implements TioServerHandler {
 		if (packet instanceof WsResponse) {
 			wsResponse = (WsResponse) packet;
 		} else {
-			wsResponse = wsMsgHandler.encodeSubProtocol(packet, tioConfig, channelContext);
+			wsResponse = wsMsgHandler.encodeSubProtocol(packet, tioConfig, context);
 			Objects.requireNonNull(wsResponse, "IWsMsgHandler encodeSubProtocol WsResponse is null.");
 		}
 		// 握手包
 		if (wsResponse.isHandShake()) {
-			WsSessionContext imSessionContext = channelContext.get(WsSessionContext.WS_SESSION_CONTEXT_KEY);
+			WsSessionContext imSessionContext = context.get(WsSessionContext.WS_SESSION_CONTEXT_KEY);
 			HttpResponse handshakeResponse = imSessionContext.getHandshakeResponse();
 			return HttpResponseEncoder.encode(handshakeResponse);
 		}
