@@ -131,3 +131,27 @@ MqttClient.create()
     })
     .connectSync();
 ```
+
+## 接口代理
+
+```java
+// 初始化 mqtt 客户端
+MqttClient client = MqttClient.create()
+    .ip("127.0.0.1")
+    .port(1883)
+    .username("admin")
+    .password("123456")
+    .connectSync();
+// 代理接口
+DoorClient doorClient = client.getInterface(DoorClient.class);
+
+client.schedule(() -> {
+    doorClient.sendMessage("open", false);
+}, 1000);
+
+public interface DoorClient {
+
+    @MqttClientPublish(value = "/a/door/open", qos = MqttQoS.QOS0)
+    void sendMessage(@MqttPayload String message, @MqttRetain boolean retain);
+}
+```
