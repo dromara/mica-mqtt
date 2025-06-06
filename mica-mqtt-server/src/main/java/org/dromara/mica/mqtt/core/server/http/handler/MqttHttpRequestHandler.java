@@ -81,14 +81,4 @@ public class MqttHttpRequestHandler implements HttpRequestHandler {
 		return Result.fail(request, ResultCode.E105);
 	}
 
-	@Override
-	public HttpConfig getHttpConfig(HttpRequest request) {
-		return request.getHttpConfig();
-	}
-
-	@Override
-	public void clearStaticResCache() {
-		// ignore
-	}
-
 }
