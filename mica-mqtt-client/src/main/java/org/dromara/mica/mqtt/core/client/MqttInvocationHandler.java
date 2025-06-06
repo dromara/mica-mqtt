@@ -27,6 +27,8 @@ import org.dromara.mica.mqtt.core.util.TopicUtil;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
 
 /**
@@ -34,56 +36,123 @@ import java.util.function.Consumer;
  */
 public class MqttInvocationHandler<T extends IMqttClient> implements InvocationHandler {
 
-    private final T mqttClient;
+	private final T mqttClient;
 
-    private final Class<?> targetInterface;
+	private final Class<?> targetInterface;
 
-    public MqttInvocationHandler(T mqttClient, Class<?> targetInterface) {
-        this.mqttClient = mqttClient;
-        this.targetInterface = targetInterface;
-    }
+	private final ConcurrentMap<Method, MethodMetadata> methodCache = new ConcurrentHashMap<>();
 
-    @Override
-    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        MqttClientPublish mqttPublish = method.getAnnotation(MqttClientPublish.class);
-        if (mqttPublish == null) {
-            throw new UnsupportedOperationException("Method not annotated with @MqttClientPublish");
-        }
+	public MqttInvocationHandler(T mqttClient, Class<?> targetInterface) {
+		this.mqttClient = mqttClient;
+		this.targetInterface = targetInterface;
+	}
 
-        Object payload = null;
-        MqttProperties properties = null;
-        boolean retain = false;
-        Consumer<MqttMessageBuilders.PublishBuilder> builder = null;
+	@Override
+	public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+		MethodMetadata metadata = resolveMethod(method);
 
-        Annotation[][] paramAnnotations = method.getParameterAnnotations();
-        for (int i = 0; i < args.length; i++) {
-            Object arg = args[i];
-            Annotation[] annotations = paramAnnotations[i];
+		Object payload = metadata.getPayloadIndex() >= 0 ? args[metadata.getPayloadIndex()] : null;
+		boolean retain = metadata.getRetainIndex() >= 0 && Boolean.TRUE.equals(args[metadata.getRetainIndex()]);
+		MqttProperties properties = metadata.getPropertiesIndex() >= 0
+				? (MqttProperties) args[metadata.getPropertiesIndex()]
+				: null;
+		Consumer<MqttMessageBuilders.PublishBuilder> builder = metadata.getBuilderIndex() >= 0
+				? (Consumer<MqttMessageBuilders.PublishBuilder>) args[metadata.getBuilderIndex()]
+				: null;
 
-            for (Annotation annotation : annotations) {
-                if (annotation instanceof MqttPayload) {
-                    payload = arg;
-                } else if (annotation instanceof MqttRetain) {
-                    retain = Boolean.TRUE.equals(arg);
-                }
-            }
+		String topic = TopicUtil.resolveTopic(metadata.getMqttPublish().value(), payload);
+		MqttQoS qos = metadata.getMqttPublish().qos();
 
-            if (payload == null) {
-                if (arg instanceof MqttProperties) {
-                    properties = (MqttProperties) arg;
-                } else if (arg instanceof Consumer) {
-                    builder = (Consumer<MqttMessageBuilders.PublishBuilder>) arg;
-                }
-            }
-        }
+		if (topic == null || topic.isEmpty()) {
+			throw new IllegalArgumentException("Resolved topic is null or empty");
+		}
 
-        String topic = TopicUtil.resolveTopic(mqttPublish.value(), payload);
-        MqttQoS qos = mqttPublish.qos();
+		if (builder == null) {
+			return mqttClient.getMqttClient().publish(topic, payload, qos, retain, properties);
+		} else {
+			return mqttClient.getMqttClient().publish(topic, payload, qos, builder);
+		}
+	}
 
-        if (builder == null) {
-            return mqttClient.getMqttClient().publish(topic, payload, qos, retain, properties);
-        } else {
-            return mqttClient.getMqttClient().publish(topic, payload, qos, builder);
-        }
-    }
+	private MethodMetadata resolveMethod(Method method) {
+		return methodCache.computeIfAbsent(method, m -> {
+			MqttClientPublish mqttPublish = m.getAnnotation(MqttClientPublish.class);
+			if (mqttPublish == null) {
+				throw new UnsupportedOperationException("Method not annotated with @MqttClientPublish");
+			}
+
+			Annotation[][] paramAnnotations = m.getParameterAnnotations();
+			Class<?>[] paramTypes = m.getParameterTypes();
+
+			int payloadIndex = -1;
+			int retainIndex = -1;
+			int propertiesIndex = -1;
+			int builderIndex = -1;
+
+			for (int i = 0; i < paramAnnotations.length; i++) {
+				for (Annotation annotation : paramAnnotations[i]) {
+					if (annotation instanceof MqttPayload) {
+						payloadIndex = i;
+					} else if (annotation instanceof MqttRetain) {
+						retainIndex = i;
+					}
+				}
+			}
+
+			for (int i = 0; i < paramTypes.length; i++) {
+				if (propertiesIndex == -1 && MqttProperties.class.isAssignableFrom(paramTypes[i])) {
+					propertiesIndex = i;
+				} else if (builderIndex == -1 && Consumer.class.isAssignableFrom(paramTypes[i])) {
+					builderIndex = i;
+				}
+			}
+
+			return new MethodMetadata(mqttPublish, payloadIndex, retainIndex, propertiesIndex, builderIndex);
+		});
+	}
+
+	public static class MethodMetadata {
+
+		private final MqttClientPublish mqttPublish;
+
+		private final int payloadIndex;
+
+		private final int retainIndex;
+
+		private final int propertiesIndex;
+
+		private final int builderIndex;
+
+		MethodMetadata(MqttClientPublish mqttPublish,
+					   int payloadIndex,
+					   int retainIndex,
+					   int propertiesIndex,
+					   int builderIndex) {
+			this.mqttPublish = mqttPublish;
+			this.payloadIndex = payloadIndex;
+			this.retainIndex = retainIndex;
+			this.propertiesIndex = propertiesIndex;
+			this.builderIndex = builderIndex;
+		}
+
+		public MqttClientPublish getMqttPublish() {
+			return mqttPublish;
+		}
+
+		public int getPayloadIndex() {
+			return payloadIndex;
+		}
+
+		public int getRetainIndex() {
+			return retainIndex;
+		}
+
+		public int getPropertiesIndex() {
+			return propertiesIndex;
+		}
+
+		public int getBuilderIndex() {
+			return builderIndex;
+		}
+	}
 }
