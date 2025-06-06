@@ -464,7 +464,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		byte[] payload = publishMessage.payload();
 
 		String[] retainTopicName = TopicUtil.retainTopicName(topicName);
-		String newTopic = retainTopicName[2];
+		String newTopic = retainTopicName[0];
 		boolean store = false;
 
 		// 1. retain 消息逻辑
