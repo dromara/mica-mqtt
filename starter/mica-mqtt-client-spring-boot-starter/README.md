@@ -249,3 +249,21 @@ public void sub1(String topic, byte[] payload) {
     logger.info("topic:{} payload:{}", topic, ByteBufferUtil.toString(payload));
 }
 ```
+
+### 接口代理
+
+```java
+
+@EnableMqttClients
+public class MqttClientApplication {
+    // ...
+}
+
+@MqttClient(clientBean = "mqttClientTemplate")
+public interface HelloInterfaceB {
+
+    @MqttClientPublish("/test/HelloInterfaceB")
+    void sayHello(@MqttPayload Object payload);
+
+}
+```
