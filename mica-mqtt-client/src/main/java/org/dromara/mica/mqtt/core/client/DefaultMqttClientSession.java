@@ -21,11 +21,11 @@ import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.utils.collection.IntObjectHashMap;
-import org.tio.utils.collection.IntObjectMap;
 import org.tio.utils.collection.MultiValueMap;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 /**
@@ -38,11 +38,11 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 	/**
 	 * 订阅的数据承载
 	 */
-	private final MultiValueMap<String, MqttClientSubscription> subscriptions = new MultiValueMap<>();
-	private final IntObjectMap<MqttPendingSubscription> pendingSubscriptions = new IntObjectHashMap<>();
-	private final IntObjectMap<MqttPendingUnSubscription> pendingUnSubscriptions = new IntObjectHashMap<>();
-	private final IntObjectMap<MqttPendingPublish> pendingPublishData = new IntObjectHashMap<>();
-	private final IntObjectMap<MqttPendingQos2Publish> pendingQos2PublishData = new IntObjectHashMap<>();
+	private final MultiValueMap<String, MqttClientSubscription> subscriptions = new MultiValueMap<>(new ConcurrentHashMap<>());
+	private final ConcurrentMap<Integer, MqttPendingSubscription> pendingSubscriptions = new ConcurrentHashMap<>();
+	private final ConcurrentMap<Integer, MqttPendingUnSubscription> pendingUnSubscriptions = new ConcurrentHashMap<>();
+	private final ConcurrentMap<Integer, MqttPendingPublish> pendingPublishData = new ConcurrentHashMap<>();
+	private final ConcurrentMap<Integer, MqttPendingQos2Publish> pendingQos2PublishData = new ConcurrentHashMap<>();
 
 	@Override
 	public void addPaddingSubscribe(int messageId, MqttPendingSubscription pendingSubscription) {
@@ -118,12 +118,10 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 	}
 
 	@Override
-	public synchronized List<MqttClientSubscription> getSubscriptions() {
+	public List<MqttClientSubscription> getSubscriptions() {
 		List<MqttClientSubscription> subscriptionList = new ArrayList<>();
-		synchronized (subscriptions) {
-			for (Set<MqttClientSubscription> mqttSubscriptions : subscriptions.values()) {
-				subscriptionList.addAll(mqttSubscriptions);
-			}
+		for (Set<MqttClientSubscription> mqttSubscriptions : subscriptions.values()) {
+			subscriptionList.addAll(mqttSubscriptions);
 		}
 		return Collections.unmodifiableList(subscriptionList);
 	}
