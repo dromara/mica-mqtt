@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.core.server.http.handler;
 
 import org.tio.http.common.Method;
 import org.tio.http.common.RequestLine;
+import org.tio.http.common.handler.HttpRequestFunction;
 
 import java.util.*;
 
@@ -28,7 +29,7 @@ import java.util.*;
  */
 public final class MqttHttpRoutes {
 	private static final LinkedList<HttpFilter> FILTERS = new LinkedList<>();
-	private static final Map<RouteInfo, HttpHandler> ROUTS = new HashMap<>();
+	private static final Map<RouteInfo, HttpRequestFunction> ROUTS = new HashMap<>();
 
 	/**
 	 * 注册 filter 到 first
@@ -72,10 +73,10 @@ public final class MqttHttpRoutes {
 	 *
 	 * @param method  请求方法
 	 * @param path    路径
-	 * @param handler HttpHandler
+	 * @param function HttpHandler
 	 */
-	public static void register(Method method, String path, HttpHandler handler) {
-		ROUTS.put(new RouteInfo(path, method), handler);
+	public static void register(Method method, String path, HttpRequestFunction function) {
+		ROUTS.put(new RouteInfo(path, method), function);
 	}
 
 	/**
@@ -84,7 +85,7 @@ public final class MqttHttpRoutes {
 	 * @param requestLine RequestLine
 	 * @return HttpHandler
 	 */
-	public static HttpHandler getHandler(RequestLine requestLine) {
+	public static HttpRequestFunction getHandler(RequestLine requestLine) {
 		String path = requestLine.getPath();
 		Method method = requestLine.getMethod();
 		return ROUTS.get(new RouteInfo(path, method));
@@ -95,7 +96,7 @@ public final class MqttHttpRoutes {
 	 *
 	 * @return 路由信息
 	 */
-	public static Map<RouteInfo, HttpHandler> getRouts() {
+	public static Map<RouteInfo, HttpRequestFunction> getRouts() {
 		return Collections.unmodifiableMap(ROUTS);
 	}
 

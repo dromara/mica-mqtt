@@ -20,10 +20,10 @@ import org.dromara.mica.mqtt.core.server.http.api.code.ResultCode;
 import org.dromara.mica.mqtt.core.server.http.api.result.Result;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.http.common.HttpConfig;
 import org.tio.http.common.HttpRequest;
 import org.tio.http.common.HttpResponse;
 import org.tio.http.common.RequestLine;
+import org.tio.http.common.handler.HttpRequestFunction;
 import org.tio.http.common.handler.HttpRequestHandler;
 
 import java.util.List;
@@ -51,7 +51,7 @@ public class MqttHttpRequestHandler implements HttpRequestHandler {
 			return resp500(request, requestLine, e);
 		}
 		// 2. 路由处理
-		HttpHandler handler = MqttHttpRoutes.getHandler(requestLine);
+		HttpRequestFunction handler = MqttHttpRoutes.getHandler(requestLine);
 		if (handler == null) {
 			return resp404(request, requestLine);
 		}
