@@ -23,6 +23,7 @@ import org.dromara.mica.mqtt.core.annotation.MqttClientPublish;
 import org.dromara.mica.mqtt.core.annotation.MqttPayload;
 import org.dromara.mica.mqtt.core.annotation.MqttRetain;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
+import org.tio.utils.hutool.CollUtil;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationHandler;
@@ -35,16 +36,11 @@ import java.util.function.Consumer;
  * @author ChangJin Wei (魏昌进)
  */
 public class MqttInvocationHandler<T extends IMqttClient> implements InvocationHandler {
-
 	private final T mqttClient;
-
-	private final Class<?> targetInterface;
-
 	private final ConcurrentMap<Method, MethodMetadata> methodCache = new ConcurrentHashMap<>();
 
-	public MqttInvocationHandler(T mqttClient, Class<?> targetInterface) {
+	public MqttInvocationHandler(T mqttClient) {
 		this.mqttClient = mqttClient;
-		this.targetInterface = targetInterface;
 	}
 
 	@Override
@@ -54,11 +50,11 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 		Object payload = metadata.getPayloadIndex() >= 0 ? args[metadata.getPayloadIndex()] : null;
 		boolean retain = metadata.getRetainIndex() >= 0 && Boolean.TRUE.equals(args[metadata.getRetainIndex()]);
 		MqttProperties properties = metadata.getPropertiesIndex() >= 0
-				? (MqttProperties) args[metadata.getPropertiesIndex()]
-				: null;
+			? (MqttProperties) args[metadata.getPropertiesIndex()]
+			: null;
 		Consumer<MqttMessageBuilders.PublishBuilder> builder = metadata.getBuilderIndex() >= 0
-				? (Consumer<MqttMessageBuilders.PublishBuilder>) args[metadata.getBuilderIndex()]
-				: null;
+			? (Consumer<MqttMessageBuilders.PublishBuilder>) args[metadata.getBuilderIndex()]
+			: null;
 
 		String topic = TopicUtil.resolveTopic(metadata.getMqttPublish().value(), payload);
 		MqttQoS qos = metadata.getMqttPublish().qos();
@@ -75,7 +71,7 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 	}
 
 	private MethodMetadata resolveMethod(Method method) {
-		return methodCache.computeIfAbsent(method, m -> {
+		return CollUtil.computeIfAbsent(methodCache, method, m -> {
 			MqttClientPublish mqttPublish = m.getAnnotation(MqttClientPublish.class);
 			if (mqttPublish == null) {
 				throw new UnsupportedOperationException("Method not annotated with @MqttClientPublish");
@@ -111,7 +107,7 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 		});
 	}
 
-	public static class MethodMetadata {
+	private static class MethodMetadata {
 
 		private final MqttClientPublish mqttPublish;
 

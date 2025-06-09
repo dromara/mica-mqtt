@@ -23,20 +23,20 @@ import java.lang.reflect.Proxy;
  */
 public interface IMqttClient {
 
-    MqttClient getMqttClient();
+	MqttClient getMqttClient();
 
-    /**
-     * 增加一个代理接口方法
-     *
-     * @param clientClass 被代理接口
-     * @param <T> 代理接口的类型
-     * @return 代理对象
-     */
-    default <T> T getInterface(Class<T> clientClass) {
-        return (T) Proxy.newProxyInstance(
-                clientClass.getClassLoader(),
-                new Class<?>[]{clientClass},
-                new MqttInvocationHandler(this, clientClass)
-        );
-    }
+	/**
+	 * 增加一个代理接口方法
+	 *
+	 * @param clientClass 被代理接口
+	 * @param <T>         代理接口的类型
+	 * @return 代理对象
+	 */
+	default <T> T getInterface(Class<T> clientClass) {
+		return (T) Proxy.newProxyInstance(
+			clientClass.getClassLoader(),
+			new Class<?>[]{clientClass},
+			new MqttInvocationHandler(this)
+		);
+	}
 }
