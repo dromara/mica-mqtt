@@ -225,26 +225,26 @@ public final class TopicUtil {
 		return startIndex != -1 && endIndex != -1 && endIndex > startIndex + 2;
 	}
 
-
 	public static String resolveTopic(String topicTemplate, Object payload) {
-		if (payload == null || !topicTemplate.contains("${")) {
+		if (payload == null) {
 			return topicTemplate;
 		}
-
-		String resolved = topicTemplate;
-		while (resolved.contains("${")) {
-			int start = resolved.indexOf("${");
-			int end = resolved.indexOf("}", start);
-			if (end == -1) {
-				break;
-			}
-
-			String fieldName = resolved.substring(start + 2, end);
+		// 替换变量
+		StringBuilder sb = new StringBuilder((int) (topicTemplate.length() * 1.5));
+		int cursor = 0;
+		for (int start, end; (start = topicTemplate.indexOf("${", cursor)) != -1 && (end = topicTemplate.indexOf('}', start)) != -1; ) {
+			sb.append(topicTemplate, cursor, start);
+			String fieldName = topicTemplate.substring(start + 2, end);
 			Object value = getFieldValue(payload, fieldName);
-
-			resolved = resolved.substring(0, start) + (value != null ? value.toString() : "") + resolved.substring(end + 1);
+			sb.append(value == null ? "" : value);
+			cursor = end + 1;
 		}
-		return resolved;
+		if (cursor == 0) {
+			return topicTemplate;
+		} else {
+			sb.append(topicTemplate.substring(cursor));
+			return sb.toString();
+		}
 	}
 
 	public static Object getFieldValue(Object obj, String fieldName) {

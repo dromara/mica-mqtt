@@ -108,4 +108,20 @@ class TopicUtilTest {
 		Assertions.assertFalse(TopicUtil.hasVariable(test3));
 		Assertions.assertTrue(TopicUtil.hasVariable(test4));
 	}
+
+	@Test
+	void testResolveTopic() {
+		String message = "Hello, ${name}!";
+		TestBean testBean = new TestBean();
+		testBean.setName("张三");
+		String m1 = TopicUtil.resolveTopic(message, testBean);
+		Assertions.assertEquals("Hello, 张三!", m1);
+		String s1 = "$SYS/brokers/${node}/clients/${clientId}/disconnected";
+		testBean.setNode("node1");
+		testBean.setClientId("abc123");
+		String m2 = TopicUtil.resolveTopic(s1, testBean);
+		Assertions.assertEquals("$SYS/brokers/node1/clients/abc123/disconnected", m2);
+		String m3 = TopicUtil.resolveTopic("/iot/test/123", testBean);
+		Assertions.assertEquals("/iot/test/123", m3);
+	}
 }
