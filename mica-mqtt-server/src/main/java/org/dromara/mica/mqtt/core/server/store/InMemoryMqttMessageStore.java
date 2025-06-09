@@ -38,11 +38,16 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 	 */
 	private final ConcurrentMap<String, Message> willStore = new ConcurrentHashMap<>();
 	/**
+	 * 保持消息 topic: Message
 	 * 带有有效期的保持消息 topic: Message
 	 */
-	private final TimedCache<String, Message> retainStore = new TimedCache<>(
-		Long.MAX_VALUE,
-		60 * 1000, // 定时 1s 清理一次缓存
+	private final ConcurrentMap<String, Message> retainStore = new ConcurrentHashMap<>();
+	/**
+	 * 带有有效期的保持消息 topic: Message
+	 */
+	private final TimedCache<String, Message> timedRetainStore = new TimedCache<>(
+		TimeUnit.HOURS.toMillis(2),   // 默认 2 小时缓存
+		TimeUnit.SECONDS.toMillis(1), // 定时 1s 清理一次缓存
 		new ConcurrentHashMap<>()
 	);
 
@@ -68,7 +73,7 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 		if (timeout <= 0) {
 			retainStore.put(topic, message);
 		} else {
-			retainStore.put(topic, message, TimeUnit.SECONDS.toMillis(timeout));
+			timedRetainStore.put(topic, message, TimeUnit.SECONDS.toMillis(timeout));
 		}
 		return true;
 	}
@@ -76,6 +81,7 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 	@Override
 	public boolean clearRetainMessage(String topic) {
 		retainStore.remove(topic);
+		timedRetainStore.remove(topic);
 		return true;
 	}
 
@@ -85,6 +91,11 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 		for (String topic : retainStore.keySet()) {
 			if (TopicUtil.match(topicFilter, topic)) {
 				retainMessageList.add(retainStore.get(topic));
+			}
+		}
+		for (String topic : timedRetainStore.keySet()) {
+			if (TopicUtil.match(topicFilter, topic)) {
+				retainMessageList.add(timedRetainStore.get(topic));
 			}
 		}
 		return retainMessageList;
