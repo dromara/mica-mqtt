@@ -40,7 +40,11 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 	/**
 	 * 带有有效期的保持消息 topic: Message
 	 */
-	private final TimedCache<String, Message> retainStore = new TimedCache<>(Long.MAX_VALUE);
+	private final TimedCache<String, Message> retainStore = new TimedCache<>(
+		Long.MAX_VALUE,
+		60 * 1000, // 定时 1s 清理一次缓存
+		new ConcurrentHashMap<>()
+	);
 
 	@Override
 	public boolean addWillMessage(String clientId, Message message) {
