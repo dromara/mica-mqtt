@@ -45,23 +45,24 @@ public class MqttHttpHelper {
 		tioConfig.ids.unbind(context);
 		tioConfig.clientNodes.remove(context);
 		tioConfig.tokens.unbind(context);
-		// 2. 关闭
-		HttpResponse httpResponse = (HttpResponse) packet;
-		HttpRequest request = httpResponse.getHttpRequest();
-		if (request != null) {
-			if (request.httpConfig.compatible1_0) {
-				if (HttpConst.HttpVersion.V1_0.equals(request.requestLine.version)) {
-					if (!HttpConst.RequestHeaderValue.Connection.keep_alive.equals(request.getConnection())) {
-						Tio.remove(context, "http 请求头Connection!=keep-alive：" + request.getRequestLine());
+		// 2. 关闭 http，sse 的包有可能会到这
+		if (packet instanceof HttpResponse) {
+			HttpRequest request = ((HttpResponse) packet).getHttpRequest();
+			if (request != null) {
+				if (request.httpConfig.compatible1_0) {
+					if (HttpConst.HttpVersion.V1_0.equals(request.requestLine.version)) {
+						if (!HttpConst.RequestHeaderValue.Connection.keep_alive.equals(request.getConnection())) {
+							Tio.remove(context, "http 请求头Connection!=keep-alive：" + request.getRequestLine());
+						}
+					} else {
+						if (HttpConst.RequestHeaderValue.Connection.close.equals(request.getConnection())) {
+							Tio.remove(context, "http 请求头Connection=close：" + request.getRequestLine());
+						}
 					}
 				} else {
 					if (HttpConst.RequestHeaderValue.Connection.close.equals(request.getConnection())) {
 						Tio.remove(context, "http 请求头Connection=close：" + request.getRequestLine());
 					}
-				}
-			} else {
-				if (HttpConst.RequestHeaderValue.Connection.close.equals(request.getConnection())) {
-					Tio.remove(context, "http 请求头Connection=close：" + request.getRequestLine());
 				}
 			}
 		}
