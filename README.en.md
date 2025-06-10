@@ -12,7 +12,7 @@
 
 📖English | [📖简体中文](README.md)
 
-Dromara `mica-mqtt` is a **low-latency** and **high-performance** `mqtt` Internet of Things component. For more usage details, please refer to the **mica-mqtt-example** module.
+Dromara `mica-mqtt` is a **low-latency, high-performance** MQTT IoT component designed for seamless integration and scalability. For detailed usage guides, refer to the **mica-mqtt-example** module.
 
 ## 🍱 Use Cases
 
@@ -22,15 +22,15 @@ Dromara `mica-mqtt` is a **low-latency** and **high-performance** `mqtt` Interne
 - Message push
 - Easy-to-use MQTT client
 
-## 🚀 Advantages
-- Ordinary yet not monotonous, simple yet not lackluster.
-- Manual transmission (more conducive to secondary development or expansion).
-- A newborn calf; infinite possibilities.
+## 🚀 Key Advantages
+- **Simplicity & Flexibility**: Intuitive design for easy integration while retaining extensibility for advanced use cases.
+- **Manual Control**: Explicit API design to facilitate secondary development and customization.
+- **Future-ready**: Built with scalability in mind, supporting evolving IoT requirements.
 
 ## ✨ Features
-- [x] Support for MQTT v3.1, v3.1.1, and v5.0 protocols.
-- [x] Support for WebSocket MQTT sub-protocol (compatible with mqtt.js).
-- [x] Support for HTTP REST API, see [HTTP API Documentation](docs/http-api.md) for details.
+- [x] Supports MQTT v3.1, v3.1.1, and v5.0 protocols.
+- [x] Supports WebSocket MQTT sub-protocol (fully compatible with mqtt.js).
+- [x] Supports HTTP REST API - see [HTTP API Documentation](docs/http-api.md) for details.
 - [x] Support for MQTT client, support Android native.
 - [x] Support for MQTT server, support Android native.
 - [x] Support for MQTT Will messages.
