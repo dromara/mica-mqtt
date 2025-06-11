@@ -41,6 +41,7 @@ import org.tio.core.Node;
 import org.tio.core.Tio;
 import org.tio.core.TioConfig;
 import org.tio.utils.hutool.StrUtil;
+import org.tio.utils.mica.Pair;
 import org.tio.utils.timer.TimerTaskService;
 
 import java.util.ArrayList;
@@ -463,8 +464,8 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		boolean isRetain = fixedHeader.isRetain();
 		byte[] payload = publishMessage.payload();
 
-		String[] retainTopicName = TopicUtil.retainTopicName(topicName);
-		String newTopic = retainTopicName[0];
+		Pair<String, Long> retainPair = TopicUtil.retainTopicName(topicName);
+		String newTopic = retainPair.getLeft();
 		boolean store = false;
 
 		// 1. retain 消息逻辑
@@ -485,7 +486,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 				// 客户端 ip:端口
 				retainMessage.setPeerHost(clientNode.getPeerHost());
 				retainMessage.setNode(serverCreator.getNodeName());
-				this.messageStore.addRetainMessage(newTopic, Long.parseLong(retainTopicName[1]), retainMessage);
+				this.messageStore.addRetainMessage(newTopic, retainPair.getRight(), retainMessage);
 				retainMessage.setStore(true);
 				store = true;
 			}

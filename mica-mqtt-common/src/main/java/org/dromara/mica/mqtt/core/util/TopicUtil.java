@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.core.util;
 
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.tio.utils.hutool.StrUtil;
+import org.tio.utils.mica.Pair;
 
 import java.lang.reflect.Field;
 import java.util.List;
@@ -92,14 +93,14 @@ public final class TopicUtil {
 	 *
 	 * @param topicName topicName
 	 */
-	public static String[] retainTopicName(String topicName) {
+	public static Pair<String, Long> retainTopicName(String topicName) {
 		if (topicName.startsWith("$retain/")) {
 			String[] retainArray = topicName.split("/", 3);
 			if (retainArray.length == 3) {
-				return new String[]{retainArray[2], retainArray[1]};
+				return new Pair<>(retainArray[2], Long.parseLong(retainArray[1]));
 			}
 		}
-		return new String[]{topicName, "-1"};
+		return new Pair<>(topicName, -1L);
 	}
 
 	/**

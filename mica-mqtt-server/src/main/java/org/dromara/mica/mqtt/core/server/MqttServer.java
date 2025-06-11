@@ -38,6 +38,7 @@ import org.tio.core.stat.vo.StatVo;
 import org.tio.server.TioServer;
 import org.tio.server.TioServerConfig;
 import org.tio.utils.hutool.StrUtil;
+import org.tio.utils.mica.Pair;
 import org.tio.utils.page.Page;
 import org.tio.utils.page.PageUtils;
 import org.tio.utils.timer.TimerTask;
@@ -190,9 +191,9 @@ public final class MqttServer {
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
 		if (retain && !store) {
-			String[] retainTopicName = TopicUtil.retainTopicName(topic);
-			topic = retainTopicName[0];
-			this.saveRetainMessage(topic, Long.parseLong(retainTopicName[1]), qos, payload);
+			Pair<String, Long> retainPair = TopicUtil.retainTopicName(topic);
+			topic = retainPair.getLeft();
+			this.saveRetainMessage(topic, retainPair.getRight(), qos, payload);
 		}
 		// 获取 context
 		ChannelContext context = Tio.getByBsId(getServerConfig(), clientId);
@@ -305,9 +306,9 @@ public final class MqttServer {
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
 		if (retain && !store) {
-			String[] retainTopicName = TopicUtil.retainTopicName(topic);
-			topic = retainTopicName[0];
-			this.saveRetainMessage(topic, Long.parseLong(retainTopicName[1]), qos, payload);
+			Pair<String, Long> retainPair = TopicUtil.retainTopicName(topic);
+			topic = retainPair.getLeft();
+			this.saveRetainMessage(topic, retainPair.getRight(), qos, payload);
 		}
 		// 查找订阅该 topic 的客户端
 		List<Subscribe> subscribeList = sessionManager.searchSubscribe(topic);
