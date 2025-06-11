@@ -21,6 +21,7 @@ import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.tio.utils.cache.TimedCache;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -99,6 +100,14 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 			}
 		}
 		return retainMessageList;
+	}
+
+	@Override
+	public void clean() throws IOException {
+		this.willStore.clear();
+		this.retainStore.clear();
+		this.timedRetainStore.clear();
+		this.timedRetainStore.close();
 	}
 
 }

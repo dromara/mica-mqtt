@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.core.server.store;
 
 import org.dromara.mica.mqtt.core.server.model.Message;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -78,4 +79,10 @@ public interface IMqttMessageStore {
 	 */
 	List<Message> getRetainMessage(String topicFilter);
 
+	/**
+	 * 清除所有，并释放资源
+	 */
+	default void clean() throws IOException {
+
+	}
 }

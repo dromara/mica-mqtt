@@ -597,6 +597,11 @@ public final class MqttServer {
 		} catch (Throwable e) {
 			logger.error("MqttServer stop session clean error.", e);
 		}
+		try {
+			messageStore.clean();
+		} catch (Throwable e) {
+			logger.error("MqttServer stop message store clean error.", e);
+		}
 		return result;
 	}
 
