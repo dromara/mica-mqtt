@@ -146,7 +146,7 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos) {
-		return publish(clientId, topic, payload, qos, false, false);
+		return publish(clientId, topic, payload, qos, false);
 	}
 
 	/**
@@ -159,7 +159,7 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publish(String clientId, String topic, Object payload, boolean retain) {
-		return publish(clientId, topic, payload, MqttQoS.QOS0, retain, false);
+		return publish(clientId, topic, payload, MqttQoS.QOS0, retain);
 	}
 
 	/**
@@ -173,24 +173,10 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos, boolean retain) {
-		return publish(clientId, topic, payload, qos, retain, retain);
-	}
-
-	/**
-	 * 发布消息
-	 *
-	 * @param clientId clientId
-	 * @param topic    topic
-	 * @param payload  消息体
-	 * @param qos      MqttQoS
-	 * @param retain   是否在服务器上保留消息
-	 * @return 是否发送成功
-	 */
-	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos, boolean retain, boolean store) {
 		// 校验 topic
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
-		if (retain && !store) {
+		if (retain) {
 			Pair<String, Long> retainPair = TopicUtil.retainTopicName(topic);
 			topic = retainPair.getLeft();
 			this.saveRetainMessage(topic, retainPair.getRight(), qos, payload);
@@ -264,7 +250,7 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publishAll(String topic, Object payload, MqttQoS qos) {
-		return publishAll(topic, payload, qos, false, false);
+		return publishAll(topic, payload, qos, false);
 	}
 
 	/**
@@ -276,7 +262,7 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publishAll(String topic, Object payload, boolean retain) {
-		return publishAll(topic, payload, MqttQoS.QOS0, retain, false);
+		return publishAll(topic, payload, MqttQoS.QOS0, retain);
 	}
 
 	/**
@@ -289,23 +275,10 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publishAll(String topic, Object payload, MqttQoS qos, boolean retain) {
-		return publishAll(topic, payload, qos, retain, retain);
-	}
-
-	/**
-	 * 发布消息给所以的在线设备
-	 *
-	 * @param topic   topic
-	 * @param payload 消息体
-	 * @param qos     MqttQoS
-	 * @param retain  是否在服务器上保留消息
-	 * @return 是否发送成功
-	 */
-	public boolean publishAll(String topic, Object payload, MqttQoS qos, boolean retain, boolean store) {
 		// 校验 topic
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
-		if (retain && !store) {
+		if (retain) {
 			Pair<String, Long> retainPair = TopicUtil.retainTopicName(topic);
 			topic = retainPair.getLeft();
 			this.saveRetainMessage(topic, retainPair.getRight(), qos, payload);
@@ -342,9 +315,9 @@ public final class MqttServer {
 		String clientId = message.getClientId();
 		MqttQoS mqttQoS = MqttQoS.valueOf(message.getQos());
 		if (StrUtil.isBlank(clientId)) {
-			return publishAll(topic, message.getPayload(), mqttQoS, message.isRetain(), message.isStore());
+			return publishAll(topic, message.getPayload(), mqttQoS, message.isRetain());
 		} else {
-			return publish(clientId, topic, message.getPayload(), mqttQoS, message.isRetain(), message.isStore());
+			return publish(clientId, topic, message.getPayload(), mqttQoS, message.isRetain());
 		}
 	}
 
@@ -361,13 +334,12 @@ public final class MqttServer {
 		retainMessage.setQos(mqttQoS.value());
 		retainMessage.setPayload(payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload));
 		retainMessage.setMessageType(MessageType.DOWN_STREAM);
-		retainMessage.setRetain(true);
+		// 将保留消息标记成 false，避免后续下发时再次存储
+		retainMessage.setRetain(false);
 		retainMessage.setDup(false);
 		retainMessage.setTimestamp(System.currentTimeMillis());
 		retainMessage.setNode(serverCreator.getNodeName());
-		if (this.messageStore.addRetainMessage(topic, timeout, retainMessage)) {
-			retainMessage.setStore(true);
-		}
+		this.messageStore.addRetainMessage(topic, timeout, retainMessage);
 	}
 
 	/**

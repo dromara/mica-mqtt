@@ -74,7 +74,7 @@ public abstract class AbstractMqttMessageDispatcher implements org.dromara.mica.
 			String topic = message.getTopic();
 			// http rest api 消息也会转发到此
 			MqttQoS mqttQoS = MqttQoS.valueOf(message.getQos());
-			mqttServer.publishAll(topic, message.getPayload(), mqttQoS, message.isRetain(), message.isStore());
+			mqttServer.publishAll(topic, message.getPayload(), mqttQoS, message.isRetain());
 			// 触发消息
 			try {
 				onHttpApiMessage(topic, mqttQoS, message);

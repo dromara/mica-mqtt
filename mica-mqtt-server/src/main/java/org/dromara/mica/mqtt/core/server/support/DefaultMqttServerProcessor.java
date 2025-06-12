@@ -463,32 +463,28 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		Node clientNode = context.getClientNode();
 		boolean isRetain = fixedHeader.isRetain();
 		byte[] payload = publishMessage.payload();
-
-		Pair<String, Long> retainPair = TopicUtil.retainTopicName(topicName);
-		String newTopic = retainPair.getLeft();
-		boolean store = false;
-
 		// 1. retain 消息逻辑
 		if (isRetain) {
+			Pair<String, Long> retainPair = TopicUtil.retainTopicName(topicName);
+			topicName = retainPair.getLeft();
 			// qos == 0 or payload is none,then clear previous retain message
 			if (MqttQoS.QOS0 == mqttQoS || payload == null || payload.length == 0) {
-				this.messageStore.clearRetainMessage(newTopic);
+				this.messageStore.clearRetainMessage(topicName);
 			} else {
 				Message retainMessage = new Message();
-				retainMessage.setTopic(newTopic);
+				retainMessage.setTopic(topicName);
 				retainMessage.setQos(mqttQoS.value());
 				retainMessage.setPayload(payload);
 				retainMessage.setFromClientId(clientId);
 				retainMessage.setMessageType(MessageType.DOWN_STREAM);
-				retainMessage.setRetain(true);
+				// 将保留消息标记成 false，避免后续下发时再次存储
+				retainMessage.setRetain(false);
 				retainMessage.setDup(fixedHeader.isDup());
 				retainMessage.setTimestamp(System.currentTimeMillis());
 				// 客户端 ip:端口
 				retainMessage.setPeerHost(clientNode.getPeerHost());
 				retainMessage.setNode(serverCreator.getNodeName());
-				this.messageStore.addRetainMessage(newTopic, retainPair.getRight(), retainMessage);
-				retainMessage.setStore(true);
-				store = true;
+				this.messageStore.addRetainMessage(topicName, retainPair.getRight(), retainMessage);
 			}
 		}
 		// 2. message
@@ -499,14 +495,14 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		message.setId(packetId);
 		// 注意：broker 消息转发是不需要设置 toClientId 而是应该按 topic 找到订阅的客户端进行发送
 		message.setFromClientId(clientId);
-		message.setTopic(newTopic);
+		message.setTopic(topicName);
 		message.setQos(mqttQoS.value());
 		if (payload != null) {
 			message.setPayload(payload);
 		}
 		message.setMessageType(MessageType.UP_STREAM);
-		message.setRetain(isRetain);
-		message.setStore(store);
+		// 将保留消息标记成 false，避免后续下发时再次存储，因为上面已经保存
+		message.setRetain(false);
 		message.setDup(fixedHeader.isDup());
 		message.setTimestamp(System.currentTimeMillis());
 		// 客户端 ip:端口
@@ -516,7 +512,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		if (messageListener != null) {
 			executor.submit(() -> {
 				try {
-					messageListener.onMessage(context, clientId, newTopic, mqttQoS, publishMessage, message);
+					messageListener.onMessage(context, clientId, message.getTopic(), mqttQoS, publishMessage, message);
 				} catch (Throwable e) {
 					logger.error(e.getMessage(), e);
 				}
