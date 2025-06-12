@@ -238,7 +238,6 @@ public class MqttWebServer {
 		this.httpConfig.setBindIp(serverCreator.getIp());
 		this.httpConfig.setName(serverCreator.getName() + "-HTTP/Websocket");
 		this.httpConfig.setCheckHost(false);
-		this.httpConfig.setHttpRequestHandler(this.httpRequestHandler);
 		this.mqttWebServerAioHandler = new MqttWebServerAioHandler(httpConfig, this.httpRequestHandler, wsMsgHandler);
 		this.serverTioConfig = new TioServerConfig(this.httpConfig.getName(), mqttWebServerAioHandler, serverAioListener, tioExecutor, groupExecutor);
 		this.serverTioConfig.setSslConfig(serverCreator.getSslConfig());
