@@ -27,7 +27,7 @@ mqtt:
     port: 1883                  # 端口：默认：1883
     name: Mica-Mqtt-Client      # 名称，默认：Mica-Mqtt-Client
     client-id: 000001           # 客户端Id（非常重要，一般为设备 sn，不可重复）
-    user-name: mica             # 认证的用户名
+    username: mica              # 认证的用户名，注意：2.5.x 开始将 user-name 改成了 username
     password: 123456            # 认证的密码
     global-subscribe:           # 全局订阅的 topic，可被全局监听到，保留 session 停机重启，依然可以接受到消息。（2.2.9开始支持）
     timeout: 5                  # 超时时间，单位：秒，默认：5秒
