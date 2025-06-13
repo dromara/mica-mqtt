@@ -486,15 +486,25 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 				this.messageStore.addRetainMessage(topicName, retainPair.getRight(), retainMessage);
 			}
 		}
+		// topic
+		final String topic = topicName;
+		// 2. 消息监听
+		if (messageListener != null) {
+			executor.submit(() -> {
+				try {
+					messageListener.onMessage(context, clientId, topic, mqttQoS, publishMessage);
+				} catch (Throwable e) {
+					logger.error(e.getMessage(), e);
+				}
+			});
+		}
 		// 2. message
 		MqttPublishVariableHeader variableHeader = publishMessage.variableHeader();
-		// messageId
-		int packetId = variableHeader.packetId();
 		Message message = new Message();
-		message.setId(packetId);
+		message.setId(variableHeader.packetId());
 		// 注意：broker 消息转发是不需要设置 toClientId 而是应该按 topic 找到订阅的客户端进行发送
 		message.setFromClientId(clientId);
-		message.setTopic(topicName);
+		message.setTopic(topic);
 		message.setQos(mqttQoS.value());
 		if (payload != null) {
 			message.setPayload(payload);
@@ -507,16 +517,6 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		// 客户端 ip:端口
 		message.setPeerHost(clientNode.getPeerHost());
 		message.setNode(serverCreator.getNodeName());
-		// 3. 消息发布
-		if (messageListener != null) {
-			executor.submit(() -> {
-				try {
-					messageListener.onMessage(context, clientId, message.getTopic(), mqttQoS, publishMessage);
-				} catch (Throwable e) {
-					logger.error(e.getMessage(), e);
-				}
-			});
-		}
 		// 4. 消息流转
 		executor.submit(() -> {
 			try {
