@@ -223,6 +223,10 @@ public class MqttServerCreator {
 	private boolean proxyProtocolOn = false;
 
 	private MqttSerializer mqttSerializer;
+	/**
+	 * 开启 mcp 服务
+	 */
+	private boolean enableMcpServer = true;
 
 	public String getName() {
 		return name;
@@ -596,6 +600,15 @@ public class MqttServerCreator {
 
 	public MqttServerCreator mqttSerializer(MqttSerializer mqttSerializer) {
 		this.mqttSerializer = mqttSerializer;
+		return this;
+	}
+
+	public boolean isMcpServerEnabled() {
+		return enableMcpServer;
+	}
+
+	public MqttServerCreator enableMcpServer(boolean enableMcpServer) {
+		this.enableMcpServer = enableMcpServer;
 		return this;
 	}
 

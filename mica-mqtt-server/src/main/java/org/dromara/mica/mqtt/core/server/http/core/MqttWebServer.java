@@ -199,6 +199,7 @@ import org.dromara.mica.mqtt.core.server.http.api.MqttHttpApi;
 import org.dromara.mica.mqtt.core.server.http.api.auth.BasicAuthFilter;
 import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRequestHandler;
 import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRoutes;
+import org.dromara.mica.mqtt.core.server.http.mcp.MqttMcp;
 import org.dromara.mica.mqtt.core.server.http.websocket.MqttWsMsgHandler;
 import org.tio.core.uuid.SeqTioUuid;
 import org.tio.http.common.HttpConfig;
@@ -295,6 +296,11 @@ public class MqttWebServer {
 			String password = serverCreator.getHttpBasicPassword();
 			if (Objects.nonNull(username) && Objects.nonNull(password)) {
 				MqttHttpRoutes.addFilter(new BasicAuthFilter(username, password));
+			}
+			// 是否开启 mcp
+			if (serverCreator.isMcpServerEnabled()) {
+				MqttMcp mqttMcp = new MqttMcp(serverCreator, mqttServerConfig);
+				mqttMcp.register();
 			}
 		}
 		// 2. 初始化处理器
