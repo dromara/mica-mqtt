@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.codec;
 
+import org.dromara.mica.mqtt.codec.properties.*;
 import org.tio.core.ChannelContext;
 import org.tio.core.exception.TioDecodeException;
 import org.tio.utils.buffer.ByteBufferUtil;
@@ -634,7 +635,7 @@ public final class MqttDecoder {
 			long propertyId = decodeVariableByteInteger(buffer);
 			final int propertyIdValue = unpackA(propertyId);
 			numberOfBytesConsumed += unpackB(propertyId);
-			MqttProperties.MqttPropertyType propertyType = MqttProperties.MqttPropertyType.valueOf(propertyIdValue);
+			MqttPropertyType propertyType = MqttPropertyType.valueOf(propertyIdValue);
 			switch (propertyType) {
 				case PAYLOAD_FORMAT_INDICATOR:
 				case REQUEST_PROBLEM_INFORMATION:
@@ -646,7 +647,7 @@ public final class MqttDecoder {
 				case SHARED_SUBSCRIPTION_AVAILABLE:
 					final int b1 = ByteBufferUtil.readUnsignedByte(buffer);
 					numberOfBytesConsumed++;
-					decodedProperties.add(new MqttProperties.IntegerProperty(propertyIdValue, b1));
+					decodedProperties.add(new IntegerProperty(propertyIdValue, b1));
 					break;
 				case SERVER_KEEP_ALIVE:
 				case RECEIVE_MAXIMUM:
@@ -654,7 +655,7 @@ public final class MqttDecoder {
 				case TOPIC_ALIAS:
 					final int int2BytesResult = decodeMsbLsb(buffer);
 					numberOfBytesConsumed += 2;
-					decodedProperties.add(new MqttProperties.IntegerProperty(propertyIdValue, int2BytesResult));
+					decodedProperties.add(new IntegerProperty(propertyIdValue, int2BytesResult));
 					break;
 				case PUBLICATION_EXPIRY_INTERVAL:
 				case SESSION_EXPIRY_INTERVAL:
@@ -662,12 +663,12 @@ public final class MqttDecoder {
 				case MAXIMUM_PACKET_SIZE:
 					final int maxPacketSize = buffer.getInt();
 					numberOfBytesConsumed += 4;
-					decodedProperties.add(new MqttProperties.IntegerProperty(propertyIdValue, maxPacketSize));
+					decodedProperties.add(new IntegerProperty(propertyIdValue, maxPacketSize));
 					break;
 				case SUBSCRIPTION_IDENTIFIER:
 					long vbIntegerResult = decodeVariableByteInteger(buffer);
 					numberOfBytesConsumed += unpackB(vbIntegerResult);
-					decodedProperties.add(new MqttProperties.IntegerProperty(propertyIdValue, unpackA(vbIntegerResult)));
+					decodedProperties.add(new IntegerProperty(propertyIdValue, unpackA(vbIntegerResult)));
 					break;
 				case CONTENT_TYPE:
 				case RESPONSE_TOPIC:
@@ -678,20 +679,20 @@ public final class MqttDecoder {
 				case REASON_STRING:
 					final Result<String> stringResult = decodeString(buffer);
 					numberOfBytesConsumed += stringResult.numberOfBytesConsumed;
-					decodedProperties.add(new MqttProperties.StringProperty(propertyIdValue, stringResult.value));
+					decodedProperties.add(new StringProperty(propertyIdValue, stringResult.value));
 					break;
 				case USER_PROPERTY:
 					final Result<String> keyResult = decodeString(buffer);
 					final Result<String> valueResult = decodeString(buffer);
 					numberOfBytesConsumed += keyResult.numberOfBytesConsumed;
 					numberOfBytesConsumed += valueResult.numberOfBytesConsumed;
-					decodedProperties.add(new MqttProperties.UserProperty(keyResult.value, valueResult.value));
+					decodedProperties.add(new UserProperty(keyResult.value, valueResult.value));
 					break;
 				case CORRELATION_DATA:
 				case AUTHENTICATION_DATA:
 					final byte[] binaryDataResult = decodeByteArray(buffer);
 					numberOfBytesConsumed += binaryDataResult.length + 2;
-					decodedProperties.add(new MqttProperties.BinaryProperty(propertyIdValue, binaryDataResult));
+					decodedProperties.add(new BinaryProperty(propertyIdValue, binaryDataResult));
 					break;
 				default:
 					//shouldn't reach here

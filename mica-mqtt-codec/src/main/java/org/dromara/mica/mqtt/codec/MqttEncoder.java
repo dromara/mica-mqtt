@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.codec;
 
+import org.dromara.mica.mqtt.codec.properties.*;
 import org.tio.core.ChannelContext;
 import org.tio.utils.buffer.ByteBufferAllocator;
 import org.tio.utils.buffer.ByteBufferUtil;
@@ -507,8 +508,9 @@ public final class MqttEncoder {
 
 	private static byte[] encodeProperties(MqttProperties mqttProperties) {
 		FastByteBuffer writeBuffer = new FastByteBuffer(128);
-		for (MqttProperties.MqttProperty property : mqttProperties.listAll()) {
-			MqttProperties.MqttPropertyType propertyType = MqttProperties.MqttPropertyType.valueOf(property.propertyId);
+		for (MqttProperty property : mqttProperties.listAll()) {
+			int propertyId = property.propertyId();
+			MqttPropertyType propertyType = MqttPropertyType.valueOf(propertyId);
 			switch (propertyType) {
 				case PAYLOAD_FORMAT_INDICATOR:
 				case REQUEST_PROBLEM_INFORMATION:
@@ -518,30 +520,30 @@ public final class MqttEncoder {
 				case WILDCARD_SUBSCRIPTION_AVAILABLE:
 				case SUBSCRIPTION_IDENTIFIER_AVAILABLE:
 				case SHARED_SUBSCRIPTION_AVAILABLE:
-					writeBuffer.writeVarLengthInt(property.propertyId);
-					final byte bytePropValue = ((MqttProperties.IntegerProperty) property).value.byteValue();
+					writeBuffer.writeVarLengthInt(propertyId);
+					final byte bytePropValue = ((IntegerProperty) property).value().byteValue();
 					writeBuffer.writeByte(bytePropValue);
 					break;
 				case SERVER_KEEP_ALIVE:
 				case RECEIVE_MAXIMUM:
 				case TOPIC_ALIAS_MAXIMUM:
 				case TOPIC_ALIAS:
-					writeBuffer.writeVarLengthInt(property.propertyId);
+					writeBuffer.writeVarLengthInt(propertyId);
 					final short twoBytesInPropValue =
-						((MqttProperties.IntegerProperty) property).value.shortValue();
+						((IntegerProperty) property).value().shortValue();
 					writeBuffer.writeShortBE(twoBytesInPropValue);
 					break;
 				case PUBLICATION_EXPIRY_INTERVAL:
 				case SESSION_EXPIRY_INTERVAL:
 				case WILL_DELAY_INTERVAL:
 				case MAXIMUM_PACKET_SIZE:
-					writeBuffer.writeVarLengthInt(property.propertyId);
-					final int fourBytesIntPropValue = ((MqttProperties.IntegerProperty) property).value;
+					writeBuffer.writeVarLengthInt(propertyId);
+					final int fourBytesIntPropValue = ((IntegerProperty) property).value();
 					writeBuffer.writeIntBE(fourBytesIntPropValue);
 					break;
 				case SUBSCRIPTION_IDENTIFIER:
-					writeBuffer.writeVarLengthInt(property.propertyId);
-					final int vbi = ((MqttProperties.IntegerProperty) property).value;
+					writeBuffer.writeVarLengthInt(propertyId);
+					final int vbi = ((IntegerProperty) property).value();
 					writeBuffer.writeVarLengthInt(vbi);
 					break;
 				case CONTENT_TYPE:
@@ -551,22 +553,22 @@ public final class MqttEncoder {
 				case RESPONSE_INFORMATION:
 				case SERVER_REFERENCE:
 				case REASON_STRING:
-					writeBuffer.writeVarLengthInt(property.propertyId);
-					writeEagerUTF8String(writeBuffer, ((MqttProperties.StringProperty) property).value);
+					writeBuffer.writeVarLengthInt(propertyId);
+					writeEagerUTF8String(writeBuffer, ((StringProperty) property).value());
 					break;
 				case USER_PROPERTY:
-					final List<MqttProperties.StringPair> pairs =
-						((MqttProperties.UserProperties) property).value;
-					for (MqttProperties.StringPair pair : pairs) {
-						writeBuffer.writeVarLengthInt(property.propertyId);
+					final List<StringPair> pairs =
+						((UserProperties) property).value();
+					for (StringPair pair : pairs) {
+						writeBuffer.writeVarLengthInt(propertyId);
 						writeEagerUTF8String(writeBuffer, pair.key);
 						writeEagerUTF8String(writeBuffer, pair.value);
 					}
 					break;
 				case CORRELATION_DATA:
 				case AUTHENTICATION_DATA:
-					writeBuffer.writeVarLengthInt(property.propertyId);
-					final byte[] binaryPropValue = ((MqttProperties.BinaryProperty) property).value;
+					writeBuffer.writeVarLengthInt(propertyId);
+					final byte[] binaryPropValue = ((BinaryProperty) property).value();
 					writeBuffer.writeShortBE((short) binaryPropValue.length);
 					writeBuffer.writeBytes(binaryPropValue, 0, binaryPropValue.length);
 					break;
