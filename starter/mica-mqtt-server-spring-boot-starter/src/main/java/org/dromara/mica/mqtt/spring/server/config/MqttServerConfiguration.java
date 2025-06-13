@@ -33,7 +33,6 @@ import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.MqttServerCustomizer;
 import org.dromara.mica.mqtt.spring.server.MqttServerTemplate;
 import org.dromara.mica.mqtt.spring.server.event.SpringEventMqttConnectStatusListener;
-import org.dromara.mica.mqtt.spring.server.event.SpringEventMqttMessageListener;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -63,12 +62,6 @@ public class MqttServerConfiguration {
 	@ConditionalOnMissingBean
 	public IMqttConnectStatusListener springEventMqttConnectStatusListener(ApplicationEventPublisher eventPublisher) {
 		return new SpringEventMqttConnectStatusListener(eventPublisher);
-	}
-
-	@Bean
-	@ConditionalOnMissingBean
-	public IMqttMessageListener springEventMqttMessageListener(ApplicationEventPublisher eventPublisher) {
-		return new SpringEventMqttMessageListener(eventPublisher);
 	}
 
 	@Bean
