@@ -37,14 +37,20 @@ import java.util.function.Consumer;
  */
 public class MqttInvocationHandler<T extends IMqttClient> implements InvocationHandler {
 	private final T mqttClient;
-	private final ConcurrentMap<Method, MethodMetadata> methodCache = new ConcurrentHashMap<>();
+	private final ConcurrentMap<Method, MethodMetadata> methodCache;
 
 	public MqttInvocationHandler(T mqttClient) {
 		this.mqttClient = mqttClient;
+		this.methodCache = new ConcurrentHashMap<>();
 	}
 
 	@Override
 	public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+		// 处理默认的 hashCode、equals 和 toString
+		if (Object.class.equals(method.getDeclaringClass())) {
+			return method.invoke(this, args);
+		}
+		// 其它代理方法
 		MethodMetadata metadata = resolveMethod(method);
 
 		Object payload = metadata.getPayloadIndex() >= 0 ? args[metadata.getPayloadIndex()] : null;
@@ -62,11 +68,11 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 		if (topic == null || topic.isEmpty()) {
 			throw new IllegalArgumentException("Resolved topic is null or empty");
 		}
-
+		MqttClient client = mqttClient.getMqttClient();
 		if (builder == null) {
-			return mqttClient.getMqttClient().publish(topic, payload, qos, retain, properties);
+			return client.publish(topic, payload, qos, retain, properties);
 		} else {
-			return mqttClient.getMqttClient().publish(topic, payload, qos, builder);
+			return client.publish(topic, payload, qos, builder);
 		}
 	}
 
