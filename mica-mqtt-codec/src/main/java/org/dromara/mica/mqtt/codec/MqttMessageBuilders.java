@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.codec;
 
-import org.dromara.mica.mqtt.codec.MqttProperties.MqttPropertyType;
+import org.dromara.mica.mqtt.codec.properties.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -347,7 +347,7 @@ public final class MqttMessageBuilders {
 		private Long maximumPacketSize;
 		private int topicAliasMaximum;
 		private String reasonString;
-		private final MqttProperties.UserProperties userProperties = new MqttProperties.UserProperties();
+		private final UserProperties userProperties = new UserProperties();
 		private Boolean wildcardSubscriptionAvailable;
 		private Boolean subscriptionIdentifiersAvailable;
 		private Boolean sharedSubscriptionAvailable;
@@ -360,60 +360,60 @@ public final class MqttMessageBuilders {
 		public MqttProperties build() {
 			final MqttProperties props = new MqttProperties();
 			if (clientId != null) {
-				props.add(new MqttProperties.StringProperty(MqttPropertyType.ASSIGNED_CLIENT_IDENTIFIER.value(),
+				props.add(new StringProperty(MqttPropertyType.ASSIGNED_CLIENT_IDENTIFIER.value(),
 					clientId));
 			}
 			if (sessionExpiryInterval != null) {
-				props.add(new MqttProperties.IntegerProperty(
+				props.add(new IntegerProperty(
 					MqttPropertyType.SESSION_EXPIRY_INTERVAL.value(), sessionExpiryInterval.intValue()));
 			}
 			if (receiveMaximum > 0) {
-				props.add(new MqttProperties.IntegerProperty(MqttPropertyType.RECEIVE_MAXIMUM.value(), receiveMaximum));
+				props.add(new IntegerProperty(MqttPropertyType.RECEIVE_MAXIMUM.value(), receiveMaximum));
 			}
 			if (maximumQos != null) {
-				props.add(new MqttProperties.IntegerProperty(MqttPropertyType.MAXIMUM_QOS.value(), maximumQos.intValue()));
+				props.add(new IntegerProperty(MqttPropertyType.MAXIMUM_QOS.value(), maximumQos.intValue()));
 			}
-			props.add(new MqttProperties.IntegerProperty(MqttPropertyType.RETAIN_AVAILABLE.value(), retain ? 1 : 0));
+			props.add(new IntegerProperty(MqttPropertyType.RETAIN_AVAILABLE.value(), retain ? 1 : 0));
 			if (maximumPacketSize != null) {
-				props.add(new MqttProperties.IntegerProperty(MqttPropertyType.MAXIMUM_PACKET_SIZE.value(),
+				props.add(new IntegerProperty(MqttPropertyType.MAXIMUM_PACKET_SIZE.value(),
 					maximumPacketSize.intValue()));
 			}
-			props.add(new MqttProperties.IntegerProperty(MqttPropertyType.TOPIC_ALIAS_MAXIMUM.value(),
+			props.add(new IntegerProperty(MqttPropertyType.TOPIC_ALIAS_MAXIMUM.value(),
 				topicAliasMaximum));
 			if (reasonString != null) {
-				props.add(new MqttProperties.StringProperty(MqttPropertyType.REASON_STRING.value(), reasonString));
+				props.add(new StringProperty(MqttPropertyType.REASON_STRING.value(), reasonString));
 			}
 			props.add(userProperties);
 			if (wildcardSubscriptionAvailable != null) {
-				props.add(new MqttProperties.IntegerProperty(MqttPropertyType.WILDCARD_SUBSCRIPTION_AVAILABLE.value(),
+				props.add(new IntegerProperty(MqttPropertyType.WILDCARD_SUBSCRIPTION_AVAILABLE.value(),
 					wildcardSubscriptionAvailable ? 1 : 0));
 			}
 			if (subscriptionIdentifiersAvailable != null) {
-				props.add(new MqttProperties.IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER_AVAILABLE.value(),
+				props.add(new IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER_AVAILABLE.value(),
 					subscriptionIdentifiersAvailable ? 1 : 0));
 			}
 			if (sharedSubscriptionAvailable != null) {
-				props.add(new MqttProperties.IntegerProperty(MqttPropertyType.SHARED_SUBSCRIPTION_AVAILABLE.value(),
+				props.add(new IntegerProperty(MqttPropertyType.SHARED_SUBSCRIPTION_AVAILABLE.value(),
 					sharedSubscriptionAvailable ? 1 : 0));
 			}
 			if (serverKeepAlive != null) {
-				props.add(new MqttProperties.IntegerProperty(MqttPropertyType.SERVER_KEEP_ALIVE.value(),
+				props.add(new IntegerProperty(MqttPropertyType.SERVER_KEEP_ALIVE.value(),
 					serverKeepAlive));
 			}
 			if (responseInformation != null) {
-				props.add(new MqttProperties.StringProperty(MqttPropertyType.RESPONSE_INFORMATION.value(),
+				props.add(new StringProperty(MqttPropertyType.RESPONSE_INFORMATION.value(),
 					responseInformation));
 			}
 			if (serverReference != null) {
-				props.add(new MqttProperties.StringProperty(MqttPropertyType.SERVER_REFERENCE.value(),
+				props.add(new StringProperty(MqttPropertyType.SERVER_REFERENCE.value(),
 					serverReference));
 			}
 			if (authenticationMethod != null) {
-				props.add(new MqttProperties.StringProperty(MqttPropertyType.AUTHENTICATION_METHOD.value(),
+				props.add(new StringProperty(MqttPropertyType.AUTHENTICATION_METHOD.value(),
 					authenticationMethod));
 			}
 			if (authenticationData != null) {
-				props.add(new MqttProperties.BinaryProperty(MqttPropertyType.AUTHENTICATION_DATA.value(),
+				props.add(new BinaryProperty(MqttPropertyType.AUTHENTICATION_DATA.value(),
 					authenticationData));
 			}
 			return props;
@@ -585,14 +585,12 @@ public final class MqttMessageBuilders {
 				new MqttFixedHeader(MqttMessageType.SUBACK, false, MqttQoS.QOS0, false, 0);
 			MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader =
 				new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
-
-			//transform to primitive types
-			int[] grantedQosArray = new int[this.grantedQosList.size()];
+			// transform to primitive types
+			short[] grantedQosArray = new short[this.grantedQosList.size()];
 			int i = 0;
 			for (MqttQoS grantedQos : this.grantedQosList) {
 				grantedQosArray[i++] = grantedQos.value();
 			}
-
 			MqttSubAckPayload subAckPayload = new MqttSubAckPayload(grantedQosArray);
 			return new MqttSubAckMessage(mqttFixedHeader, mqttSubAckVariableHeader, subAckPayload);
 		}

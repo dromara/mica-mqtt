@@ -19,7 +19,7 @@ package org.dromara.mica.mqtt.codec;
 /**
  * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#publish">MQTTV3.1/publish</a>
  *
- * @author netty、L.cm
+ * @author netty
  */
 public class MqttPublishMessage extends MqttMessage {
 	public MqttPublishMessage(
@@ -40,7 +40,7 @@ public class MqttPublishMessage extends MqttMessage {
 	}
 
 	public byte[] getPayload() {
-		return this.payload();
+		return (byte[]) super.payload();
 	}
 
 }

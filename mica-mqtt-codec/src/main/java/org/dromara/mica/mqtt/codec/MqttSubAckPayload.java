@@ -27,21 +27,21 @@ import java.util.Objects;
  * @author netty
  */
 public class MqttSubAckPayload {
-	private final List<Integer> reasonCodes;
+	private final List<Short> reasonCodes;
 
-	public MqttSubAckPayload(int... reasonCodes) {
+	public MqttSubAckPayload(short[] reasonCodes) {
 		Objects.requireNonNull(reasonCodes, "reasonCodes is null.");
-		List<Integer> list = new ArrayList<>(reasonCodes.length);
-		for (int v : reasonCodes) {
+		List<Short> list = new ArrayList<>(reasonCodes.length);
+		for (short v : reasonCodes) {
 			list.add(v);
 		}
 		this.reasonCodes = Collections.unmodifiableList(list);
 	}
 
-	public MqttSubAckPayload(Iterable<Integer> reasonCodes) {
+	public MqttSubAckPayload(Iterable<Short> reasonCodes) {
 		Objects.requireNonNull(reasonCodes, "reasonCodes is null.");
-		List<Integer> list = new ArrayList<>();
-		for (Integer v : reasonCodes) {
+		List<Short> list = new ArrayList<>();
+		for (Short v : reasonCodes) {
 			if (v == null) {
 				break;
 			}
@@ -50,9 +50,9 @@ public class MqttSubAckPayload {
 		this.reasonCodes = Collections.unmodifiableList(list);
 	}
 
-	public List<Integer> grantedQoSLevels() {
-		List<Integer> qosLevels = new ArrayList<>(reasonCodes.size());
-		for (int code : reasonCodes) {
+	public List<Short> grantedQoSLevels() {
+		List<Short> qosLevels = new ArrayList<>(reasonCodes.size());
+		for (Short code : reasonCodes) {
 			if (code > MqttQoS.QOS2.value()) {
 				qosLevels.add(MqttQoS.FAILURE.value());
 			} else {
@@ -62,7 +62,7 @@ public class MqttSubAckPayload {
 		return qosLevels;
 	}
 
-	public List<Integer> reasonCodes() {
+	public List<Short> reasonCodes() {
 		return reasonCodes;
 	}
 

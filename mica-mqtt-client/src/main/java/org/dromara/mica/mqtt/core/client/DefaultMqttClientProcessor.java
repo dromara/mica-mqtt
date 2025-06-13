@@ -188,7 +188,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		}
 		List<MqttClientSubscription> subscriptionList = paddingSubscribe.getSubscriptionList();
 		MqttSubAckPayload subAckPayload = message.payload();
-		List<Integer> reasonCodeList = subAckPayload.reasonCodes();
+		List<Short> reasonCodeList = subAckPayload.reasonCodes();
 		// reasonCodes 为空
 		if (reasonCodeList.isEmpty()) {
 			logger.error("MqttClient subscriptionList:{} subscribe failed reasonCodes is empty packetId:{}", subscriptionList, packetId);
@@ -199,7 +199,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		List<MqttClientSubscription> subscribedList = new ArrayList<>();
 		// MQTT 3.1.1 协议未明确规定批量订阅的返回格式，批量可能只返回一个 reasonCode
 		if (reasonCodeListSize == 1) {
-			Integer reasonCode = reasonCodeList.get(0);
+			Short reasonCode = reasonCodeList.get(0);
 			// reasonCodes 范围，0 ~ 2
 			if (reasonCode != null && reasonCode >= 0 && reasonCode <= 2) {
 				subscribedList.addAll(subscriptionList);
@@ -209,7 +209,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			for (int i = 0; i < subscriptionList.size(); i++) {
 				MqttClientSubscription subscription = subscriptionList.get(i);
 				String topicFilter = subscription.getTopicFilter();
-				Integer reasonCode = reasonCodeList.get(i);
+				Short reasonCode = reasonCodeList.get(i);
 				// reasonCodes 范围
 				if (reasonCode == null || reasonCode < 0 || reasonCode > 2) {
 					logger.error("MqttClient topicFilter:{} subscribe failed reasonCodes:{} packetId:{}", topicFilter, reasonCode, packetId);

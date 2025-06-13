@@ -20,6 +20,8 @@ import org.dromara.mica.mqtt.codec.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.MqttMessageBuilders;
 import org.dromara.mica.mqtt.codec.MqttProperties;
 import org.dromara.mica.mqtt.codec.MqttVersion;
+import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
+import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tio.client.DefaultTioClientListener;
@@ -118,7 +120,7 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 				if (properties == null) {
 					properties = new MqttProperties();
 				}
-				properties.add(new MqttProperties.IntegerProperty(MqttProperties.MqttPropertyType.SESSION_EXPIRY_INTERVAL, sessionExpiryInterval));
+				properties.add(new IntegerProperty(MqttPropertyType.SESSION_EXPIRY_INTERVAL, sessionExpiryInterval));
 			}
 			if (properties != null) {
 				builder.properties(properties);

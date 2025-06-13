@@ -25,28 +25,28 @@ public enum MqttQoS {
 	/**
 	 * QoS level 0 至多发送一次，发送即丢弃。没有确认消息，也不知道对方是否收到。
 	 */
-	QOS0(0),
+	QOS0((byte) 0),
 	/**
 	 * QoS level 1 至少一次，都要在可变头部中附加一个16位的消息ID，SUBSCRIBE 和 UNSUBSCRIBE 消息使用 QoS level 1。
 	 */
-	QOS1(1),
+	QOS1((byte) 1),
 	/**
 	 * QoS level 2 确保只有一次，仅仅在 PUBLISH 类型消息中出现，要求在可变头部中要附加消息ID。
 	 */
-	QOS2(2),
+	QOS2((byte) 2),
 	/**
 	 * 失败
 	 */
-	FAILURE(0x80);
+	FAILURE((byte) 0x80);
 
-	private final int value;
+	private final byte value;
 
-	MqttQoS(int value) {
+	MqttQoS(byte value) {
 		this.value = value;
 	}
 
-	public int value() {
-		return value;
+	public short value() {
+		return (short) (value & 0xFF);
 	}
 
 	public static MqttQoS valueOf(int value) {
@@ -68,4 +68,5 @@ public enum MqttQoS {
 	public String toString() {
 		return "QoS" + value;
 	}
+
 }
