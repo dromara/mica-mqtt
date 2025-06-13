@@ -69,9 +69,10 @@ public class MqttBrokerConfiguration {
 	}
 
 	@Bean
-	public IMqttMessageDispatcher mqttMessageDispatcher(RStreamTemplate streamTemplate,
+	public IMqttMessageDispatcher mqttMessageDispatcher(ApplicationContext context,
+														RStreamTemplate streamTemplate,
 														IMessageSerializer messageSerializer) {
-		return new RedisMqttMessageDispatcher(streamTemplate, messageSerializer, RedisKeys.REDIS_CHANNEL_EXCHANGE.getKey());
+		return new RedisMqttMessageDispatcher(context, streamTemplate, messageSerializer, RedisKeys.REDIS_CHANNEL_EXCHANGE.getKey());
 	}
 
 	@Bean

@@ -17,9 +17,15 @@
 package org.dromara.mica.mqtt.broker.cluster;
 
 import net.dreamlu.mica.redis.stream.RStreamTemplate;
+import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.serializer.IMessageSerializer;
+import org.dromara.mica.mqtt.spring.server.MqttServerTemplate;
+import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.context.ApplicationContext;
+import org.tio.core.ChannelContext;
 
 import java.util.Objects;
 
@@ -28,14 +34,18 @@ import java.util.Objects;
  *
  * @author L.cm
  */
-public class RedisMqttMessageDispatcher implements IMqttMessageDispatcher {
+public class RedisMqttMessageDispatcher implements IMqttMessageDispatcher, SmartInitializingSingleton {
+	private final ApplicationContext context;
 	private final RStreamTemplate streamTemplate;
 	private final IMessageSerializer messageSerializer;
 	private final String channel;
+	private MqttServerTemplate mqttServerTemplate;
 
-	public RedisMqttMessageDispatcher(RStreamTemplate streamTemplate,
+	public RedisMqttMessageDispatcher(ApplicationContext context,
+									  RStreamTemplate streamTemplate,
 									  IMessageSerializer messageSerializer,
 									  String channel) {
+		this.context = context;
 		this.streamTemplate = streamTemplate;
 		this.messageSerializer = messageSerializer;
 		this.channel = Objects.requireNonNull(channel, "Redis pub/sub channel is null.");
@@ -51,4 +61,18 @@ public class RedisMqttMessageDispatcher implements IMqttMessageDispatcher {
 		return true;
 	}
 
+	@Override
+	public void sendRetainMessage(ChannelContext context, String clientId, Message retainMessage) {
+		MqttServer mqttServer = mqttServerTemplate.getMqttServer();
+		String topic = retainMessage.getTopic();
+		byte[] payload = retainMessage.getPayload();
+		MqttQoS mqttQoS = MqttQoS.valueOf(retainMessage.getQos());
+		boolean retain = retainMessage.isRetain();
+		mqttServer.publish(context, clientId, topic, payload, mqttQoS, retain);
+	}
+
+	@Override
+	public void afterSingletonsInstantiated() {
+		mqttServerTemplate = context.getBean(MqttServerTemplate.class);
+	}
 }

@@ -38,7 +38,7 @@ import java.util.Objects;
  *
  * @author L.cm
  */
-public abstract class AbstractMqttMessageDispatcher implements org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher {
+public abstract class AbstractMqttMessageDispatcher implements IMqttMessageDispatcher {
 	private static final Logger logger = LoggerFactory.getLogger(AbstractMqttMessageDispatcher.class);
 	protected MqttServer mqttServer;
 	protected IMqttMessageListener messageListener;
@@ -92,6 +92,15 @@ public abstract class AbstractMqttMessageDispatcher implements org.dromara.mica.
 		return true;
 	}
 
+	@Override
+	public void sendRetainMessage(ChannelContext context, String clientId, Message retainMessage) {
+		String topic = retainMessage.getTopic();
+		byte[] payload = retainMessage.getPayload();
+		MqttQoS mqttQoS = MqttQoS.valueOf(retainMessage.getQos());
+		boolean retain = retainMessage.isRetain();
+		mqttServer.publish(context, clientId, topic, payload, mqttQoS, retain);
+	}
+
 	private void onHttpApiMessage(String topic, MqttQoS mqttQoS, Message message) {
 		String clientId = message.getClientId();
 		// 构造 context
@@ -109,7 +118,7 @@ public abstract class AbstractMqttMessageDispatcher implements org.dromara.mica.
 			.retained(message.isRetain())
 			.payload(message.getPayload())
 			.build();
-		messageListener.onMessage(context, clientId, topic, mqttQoS, publishMessage, message);
+		messageListener.onMessage(context, clientId, topic, mqttQoS, publishMessage);
 	}
 
 }

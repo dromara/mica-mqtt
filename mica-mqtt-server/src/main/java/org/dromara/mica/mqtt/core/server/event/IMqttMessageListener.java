@@ -16,7 +16,6 @@
 
 package org.dromara.mica.mqtt.core.server.event;
 
-import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.tio.core.ChannelContext;
@@ -28,20 +27,6 @@ import org.tio.core.ChannelContext;
  */
 @FunctionalInterface
 public interface IMqttMessageListener {
-
-	/**
-	 * 监听到消息
-	 *
-	 * @param context        ChannelContext
-	 * @param clientId       clientId
-	 * @param topic          topic
-	 * @param qoS            MqttQoS
-	 * @param publishMessage MqttPublishMessage
-	 * @param message        Message
-	 */
-	default void onMessage(ChannelContext context, String clientId, String topic, MqttQoS qoS, MqttPublishMessage publishMessage, Message message) {
-		onMessage(context, clientId, topic, qoS, publishMessage);
-	}
 
 	/**
 	 * 监听到消息

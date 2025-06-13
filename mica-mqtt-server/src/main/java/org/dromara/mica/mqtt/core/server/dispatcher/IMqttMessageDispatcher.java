@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.server.dispatcher;
 
 import org.dromara.mica.mqtt.core.server.model.Message;
+import org.tio.core.ChannelContext;
 
 /**
  * mqtt 消息调度器
@@ -28,21 +29,17 @@ public interface IMqttMessageDispatcher {
 	/**
 	 * 发送消息
 	 *
-	 * @param message        消息
+	 * @param message 消息
 	 * @return 是否成功
 	 */
 	boolean send(Message message);
 
 	/**
-	 * 发送消息
+	 * 订阅时下发保留消息，直接发布到订阅的连接
 	 *
-	 * @param clientId 客户端 Id
-	 * @param message  消息
-	 * @return 是否成功
+	 * @param context       ChannelContext
+	 * @param clientId      clientId
+	 * @param retainMessage retainMessage
 	 */
-	default boolean send(String clientId, Message message) {
-		message.setClientId(clientId);
-		return send(message);
-	}
-
+	void sendRetainMessage(ChannelContext context, String clientId, Message retainMessage);
 }

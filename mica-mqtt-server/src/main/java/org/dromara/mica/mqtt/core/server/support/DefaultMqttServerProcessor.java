@@ -368,7 +368,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 				List<Message> retainMessageList = messageStore.getRetainMessage(topic);
 				if (retainMessageList != null && !retainMessageList.isEmpty()) {
 					for (Message retainMessage : retainMessageList) {
-						messageDispatcher.send(clientId, retainMessage);
+						messageDispatcher.sendRetainMessage(context, clientId, retainMessage);
 					}
 				}
 			});
@@ -477,8 +477,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 				retainMessage.setPayload(payload);
 				retainMessage.setFromClientId(clientId);
 				retainMessage.setMessageType(MessageType.DOWN_STREAM);
-				// 将保留消息标记成 false，避免后续下发时再次存储
-				retainMessage.setRetain(false);
+				retainMessage.setRetain(true);
 				retainMessage.setDup(fixedHeader.isDup());
 				retainMessage.setTimestamp(System.currentTimeMillis());
 				// 客户端 ip:端口
@@ -501,7 +500,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			message.setPayload(payload);
 		}
 		message.setMessageType(MessageType.UP_STREAM);
-		// 将保留消息标记成 false，避免后续下发时再次存储，因为上面已经保存
+		// 已订阅状态下的监听，此时消息被视为“实时发布”而非“保留触发”，标志位不会被激活
 		message.setRetain(false);
 		message.setDup(fixedHeader.isDup());
 		message.setTimestamp(System.currentTimeMillis());
@@ -512,7 +511,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		if (messageListener != null) {
 			executor.submit(() -> {
 				try {
-					messageListener.onMessage(context, clientId, message.getTopic(), mqttQoS, publishMessage, message);
+					messageListener.onMessage(context, clientId, message.getTopic(), mqttQoS, publishMessage);
 				} catch (Throwable e) {
 					logger.error(e.getMessage(), e);
 				}

@@ -108,7 +108,6 @@ public class MqttClusterMessageListener {
 		}
 	}
 
-
 	private void onHttpApiMessage(String topic, MqttQoS mqttQoS, Message message) {
 		String clientId = message.getClientId();
 		// 构造 context
@@ -126,7 +125,7 @@ public class MqttClusterMessageListener {
 			.retained(message.isRetain())
 			.payload(message.getPayload())
 			.build();
-		messageListener.onMessage(context, clientId, topic, mqttQoS, publishMessage, message);
+		messageListener.onMessage(context, clientId, topic, mqttQoS, publishMessage);
 	}
 
 }

@@ -197,7 +197,7 @@ public final class MqttServer {
 	}
 
 	/**
-	 * 发布消息
+	 * 直接发布消息
 	 *
 	 * @param context  ChannelContext
 	 * @param clientId clientId
@@ -207,7 +207,7 @@ public final class MqttServer {
 	 * @param retain   是否在服务器上保留消息
 	 * @return 是否发送成功
 	 */
-	private boolean publish(ChannelContext context, String clientId, String topic, Object payload, MqttQoS qos, boolean retain) {
+	public boolean publish(ChannelContext context, String clientId, String topic, Object payload, MqttQoS qos, boolean retain) {
 		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
 		int messageId = isHighLevelQoS ? sessionManager.getMessageId(clientId) : -1;
 		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
