@@ -67,7 +67,7 @@ public final class TopicUtil {
 				}
 			} else if (ch == MqttCodecUtil.TOPIC_WILDCARDS_ONE) {
 				// 校验: 单独 + 是允许的，判断 + 号前一位是否为 /，如果有后一位也必须为 /
-				if ((i > 0 && topicFilterChars[i - 1] != '/') || (i < topicFilterIdxEnd && topicFilterChars[i + 1] != '/')) {
+				if ((i > 0 && topicFilterChars[i - 1] != MqttCodecUtil.TOPIC_LAYER) || (i < topicFilterIdxEnd && topicFilterChars[i + 1] != MqttCodecUtil.TOPIC_LAYER)) {
 					throw new IllegalArgumentException("Mqtt subscribe topicFilter illegal:" + topicFilter);
 				}
 			}
@@ -95,7 +95,7 @@ public final class TopicUtil {
 	 */
 	public static Pair<String, Long> retainTopicName(String topicName) {
 		if (topicName.startsWith("$retain/")) {
-			String[] retainArray = topicName.split("/", 3);
+			String[] retainArray = topicName.split(TOPIC_LAYER, 3);
 			if (retainArray.length == 3) {
 				return new Pair<>(retainArray[2], Long.parseLong(retainArray[1]));
 			}
@@ -132,7 +132,7 @@ public final class TopicUtil {
 				return true;
 			} else if (ch == MqttCodecUtil.TOPIC_WILDCARDS_ONE) {
 				// 校验: 单独 + 是允许的，判断 + 号前一位是否为 /，如果有后一位也必须为 /
-				if ((i > 0 && topicFilterChars[i - 1] != '/') || (i < topicFilterIdxEnd && topicFilterChars[i + 1] != '/')) {
+				if ((i > 0 && topicFilterChars[i - 1] != MqttCodecUtil.TOPIC_LAYER) || (i < topicFilterIdxEnd && topicFilterChars[i + 1] != MqttCodecUtil.TOPIC_LAYER)) {
 					throw new IllegalArgumentException("Mqtt subscribe topicFilter illegal:" + topicFilter);
 				}
 				// 如果 + 是最后一位，判断 topicName 中是否还存在层级 /
@@ -140,20 +140,20 @@ public final class TopicUtil {
 				int topicNameIdx = i + wildcardCharLen;
 				if (i == topicFilterIdxEnd && topicNameLength > topicNameIdx) {
 					for (int j = topicNameIdx; j < topicNameLength; j++) {
-						if (topicNameChars[j] == '/') {
+						if (topicNameChars[j] == MqttCodecUtil.TOPIC_LAYER) {
 							return false;
 						}
 					}
 					return true;
 				}
 				inLayerWildcard = true;
-			} else if (ch == '/') {
+			} else if (ch == MqttCodecUtil.TOPIC_LAYER) {
 				if (inLayerWildcard) {
 					inLayerWildcard = false;
 				}
 				// 预读下一位，如果是 #，并且 topicName 位数已经不足
 				int next = i + 1;
-				if ((topicFilterLength > next) && topicFilterChars[next] == '#' && topicNameLength < next) {
+				if ((topicFilterLength > next) && topicFilterChars[next] == MqttCodecUtil.TOPIC_WILDCARDS_MORE && topicNameLength < next) {
 					return true;
 				}
 			}
@@ -164,7 +164,7 @@ public final class TopicUtil {
 			// 进入通配符
 			if (inLayerWildcard) {
 				for (int j = i + wildcardCharLen; j < topicNameLength; j++) {
-					if (topicNameChars[j] == '/') {
+					if (topicNameChars[j] == MqttCodecUtil.TOPIC_LAYER) {
 						wildcardCharLen--;
 						continue topicFilterLoop;
 					} else {
