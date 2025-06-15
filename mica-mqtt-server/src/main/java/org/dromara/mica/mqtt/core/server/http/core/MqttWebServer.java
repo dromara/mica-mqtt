@@ -235,8 +235,7 @@ public class MqttWebServer {
 
 	public MqttWebServer(MqttServerCreator serverCreator, TioServerListener serverAioListener, IWsMsgHandler wsMsgHandler, SynThreadPoolExecutor tioExecutor, ExecutorService groupExecutor) {
 		this.httpRequestHandler = new MqttHttpRequestHandler();
-		this.httpConfig = new HttpConfig(serverCreator.getWebPort());
-		this.httpConfig.setBindIp(serverCreator.getIp());
+		this.httpConfig = new HttpConfig();
 		this.httpConfig.setName(serverCreator.getName() + "-HTTP/Websocket");
 		this.httpConfig.setCheckHost(false);
 		this.mqttWebServerAioHandler = new MqttWebServerAioHandler(httpConfig, this.httpRequestHandler, wsMsgHandler);
@@ -268,8 +267,8 @@ public class MqttWebServer {
 		return tioServer;
 	}
 
-	public void start() throws IOException {
-		tioServer.start(this.httpConfig.getBindIp(), this.httpConfig.getBindPort());
+	public void start(String serverIp, int serverPort) throws IOException {
+		tioServer.start(serverIp, serverPort);
 	}
 
 	public boolean stop() {
