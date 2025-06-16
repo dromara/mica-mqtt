@@ -552,7 +552,11 @@ public final class MqttClientCreator {
 	}
 
 	public MqttClientCreator debug() {
-		this.debug = true;
+		return debug(true);
+	}
+
+	public MqttClientCreator debug(boolean debug) {
+		this.debug = debug;
 		return this;
 	}
 
@@ -593,6 +597,34 @@ public final class MqttClientCreator {
 		return this;
 	}
 
+	public MqttClientCreator newCreator() {
+		return new MqttClientCreator()
+			.name(this.name)
+			.ip(this.ip)
+			.port(this.port)
+			.timeout(this.timeout)
+			.readBufferSize(this.readBufferSize)
+			.maxBytesInMessage(this.maxBytesInMessage)
+			.maxClientIdLength(this.maxClientIdLength)
+			.keepAliveSecs(this.keepAliveSecs)
+			.sslConfig(this.sslConfig)
+			.reconnect(this.reconnect)
+			.reInterval(this.reInterval)
+			.retryCount(this.retryCount)
+			.reSubscribeBatchSize(this.reSubscribeBatchSize)
+			.clientId(this.clientId)
+			.version(this.version)
+			.username(this.username)
+			.password(this.password)
+			.cleanSession(this.cleanSession)
+			.sessionExpiryIntervalSecs(this.sessionExpiryIntervalSecs)
+			.willMessage(this.willMessage)
+			.bufferAllocator(this.bufferAllocator)
+			.connectListener(this.connectListener)
+			.statEnable(this.statEnable)
+			.debug(this.debug);
+	}
+
 	private MqttClient build() {
 		// 1. clientId 为空，生成默认的 clientId
 		if (StrUtil.isBlank(this.clientId)) {
@@ -617,7 +649,7 @@ public final class MqttClientCreator {
 		}
 		// mqttExecutor
 		if (this.mqttExecutor == null) {
-			this.mqttExecutor = ThreadUtils.getBizExecutor(2);
+			this.mqttExecutor = ThreadUtils.getBizExecutor(Math.max(2, ThreadUtils.CORE_POOL_SIZE));
 		}
 		// taskService
 		if (this.taskService == null) {
