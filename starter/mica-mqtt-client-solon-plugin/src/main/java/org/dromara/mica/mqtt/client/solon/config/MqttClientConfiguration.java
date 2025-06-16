@@ -64,13 +64,11 @@ public class MqttClientConfiguration {
 			.cleanSession(properties.isCleanSession())
 			.sessionExpiryIntervalSecs(properties.getSessionExpiryIntervalSecs())
 			.bufferAllocator(properties.getBufferAllocator())
-			.statEnable(properties.isStatEnable());
+			.statEnable(properties.isStatEnable())
+			.debug(properties.isDebug());
 		Integer timeout = properties.getTimeout();
 		if (timeout != null && timeout > 0) {
 			clientCreator.timeout(timeout);
-		}
-		if (properties.isDebug()) {
-			clientCreator.debug();
 		}
 		// mqtt 业务线程数
 		Integer bizThreadPoolSize = properties.getBizThreadPoolSize();
