@@ -522,7 +522,7 @@ public final class MqttServer {
 		// 2. 启动 mqtt web
 		if (webServer != null) {
 			try {
-				webServer.start();
+				webServer.start(serverCreator.getIp(), serverCreator.getPort());
 			} catch (IOException e) {
 				String message = String.format("Mica mqtt http/websocket server port %d start fail.", this.serverCreator.getWebPort());
 				throw new IllegalStateException(message, e);

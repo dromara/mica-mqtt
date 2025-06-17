@@ -497,7 +497,8 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			message.setPayload(payload);
 		}
 		message.setMessageType(MessageType.UP_STREAM);
-		message.setRetain(isRetain);
+		// 已订阅状态下的监听，此时消息被视为“实时发布”而非“保留触发”，标志位不会被激活
+		message.setRetain(false);
 		message.setDup(fixedHeader.isDup());
 		message.setTimestamp(System.currentTimeMillis());
 		Node clientNode = context.getClientNode();
