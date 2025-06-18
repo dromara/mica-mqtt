@@ -44,7 +44,6 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 	private final IMqttClientSession clientSession;
 	private final IMqttClientConnectListener connectListener;
 	private final IMqttClientGlobalMessageListener globalMessageListener;
-	private final IMqttClientMessageIdGenerator messageIdGenerator;
 	private final TimerTaskService taskService;
 	private final ExecutorService executor;
 
@@ -53,7 +52,6 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		this.clientSession = mqttClientCreator.getClientSession();
 		this.connectListener = mqttClientCreator.getConnectListener();
 		this.globalMessageListener = mqttClientCreator.getGlobalMessageListener();
-		this.messageIdGenerator = mqttClientCreator.getMessageIdGenerator();
 		this.taskService = mqttClientCreator.getTaskService();
 		this.executor = mqttClientCreator.getMqttExecutor();
 	}
@@ -150,7 +148,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 	 * @param globalReSubscriptionList globalReSubscriptionList
 	 */
 	private void globalReSendSubscription(ChannelContext context, Set<MqttTopicSubscription> globalReSubscriptionList) {
-		int packetId = messageIdGenerator.getId();
+		int packetId = clientSession.getPacketId();
 		MqttSubscribeMessage message = MqttMessageBuilders.subscribe()
 			.addSubscriptions(globalReSubscriptionList)
 			.messageId(packetId)
@@ -168,7 +166,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 	private void reSendSubscription(ChannelContext context, List<MqttClientSubscription> reSubscriptionList) {
 		// 2. 批量重新订阅
 		List<MqttTopicSubscription> topicSubscriptionList = reSubscriptionList.stream().map(MqttClientSubscription::toTopicSubscription).collect(Collectors.toList());
-		int packetId = messageIdGenerator.getId();
+		int packetId = clientSession.getPacketId();
 		MqttSubscribeMessage message = MqttMessageBuilders.subscribe().addSubscriptions(topicSubscriptionList).messageId(packetId).build();
 		MqttPendingSubscription pendingSubscription = new MqttPendingSubscription(reSubscriptionList, message);
 		pendingSubscription.startRetransmitTimer(taskService, context);

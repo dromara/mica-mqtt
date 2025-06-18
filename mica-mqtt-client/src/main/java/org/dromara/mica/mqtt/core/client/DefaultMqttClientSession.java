@@ -26,6 +26,7 @@ import org.tio.utils.collection.MultiValueMap;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -36,6 +37,10 @@ import java.util.stream.Collectors;
 public class DefaultMqttClientSession implements IMqttClientSession {
 	private static final Logger logger = LoggerFactory.getLogger(DefaultMqttClientSession.class);
 	/**
+	 * packetId 递增生成器
+	 */
+	private final AtomicInteger packetIdGen = new AtomicInteger(1);
+	/**
 	 * 订阅的数据承载
 	 */
 	private final MultiValueMap<String, MqttClientSubscription> subscriptions = new MultiValueMap<>(new ConcurrentHashMap<>());
@@ -43,6 +48,12 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 	private final ConcurrentMap<Integer, MqttPendingUnSubscription> pendingUnSubscriptions = new ConcurrentHashMap<>();
 	private final ConcurrentMap<Integer, MqttPendingPublish> pendingPublishData = new ConcurrentHashMap<>();
 	private final ConcurrentMap<Integer, MqttPendingQos2Publish> pendingQos2PublishData = new ConcurrentHashMap<>();
+
+	@Override
+	public int getPacketId() {
+		packetIdGen.compareAndSet(0xffff, 1);
+		return packetIdGen.getAndIncrement();
+	}
 
 	@Override
 	public void addPaddingSubscribe(int messageId, MqttPendingSubscription pendingSubscription) {

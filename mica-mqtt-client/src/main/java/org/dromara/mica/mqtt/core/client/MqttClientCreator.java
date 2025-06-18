@@ -172,10 +172,6 @@ public final class MqttClientCreator {
 	 */
 	private IMqttClientSession clientSession;
 	/**
-	 * messageId 生成器
-	 */
-	private IMqttClientMessageIdGenerator messageIdGenerator;
-	/**
 	 * 是否开启监控，默认：false 不开启，节省内存
 	 */
 	private boolean statEnable = false;
@@ -319,10 +315,6 @@ public final class MqttClientCreator {
 
 	public IMqttClientSession getClientSession() {
 		return clientSession;
-	}
-
-	public IMqttClientMessageIdGenerator getMessageIdGenerator() {
-		return messageIdGenerator;
 	}
 
 	public boolean isStatEnable() {
@@ -537,11 +529,6 @@ public final class MqttClientCreator {
 		return this;
 	}
 
-	public MqttClientCreator messageIdGenerator(IMqttClientMessageIdGenerator messageIdGenerator) {
-		this.messageIdGenerator = messageIdGenerator;
-		return this;
-	}
-
 	public MqttClientCreator statEnable() {
 		return statEnable(true);
 	}
@@ -634,10 +621,6 @@ public final class MqttClientCreator {
 		// 2. 客户端 session
 		if (this.clientSession == null) {
 			this.clientSession = new DefaultMqttClientSession();
-		}
-		// 3. 消息id 生成器
-		if (this.messageIdGenerator == null) {
-			this.messageIdGenerator = new DefaultMqttClientMessageIdGenerator();
 		}
 		// tioExecutor
 		if (this.tioExecutor == null) {

@@ -31,7 +31,6 @@ import org.tio.core.Tio;
 import org.tio.utils.timer.TimerTask;
 import org.tio.utils.timer.TimerTaskService;
 
-import java.lang.reflect.Proxy;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -53,7 +52,6 @@ public final class MqttClient implements IMqttClient {
 	private final IMqttClientSession clientSession;
 	private final TimerTaskService taskService;
 	private final ExecutorService mqttExecutor;
-	private final IMqttClientMessageIdGenerator messageIdGenerator;
 	private final MqttSerializer mqttSerializer;
 	private ClientChannelContext context;
 
@@ -68,9 +66,8 @@ public final class MqttClient implements IMqttClient {
 		this.taskService = config.getTaskService();
 		this.mqttExecutor = config.getMqttExecutor();
 		this.clientSession = config.getClientSession();
-		this.messageIdGenerator = config.getMessageIdGenerator();
-        this.mqttSerializer = config.getMqttSerializer();
-    }
+		this.mqttSerializer = config.getMqttSerializer();
+	}
 
 	/**
 	 * 订阅
@@ -208,7 +205,7 @@ public final class MqttClient implements IMqttClient {
 			.map(MqttClientSubscription::toTopicSubscription)
 			.collect(Collectors.toList());
 		// 3. 没有订阅过
-		int messageId = messageIdGenerator.getId();
+		int messageId = clientSession.getPacketId();
 		MqttSubscribeMessage message = MqttMessageBuilders.subscribe()
 			.addSubscriptions(topicSubscriptionList)
 			.messageId(messageId)
@@ -252,7 +249,7 @@ public final class MqttClient implements IMqttClient {
 		clientSession.removePaddingSubscribes(topicFilters);
 		clientSession.removeSubscriptions(topicFilters);
 		// 3. 发送取消订阅到服务端
-		int messageId = messageIdGenerator.getId();
+		int messageId = clientSession.getPacketId();
 		MqttUnsubscribeMessage message = MqttMessageBuilders.unsubscribe()
 			.addTopicFilters(topicFilters)
 			.messageId(messageId)
@@ -344,7 +341,7 @@ public final class MqttClient implements IMqttClient {
 		TopicUtil.validateTopicName(topic);
 		// qos 判断
 		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
-		int messageId = isHighLevelQoS ? messageIdGenerator.getId() : -1;
+		int messageId = isHighLevelQoS ? clientSession.getPacketId() : -1;
 		MqttMessageBuilders.PublishBuilder publishBuilder = MqttMessageBuilders.publish();
 		// 序列化
 		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);

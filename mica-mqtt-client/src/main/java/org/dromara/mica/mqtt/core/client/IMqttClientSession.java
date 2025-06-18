@@ -30,6 +30,13 @@ import java.util.List;
 public interface IMqttClientSession {
 
 	/**
+	 * 获取 packetId
+	 *
+	 * @return packetId
+	 */
+	int getPacketId();
+
+	/**
 	 * 添加订阅
 	 *
 	 * @param messageId           messageId
