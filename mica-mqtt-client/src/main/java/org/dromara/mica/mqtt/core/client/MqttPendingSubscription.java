@@ -1,6 +1,8 @@
 package org.dromara.mica.mqtt.core.client;
 
 
+import org.dromara.mica.mqtt.codec.MqttMessage;
+import org.dromara.mica.mqtt.codec.MqttPacket;
 import org.dromara.mica.mqtt.codec.MqttSubscribeMessage;
 import org.dromara.mica.mqtt.core.common.RetryProcessor;
 import org.slf4j.Logger;
@@ -31,7 +33,8 @@ final class MqttPendingSubscription {
 
 	void startRetransmitTimer(TimerTaskService taskService, ChannelContext context) {
 		this.retryProcessor.setHandle((fixedHeader, originalMessage) -> {
-			boolean result = Tio.send(context, new MqttSubscribeMessage(fixedHeader, originalMessage.variableHeader(), originalMessage.payload()));
+			MqttMessage message = new MqttSubscribeMessage(fixedHeader, originalMessage.variableHeader(), originalMessage.payload());
+			boolean result = Tio.send(context, new MqttPacket(message));
 			logger.info("retry send Subscribe topics:{} result:{}", subscriptionList, result);
 		});
 		this.retryProcessor.start(taskService);

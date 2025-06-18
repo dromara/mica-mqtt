@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.server;
 
 import org.dromara.mica.mqtt.codec.MqttMessageBuilders;
+import org.dromara.mica.mqtt.codec.MqttPacket;
 import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
@@ -225,7 +226,7 @@ public final class MqttServer {
 			pendingPublish.startPublishRetransmissionTimer(taskService, context);
 		}
 		// 发送消息
-		boolean result = Tio.send(context, message);
+		boolean result = Tio.send(context, new MqttPacket(message));
 		logger.debug("MQTT Topic:{} qos:{} retain:{} publish clientId:{} result:{}", topic, qos, retain, clientId, result);
 		return result;
 	}

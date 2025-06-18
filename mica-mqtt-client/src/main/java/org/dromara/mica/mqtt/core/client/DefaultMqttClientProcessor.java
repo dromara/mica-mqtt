@@ -153,7 +153,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			.addSubscriptions(globalReSubscriptionList)
 			.messageId(packetId)
 			.build();
-		boolean result = Tio.send(context, message);
+		boolean result = Tio.send(context, new MqttPacket(message));
 		logger.info("MQTT globalReSubscriptionList:{} packetId:{} resubscribing result:{}", globalReSubscriptionList, packetId, result);
 	}
 
@@ -177,7 +177,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		pendingSubscription.startRetransmitTimer(taskService, context);
 		clientSession.addPaddingSubscribe(packetId, pendingSubscription);
 		// gitee issues #IB72L6 先添加并启动重试，再发送订阅
-		boolean result = Tio.send(context, message);
+		boolean result = Tio.send(context, new MqttPacket(message));
 		logger.info("MQTT subscriptionList:{} packetId:{} resubscribing result:{}", reSubscriptionList, packetId, result);
 	}
 
@@ -262,7 +262,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 				invokeListenerForPublish(context, topicName, message);
 				if (packetId != -1) {
 					MqttMessage messageAck = MqttMessageBuilders.pubAck().packetId(packetId).build();
-					boolean resultPubAck = Tio.send(context, messageAck);
+					boolean resultPubAck = Tio.send(context, new MqttPacket(messageAck));
 					logger.debug("Publish - PubAck send topicName:{} mqttQoS:{} packetId:{} result:{}", topicName, mqttQoS, packetId, resultPubAck);
 				}
 				break;
@@ -274,7 +274,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 					clientSession.addPendingQos2Publish(packetId, pendingQos2Publish);
 					pendingQos2Publish.startPubRecRetransmitTimer(taskService, context);
 					// 先启动重试再发布消息
-					boolean resultPubRec = Tio.send(context, pubRecMessage);
+					boolean resultPubRec = Tio.send(context, new MqttPacket(pubRecMessage));
 					logger.debug("Publish - PubRec send topicName:{} mqttQoS:{} packetId:{} result:{}", topicName, mqttQoS, packetId, resultPubRec);
 				}
 				break;
@@ -332,7 +332,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		pendingPublish.startPubRelRetransmissionTimer(taskService, context);
 
 		// 发送消息
-		boolean result = Tio.send(context, pubRelMessage);
+		boolean result = Tio.send(context, new MqttPacket(pubRelMessage));
 		logger.debug("Publish - PubRec send packetId:{} result:{}", packetId, result);
 	}
 
@@ -351,7 +351,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBCOMP, false, MqttQoS.QOS0, false, 0);
 		MqttMessageIdVariableHeader variableHeader = MqttMessageIdVariableHeader.from(packetId);
 		// 发送消息
-		boolean result = Tio.send(context, new MqttMessage(fixedHeader, variableHeader));
+		boolean result = Tio.send(context, new MqttPacket(new MqttMessage(fixedHeader, variableHeader)));
 		logger.debug("Publish - PubRel send packetId:{} result:{}", packetId, result);
 	}
 

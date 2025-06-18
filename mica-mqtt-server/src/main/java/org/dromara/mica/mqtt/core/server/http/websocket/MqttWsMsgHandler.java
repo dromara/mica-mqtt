@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.server.http.websocket;
 
 import org.dromara.mica.mqtt.codec.MqttMessage;
+import org.dromara.mica.mqtt.codec.MqttPacket;
 import org.dromara.mica.mqtt.core.server.MqttMessageInterceptors;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.slf4j.Logger;
@@ -122,9 +123,10 @@ public class MqttWsMsgHandler implements IWsMsgHandler {
 				}
 				return null;
 			}
+			MqttMessage mqttMessage = ((MqttPacket) packet).getMqttMessage();
 			// 消息解析后
 			try {
-				messageInterceptors.onAfterDecoded(context, (MqttMessage) packet, readableLength);
+				messageInterceptors.onAfterDecoded(context, mqttMessage, readableLength);
 			} catch (Throwable e) {
 				logger.error(e.getMessage(), e);
 			}
@@ -132,7 +134,7 @@ public class MqttWsMsgHandler implements IWsMsgHandler {
 			mqttServerAioHandler.handler(packet, context);
 			// 消息处理后
 			try {
-				messageInterceptors.onAfterHandled(context, (MqttMessage) packet, readableLength);
+				messageInterceptors.onAfterHandled(context, mqttMessage, readableLength);
 			} catch (Throwable e) {
 				logger.error(e.getMessage(), e);
 			}
@@ -142,7 +144,7 @@ public class MqttWsMsgHandler implements IWsMsgHandler {
 
 	@Override
 	public WsResponse encodeSubProtocol(Packet packet, TioConfig tioConfig, ChannelContext context) {
-		if (packet instanceof MqttMessage) {
+		if (packet instanceof MqttPacket) {
 			ByteBuffer buffer = mqttServerAioHandler.encode(packet, null, context);
 			return WsResponse.fromBytes(buffer.array());
 		}

@@ -240,9 +240,9 @@ public final class MqttDecoder {
 		// 3. 判断是否 ping 消息，ping 只有消息类型
 		MqttMessageType messageType = mqttFixedHeader.messageType();
 		if (MqttMessageType.PINGREQ == messageType) {
-			return MqttMessage.PINGREQ;
+			return MqttPacket.MQTT_PING_REQ;
 		} else if (MqttMessageType.PINGRESP == messageType) {
-			return MqttMessage.PINGRESP;
+			return MqttPacket.MQTT_PING_RSP;
 		}
 		MqttMessage message = decodeMqttMessage(ctx, buffer, messageType, mqttFixedHeader);
 		// 4. 解码异常
@@ -250,7 +250,7 @@ public final class MqttDecoder {
 		if (decoderResult.isFailure()) {
 			throw new TioDecodeException(decoderResult.getCause());
 		}
-		return message;
+		return new MqttPacket(message);
 	}
 
 	private Result<MqttPubReplyMessageVariableHeader> decodePubReplyMessage(

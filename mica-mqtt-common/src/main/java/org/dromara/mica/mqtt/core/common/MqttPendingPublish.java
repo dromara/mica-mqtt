@@ -1,6 +1,7 @@
 package org.dromara.mica.mqtt.core.common;
 
 import org.dromara.mica.mqtt.codec.MqttMessage;
+import org.dromara.mica.mqtt.codec.MqttPacket;
 import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.slf4j.Logger;
@@ -39,7 +40,8 @@ public final class MqttPendingPublish {
 
 	public void startPublishRetransmissionTimer(TimerTaskService taskService, ChannelContext context) {
 		this.pubRetryProcessor.setHandle(((fixedHeader, originalMessage) -> {
-			boolean result = Tio.send(context, new MqttPublishMessage(fixedHeader, originalMessage.variableHeader(), this.message.payload()));
+			MqttPublishMessage publishMessage = new MqttPublishMessage(fixedHeader, originalMessage.variableHeader(), this.message.payload());
+			boolean result = Tio.send(context, new MqttPacket(publishMessage));
 			if (context.isServer()) {
 				logger.info("retry send Publish msg clientId:{} qos:{} result:{}", context.getBsId(), qos, result);
 			} else {
@@ -59,7 +61,8 @@ public final class MqttPendingPublish {
 
 	public void startPubRelRetransmissionTimer(TimerTaskService taskService, ChannelContext context) {
 		this.pubRelRetryProcessor.setHandle((fixedHeader, originalMessage) -> {
-			boolean result = Tio.send(context, new MqttMessage(fixedHeader, originalMessage.variableHeader()));
+			MqttMessage mqttMessage = new MqttMessage(fixedHeader, originalMessage.variableHeader());
+			boolean result = Tio.send(context, new  MqttPacket(mqttMessage));
 			if (context.isServer()) {
 				logger.info("retry send PubRel msg clientId:{} qos:{} result:{}", context.getBsId(), qos, result);
 			} else {

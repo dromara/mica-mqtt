@@ -47,7 +47,7 @@ public class MqttClientAioHandler implements TioClientHandler {
 
 	@Override
 	public Packet heartbeatPacket(ChannelContext channelContext) {
-		return MqttMessage.PINGREQ;
+		return MqttPacket.MQTT_PING_REQ;
 	}
 
 	@Override
@@ -57,12 +57,12 @@ public class MqttClientAioHandler implements TioClientHandler {
 
 	@Override
 	public ByteBuffer encode(Packet packet, TioConfig tioConfig, ChannelContext channelContext) {
-		return mqttEncoder.doEncode(channelContext, (MqttMessage) packet, allocator);
+		return mqttEncoder.doEncode(channelContext, ((MqttPacket) packet).getMqttMessage(), allocator);
 	}
 
 	@Override
 	public void handler(Packet packet, ChannelContext context) {
-		MqttMessage message = (MqttMessage) packet;
+		MqttMessage message = ((MqttPacket) packet).getMqttMessage();
 		// 1. 先判断 mqtt 消息解析是否正常
 		DecoderResult decoderResult = message.decoderResult();
 		if (decoderResult.isFailure()) {
