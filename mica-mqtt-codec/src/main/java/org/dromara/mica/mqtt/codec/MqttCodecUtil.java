@@ -17,7 +17,6 @@
 package org.dromara.mica.mqtt.codec;
 
 import org.tio.core.ChannelContext;
-import org.tio.core.exception.TioDecodeException;
 
 /**
  * 编解码工具
@@ -94,18 +93,18 @@ public final class MqttCodecUtil {
 		}
 	}
 
-	protected static MqttFixedHeader validateFixedHeader(ChannelContext ctx, MqttFixedHeader mqttFixedHeader) throws TioDecodeException {
+	protected static MqttFixedHeader validateFixedHeader(ChannelContext ctx, MqttFixedHeader mqttFixedHeader) {
 		switch (mqttFixedHeader.messageType()) {
 			case PUBREL:
 			case SUBSCRIBE:
 			case UNSUBSCRIBE:
 				if (MqttQoS.QOS1 != mqttFixedHeader.qosLevel()) {
-					throw new TioDecodeException(mqttFixedHeader.messageType().name() + " message must have QoS 1");
+					throw new DecoderException(mqttFixedHeader.messageType().name() + " message must have QoS 1");
 				}
 				return mqttFixedHeader;
 			case AUTH:
 				if (MqttVersion.MQTT_5 != MqttCodecUtil.getMqttVersion(ctx)) {
-					throw new TioDecodeException("AUTH message requires at least MQTT 5");
+					throw new DecoderException("AUTH message requires at least MQTT 5");
 				}
 				return mqttFixedHeader;
 			default:

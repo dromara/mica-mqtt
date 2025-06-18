@@ -63,12 +63,6 @@ public class MqttClientAioHandler implements TioClientHandler {
 	@Override
 	public void handler(Packet packet, ChannelContext context) {
 		MqttMessage message = ((MqttPacket) packet).getMqttMessage();
-		// 1. 先判断 mqtt 消息解析是否正常
-		DecoderResult decoderResult = message.decoderResult();
-		if (decoderResult.isFailure()) {
-			processor.processDecodeFailure(context, message, decoderResult.getCause());
-			return;
-		}
 		MqttFixedHeader fixedHeader = message.fixedHeader();
 		// 根据消息类型处理消息
 		MqttMessageType messageType = fixedHeader.messageType();

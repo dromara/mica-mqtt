@@ -62,7 +62,7 @@ public final class MqttDecoder {
 	 * @param buffer the buffer to decode from
 	 * @return the fixed header
 	 */
-	private static MqttFixedHeader decodeFixedHeader(ChannelContext ctx, ByteBuffer buffer) throws TioDecodeException {
+	private static MqttFixedHeader decodeFixedHeader(ChannelContext ctx, ByteBuffer buffer) {
 		short b1 = ByteBufferUtil.readUnsignedByte(buffer);
 		MqttMessageType messageType = MqttMessageType.valueOf(b1 >> 4);
 		boolean dupFlag = (b1 & 0x08) == 0x08;
@@ -83,7 +83,7 @@ public final class MqttDecoder {
 		} while ((digit & 128) != 0 && loops < 4);
 		// MQTT protocol limits Remaining Length to 4 bytes
 		if (loops == 4 && (digit & 128) != 0) {
-			throw new TioDecodeException("remaining length exceeds 4 digits (" + messageType + ')');
+			throw new DecoderException("remaining length exceeds 4 digits (" + messageType + ')');
 		}
 		int headLength = 1 + loops;
 		MqttFixedHeader decodedFixedHeader = new MqttFixedHeader(messageType, dupFlag, MqttQoS.valueOf(qosLevel), retain, headLength, remainingLength);
@@ -224,7 +224,7 @@ public final class MqttDecoder {
 		return new Result<>(mqttConnAckVariableHeader, numberOfBytesConsumed);
 	}
 
-	public Packet doDecode(ChannelContext ctx, ByteBuffer buffer, int readableLength) throws TioDecodeException {
+	public Packet doDecode(ChannelContext ctx, ByteBuffer buffer, int readableLength) {
 		// 1. 解析消息头
 		MqttFixedHeader mqttFixedHeader = getOrDecodeMqttFixedHeader(ctx, buffer, readableLength);
 		if (mqttFixedHeader == null) {
@@ -244,13 +244,7 @@ public final class MqttDecoder {
 		} else if (MqttMessageType.PINGRESP == messageType) {
 			return MqttPacket.MQTT_PING_RSP;
 		}
-		MqttMessage message = decodeMqttMessage(ctx, buffer, messageType, mqttFixedHeader);
-		// 4. 解码异常
-		DecoderResult decoderResult = message.decoderResult();
-		if (decoderResult.isFailure()) {
-			throw new TioDecodeException(decoderResult.getCause());
-		}
-		return new MqttPacket(message);
+		return new MqttPacket(decodeMqttMessage(ctx, buffer, messageType, mqttFixedHeader));
 	}
 
 	private Result<MqttPubReplyMessageVariableHeader> decodePubReplyMessage(
@@ -306,7 +300,7 @@ public final class MqttDecoder {
 		return new Result<>(mqttReasonAndPropsVariableHeader, consumed);
 	}
 
-	private MqttFixedHeader getOrDecodeMqttFixedHeader(ChannelContext ctx, ByteBuffer buffer, int readableLength) throws TioDecodeException {
+	private MqttFixedHeader getOrDecodeMqttFixedHeader(ChannelContext ctx, ByteBuffer buffer, int readableLength) {
 		// 1. 缓存避免重复解析
 		MqttFixedHeader mqttFixedHeader = ctx.get(MQTT_FIXED_HEADER_KEY);
 		if (mqttFixedHeader != null) {
@@ -326,7 +320,7 @@ public final class MqttDecoder {
 		int messageLength = mqttFixedHeader.getMessageLength();
 		// 超过最大包
 		if (messageLength > maxBytesInMessage) {
-			throw new TioDecodeException("too large message: " + messageLength + " bytes but maxBytesInMessage is " + maxBytesInMessage);
+			throw new DecoderException("too large message: " + messageLength + " bytes but maxBytesInMessage is " + maxBytesInMessage);
 		}
 		// 存储固定头，避免重复解析
 		ctx.set(MQTT_FIXED_HEADER_KEY, mqttFixedHeader);
@@ -349,7 +343,7 @@ public final class MqttDecoder {
 			variableHeader = decodedVariableHeader.value;
 			bytesRemainingInVariablePart -= decodedVariableHeader.numberOfBytesConsumed;
 		} catch (Exception cause) {
-			return MqttMessageFactory.newInvalidMessage(mqttFixedHeader, null, cause);
+			throw new DecoderException(cause);
 		}
 		// 3. 解析消息体
 		final Result<?> decodedPayload;
@@ -357,12 +351,11 @@ public final class MqttDecoder {
 			decodedPayload = decodePayload(buffer, maxClientIdLength, messageType, bytesRemainingInVariablePart, variableHeader);
 			bytesRemainingInVariablePart -= decodedPayload.numberOfBytesConsumed;
 			if (bytesRemainingInVariablePart != 0) {
-				throw new DecoderException("non-zero remaining payload bytes: " +
-					bytesRemainingInVariablePart + " (" + mqttFixedHeader.messageType() + ')');
+				throw new DecoderException("non-zero remaining payload bytes: " + bytesRemainingInVariablePart + " (" + mqttFixedHeader.messageType() + ')');
 			}
 			return MqttMessageFactory.newMessage(mqttFixedHeader, variableHeader, decodedPayload.value);
 		} catch (Throwable cause) {
-			return MqttMessageFactory.newInvalidMessage(mqttFixedHeader, variableHeader, cause);
+			throw new DecoderException(cause);
 		}
 	}
 

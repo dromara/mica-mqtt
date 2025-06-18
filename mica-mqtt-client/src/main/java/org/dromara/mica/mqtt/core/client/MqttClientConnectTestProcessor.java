@@ -17,8 +17,6 @@
 package org.dromara.mica.mqtt.core.client;
 
 import org.dromara.mica.mqtt.codec.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.tio.core.ChannelContext;
 import org.tio.core.Tio;
 
@@ -30,17 +28,10 @@ import java.util.concurrent.CompletableFuture;
  * @author L.cm
  */
 public class MqttClientConnectTestProcessor implements IMqttClientProcessor {
-	private static final Logger logger = LoggerFactory.getLogger(MqttClientConnectTestProcessor.class);
 	private final CompletableFuture<MqttConnectReasonCode> future;
 
 	public MqttClientConnectTestProcessor(CompletableFuture<MqttConnectReasonCode> future) {
 		this.future = future;
-	}
-
-	@Override
-	public void processDecodeFailure(ChannelContext context, MqttMessage message, Throwable ex) {
-		// 客户端失败，默认记录异常日志
-		logger.error(ex.getMessage(), ex);
 	}
 
 	@Override

@@ -77,15 +77,6 @@ public final class MqttMessageFactory {
 		}
 	}
 
-	public static MqttMessage newInvalidMessage(Throwable cause) {
-		return new MqttMessage(null, null, null, DecoderResult.failure(cause));
-	}
-
-	public static MqttMessage newInvalidMessage(MqttFixedHeader mqttFixedHeader, Object variableHeader,
-												Throwable cause) {
-		return new MqttMessage(mqttFixedHeader, variableHeader, null, DecoderResult.failure(cause));
-	}
-
 	private MqttMessageFactory() {
 	}
 }

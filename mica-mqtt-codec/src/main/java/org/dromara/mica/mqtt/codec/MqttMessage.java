@@ -25,7 +25,6 @@ public class MqttMessage {
 	private final MqttFixedHeader mqttFixedHeader;
 	private final Object variableHeader;
 	private final Object payload;
-	private final DecoderResult decoderResult;
 
 	public MqttMessage(MqttFixedHeader mqttFixedHeader) {
 		this(mqttFixedHeader, null, null);
@@ -36,18 +35,9 @@ public class MqttMessage {
 	}
 
 	public MqttMessage(MqttFixedHeader mqttFixedHeader, Object variableHeader, Object payload) {
-		this(mqttFixedHeader, variableHeader, payload, DecoderResult.SUCCESS);
-	}
-
-	public MqttMessage(
-		MqttFixedHeader mqttFixedHeader,
-		Object variableHeader,
-		Object payload,
-		DecoderResult decoderResult) {
 		this.mqttFixedHeader = mqttFixedHeader;
 		this.variableHeader = variableHeader;
 		this.payload = payload;
-		this.decoderResult = decoderResult;
 	}
 
 	public MqttFixedHeader fixedHeader() {
@@ -60,10 +50,6 @@ public class MqttMessage {
 
 	public Object payload() {
 		return payload;
-	}
-
-	public DecoderResult decoderResult() {
-		return decoderResult;
 	}
 
 	@Override

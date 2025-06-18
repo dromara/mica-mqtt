@@ -27,15 +27,6 @@ import org.tio.core.ChannelContext;
 public interface IMqttClientProcessor {
 
 	/**
-	 * 处理编解码失败
-	 *
-	 * @param context ChannelContext
-	 * @param message MqttMessage
-	 * @param ex      Throwable
-	 */
-	void processDecodeFailure(ChannelContext context, MqttMessage message, Throwable ex);
-
-	/**
 	 * 处理服务端链接 ack
 	 *
 	 * @param context ChannelContext

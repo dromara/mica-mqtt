@@ -57,12 +57,6 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 	}
 
 	@Override
-	public void processDecodeFailure(ChannelContext context, MqttMessage message, Throwable ex) {
-		// 客户端失败，默认记录异常日志
-		logger.error(ex.getMessage(), ex);
-	}
-
-	@Override
 	public void processConAck(ChannelContext context, MqttConnAckMessage message) {
 		MqttConnAckVariableHeader connAckVariableHeader = message.variableHeader();
 		MqttConnectReasonCode returnCode = connAckVariableHeader.connectReturnCode();
