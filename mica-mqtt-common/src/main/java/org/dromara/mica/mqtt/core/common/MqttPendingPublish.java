@@ -9,7 +9,6 @@ import org.tio.core.ChannelContext;
 import org.tio.core.Tio;
 import org.tio.utils.timer.TimerTaskService;
 
-import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -19,21 +18,15 @@ import java.util.Objects;
  */
 public final class MqttPendingPublish {
 	private static final Logger logger = LoggerFactory.getLogger(MqttPendingPublish.class);
-	private final byte[] payload;
 	private final MqttPublishMessage message;
 	private final MqttQoS qos;
 	private final RetryProcessor<MqttPublishMessage> pubRetryProcessor = new RetryProcessor<>();
 	private final RetryProcessor<MqttMessage> pubRelRetryProcessor = new RetryProcessor<>();
 
-	public MqttPendingPublish(byte[] payload, MqttPublishMessage message, MqttQoS qos) {
-		this.payload = payload;
+	public MqttPendingPublish(MqttPublishMessage message, MqttQoS qos) {
 		this.message = message;
 		this.qos = qos;
 		this.pubRetryProcessor.setOriginalMessage(message);
-	}
-
-	public byte[] getPayload() {
-		return payload;
 	}
 
 	public MqttPublishMessage getMessage() {
@@ -46,7 +39,7 @@ public final class MqttPendingPublish {
 
 	public void startPublishRetransmissionTimer(TimerTaskService taskService, ChannelContext context) {
 		this.pubRetryProcessor.setHandle(((fixedHeader, originalMessage) -> {
-			boolean result = Tio.send(context, new MqttPublishMessage(fixedHeader, originalMessage.variableHeader(), this.payload));
+			boolean result = Tio.send(context, new MqttPublishMessage(fixedHeader, originalMessage.variableHeader(), this.message.payload()));
 			if (context.isServer()) {
 				logger.info("retry send Publish msg clientId:{} qos:{} result:{}", context.getBsId(), qos, result);
 			} else {
@@ -89,13 +82,11 @@ public final class MqttPendingPublish {
 			return false;
 		}
 		MqttPendingPublish that = (MqttPendingPublish) o;
-		return Arrays.equals(payload, that.payload) && Objects.equals(message, that.message) && qos == that.qos;
+		return Objects.equals(message, that.message) && qos == that.qos;
 	}
 
 	@Override
 	public int hashCode() {
-		int result = Objects.hash(message, qos);
-		result = 31 * result + Arrays.hashCode(payload);
-		return result;
+		return Objects.hash(message, qos);
 	}
 }

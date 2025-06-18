@@ -165,9 +165,14 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 	 */
 	private void reSendSubscription(ChannelContext context, List<MqttClientSubscription> reSubscriptionList) {
 		// 2. 批量重新订阅
-		List<MqttTopicSubscription> topicSubscriptionList = reSubscriptionList.stream().map(MqttClientSubscription::toTopicSubscription).collect(Collectors.toList());
+		List<MqttTopicSubscription> topicSubscriptionList = reSubscriptionList.stream()
+			.map(MqttClientSubscription::toTopicSubscription)
+			.collect(Collectors.toList());
 		int packetId = clientSession.getPacketId();
-		MqttSubscribeMessage message = MqttMessageBuilders.subscribe().addSubscriptions(topicSubscriptionList).messageId(packetId).build();
+		MqttSubscribeMessage message = MqttMessageBuilders.subscribe()
+			.addSubscriptions(topicSubscriptionList)
+			.messageId(packetId)
+			.build();
 		MqttPendingSubscription pendingSubscription = new MqttPendingSubscription(reSubscriptionList, message);
 		pendingSubscription.startRetransmitTimer(taskService, context);
 		clientSession.addPaddingSubscribe(packetId, pendingSubscription);

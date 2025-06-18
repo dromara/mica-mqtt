@@ -366,7 +366,7 @@ public final class MqttClient implements IMqttClient {
 		}
 		// 如果是高版本的 qos
 		if (isHighLevelQoS) {
-			MqttPendingPublish pendingPublish = new MqttPendingPublish(newPayload, message, qos);
+			MqttPendingPublish pendingPublish = new MqttPendingPublish(message, qos);
 			clientSession.addPendingPublish(messageId, pendingPublish);
 			pendingPublish.startPublishRetransmissionTimer(taskService, clientContext);
 		}

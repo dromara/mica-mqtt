@@ -220,7 +220,7 @@ public final class MqttServer {
 			.build();
 		// 先启动高 qos 的重试
 		if (isHighLevelQoS) {
-			MqttPendingPublish pendingPublish = new MqttPendingPublish(newPayload, message, qos);
+			MqttPendingPublish pendingPublish = new MqttPendingPublish(message, qos);
 			sessionManager.addPendingPublish(clientId, messageId, pendingPublish);
 			pendingPublish.startPublishRetransmissionTimer(taskService, context);
 		}
