@@ -82,14 +82,14 @@ public final class MqttCodecUtil {
 		}
 		switch (mqttVersion) {
 			case MQTT_3_1:
-				return clientId.length() >= MqttConstant.MIN_CLIENT_ID_LENGTH && clientId.length() <= maxClientIdLength;
+				return !clientId.isEmpty() && clientId.length() <= maxClientIdLength;
 			case MQTT_3_1_1:
 			case MQTT_5:
 				// In 3.1.3.1 Client Identifier of MQTT 3.1.1 and 5.0 specifications, The Server MAY allow ClientId’s
 				// that contain more than 23 encoded bytes. And, The Server MAY allow zero-length ClientId.
 				return true;
 			default:
-				throw new IllegalArgumentException(mqttVersion + " is unknown mqtt version");
+				throw new MqttUnacceptableProtocolVersionException(mqttVersion + " is unknown mqtt version");
 		}
 	}
 

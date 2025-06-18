@@ -347,16 +347,12 @@ public final class MqttDecoder {
 		}
 		// 3. 解析消息体
 		final Result<?> decodedPayload;
-		try {
-			decodedPayload = decodePayload(buffer, maxClientIdLength, messageType, bytesRemainingInVariablePart, variableHeader);
-			bytesRemainingInVariablePart -= decodedPayload.numberOfBytesConsumed;
-			if (bytesRemainingInVariablePart != 0) {
-				throw new DecoderException("non-zero remaining payload bytes: " + bytesRemainingInVariablePart + " (" + mqttFixedHeader.messageType() + ')');
-			}
-			return MqttMessageFactory.newMessage(mqttFixedHeader, variableHeader, decodedPayload.value);
-		} catch (Throwable cause) {
-			throw new DecoderException(cause);
+		decodedPayload = decodePayload(buffer, maxClientIdLength, messageType, bytesRemainingInVariablePart, variableHeader);
+		bytesRemainingInVariablePart -= decodedPayload.numberOfBytesConsumed;
+		if (bytesRemainingInVariablePart != 0) {
+			throw new DecoderException("non-zero remaining payload bytes: " + bytesRemainingInVariablePart + " (" + mqttFixedHeader.messageType() + ')');
 		}
+		return MqttMessageFactory.newMessage(mqttFixedHeader, variableHeader, decodedPayload.value);
 	}
 
 	/**
