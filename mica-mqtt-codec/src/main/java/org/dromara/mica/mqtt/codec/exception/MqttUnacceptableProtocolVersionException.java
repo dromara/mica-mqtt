@@ -13,20 +13,22 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package org.dromara.mica.mqtt.codec;
+
+package org.dromara.mica.mqtt.codec.exception;
 
 /**
- * A {@link MqttIdentifierRejectedException} which is thrown when a CONNECT request contains invalid client identifier.
+ * A {@link MqttUnacceptableProtocolVersionException} which is thrown when
+ * a CONNECT request contains unacceptable protocol version.
  *
  * @author netty
  */
-public final class MqttIdentifierRejectedException extends DecoderException {
-	private static final long serialVersionUID = -1323503322689614981L;
+public final class MqttUnacceptableProtocolVersionException extends DecoderException {
+	private static final long serialVersionUID = 4914652213232455749L;
 
 	/**
 	 * Creates a new instance
 	 */
-	public MqttIdentifierRejectedException() {
+	public MqttUnacceptableProtocolVersionException() {
 	}
 
 	/**
@@ -35,7 +37,7 @@ public final class MqttIdentifierRejectedException extends DecoderException {
 	 * @param message message
 	 * @param cause   Throwable
 	 */
-	public MqttIdentifierRejectedException(String message, Throwable cause) {
+	public MqttUnacceptableProtocolVersionException(String message, Throwable cause) {
 		super(message, cause);
 	}
 
@@ -44,7 +46,7 @@ public final class MqttIdentifierRejectedException extends DecoderException {
 	 *
 	 * @param message message
 	 */
-	public MqttIdentifierRejectedException(String message) {
+	public MqttUnacceptableProtocolVersionException(String message) {
 		super(message);
 	}
 
@@ -53,7 +55,7 @@ public final class MqttIdentifierRejectedException extends DecoderException {
 	 *
 	 * @param cause Throwable
 	 */
-	public MqttIdentifierRejectedException(Throwable cause) {
+	public MqttUnacceptableProtocolVersionException(Throwable cause) {
 		super(cause);
 	}
 

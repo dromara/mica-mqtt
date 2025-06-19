@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 The Netty Project
+ * Copyright 2014 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -13,49 +13,48 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.exception;
 
 /**
- * An {@link RuntimeException} which is thrown by an encoder.
+ * A {@link MqttIdentifierRejectedException} which is thrown when a CONNECT request contains invalid client identifier.
  *
  * @author netty
  */
-public class EncoderException extends RuntimeException {
-
-	private static final long serialVersionUID = -5086121160476476774L;
+public final class MqttIdentifierRejectedException extends DecoderException {
+	private static final long serialVersionUID = -1323503322689614981L;
 
 	/**
-	 * Creates a new instance.
+	 * Creates a new instance
 	 */
-	public EncoderException() {
+	public MqttIdentifierRejectedException() {
 	}
 
 	/**
-	 * Creates a new instance.
+	 * Creates a new instance
 	 *
 	 * @param message message
 	 * @param cause   Throwable
 	 */
-	public EncoderException(String message, Throwable cause) {
+	public MqttIdentifierRejectedException(String message, Throwable cause) {
 		super(message, cause);
 	}
 
 	/**
-	 * Creates a new instance.
+	 * Creates a new instance
 	 *
 	 * @param message message
 	 */
-	public EncoderException(String message) {
+	public MqttIdentifierRejectedException(String message) {
 		super(message);
 	}
 
 	/**
-	 * Creates a new instance.
+	 * Creates a new instance
 	 *
 	 * @param cause Throwable
 	 */
-	public EncoderException(Throwable cause) {
+	public MqttIdentifierRejectedException(Throwable cause) {
 		super(cause);
 	}
+
 }

@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.codec;
 
+import org.dromara.mica.mqtt.codec.exception.MqttUnacceptableProtocolVersionException;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
