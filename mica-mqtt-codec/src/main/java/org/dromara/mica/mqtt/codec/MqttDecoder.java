@@ -18,7 +18,6 @@ package org.dromara.mica.mqtt.codec;
 
 import org.dromara.mica.mqtt.codec.properties.*;
 import org.tio.core.ChannelContext;
-import org.tio.core.exception.TioDecodeException;
 import org.tio.core.intf.Packet;
 import org.tio.utils.buffer.ByteBufferUtil;
 
