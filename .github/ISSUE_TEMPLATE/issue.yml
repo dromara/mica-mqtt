@@ -3,6 +3,16 @@ description: "请尽可能详细的描述问题，提供足够的上下文"
 labels: ["question"]
 body:
   - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options:
+        - "window"
+        - "linux"
+        - "MacOS"
+    validations:
+      required: true
+  - type: dropdown
     id: version
     attributes:
       label: mica-mqtt版本
