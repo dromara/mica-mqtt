@@ -222,7 +222,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		String topicName = variableHeader.topicName();
 		// 1. 权限判断，在 MQTT v3.1 和 v3.1.1 协议中，发布操作被拒绝后服务器无任何报文错误返回，这是协议设计的一个缺陷。但在 MQTT v5.0 协议上已经支持应答一个相应的错误报文。
 		if (publishPermission != null && !publishPermission.verifyPermission(context, clientId, topicName, mqttQoS, fixedHeader.isRetain())) {
-			logger.error("Mqtt clientId:{} username:{} topic:{} no publish permission.", clientId, context.getUserId(), topicName);
+			logger.error("Mqtt clientId:{} username:{} topic:{} 没有发布权限。", clientId, context.getUserId(), topicName);
 			return;
 		}
 		// 2. 处理发布逻辑
@@ -347,7 +347,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			// 校验是否可以订阅
 			if (enableSubscribeValidator && !subscribeValidator.verifyTopicFilter(context, clientId, topicFilter, mqttQoS)) {
 				grantedQosList.add(MqttQoS.FAILURE);
-				logger.error("Subscribe - clientId:{} username:{} topicFilter:{} mqttQoS:{} valid failed packetId:{}", clientId, context.getUserId(), topicFilter, mqttQoS, packetId);
+				logger.error("Subscribe - clientId:{} username:{} topicFilter:{} mqttQoS:{} 没有订阅权限 packetId:{}", clientId, context.getUserId(), topicFilter, mqttQoS, packetId);
 			} else {
 				grantedQosList.add(mqttQoS);
 				subscribedTopicList.add(topicFilter);
