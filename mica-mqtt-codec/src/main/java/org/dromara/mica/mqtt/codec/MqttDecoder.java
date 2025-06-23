@@ -241,11 +241,11 @@ public final class MqttDecoder {
 		// 3. 判断是否 ping 消息，ping 只有消息类型
 		MqttMessageType messageType = mqttFixedHeader.messageType();
 		if (MqttMessageType.PINGREQ == messageType) {
-			return MqttPacket.MQTT_PING_REQ;
+			return MqttMessage.PINGREQ;
 		} else if (MqttMessageType.PINGRESP == messageType) {
-			return MqttPacket.MQTT_PING_RSP;
+			return MqttMessage.PINGRESP;
 		}
-		return new MqttPacket(decodeMqttMessage(ctx, buffer, messageType, mqttFixedHeader));
+		return decodeMqttMessage(ctx, buffer, messageType, mqttFixedHeader);
 	}
 
 	private Result<MqttPubReplyMessageVariableHeader> decodePubReplyMessage(

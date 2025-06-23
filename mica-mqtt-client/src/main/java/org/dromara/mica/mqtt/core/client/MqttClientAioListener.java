@@ -50,7 +50,7 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 	public void onAfterConnected(ChannelContext context, boolean isConnected, boolean isReconnect) {
 		if (isConnected) {
 			// 重连时，发送 mqtt 连接消息
-			boolean result = Tio.bSend(context, new MqttPacket(getConnectMessage(this.clientCreator)));
+			boolean result = Tio.bSend(context, getConnectMessage(this.clientCreator));
 			logger.info("MqttClient reconnect send connect result:{}", result);
 			if (!result) {
 				// 如果重连未成功，直接关闭连接，等待后续重连

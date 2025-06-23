@@ -16,12 +16,23 @@
 
 package org.dromara.mica.mqtt.codec;
 
+import org.tio.core.intf.Packet;
+
 /**
  * Base class for all MQTT message types.
  *
  * @author netty
  */
-public class MqttMessage {
+public class MqttMessage extends Packet {
+	// Constants for fixed-header only message types with all flags set to 0 (see
+	// https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Table_2.2_-)
+	public static final MqttMessage PINGREQ = new MqttMessage(new MqttFixedHeader(MqttMessageType.PINGREQ, false,
+		MqttQoS.QOS0, false, 0));
+	public static final MqttMessage PINGRESP = new MqttMessage(new MqttFixedHeader(MqttMessageType.PINGRESP, false,
+		MqttQoS.QOS0, false, 0));
+	public static final MqttMessage DISCONNECT = new MqttMessage(new MqttFixedHeader(MqttMessageType.DISCONNECT, false,
+		MqttQoS.QOS0, false, 0));
+
 	private final MqttFixedHeader mqttFixedHeader;
 	private final Object variableHeader;
 	private final Object payload;

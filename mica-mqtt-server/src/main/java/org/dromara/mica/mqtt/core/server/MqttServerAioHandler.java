@@ -80,7 +80,7 @@ public class MqttServerAioHandler implements TioServerHandler {
 	 */
 	@Override
 	public ByteBuffer encode(Packet packet, TioConfig tioConfig, ChannelContext context) {
-		return mqttEncoder.doEncode(context, ((MqttPacket) packet).getMqttMessage(), allocator);
+		return mqttEncoder.doEncode(context, (MqttMessage) packet, allocator);
 	}
 
 	/**
@@ -91,7 +91,7 @@ public class MqttServerAioHandler implements TioServerHandler {
 	 */
 	@Override
 	public void handler(Packet packet, ChannelContext context) {
-		MqttMessage mqttMessage = ((MqttPacket) packet).getMqttMessage();
+		MqttMessage mqttMessage = (MqttMessage) packet;
 		log.debug("MqttMessage:{}", mqttMessage);
 		MqttFixedHeader fixedHeader = mqttMessage.fixedHeader();
 		MqttMessageType messageType = fixedHeader.messageType();
@@ -152,14 +152,14 @@ public class MqttServerAioHandler implements TioServerHandler {
 				.returnCode(MqttConnectReasonCode.CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION)
 				.sessionPresent(false)
 				.build();
-			Tio.bSend(context, new MqttPacket(message));
+			Tio.bSend(context, message);
 		} else if (cause instanceof MqttIdentifierRejectedException) {
 			// 不合格的 clientId
 			MqttConnAckMessage message = MqttMessageBuilders.connAck()
 				.returnCode(MqttConnectReasonCode.CONNECTION_REFUSED_IDENTIFIER_REJECTED)
 				.sessionPresent(false)
 				.build();
-			Tio.bSend(context, new MqttPacket(message));
+			Tio.bSend(context, message);
 		}
 	}
 

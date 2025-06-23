@@ -218,7 +218,7 @@ public final class MqttClient implements IMqttClient {
 			pendingSubscription.startRetransmitTimer(taskService, clientContext);
 			clientSession.addPaddingSubscribe(messageId, pendingSubscription);
 			// gitee issues #IB72L6 先添加并启动重试，再发送订阅
-			boolean result = Tio.send(clientContext, new MqttPacket(message));
+			boolean result = Tio.send(clientContext, message);
 			logger.info("MQTT subscriptionList:{} messageId:{} subscribing result:{}", needSubscriptionList, messageId, result);
 		} else {
 			clientSession.addSubscriptionList(needSubscriptionList);
@@ -260,7 +260,7 @@ public final class MqttClient implements IMqttClient {
 		clientSession.addPaddingUnSubscribe(messageId, pendingUnSubscription);
 		pendingUnSubscription.startRetransmissionTimer(taskService, clientContext);
 		// 5. 发送取消订阅的消息
-		boolean result = Tio.send(clientContext, new MqttPacket(message));
+		boolean result = Tio.send(clientContext, message);
 		logger.info("MQTT Topic:{} messageId:{} unSubscribing result:{}", topicFilters, messageId, result);
 		return this;
 	}
@@ -371,7 +371,7 @@ public final class MqttClient implements IMqttClient {
 			pendingPublish.startPublishRetransmissionTimer(taskService, clientContext);
 		}
 		// 发送消息
-		boolean result = Tio.send(clientContext, new MqttPacket(message));
+		boolean result = Tio.send(clientContext, message);
 		logger.debug("MQTT Topic:{} qos:{} retain:{} publish result:{}", topic, qos, publishBuilder.isRetained(), result);
 		return result;
 	}
@@ -508,7 +508,7 @@ public final class MqttClient implements IMqttClient {
 		if (channelContext == null) {
 			return false;
 		}
-		boolean result = Tio.bSend(channelContext, MqttPacket.MQTT_DISCONNECT);
+		boolean result = Tio.bSend(channelContext, MqttMessage.DISCONNECT);
 		if (result) {
 			Tio.close(channelContext, null, "MqttClient disconnect.", true);
 		}

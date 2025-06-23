@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.core.server;
 
-import org.dromara.mica.mqtt.codec.MqttPacket;
+import org.dromara.mica.mqtt.codec.MqttMessage;
 import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.http.core.MqttHttpHelper;
@@ -141,8 +141,8 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		// 1. http 请求处理
 		if (context.containsKey(MqttConst.IS_HTTP)) {
 			MqttHttpHelper.close(context, packet);
-		} else if (packet instanceof MqttPacket) {
-			messageInterceptors.onAfterSent(context, ((MqttPacket) packet).getMqttMessage(), isSentSuccess);
+		} else if (packet instanceof MqttMessage) {
+			messageInterceptors.onAfterSent(context, (MqttMessage) packet, isSentSuccess);
 		}
 	}
 
@@ -153,15 +153,15 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 
 	@Override
 	public void onAfterDecoded(ChannelContext context, Packet packet, int packetSize) throws Exception {
-		if (packet instanceof MqttPacket) {
-			messageInterceptors.onAfterDecoded(context, ((MqttPacket) packet).getMqttMessage(), packetSize);
+		if (packet instanceof MqttMessage) {
+			messageInterceptors.onAfterDecoded(context, (MqttMessage) packet, packetSize);
 		}
 	}
 
 	@Override
 	public void onAfterHandled(ChannelContext context, Packet packet, long cost) throws Exception {
-		if (packet instanceof MqttPacket) {
-			messageInterceptors.onAfterHandled(context, ((MqttPacket) packet).getMqttMessage(), cost);
+		if (packet instanceof MqttMessage) {
+			messageInterceptors.onAfterHandled(context, (MqttMessage) packet, cost);
 		}
 	}
 

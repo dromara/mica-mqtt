@@ -186,7 +186,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			.returnCode(returnCode)
 			.sessionPresent(false)
 			.build();
-		boolean result = Tio.send(context, new MqttPacket(message));
+		boolean result = Tio.send(context, message);
 		if (returnCode.isAccepted()) {
 			logger.info("Connect successful, clientId: {} uniqueId:{} result:{}", clientId, uniqueId, result);
 		} else {
@@ -238,7 +238,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 					MqttMessage messageAck = MqttMessageBuilders.pubAck()
 						.packetId(packetId)
 						.build();
-					boolean resultPubAck = Tio.send(context, new MqttPacket(messageAck));
+					boolean resultPubAck = Tio.send(context, messageAck);
 					logger.debug("Publish - PubAck send clientId:{} topicName:{} mqttQoS:{} packetId:{} result:{}", clientId, topicName, mqttQoS, packetId, resultPubAck);
 				}
 				break;
@@ -251,7 +251,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 					sessionManager.addPendingQos2Publish(clientId, packetId, pendingQos2Publish);
 					pendingQos2Publish.startPubRecRetransmitTimer(taskService, context);
 					// 发送消息
-					boolean resultPubRec = Tio.send(context, new MqttPacket(pubRecMessage));
+					boolean resultPubRec = Tio.send(context, pubRecMessage);
 					logger.debug("Publish - PubRec send clientId:{} topicName:{} mqttQoS:{} packetId:{} result:{}", clientId, topicName, mqttQoS, packetId, resultPubRec);
 				}
 				break;
@@ -290,7 +290,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		pendingPublish.setPubRelMessage(pubRelMessage);
 		pendingPublish.startPubRelRetransmissionTimer(taskService, context);
 
-		boolean result = Tio.send(context, new MqttPacket(pubRelMessage));
+		boolean result = Tio.send(context, pubRelMessage);
 		logger.debug("Publish - PubRel send clientId:{} packetId:{} result:{}", clientId, packetId, result);
 	}
 
@@ -313,7 +313,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			new MqttFixedHeader(MqttMessageType.PUBCOMP, false, MqttQoS.QOS0, false, 0),
 			MqttMessageIdVariableHeader.from(packetId), null);
 
-		boolean result = Tio.send(context, new MqttPacket(message));
+		boolean result = Tio.send(context, message);
 		logger.debug("Publish - PubComp send clientId:{} packetId:{} result:{}", clientId, packetId, result);
 	}
 
@@ -361,7 +361,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			.addGrantedQosList(grantedQosList)
 			.packetId(packetId)
 			.build();
-		boolean result = Tio.send(context, new MqttPacket(subAckMessage));
+		boolean result = Tio.send(context, subAckMessage);
 		logger.info("Subscribe - SubAck send clientId:{} subscribedTopicList:{} packetId:{} result:{}", clientId, subscribedTopicList, packetId, result);
 		// 4. 发送保留消息
 		for (String topic : subscribedTopicList) {
@@ -410,7 +410,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		MqttMessage unSubMessage = MqttMessageBuilders.unsubAck()
 			.packetId(packetId)
 			.build();
-		boolean result = Tio.send(context, new MqttPacket(unSubMessage));
+		boolean result = Tio.send(context, unSubMessage);
 		logger.debug("UnSubscribe - UnSubAck send clientId:{} result:{}", clientId, result);
 	}
 
@@ -437,7 +437,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	@Override
 	public void processPingReq(ChannelContext context) {
 		String clientId = context.getBsId();
-		boolean result = Tio.send(context, MqttPacket.MQTT_PING_RSP);
+		boolean result = Tio.send(context, MqttMessage.PINGRESP);
 		logger.debug("PingReq - PingResp send clientId:{} result:{}", clientId, result);
 	}
 

@@ -17,7 +17,6 @@
 package org.dromara.mica.mqtt.core.server.http.websocket;
 
 import org.dromara.mica.mqtt.codec.MqttMessage;
-import org.dromara.mica.mqtt.codec.MqttPacket;
 import org.dromara.mica.mqtt.core.server.MqttMessageInterceptors;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.slf4j.Logger;
@@ -123,7 +122,7 @@ public class MqttWsMsgHandler implements IWsMsgHandler {
 				}
 				return null;
 			}
-			MqttMessage mqttMessage = ((MqttPacket) packet).getMqttMessage();
+			MqttMessage mqttMessage = (MqttMessage) packet;
 			// 消息解析后
 			try {
 				messageInterceptors.onAfterDecoded(context, mqttMessage, readableLength);
@@ -144,7 +143,7 @@ public class MqttWsMsgHandler implements IWsMsgHandler {
 
 	@Override
 	public WsResponse encodeSubProtocol(Packet packet, TioConfig tioConfig, ChannelContext context) {
-		if (packet instanceof MqttPacket) {
+		if (packet instanceof MqttMessage) {
 			ByteBuffer buffer = mqttServerAioHandler.encode(packet, null, context);
 			return WsResponse.fromBytes(buffer.array());
 		}
