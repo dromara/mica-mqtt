@@ -119,7 +119,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		ChannelContext otherContext = Tio.getByBsId(context.getTioConfig(), uniqueId);
 		if (otherContext != null) {
 			Tio.unbindBsId(otherContext);
-			String remark = String.format("uniqueId:[%s] clientId:[%s] now bind on new context id:[%s]", uniqueId, clientId, context.getId());
+			String remark = String.format("uniqueId:[%s] clientId:[%s] 被踢出，请检查是否有相同 clientId 互踢，新 contextId:[%s]", uniqueId, clientId, context.getId());
 			Tio.remove(otherContext, remark);
 			cleanSession(uniqueId);
 		}
