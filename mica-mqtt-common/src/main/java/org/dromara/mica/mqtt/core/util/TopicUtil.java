@@ -133,10 +133,6 @@ public final class TopicUtil {
 		}
 	}
 
-	public static void main(String[] args) {
-		System.out.println(Integer.MAX_VALUE);
-	}
-
 	/**
 	 * 判断 topicFilter topicName 是否匹配
 	 *
