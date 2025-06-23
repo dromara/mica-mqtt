@@ -179,7 +179,8 @@ public final class MqttServer {
 		if (retain) {
 			Pair<String, Integer> retainPair = TopicUtil.retainTopicName(topic);
 			int timeOut = retainPair.getRight();
-			if (timeOut == 0) {
+			if (timeOut < 0) {
+				logger.error("MqttPublishMessage topic {} 不符合 $retain/${ttl}/topic 规则.", topic);
 				return false;
 			}
 			topic = retainPair.getLeft();
@@ -285,7 +286,8 @@ public final class MqttServer {
 		if (retain) {
 			Pair<String, Integer> retainPair = TopicUtil.retainTopicName(topic);
 			int timeOut = retainPair.getRight();
-			if (timeOut == 0) {
+			if (timeOut < 0) {
+				logger.error("MqttPublishMessage topic {} 不符合 $retain/${ttl}/topic 规则.", topic);
 				return false;
 			}
 			topic = retainPair.getLeft();

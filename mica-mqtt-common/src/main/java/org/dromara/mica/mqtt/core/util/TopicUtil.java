@@ -96,16 +96,17 @@ public final class TopicUtil {
 	public static Pair<String, Integer> retainTopicName(String topicName) {
 		if (topicName.startsWith("$retain/")) {
 			return getRetainTopicPair(topicName);
+		} else {
+			return new Pair<>(topicName, 0);
 		}
-		return new Pair<>(topicName, -1);
 	}
 
 	/**
 	 * 处理 $retain topic，注意，时间的三个含义，
 	 *
 	 * <p>
-	 * -1： 表示使用原 topic，
-	 * 0： 表示topic有问题需要丢弃消息
+	 * -1： 表示topic有问题需要丢弃消息
+	 * 0： 表示使用原 topic，
 	 * gt 0：表示保留消息存储时间
 	 * </p>
 	 *
@@ -117,17 +118,17 @@ public final class TopicUtil {
 		int timeIndexBegin = 8;
 		int nextLayer = topicName.indexOf(MqttCodecUtil.TOPIC_LAYER, timeIndexBegin);
 		if (nextLayer == -1) {
-			return new Pair<>(topicName, 0);
+			return new Pair<>(topicName, -1);
 		}
 		int time;
 		try {
 			time = Integer.parseInt(topicName.substring(timeIndexBegin, nextLayer));
 		} catch (NumberFormatException e) {
-			time = 0;
+			time = -1;
 		}
 		String retainTopic = topicName.substring(nextLayer + 1);
 		if (retainTopic.isEmpty()) {
-			return new Pair<>(topicName, 0);
+			return new Pair<>(topicName, -1);
 		} else {
 			return new Pair<>(retainTopic, time);
 		}

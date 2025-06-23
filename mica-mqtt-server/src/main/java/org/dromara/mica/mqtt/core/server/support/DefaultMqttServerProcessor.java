@@ -468,7 +468,8 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		if (isRetain) {
 			Pair<String, Integer> retainPair = TopicUtil.retainTopicName(topicName);
 			int timeOut = retainPair.getRight();
-			if (timeOut == 0) {
+			if (timeOut < 0) {
+				logger.error("MqttPublishMessage topic {} 不符合 $retain/${ttl}/topic 规则.", topicName);
 				return;
 			}
 			topicName = retainPair.getLeft();

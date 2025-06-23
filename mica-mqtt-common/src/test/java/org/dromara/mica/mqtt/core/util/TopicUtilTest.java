@@ -133,9 +133,9 @@ class TopicUtilTest {
 		Pair<String, Integer> pair2 = TopicUtil.retainTopicName("$retain/15//x/y");
 		Assertions.assertEquals("/x/y", pair2.getLeft());
 		Pair<String, Integer> pair3 = TopicUtil.retainTopicName("$retain/15/");
-		Assertions.assertEquals(0, pair3.getRight());
+		Assertions.assertEquals(-1, pair3.getRight());
 		Pair<String, Integer> pair4 = TopicUtil.retainTopicName("$retain/");
-		Assertions.assertEquals(0, pair4.getRight());
+		Assertions.assertEquals(-1, pair4.getRight());
 	}
 
 }
