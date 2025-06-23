@@ -2,6 +2,10 @@
 
 ## 发行版本
 
+### v2.4.8 - 2025-06-20
+- :sparkles: mica-mqtt-client-spring-boot-starter `MqttClientSubscribeDetector` bean 配置改成 `static` 方法。
+- :sparkles: mica-mqtt-server 调整保留消息标志位的规则。
+
 ### v2.4.7 - 2025-06-02
 - :sparkles: mica-mqtt-client、mica-mqtt-server publish相关接口支持object发送 (github #98) 感谢 `@galaxy-sea` 贡献
 - :sparkles: mica-mqtt-client 调整 MqttClient#reconnect 策略，（gitee #IBY5LQ）感谢 `@拉风的CC` 反馈。
