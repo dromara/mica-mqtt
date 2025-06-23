@@ -70,7 +70,7 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 	}
 
 	@Override
-	public boolean addRetainMessage(String topic, long timeout, Message message) {
+	public boolean addRetainMessage(String topic, int timeout, Message message) {
 		if (timeout <= 0) {
 			retainStore.put(topic, message);
 		} else {

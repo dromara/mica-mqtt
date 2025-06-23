@@ -56,7 +56,7 @@ public class RedisMqttMessageStore implements IMqttMessageStore {
 	}
 
 	@Override
-	public boolean addRetainMessage(String topic, long timeout, Message message) {
+	public boolean addRetainMessage(String topic, int timeout, Message message) {
 		redisCache.set(RedisKeys.MESSAGE_STORE_RETAIN.getKey(topic), message, messageSerializer::serialize);
 		redisCache.expire(RedisKeys.MESSAGE_STORE_RETAIN.getKey(topic), timeout);
 		return true;

@@ -61,7 +61,7 @@ public interface IMqttMessageStore {
 	 * @param message message
 	 * @return boolean
 	 */
-	boolean addRetainMessage(String topic, long timeout, Message message);
+	boolean addRetainMessage(String topic, int timeout, Message message);
 
 	/**
 	 * 清理该 topic 的 retain 消息

@@ -93,14 +93,48 @@ public final class TopicUtil {
 	 *
 	 * @param topicName topicName
 	 */
-	public static Pair<String, Long> retainTopicName(String topicName) {
+	public static Pair<String, Integer> retainTopicName(String topicName) {
 		if (topicName.startsWith("$retain/")) {
-			String[] retainArray = topicName.split(TOPIC_LAYER, 3);
-			if (retainArray.length == 3) {
-				return new Pair<>(retainArray[2], Long.parseLong(retainArray[1]));
-			}
+			return getRetainTopicPair(topicName);
 		}
-		return new Pair<>(topicName, -1L);
+		return new Pair<>(topicName, -1);
+	}
+
+	/**
+	 * 处理 $retain topic，注意，时间的三个含义，
+	 *
+	 * <p>
+	 * -1： 表示使用原 topic，
+	 * 0： 表示topic有问题需要丢弃消息
+	 * gt 0：表示保留消息存储时间
+	 * </p>
+	 *
+	 * @param topicName topicName
+	 * @return Pair
+	 */
+	private static Pair<String, Integer> getRetainTopicPair(String topicName) {
+		// $retain/ 的长度
+		int timeIndexBegin = 8;
+		int nextLayer = topicName.indexOf(MqttCodecUtil.TOPIC_LAYER, timeIndexBegin);
+		if (nextLayer == -1) {
+			return new Pair<>(topicName, 0);
+		}
+		int time;
+		try {
+			time = Integer.parseInt(topicName.substring(timeIndexBegin, nextLayer));
+		} catch (NumberFormatException e) {
+			time = 0;
+		}
+		String retainTopic = topicName.substring(nextLayer + 1);
+		if (retainTopic.isEmpty()) {
+			return new Pair<>(topicName, 0);
+		} else {
+			return new Pair<>(retainTopic, time);
+		}
+	}
+
+	public static void main(String[] args) {
+		System.out.println(Integer.MAX_VALUE);
 	}
 
 	/**

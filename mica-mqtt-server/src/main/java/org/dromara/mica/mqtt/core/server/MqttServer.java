@@ -177,9 +177,13 @@ public final class MqttServer {
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
 		if (retain) {
-			Pair<String, Long> retainPair = TopicUtil.retainTopicName(topic);
+			Pair<String, Integer> retainPair = TopicUtil.retainTopicName(topic);
+			int timeOut = retainPair.getRight();
+			if (timeOut == 0) {
+				return false;
+			}
 			topic = retainPair.getLeft();
-			this.saveRetainMessage(topic, retainPair.getRight(), qos, payload);
+			this.saveRetainMessage(topic, timeOut, qos, payload);
 		}
 		// 获取 context
 		ChannelContext context = Tio.getByBsId(getServerConfig(), clientId);
@@ -279,9 +283,13 @@ public final class MqttServer {
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
 		if (retain) {
-			Pair<String, Long> retainPair = TopicUtil.retainTopicName(topic);
+			Pair<String, Integer> retainPair = TopicUtil.retainTopicName(topic);
+			int timeOut = retainPair.getRight();
+			if (timeOut == 0) {
+				return false;
+			}
 			topic = retainPair.getLeft();
-			this.saveRetainMessage(topic, retainPair.getRight(), qos, payload);
+			this.saveRetainMessage(topic, timeOut, qos, payload);
 		}
 		// 查找订阅该 topic 的客户端
 		List<Subscribe> subscribeList = sessionManager.searchSubscribe(topic);
@@ -328,7 +336,7 @@ public final class MqttServer {
 	 * @param mqttQoS MqttQoS
 	 * @param payload ByteBuffer
 	 */
-	private void saveRetainMessage(String topic, long timeout, MqttQoS mqttQoS, Object payload) {
+	private void saveRetainMessage(String topic, int timeout, MqttQoS mqttQoS, Object payload) {
 		Message retainMessage = new Message();
 		retainMessage.setTopic(topic);
 		retainMessage.setQos(mqttQoS.value());

@@ -466,7 +466,11 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		byte[] payload = publishMessage.payload();
 		// 1. retain 消息逻辑
 		if (isRetain) {
-			Pair<String, Long> retainPair = TopicUtil.retainTopicName(topicName);
+			Pair<String, Integer> retainPair = TopicUtil.retainTopicName(topicName);
+			int timeOut = retainPair.getRight();
+			if (timeOut == 0) {
+				return;
+			}
 			topicName = retainPair.getLeft();
 			// qos == 0 or payload is none,then clear previous retain message
 			if (MqttQoS.QOS0 == mqttQoS || payload == null || payload.length == 0) {
@@ -484,7 +488,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 				// 客户端 ip:端口
 				retainMessage.setPeerHost(clientNode.getPeerHost());
 				retainMessage.setNode(serverCreator.getNodeName());
-				this.messageStore.addRetainMessage(topicName, retainPair.getRight(), retainMessage);
+				this.messageStore.addRetainMessage(topicName, timeOut, retainMessage);
 			}
 		}
 		// topic

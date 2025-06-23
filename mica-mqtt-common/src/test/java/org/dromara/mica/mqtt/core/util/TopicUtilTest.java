@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.core.util;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.tio.utils.mica.Pair;
 
 /**
  * TopicUtil 测试
@@ -124,4 +125,17 @@ class TopicUtilTest {
 		String m3 = TopicUtil.resolveTopic("/iot/test/123", testBean);
 		Assertions.assertEquals("/iot/test/123", m3);
 	}
+
+	@Test
+	void testRetainTopicName() {
+		Pair<String, Integer> pair1 = TopicUtil.retainTopicName("$retain/15/x/y");
+		Assertions.assertEquals("x/y", pair1.getLeft());
+		Pair<String, Integer> pair2 = TopicUtil.retainTopicName("$retain/15//x/y");
+		Assertions.assertEquals("/x/y", pair2.getLeft());
+		Pair<String, Integer> pair3 = TopicUtil.retainTopicName("$retain/15/");
+		Assertions.assertEquals(0, pair3.getRight());
+		Pair<String, Integer> pair4 = TopicUtil.retainTopicName("$retain/");
+		Assertions.assertEquals(0, pair4.getRight());
+	}
+
 }
