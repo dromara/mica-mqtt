@@ -19,7 +19,6 @@ package org.dromara.mica.mqtt.core.server;
 import org.dromara.mica.mqtt.codec.MqttMessage;
 import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
-import org.dromara.mica.mqtt.core.server.http.core.MqttHttpHelper;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
@@ -138,10 +137,7 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 
 	@Override
 	public void onAfterSent(ChannelContext context, Packet packet, boolean isSentSuccess) throws Exception {
-		// 1. http 请求处理
-		if (context.containsKey(MqttConst.IS_HTTP)) {
-			MqttHttpHelper.close(context, packet);
-		} else if (packet instanceof MqttMessage) {
+		if (packet instanceof MqttMessage) {
 			messageInterceptors.onAfterSent(context, (MqttMessage) packet, isSentSuccess);
 		}
 	}

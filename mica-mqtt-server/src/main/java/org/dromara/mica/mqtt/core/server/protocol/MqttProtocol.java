@@ -23,10 +23,27 @@ package org.dromara.mica.mqtt.core.server.protocol;
  */
 public enum MqttProtocol {
 
+	/**
+	 * mqtt 协议
+	 */
 	MQTT(1883),
+	/**
+	 * mqtt ssl 协议
+	 */
 	MQTT_SSL(8883),
+	/**
+	 * mqtt websocket 子协议
+	 */
 	MQTT_WS(8083),
-	MQTT_WS_SSL(8084);
+	/**
+	 * mqtt websocket ssl 子协议
+	 */
+	MQTT_WSS(8084),
+	/**
+	 * mqtt http api 接口
+	 */
+	MQTT_HTTP_API(18083),
+	;
 
 	private final int port;
 

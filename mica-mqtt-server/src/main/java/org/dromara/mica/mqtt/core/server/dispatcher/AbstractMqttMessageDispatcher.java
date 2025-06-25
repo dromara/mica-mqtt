@@ -107,7 +107,7 @@ public abstract class AbstractMqttMessageDispatcher implements IMqttMessageDispa
 		ServerChannelContext context = new ServerChannelContext(mqttServer.getServerConfig());
 		Node serverNode = mqttServer.getTioServer().getServerNode();
 		context.setServerNode(serverNode);
-		Node clientNode = mqttServer.getWebServer().getTioServer().getServerNode();
+		Node clientNode = mqttServer.getWebServer().getServerNode();
 		context.setClientNode(clientNode);
 		context.setBsId(clientId);
 		context.setUserId(MessageType.HTTP_API.name());

@@ -38,9 +38,10 @@ public class MqttServerConfiguration {
 			.maxBytesInMessage((int) DataSize.parse(properties.getMaxBytesInMessage()).getBytes())
 			.bufferAllocator(properties.getBufferAllocator())
 			.maxClientIdLength(properties.getMaxClientIdLength())
-			.webPort(properties.getWebPort())
 			.websocketEnable(properties.isWebsocketEnable())
+			.websocketPort(properties.getWebsocketPort())
 			.httpEnable(properties.isHttpEnable())
+			.httpPort(properties.getHttpPort())
 			.nodeName(properties.getNodeName())
 			.statEnable(properties.isStatEnable())
 			.proxyProtocolEnable(properties.isProxyProtocolOn());

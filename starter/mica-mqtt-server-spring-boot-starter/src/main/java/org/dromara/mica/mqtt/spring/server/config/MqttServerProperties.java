@@ -93,13 +93,17 @@ public class MqttServerProperties {
 	 */
 	private int maxClientIdLength = MqttConstant.DEFAULT_MAX_CLIENT_ID_LENGTH;
 	/**
-	 * http、websocket 端口，默认：8083
+	 * http 端口，默认：18083
 	 */
-	private int webPort = 8083;
+	private int httpPort = 18083;
 	/**
 	 * 开启 websocket 服务，默认：true
 	 */
 	private boolean websocketEnable = true;
+	/**
+	 * websocket 端口，默认：8083
+	 */
+	private int websocketPort = 8083;
 	/**
 	 * 开启 http 服务，默认：false
 	 */

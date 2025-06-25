@@ -45,6 +45,7 @@ import org.tio.core.ssl.ClientAuth;
 import org.tio.core.ssl.SslConfig;
 import org.tio.core.task.HeartbeatMode;
 import org.tio.http.common.HttpConfig;
+import org.tio.http.server.HttpServerStarter;
 import org.tio.server.TioServer;
 import org.tio.server.TioServerConfig;
 import org.tio.server.intf.TioServerHandler;
@@ -56,6 +57,7 @@ import org.tio.utils.json.JsonUtil;
 import org.tio.utils.thread.ThreadUtils;
 import org.tio.utils.timer.DefaultTimerTaskService;
 import org.tio.utils.timer.TimerTaskService;
+import org.tio.websocket.server.WsServerStarter;
 
 import java.io.InputStream;
 import java.util.concurrent.ExecutorService;
@@ -158,17 +160,21 @@ public class MqttServerCreator {
 	 */
 	private int maxClientIdLength = MqttConstant.DEFAULT_MAX_CLIENT_ID_LENGTH;
 	/**
-	 * http、websocket 端口，默认：8083
+	 * 开启 http 服务，默认：false
 	 */
-	private int webPort = 8083;
+	private boolean httpEnable = false;
+	/**
+	 * http 端口，默认：18083
+	 */
+	private int httpPort = 18083;
 	/**
 	 * 开启 websocket 服务，默认：true
 	 */
 	private boolean websocketEnable = true;
 	/**
-	 * 开启 http 服务，默认：false
+	 * websocket 端口，默认：8083
 	 */
-	private boolean httpEnable = false;
+	private int websocketPort = 8083;
 	/**
 	 * http Basic 认证账号
 	 */
@@ -197,10 +203,6 @@ public class MqttServerCreator {
 	 * TioConfig 自定义配置
 	 */
 	private Consumer<TioServerConfig> tioConfigCustomize;
-	/**
-	 * TioConfig 自定义配置
-	 */
-	private BiConsumer<TioServerConfig, HttpConfig> webConfigCustomize;
 	/**
 	 * 消息拦截器
 	 */
@@ -451,12 +453,21 @@ public class MqttServerCreator {
 		return this;
 	}
 
-	public int getWebPort() {
-		return webPort;
+	public boolean isHttpEnable() {
+		return httpEnable;
 	}
 
-	public MqttServerCreator webPort(int webPort) {
-		this.webPort = webPort;
+	public MqttServerCreator httpEnable(boolean httpEnable) {
+		this.httpEnable = httpEnable;
+		return this;
+	}
+
+	public int getHttpPort() {
+		return httpPort;
+	}
+
+	public MqttServerCreator httpPort(int httpPort) {
+		this.httpPort = httpPort;
 		return this;
 	}
 
@@ -469,12 +480,12 @@ public class MqttServerCreator {
 		return this;
 	}
 
-	public boolean isHttpEnable() {
-		return httpEnable;
+	public int getWebsocketPort() {
+		return websocketPort;
 	}
 
-	public MqttServerCreator httpEnable(boolean httpEnable) {
-		this.httpEnable = httpEnable;
+	public MqttServerCreator websocketPort(int websocketPort) {
+		this.websocketPort = websocketPort;
 		return this;
 	}
 
@@ -537,15 +548,6 @@ public class MqttServerCreator {
 
 	public MqttServerCreator tioConfigCustomize(Consumer<TioServerConfig> tioConfigCustomize) {
 		this.tioConfigCustomize = tioConfigCustomize;
-		return this;
-	}
-
-	public BiConsumer<TioServerConfig, HttpConfig> getWebConfigCustomize() {
-		return webConfigCustomize;
-	}
-
-	public MqttServerCreator webConfigCustomize(BiConsumer<TioServerConfig, HttpConfig> webConfigCustomize) {
-		this.webConfigCustomize = webConfigCustomize;
 		return this;
 	}
 
@@ -679,16 +681,19 @@ public class MqttServerCreator {
 			this.tioConfigCustomize.accept(tioConfig);
 		}
 		TioServer tioServer = new TioServer(tioConfig);
-		// 9 配置 mqtt http/websocket server
-		MqttWebServer webServer;
+		// 9 配置 mqtt http server
+		HttpServerStarter httpServerStarter = null;
 		logger.info("Mica mqtt http api enable:{} websocket enable:{}", this.httpEnable, this.websocketEnable);
-		if (this.httpEnable || this.websocketEnable) {
-			webServer = MqttWebServer.config(this, tioConfig);
-		} else {
-			webServer = null;
+		if (this.httpEnable) {
+			httpServerStarter = MqttWebServer.configHttp(this, tioConfig);
+		}
+		// 9 配置 mqtt websocket server
+		WsServerStarter wsServerStarter = null;
+		if (this.websocketEnable) {
+			wsServerStarter = MqttWebServer.configWs(this, tioConfig);
 		}
 		// MqttServer
-		MqttServer mqttServer = new MqttServer(tioServer, webServer, this, this.taskService);
+		MqttServer mqttServer = new MqttServer(tioServer, wsServerStarter, httpServerStarter, this, this.taskService);
 		// 9. 如果是默认的消息转发器，设置 mqttServer
 		if (this.messageDispatcher instanceof AbstractMqttMessageDispatcher) {
 			((AbstractMqttMessageDispatcher) this.messageDispatcher).config(mqttServer);

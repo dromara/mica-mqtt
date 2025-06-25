@@ -35,6 +35,7 @@ import org.tio.core.ChannelContext;
 import org.tio.core.Tio;
 import org.tio.core.TioConfig;
 import org.tio.core.stat.vo.StatVo;
+import org.tio.http.server.HttpServerStarter;
 import org.tio.server.TioServer;
 import org.tio.server.TioServerConfig;
 import org.tio.utils.hutool.StrUtil;
@@ -43,6 +44,7 @@ import org.tio.utils.page.Page;
 import org.tio.utils.page.PageUtils;
 import org.tio.utils.timer.TimerTask;
 import org.tio.utils.timer.TimerTaskService;
+import org.tio.websocket.server.WsServerStarter;
 
 import java.io.IOException;
 import java.util.List;
@@ -61,7 +63,8 @@ import java.util.stream.Collectors;
 public final class MqttServer {
 	private static final Logger logger = LoggerFactory.getLogger(MqttServer.class);
 	private final TioServer tioServer;
-	private final MqttWebServer webServer;
+	private final WsServerStarter wsServerStarter;
+	private final HttpServerStarter httpServerStarter;
 	private final MqttServerCreator serverCreator;
 	private final IMqttSessionManager sessionManager;
 	private final IMqttMessageStore messageStore;
@@ -72,11 +75,13 @@ public final class MqttServer {
 	private final TimerTaskService taskService;
 
 	MqttServer(TioServer tioServer,
-			   MqttWebServer webServer,
+			   WsServerStarter wsServerStarter,
+			   HttpServerStarter httpServerStarter,
 			   MqttServerCreator serverCreator,
 			   TimerTaskService taskService) {
 		this.tioServer = tioServer;
-		this.webServer = webServer;
+		this.wsServerStarter = wsServerStarter;
+		this.httpServerStarter = httpServerStarter;
 		this.serverCreator = serverCreator;
 		this.sessionManager = serverCreator.getSessionManager();
 		this.messageStore = serverCreator.getMessageStore();
@@ -100,10 +105,10 @@ public final class MqttServer {
 	/**
 	 * 获取 http、websocket 服务
 	 *
-	 * @return MqttWebServer
+	 * @return TioServer
 	 */
-	public MqttWebServer getWebServer() {
-		return webServer;
+	public TioServer getWebServer() {
+		return wsServerStarter.getTioServer();
 	}
 
 	/**
@@ -535,12 +540,21 @@ public final class MqttServer {
 			String message = String.format("Mica mqtt tcp server port %d start fail.", this.serverCreator.getPort());
 			throw new IllegalStateException(message, e);
 		}
-		// 2. 启动 mqtt web
-		if (webServer != null) {
+		// 2. 启动 mqtt ws
+		if (wsServerStarter != null) {
 			try {
-				webServer.start(this.serverCreator.getIp(), this.serverCreator.getWebPort());
+				wsServerStarter.start(this.serverCreator.getIp(), this.serverCreator.getWebsocketPort());
 			} catch (IOException e) {
-				String message = String.format("Mica mqtt http/websocket server port %d start fail.", this.serverCreator.getWebPort());
+				String message = String.format("Mica mqtt http server port %d start fail.", this.serverCreator.getHttpPort());
+				throw new IllegalStateException(message, e);
+			}
+		}
+		// 3. 启动 mqtt web
+		if (httpServerStarter != null) {
+			try {
+				httpServerStarter.start(this.serverCreator.getIp(), this.serverCreator.getHttpPort());
+			} catch (IOException e) {
+				String message = String.format("Mica mqtt http server port %d start fail.", this.serverCreator.getHttpPort());
 				throw new IllegalStateException(message, e);
 			}
 		}
@@ -556,9 +570,13 @@ public final class MqttServer {
 		// 停止服务
 		boolean result = this.tioServer.stop();
 		logger.info("Mqtt tcp server stop result:{}", result);
-		if (webServer != null) {
-			result &= webServer.stop();
+		if (wsServerStarter != null) {
+			result &= wsServerStarter.stop();
 			logger.info("Mqtt websocket server stop result:{}", result);
+		}
+		if (httpServerStarter != null) {
+			result &= httpServerStarter.stop();
+			logger.info("Mqtt http api server stop result:{}", result);
 		}
 		// 停止工作线程
 		ExecutorService mqttExecutor = serverCreator.getMqttExecutor();

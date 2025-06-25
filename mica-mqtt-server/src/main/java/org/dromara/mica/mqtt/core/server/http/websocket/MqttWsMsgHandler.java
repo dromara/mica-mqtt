@@ -58,16 +58,16 @@ public class MqttWsMsgHandler implements IWsMsgHandler {
 	private final TioHandler mqttServerAioHandler;
 	private final MqttMessageInterceptors messageInterceptors;
 
-	public MqttWsMsgHandler(MqttServerCreator serverCreator, TioHandler aioHandler) {
-		this(serverCreator, new String[]{"mqtt", "mqttv3.1", "mqttv3.1.1"}, aioHandler);
+	public MqttWsMsgHandler(MqttServerCreator serverCreator, TioHandler handler) {
+		this(serverCreator, new String[]{"mqtt", "mqttv3.1", "mqttv3.1.1"}, handler);
 	}
 
 	public MqttWsMsgHandler(MqttServerCreator serverCreator,
 							String[] supportedSubProtocols,
-							TioHandler aioHandler) {
+							TioHandler handler) {
 		this.serverCreator = serverCreator;
 		this.supportedSubProtocols = supportedSubProtocols;
-		this.mqttServerAioHandler = aioHandler;
+		this.mqttServerAioHandler = handler;
 		this.messageInterceptors = serverCreator.getMessageInterceptors();
 	}
 

@@ -201,20 +201,12 @@ import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRequestHandler;
 import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRoutes;
 import org.dromara.mica.mqtt.core.server.http.mcp.MqttMcp;
 import org.dromara.mica.mqtt.core.server.http.websocket.MqttWsMsgHandler;
-import org.tio.core.uuid.SeqTioUuid;
-import org.tio.http.common.HttpConfig;
-import org.tio.http.common.handler.HttpRequestHandler;
-import org.tio.server.TioServer;
+import org.tio.http.server.HttpServerStarter;
 import org.tio.server.TioServerConfig;
-import org.tio.server.intf.TioServerListener;
 import org.tio.utils.json.JsonUtil;
-import org.tio.utils.thread.pool.SynThreadPoolExecutor;
-import org.tio.websocket.server.handler.IWsMsgHandler;
+import org.tio.websocket.server.WsServerStarter;
 
-import java.io.IOException;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.function.BiConsumer;
 
 /**
  * mqtt web Server，集成 http 和 websocket
@@ -223,57 +215,6 @@ import java.util.function.BiConsumer;
  * @author L.cm
  */
 public class MqttWebServer {
-	private final HttpRequestHandler httpRequestHandler;
-	private final HttpConfig httpConfig;
-	private final TioServerConfig serverTioConfig;
-	private final MqttWebServerAioHandler mqttWebServerAioHandler;
-	private final TioServer tioServer;
-
-	public MqttWebServer(MqttServerCreator serverCreator, TioServerConfig mqttServerConfig, IWsMsgHandler wsMsgHandler) {
-		this(serverCreator, mqttServerConfig.getTioServerListener(), wsMsgHandler, mqttServerConfig.tioExecutor, mqttServerConfig.groupExecutor);
-	}
-
-	public MqttWebServer(MqttServerCreator serverCreator, TioServerListener serverAioListener, IWsMsgHandler wsMsgHandler, SynThreadPoolExecutor tioExecutor, ExecutorService groupExecutor) {
-		this.httpRequestHandler = new MqttHttpRequestHandler();
-		this.httpConfig = new HttpConfig();
-		this.httpConfig.setName(serverCreator.getName() + "-HTTP/Websocket");
-		this.httpConfig.setCheckHost(false);
-		this.mqttWebServerAioHandler = new MqttWebServerAioHandler(httpConfig, this.httpRequestHandler, wsMsgHandler);
-		this.serverTioConfig = new TioServerConfig(this.httpConfig.getName(), mqttWebServerAioHandler, serverAioListener, tioExecutor, groupExecutor);
-		this.serverTioConfig.setSslConfig(serverCreator.getSslConfig());
-		this.serverTioConfig.setHeartbeatTimeout(0);
-		this.serverTioConfig.setReadBufferSize(1024 * 30);
-		this.serverTioConfig.setTioUuid(new SeqTioUuid());
-		this.tioServer = new TioServer(serverTioConfig);
-	}
-
-	public HttpConfig getHttpConfig() {
-		return httpConfig;
-	}
-
-	public HttpRequestHandler getHttpRequestHandler() {
-		return httpRequestHandler;
-	}
-
-	public MqttWebServerAioHandler getMqttWebServerAioHandler() {
-		return mqttWebServerAioHandler;
-	}
-
-	public TioServerConfig getServerTioConfig() {
-		return serverTioConfig;
-	}
-
-	public TioServer getTioServer() {
-		return tioServer;
-	}
-
-	public void start(String serverIp, int serverPort) throws IOException {
-		tioServer.start(serverIp, serverPort);
-	}
-
-	public boolean stop() {
-		return tioServer.stop();
-	}
 
 	/**
 	 * 配置 web 服务
@@ -282,38 +223,41 @@ public class MqttWebServer {
 	 * @param mqttServerConfig ServerTioConfig
 	 * @return MqttWebServer
 	 */
-	public static MqttWebServer config(MqttServerCreator serverCreator, TioServerConfig mqttServerConfig) {
-		// 1. 判断是否开启 http
-		if (serverCreator.isHttpEnable()) {
-			// 1.1 http-api 用到 json
-			serverCreator.jsonAdapter(JsonUtil.getJsonAdapter(serverCreator.getJsonAdapter()));
-			// 1.2 http 路由配置
-			MqttHttpApi httpApi = new MqttHttpApi(serverCreator, mqttServerConfig);
-			httpApi.register();
-			// 1.3 认证配置
-			String username = serverCreator.getHttpBasicUsername();
-			String password = serverCreator.getHttpBasicPassword();
-			if (Objects.nonNull(username) && Objects.nonNull(password)) {
-				MqttHttpRoutes.addFilter(new BasicAuthFilter(username, password));
-			}
-			// 是否开启 mcp
-			if (serverCreator.isMcpServerEnabled()) {
-				MqttMcp mqttMcp = new MqttMcp(serverCreator, mqttServerConfig);
-				mqttMcp.register();
-			}
+	public static HttpServerStarter configHttp(MqttServerCreator serverCreator, TioServerConfig mqttServerConfig) {
+		// 1.1 http-api 用到 json
+		serverCreator.jsonAdapter(JsonUtil.getJsonAdapter(serverCreator.getJsonAdapter()));
+		// 1.2 http 路由配置
+		MqttHttpApi httpApi = new MqttHttpApi(serverCreator, mqttServerConfig);
+		httpApi.register();
+		// 1.3 认证配置
+		String username = serverCreator.getHttpBasicUsername();
+		String password = serverCreator.getHttpBasicPassword();
+		if (Objects.nonNull(username) && Objects.nonNull(password)) {
+			MqttHttpRoutes.addFilter(new BasicAuthFilter(username, password));
 		}
-		// 2. 初始化处理器
-		IWsMsgHandler mqttWsMsgHandler = new MqttWsMsgHandler(serverCreator, mqttServerConfig.getTioHandler());
-		MqttWebServer httpServerStarter = new MqttWebServer(serverCreator, mqttServerConfig, mqttWsMsgHandler);
-		TioServerConfig httpTioConfig = httpServerStarter.getServerTioConfig();
-		// 自定义 http 和 ws 配置
-		BiConsumer<TioServerConfig, HttpConfig> webConfigCustomize = serverCreator.getWebConfigCustomize();
-		if (webConfigCustomize != null) {
-			webConfigCustomize.accept(httpTioConfig, httpServerStarter.getHttpConfig());
+		// 是否开启 mcp
+		if (serverCreator.isMcpServerEnabled()) {
+			MqttMcp mqttMcp = new MqttMcp(serverCreator, mqttServerConfig);
+			mqttMcp.register();
 		}
-		// 3. tcp + websocket mqtt 共享公共配置
-		httpTioConfig.share(mqttServerConfig);
-		return httpServerStarter;
+		// http 服务
+		return new HttpServerStarter(new MqttHttpRequestHandler());
+	}
+
+	/**
+	 * 配置 websocket 服务
+	 *
+	 * @param serverCreator    MqttServerCreator
+	 * @param mqttServerConfig ServerTioConfig
+	 * @return MqttWebServer
+	 */
+	public static WsServerStarter configWs(MqttServerCreator serverCreator, TioServerConfig mqttServerConfig) {
+		MqttWsMsgHandler wsMsgHandler = new MqttWsMsgHandler(serverCreator, mqttServerConfig.getTioHandler());
+		WsServerStarter serverStarter = new WsServerStarter(wsMsgHandler);
+		TioServerConfig tioServerConfig = serverStarter.getTioServerConfig();
+		// 共享数据
+		tioServerConfig.share(mqttServerConfig);
+		return serverStarter;
 	}
 
 }
