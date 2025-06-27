@@ -44,13 +44,11 @@ import org.slf4j.LoggerFactory;
 import org.tio.core.ssl.ClientAuth;
 import org.tio.core.ssl.SslConfig;
 import org.tio.core.task.HeartbeatMode;
-import org.tio.http.common.HttpConfig;
 import org.tio.http.server.HttpServerStarter;
 import org.tio.server.TioServer;
 import org.tio.server.TioServerConfig;
 import org.tio.server.intf.TioServerHandler;
 import org.tio.server.intf.TioServerListener;
-import org.tio.utils.buffer.ByteBufferAllocator;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.json.JsonAdapter;
 import org.tio.utils.json.JsonUtil;
@@ -61,7 +59,6 @@ import org.tio.websocket.server.WsServerStarter;
 
 import java.io.InputStream;
 import java.util.concurrent.ExecutorService;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -103,10 +100,6 @@ public class MqttServerCreator {
 	 * 消息解析最大 bytes 长度，默认：10M
 	 */
 	private int maxBytesInMessage = MqttConstant.DEFAULT_MAX_BYTES_IN_MESSAGE;
-	/**
-	 * 堆内存和堆外内存
-	 */
-	private ByteBufferAllocator bufferAllocator = ByteBufferAllocator.HEAP;
 	/**
 	 * ssl 证书配置
 	 */
@@ -296,15 +289,6 @@ public class MqttServerCreator {
 			throw new IllegalArgumentException("maxBytesInMessage must be greater than 0.");
 		}
 		this.maxBytesInMessage = maxBytesInMessage;
-		return this;
-	}
-
-	public ByteBufferAllocator getBufferAllocator() {
-		return bufferAllocator;
-	}
-
-	public MqttServerCreator bufferAllocator(ByteBufferAllocator bufferAllocator) {
-		this.bufferAllocator = bufferAllocator;
 		return this;
 	}
 

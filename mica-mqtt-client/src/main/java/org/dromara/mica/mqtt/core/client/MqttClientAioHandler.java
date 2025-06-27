@@ -22,7 +22,6 @@ import org.tio.core.ChannelContext;
 import org.tio.core.TioConfig;
 import org.tio.core.exception.TioDecodeException;
 import org.tio.core.intf.Packet;
-import org.tio.utils.buffer.ByteBufferAllocator;
 
 import java.nio.ByteBuffer;
 
@@ -34,14 +33,12 @@ import java.nio.ByteBuffer;
 public class MqttClientAioHandler implements TioClientHandler {
 	private final MqttDecoder mqttDecoder;
 	private final MqttEncoder mqttEncoder;
-	private final ByteBufferAllocator allocator;
 	private final IMqttClientProcessor processor;
 
 	public MqttClientAioHandler(MqttClientCreator mqttClientCreator,
 								IMqttClientProcessor processor) {
 		this.mqttDecoder = new MqttDecoder(mqttClientCreator.getMaxBytesInMessage(), mqttClientCreator.getMaxClientIdLength());
 		this.mqttEncoder = MqttEncoder.INSTANCE;
-		this.allocator = mqttClientCreator.getBufferAllocator();
 		this.processor = processor;
 	}
 
@@ -57,7 +54,7 @@ public class MqttClientAioHandler implements TioClientHandler {
 
 	@Override
 	public ByteBuffer encode(Packet packet, TioConfig tioConfig, ChannelContext channelContext) {
-		return mqttEncoder.doEncode(channelContext, (MqttMessage) packet, allocator);
+		return mqttEncoder.doEncode(channelContext, (MqttMessage) packet);
 	}
 
 	@Override

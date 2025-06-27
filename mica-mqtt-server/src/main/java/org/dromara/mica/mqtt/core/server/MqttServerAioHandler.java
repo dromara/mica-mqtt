@@ -28,7 +28,6 @@ import org.tio.core.TioConfig;
 import org.tio.core.exception.TioDecodeException;
 import org.tio.core.intf.Packet;
 import org.tio.server.intf.TioServerHandler;
-import org.tio.utils.buffer.ByteBufferAllocator;
 
 import java.nio.ByteBuffer;
 
@@ -39,13 +38,11 @@ public class MqttServerAioHandler implements TioServerHandler {
 	private static final Logger log = LoggerFactory.getLogger(MqttServerAioHandler.class);
 	private final MqttDecoder mqttDecoder;
 	private final MqttEncoder mqttEncoder;
-	private final ByteBufferAllocator allocator;
 	private final MqttServerProcessor processor;
 
 	public MqttServerAioHandler(MqttServerCreator serverCreator, MqttServerProcessor processor) {
 		this.mqttDecoder = new MqttDecoder(serverCreator.getMaxBytesInMessage(), serverCreator.getMaxClientIdLength());
 		this.mqttEncoder = MqttEncoder.INSTANCE;
-		this.allocator = serverCreator.getBufferAllocator();
 		this.processor = processor;
 	}
 
@@ -80,7 +77,7 @@ public class MqttServerAioHandler implements TioServerHandler {
 	 */
 	@Override
 	public ByteBuffer encode(Packet packet, TioConfig tioConfig, ChannelContext context) {
-		return mqttEncoder.doEncode(context, (MqttMessage) packet, allocator);
+		return mqttEncoder.doEncode(context, (MqttMessage) packet);
 	}
 
 	/**

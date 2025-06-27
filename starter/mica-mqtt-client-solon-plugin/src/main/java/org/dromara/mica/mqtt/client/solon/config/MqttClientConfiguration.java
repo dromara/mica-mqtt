@@ -63,7 +63,6 @@ public class MqttClientConfiguration {
 			.version(properties.getVersion())
 			.cleanSession(properties.isCleanSession())
 			.sessionExpiryIntervalSecs(properties.getSessionExpiryIntervalSecs())
-			.bufferAllocator(properties.getBufferAllocator())
 			.statEnable(properties.isStatEnable())
 			.debug(properties.isDebug());
 		Integer timeout = properties.getTimeout();

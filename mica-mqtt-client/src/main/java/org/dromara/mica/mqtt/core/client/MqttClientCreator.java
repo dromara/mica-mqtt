@@ -29,7 +29,6 @@ import org.tio.core.Node;
 import org.tio.core.TioConfig;
 import org.tio.core.ssl.SslConfig;
 import org.tio.core.task.HeartbeatMode;
-import org.tio.utils.buffer.ByteBufferAllocator;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.thread.ThreadUtils;
 import org.tio.utils.thread.pool.SynThreadPoolExecutor;
@@ -151,10 +150,6 @@ public final class MqttClientCreator {
 	 * mqtt5 properties
 	 */
 	private MqttProperties properties;
-	/**
-	 * ByteBuffer Allocator，支持堆内存和堆外内存，默认为：堆内存
-	 */
-	private ByteBufferAllocator bufferAllocator = ByteBufferAllocator.HEAP;
 	/**
 	 * 连接监听器
 	 */
@@ -295,10 +290,6 @@ public final class MqttClientCreator {
 
 	public MqttProperties getProperties() {
 		return properties;
-	}
-
-	public ByteBufferAllocator getBufferAllocator() {
-		return bufferAllocator;
 	}
 
 	public IMqttClientConnectListener getConnectListener() {
@@ -486,11 +477,6 @@ public final class MqttClientCreator {
 		return this;
 	}
 
-	public MqttClientCreator bufferAllocator(ByteBufferAllocator allocator) {
-		this.bufferAllocator = allocator;
-		return this;
-	}
-
 	public MqttClientCreator connectListener(IMqttClientConnectListener connectListener) {
 		this.connectListener = connectListener;
 		return this;
@@ -606,7 +592,6 @@ public final class MqttClientCreator {
 			.cleanSession(this.cleanSession)
 			.sessionExpiryIntervalSecs(this.sessionExpiryIntervalSecs)
 			.willMessage(this.willMessage)
-			.bufferAllocator(this.bufferAllocator)
 			.connectListener(this.connectListener)
 			.statEnable(this.statEnable)
 			.debug(this.debug);

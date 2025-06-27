@@ -22,7 +22,6 @@ import org.dromara.mica.mqtt.codec.MqttConstant;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.unit.DataSize;
 import org.tio.core.ssl.ClientAuth;
-import org.tio.utils.buffer.ByteBufferAllocator;
 
 /**
  * MqttServer 配置
@@ -76,10 +75,6 @@ public class MqttServerProperties {
 	 * 消息解析最大 bytes 长度，默认：10M
 	 */
 	private DataSize maxBytesInMessage = DataSize.ofBytes(MqttConstant.DEFAULT_MAX_BYTES_IN_MESSAGE);
-	/**
-	 * 堆内存和堆外内存
-	 */
-	private ByteBufferAllocator bufferAllocator = ByteBufferAllocator.HEAP;
 	/**
 	 * ssl 配置
 	 */

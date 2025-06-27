@@ -36,7 +36,6 @@ public class MqttServerConfiguration {
 			.keepaliveBackoff(properties.getKeepaliveBackoff())
 			.readBufferSize((int) DataSize.parse(properties.getReadBufferSize()).getBytes())
 			.maxBytesInMessage((int) DataSize.parse(properties.getMaxBytesInMessage()).getBytes())
-			.bufferAllocator(properties.getBufferAllocator())
 			.maxClientIdLength(properties.getMaxClientIdLength())
 			.websocketEnable(properties.isWebsocketEnable())
 			.websocketPort(properties.getWebsocketPort())
