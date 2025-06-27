@@ -14,6 +14,10 @@ public class MqttProtocolListener implements IMqttProtocolListener {
 	private final Node serverNode;
 	private final SslConfig sslConfig;
 
+	public MqttProtocolListener(MqttProtocol protocol, Node serverNode) {
+		this(protocol, serverNode, null);
+	}
+
 	public MqttProtocolListener(MqttProtocol protocol, Node serverNode, SslConfig sslConfig) {
 		this.protocol = checkSSl(protocol, sslConfig);
 		this.serverNode = serverNode;
