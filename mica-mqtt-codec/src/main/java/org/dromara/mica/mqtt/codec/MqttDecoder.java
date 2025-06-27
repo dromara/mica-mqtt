@@ -170,7 +170,7 @@ public final class MqttDecoder {
 		final boolean willRetain = (b1 & 0x20) == 0x20;
 		final int willQos = (b1 & 0x18) >> 3;
 		final boolean willFlag = (b1 & 0x04) == 0x04;
-		final boolean cleanSession = (b1 & 0x02) == 0x02;
+		final boolean cleanStart = (b1 & 0x02) == 0x02;
 		if (version == MqttVersion.MQTT_3_1_1 || version == MqttVersion.MQTT_5) {
 			final boolean zeroReservedFlag = (b1 & 0x01) == 0x0;
 			if (!zeroReservedFlag) {
@@ -198,7 +198,7 @@ public final class MqttDecoder {
 			willRetain,
 			willQos,
 			willFlag,
-			cleanSession,
+			cleanStart,
 			keepAlive,
 			properties);
 		return new Result<>(mqttConnectVariableHeader, numberOfBytesConsumed);

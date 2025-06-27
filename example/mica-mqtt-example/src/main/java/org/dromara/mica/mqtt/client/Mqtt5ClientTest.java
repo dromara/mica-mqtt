@@ -43,7 +43,7 @@ public class Mqtt5ClientTest {
 			.username("mica")
 			.password("mica")
 			.version(MqttVersion.MQTT_5)
-			.cleanSession(false)
+			.cleanStart(false)
 			.sessionExpiryIntervalSecs(7200)
 			.connectListener(new MqttClientConnectListener())
 			.willMessage(builder -> {

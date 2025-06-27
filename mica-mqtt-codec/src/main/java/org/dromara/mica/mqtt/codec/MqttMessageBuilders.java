@@ -87,7 +87,7 @@ public final class MqttMessageBuilders {
 
 		private MqttVersion version = MqttVersion.MQTT_3_1_1;
 		private String clientId;
-		private boolean cleanSession;
+		private boolean cleanStart;
 		private boolean hasUser;
 		private boolean hasPassword;
 		private int keepAliveSecs;
@@ -114,8 +114,8 @@ public final class MqttMessageBuilders {
 			return this;
 		}
 
-		public ConnectBuilder cleanSession(boolean cleanSession) {
-			this.cleanSession = cleanSession;
+		public ConnectBuilder cleanStart(boolean cleanStart) {
+			this.cleanStart = cleanStart;
 			return this;
 		}
 
@@ -193,7 +193,7 @@ public final class MqttMessageBuilders {
 					willRetain,
 					willQos.value(),
 					willFlag,
-					cleanSession,
+					cleanStart,
 					keepAliveSecs,
 					properties);
 			MqttConnectPayload mqttConnectPayload =

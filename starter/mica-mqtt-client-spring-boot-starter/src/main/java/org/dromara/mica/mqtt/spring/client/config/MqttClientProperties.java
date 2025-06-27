@@ -117,9 +117,9 @@ public class MqttClientProperties {
 	 */
 	private int reSubscribeBatchSize = 20;
 	/**
-	 * mqtt 协议，默认：MQTT_3_1_1
+	 * mqtt 协议，默认：MQTT_5
 	 */
-	private MqttVersion version = MqttVersion.MQTT_3_1_1;
+	private MqttVersion version = MqttVersion.MQTT_5;
 	/**
 	 * 清除会话
 	 * <p>
@@ -127,7 +127,7 @@ public class MqttClientProperties {
 	 * true 表示消除，表示客户机是第一次连接，消息所以以前的连接信息。
 	 * </p>
 	 */
-	private boolean cleanSession = true;
+	private boolean cleanStart = true;
 	/**
 	 * 开启保留 session 时，session 的有效期，默认：0
 	 */

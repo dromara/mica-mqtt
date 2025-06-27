@@ -119,9 +119,9 @@ public final class MqttClientCreator {
 	 */
 	private String clientId;
 	/**
-	 * mqtt 协议，默认：3_1_1
+	 * mqtt 协议，默认：MQTT_5
 	 */
-	private MqttVersion version = MqttVersion.MQTT_3_1_1;
+	private MqttVersion version = MqttVersion.MQTT_5;
 	/**
 	 * 用户名
 	 */
@@ -137,7 +137,7 @@ public final class MqttClientCreator {
 	 * true 表示消除，表示客户机是第一次连接，消息所以以前的连接信息。
 	 * </p>
 	 */
-	private boolean cleanSession = true;
+	private boolean cleanStart = true;
 	/**
 	 * mqtt 5.0 session 有效期，单位秒
 	 */
@@ -276,8 +276,8 @@ public final class MqttClientCreator {
 		return password;
 	}
 
-	public boolean isCleanSession() {
-		return cleanSession;
+	public boolean isCleanStart() {
+		return cleanStart;
 	}
 
 	public Integer getSessionExpiryIntervalSecs() {
@@ -451,8 +451,8 @@ public final class MqttClientCreator {
 		return this;
 	}
 
-	public MqttClientCreator cleanSession(boolean cleanSession) {
-		this.cleanSession = cleanSession;
+	public MqttClientCreator cleanStart(boolean cleanStart) {
+		this.cleanStart = cleanStart;
 		return this;
 	}
 
@@ -589,7 +589,7 @@ public final class MqttClientCreator {
 			.version(this.version)
 			.username(this.username)
 			.password(this.password)
-			.cleanSession(this.cleanSession)
+			.cleanStart(this.cleanStart)
 			.sessionExpiryIntervalSecs(this.sessionExpiryIntervalSecs)
 			.willMessage(this.willMessage)
 			.connectListener(this.connectListener)

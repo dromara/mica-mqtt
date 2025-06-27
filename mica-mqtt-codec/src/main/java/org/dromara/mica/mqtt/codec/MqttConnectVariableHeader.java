@@ -30,7 +30,7 @@ public final class MqttConnectVariableHeader {
 	private final boolean isWillRetain;
 	private final int willQos;
 	private final boolean isWillFlag;
-	private final boolean isCleanSession;
+	private final boolean isCleanStart;
 	private final int keepAliveTimeSeconds;
 	private final MqttProperties properties;
 
@@ -42,7 +42,7 @@ public final class MqttConnectVariableHeader {
 		boolean isWillRetain,
 		int willQos,
 		boolean isWillFlag,
-		boolean isCleanSession,
+		boolean isCleanStart,
 		int keepAliveTimeSeconds) {
 		this(name,
 			version,
@@ -51,7 +51,7 @@ public final class MqttConnectVariableHeader {
 			isWillRetain,
 			willQos,
 			isWillFlag,
-			isCleanSession,
+			isCleanStart,
 			keepAliveTimeSeconds,
 			MqttProperties.NO_PROPERTIES);
 	}
@@ -64,7 +64,7 @@ public final class MqttConnectVariableHeader {
 		boolean isWillRetain,
 		int willQos,
 		boolean isWillFlag,
-		boolean isCleanSession,
+		boolean isCleanStart,
 		int keepAliveTimeSeconds,
 		MqttProperties properties) {
 		this.name = name;
@@ -74,7 +74,7 @@ public final class MqttConnectVariableHeader {
 		this.isWillRetain = isWillRetain;
 		this.willQos = willQos;
 		this.isWillFlag = isWillFlag;
-		this.isCleanSession = isCleanSession;
+		this.isCleanStart = isCleanStart;
 		this.keepAliveTimeSeconds = keepAliveTimeSeconds;
 		this.properties = MqttProperties.withEmptyDefaults(properties);
 	}
@@ -107,8 +107,8 @@ public final class MqttConnectVariableHeader {
 		return isWillFlag;
 	}
 
-	public boolean isCleanSession() {
-		return isCleanSession;
+	public boolean isCleanStart() {
+		return isCleanStart;
 	}
 
 	public int keepAliveTimeSeconds() {
@@ -128,7 +128,7 @@ public final class MqttConnectVariableHeader {
 			", hasPassword=" + hasPassword +
 			", isWillRetain=" + isWillRetain +
 			", isWillFlag=" + isWillFlag +
-			", isCleanSession=" + isCleanSession +
+			", isCleanSession=" + isCleanStart +
 			", keepAliveTimeSeconds=" + keepAliveTimeSeconds +
 			']';
 	}

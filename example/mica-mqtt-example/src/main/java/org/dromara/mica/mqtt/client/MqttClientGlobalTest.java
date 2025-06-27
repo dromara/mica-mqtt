@@ -35,7 +35,7 @@ public class MqttClientGlobalTest {
 			.password("123456")
 			// 采用 globalSubscribe，保留 session 停机重启后，可以接受到离线消息，注意：clientId 要不能变化。
 			.clientId("globalTest")
-			.cleanSession(false)
+			.cleanStart(false)
 			// 全局订阅的 topic
 			.globalSubscribe("/test", "/test/123", "/debug/#")
 			// 全局监听，也会监听到服务端 http api 订阅的数据

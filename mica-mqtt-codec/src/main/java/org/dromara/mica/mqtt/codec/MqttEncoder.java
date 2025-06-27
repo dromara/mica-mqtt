@@ -192,7 +192,7 @@ public final class MqttEncoder {
 		if (variableHeader.isWillFlag()) {
 			flagByte |= 0x04;
 		}
-		if (variableHeader.isCleanSession()) {
+		if (variableHeader.isCleanStart()) {
 			flagByte |= 0x02;
 		}
 		return flagByte;

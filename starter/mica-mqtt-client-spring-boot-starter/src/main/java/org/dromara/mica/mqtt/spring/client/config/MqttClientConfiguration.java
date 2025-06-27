@@ -80,7 +80,7 @@ public class MqttClientConfiguration {
 			.retryCount(properties.getRetryCount())
 			.reSubscribeBatchSize(properties.getReSubscribeBatchSize())
 			.version(properties.getVersion())
-			.cleanSession(properties.isCleanSession())
+			.cleanStart(properties.isCleanStart())
 			.sessionExpiryIntervalSecs(properties.getSessionExpiryIntervalSecs())
 			.statEnable(properties.isStatEnable())
 			.debug(properties.isDebug());

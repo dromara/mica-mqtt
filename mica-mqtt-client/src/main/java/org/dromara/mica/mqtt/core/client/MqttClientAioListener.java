@@ -90,7 +90,7 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 		MqttMessageBuilders.ConnectBuilder builder = MqttMessageBuilders.connect()
 			.clientId(mqttClientCreator.getClientId())
 			.username(mqttClientCreator.getUsername())
-			.cleanSession(mqttClientCreator.isCleanSession())
+			.cleanStart(mqttClientCreator.isCleanStart())
 			.protocolVersion(version)
 			// 心跳
 			.keepAlive(keepAliveSecs > 0 ? keepAliveSecs : MqttClientCreator.DEFAULT_KEEP_ALIVE_SECS)
