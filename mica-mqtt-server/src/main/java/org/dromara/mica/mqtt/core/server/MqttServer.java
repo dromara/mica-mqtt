@@ -22,7 +22,6 @@ import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
-import org.dromara.mica.mqtt.core.server.http.core.MqttWebServer;
 import org.dromara.mica.mqtt.core.server.model.ClientInfo;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
@@ -35,7 +34,6 @@ import org.tio.core.ChannelContext;
 import org.tio.core.Tio;
 import org.tio.core.TioConfig;
 import org.tio.core.stat.vo.StatVo;
-import org.tio.http.server.HttpServerStarter;
 import org.tio.server.TioServer;
 import org.tio.server.TioServerConfig;
 import org.tio.utils.hutool.StrUtil;
@@ -44,7 +42,6 @@ import org.tio.utils.page.Page;
 import org.tio.utils.page.PageUtils;
 import org.tio.utils.timer.TimerTask;
 import org.tio.utils.timer.TimerTaskService;
-import org.tio.websocket.server.WsServerStarter;
 
 import java.io.IOException;
 import java.util.List;
@@ -63,8 +60,8 @@ import java.util.stream.Collectors;
 public final class MqttServer {
 	private static final Logger logger = LoggerFactory.getLogger(MqttServer.class);
 	private final TioServer tioServer;
-	private final WsServerStarter wsServerStarter;
-	private final HttpServerStarter httpServerStarter;
+	private final TioServer wsServer;
+	private final TioServer httpServer;
 	private final MqttServerCreator serverCreator;
 	private final IMqttSessionManager sessionManager;
 	private final IMqttMessageStore messageStore;
@@ -75,13 +72,13 @@ public final class MqttServer {
 	private final TimerTaskService taskService;
 
 	MqttServer(TioServer tioServer,
-			   WsServerStarter wsServerStarter,
-			   HttpServerStarter httpServerStarter,
+			   TioServer wsServer,
+			   TioServer httpServer,
 			   MqttServerCreator serverCreator,
 			   TimerTaskService taskService) {
 		this.tioServer = tioServer;
-		this.wsServerStarter = wsServerStarter;
-		this.httpServerStarter = httpServerStarter;
+		this.wsServer = wsServer;
+		this.httpServer = httpServer;
 		this.serverCreator = serverCreator;
 		this.sessionManager = serverCreator.getSessionManager();
 		this.messageStore = serverCreator.getMessageStore();
@@ -108,7 +105,7 @@ public final class MqttServer {
 	 * @return TioServer
 	 */
 	public TioServer getWebServer() {
-		return wsServerStarter.getTioServer();
+		return wsServer;
 	}
 
 	/**
@@ -541,18 +538,18 @@ public final class MqttServer {
 			throw new IllegalStateException(message, e);
 		}
 		// 2. 启动 mqtt ws
-		if (wsServerStarter != null) {
+		if (wsServer != null) {
 			try {
-				wsServerStarter.start(this.serverCreator.getIp(), this.serverCreator.getWebsocketPort());
+				wsServer.start(this.serverCreator.getIp(), this.serverCreator.getWebsocketPort());
 			} catch (IOException e) {
 				String message = String.format("Mica mqtt http server port %d start fail.", this.serverCreator.getHttpPort());
 				throw new IllegalStateException(message, e);
 			}
 		}
 		// 3. 启动 mqtt web
-		if (httpServerStarter != null) {
+		if (httpServer != null) {
 			try {
-				httpServerStarter.start(this.serverCreator.getIp(), this.serverCreator.getHttpPort());
+				httpServer.start(this.serverCreator.getIp(), this.serverCreator.getHttpPort());
 			} catch (IOException e) {
 				String message = String.format("Mica mqtt http server port %d start fail.", this.serverCreator.getHttpPort());
 				throw new IllegalStateException(message, e);
@@ -570,12 +567,12 @@ public final class MqttServer {
 		// 停止服务
 		boolean result = this.tioServer.stop();
 		logger.info("Mqtt tcp server stop result:{}", result);
-		if (wsServerStarter != null) {
-			result &= wsServerStarter.stop();
+		if (wsServer != null) {
+			result &= wsServer.stop();
 			logger.info("Mqtt websocket server stop result:{}", result);
 		}
-		if (httpServerStarter != null) {
-			result &= httpServerStarter.stop();
+		if (httpServer != null) {
+			result &= httpServer.stop();
 			logger.info("Mqtt http api server stop result:{}", result);
 		}
 		// 停止工作线程

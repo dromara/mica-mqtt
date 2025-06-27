@@ -201,12 +201,21 @@ import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRequestHandler;
 import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRoutes;
 import org.dromara.mica.mqtt.core.server.http.mcp.MqttMcp;
 import org.dromara.mica.mqtt.core.server.http.websocket.MqttWsMsgHandler;
-import org.tio.http.server.HttpServerStarter;
+import org.tio.core.TcpConst;
+import org.tio.core.uuid.SeqTioUuid;
+import org.tio.core.uuid.SnowflakeTioUuid;
+import org.tio.http.common.HttpConfig;
+import org.tio.http.server.HttpTioServerHandler;
+import org.tio.http.server.HttpTioServerListener;
+import org.tio.server.TioServer;
 import org.tio.server.TioServerConfig;
 import org.tio.utils.json.JsonUtil;
-import org.tio.websocket.server.WsServerStarter;
+import org.tio.utils.thread.pool.SynThreadPoolExecutor;
+import org.tio.websocket.server.WsTioServerHandler;
+import org.tio.websocket.server.WsTioServerListener;
 
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 
 /**
  * mqtt web Server，集成 http 和 websocket
@@ -221,9 +230,9 @@ public class MqttWebServer {
 	 *
 	 * @param serverCreator    MqttServerCreator
 	 * @param mqttServerConfig ServerTioConfig
-	 * @return MqttWebServer
+	 * @return TioServer
 	 */
-	public static HttpServerStarter configHttp(MqttServerCreator serverCreator, TioServerConfig mqttServerConfig) {
+	public static TioServer configHttp(MqttServerCreator serverCreator, TioServerConfig mqttServerConfig) {
 		// 1.1 http-api 用到 json
 		serverCreator.jsonAdapter(JsonUtil.getJsonAdapter(serverCreator.getJsonAdapter()));
 		// 1.2 http 路由配置
@@ -241,7 +250,19 @@ public class MqttWebServer {
 			mqttMcp.register();
 		}
 		// http 服务
-		return new HttpServerStarter(new MqttHttpRequestHandler());
+		MqttHttpRequestHandler requestHandler = new MqttHttpRequestHandler();
+		HttpTioServerHandler httpTioServerHandler = new HttpTioServerHandler(new HttpConfig(), requestHandler);
+		HttpTioServerListener httpTioServerListener = new HttpTioServerListener();
+		SynThreadPoolExecutor tioExecutor = mqttServerConfig.tioExecutor;
+		ExecutorService groupExecutor = mqttServerConfig.groupExecutor;
+		TioServerConfig tioServerConfig = new TioServerConfig("MQTT Http Api Server", httpTioServerHandler, httpTioServerListener, tioExecutor, groupExecutor);
+		tioServerConfig.setTaskService(mqttServerConfig.getTaskService());
+		// 心跳超时时间，默认 30s
+		tioServerConfig.setHeartbeatTimeout(1000 * 30L);
+		tioServerConfig.setShortConnection(true);
+		tioServerConfig.setReadBufferSize(TcpConst.MAX_DATA_LENGTH);
+		tioServerConfig.setTioUuid(new SeqTioUuid());
+		return new TioServer(tioServerConfig);
 	}
 
 	/**
@@ -249,15 +270,22 @@ public class MqttWebServer {
 	 *
 	 * @param serverCreator    MqttServerCreator
 	 * @param mqttServerConfig ServerTioConfig
-	 * @return MqttWebServer
+	 * @return TioServer
 	 */
-	public static WsServerStarter configWs(MqttServerCreator serverCreator, TioServerConfig mqttServerConfig) {
+	public static TioServer configWs(MqttServerCreator serverCreator, TioServerConfig mqttServerConfig) {
 		MqttWsMsgHandler wsMsgHandler = new MqttWsMsgHandler(serverCreator, mqttServerConfig.getTioHandler());
-		WsServerStarter serverStarter = new WsServerStarter(wsMsgHandler);
-		TioServerConfig tioServerConfig = serverStarter.getTioServerConfig();
+		WsTioServerHandler wsTioServerHandler = new WsTioServerHandler(new HttpConfig(), wsMsgHandler);
+		WsTioServerListener wsTioServerListener = new WsTioServerListener();
+		SynThreadPoolExecutor tioExecutor = mqttServerConfig.tioExecutor;
+		ExecutorService groupExecutor = mqttServerConfig.groupExecutor;
+		TioServerConfig tioServerConfig = new TioServerConfig("Websocket MQTT Server", wsTioServerHandler, wsTioServerListener, tioExecutor, groupExecutor);
+		tioServerConfig.setTaskService(mqttServerConfig.getTaskService());
+		tioServerConfig.setHeartbeatTimeout(0);
+		tioServerConfig.setTioUuid(new SnowflakeTioUuid());
+		tioServerConfig.setReadBufferSize(mqttServerConfig.getReadBufferSize());
 		// 共享数据
 		tioServerConfig.share(mqttServerConfig);
-		return serverStarter;
+		return new TioServer(tioServerConfig);
 	}
 
 }

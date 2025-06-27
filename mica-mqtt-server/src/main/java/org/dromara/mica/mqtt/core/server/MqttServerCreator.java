@@ -666,18 +666,18 @@ public class MqttServerCreator {
 		}
 		TioServer tioServer = new TioServer(tioConfig);
 		// 9 配置 mqtt http server
-		HttpServerStarter httpServerStarter = null;
+		TioServer httpServer = null;
 		logger.info("Mica mqtt http api enable:{} websocket enable:{}", this.httpEnable, this.websocketEnable);
 		if (this.httpEnable) {
-			httpServerStarter = MqttWebServer.configHttp(this, tioConfig);
+			httpServer = MqttWebServer.configHttp(this, tioConfig);
 		}
 		// 9 配置 mqtt websocket server
-		WsServerStarter wsServerStarter = null;
+		TioServer wsServer = null;
 		if (this.websocketEnable) {
-			wsServerStarter = MqttWebServer.configWs(this, tioConfig);
+			wsServer = MqttWebServer.configWs(this, tioConfig);
 		}
 		// MqttServer
-		MqttServer mqttServer = new MqttServer(tioServer, wsServerStarter, httpServerStarter, this, this.taskService);
+		MqttServer mqttServer = new MqttServer(tioServer, wsServer, httpServer, this, this.taskService);
 		// 9. 如果是默认的消息转发器，设置 mqttServer
 		if (this.messageDispatcher instanceof AbstractMqttMessageDispatcher) {
 			((AbstractMqttMessageDispatcher) this.messageDispatcher).config(mqttServer);
