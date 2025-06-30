@@ -26,7 +26,7 @@ public class MqttProtocolListener implements IMqttProtocolListener {
 
 	private static MqttProtocol checkSSl(MqttProtocol mqttProtocol, SslConfig sslConfig) {
 		if ((MqttProtocol.MQTT_SSL == mqttProtocol || MqttProtocol.MQTT_WSS == mqttProtocol) && sslConfig == null) {
-			throw new NullPointerException(mqttProtocol + " 需要配置 SSLContext");
+			throw new NullPointerException(mqttProtocol + " 缺少必要参数 SslConfig");
 		} else {
 			return mqttProtocol;
 		}
