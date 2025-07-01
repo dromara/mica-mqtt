@@ -56,7 +56,7 @@ public class MqttServerConfiguration {
 		MqttServerProperties.Ssl ssl = properties.getSsl();
 		// ssl 配置
 		if (ssl.isEnabled()) {
-			serverCreator.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());
+//			serverCreator.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());
 		}
 		return serverCreator;
 	}
