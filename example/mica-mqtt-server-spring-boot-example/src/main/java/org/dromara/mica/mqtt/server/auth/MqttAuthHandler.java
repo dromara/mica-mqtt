@@ -13,7 +13,7 @@ import org.tio.core.ChannelContext;
 public class MqttAuthHandler implements IMqttServerAuthHandler {
 
 	@Override
-	public boolean authenticate(ChannelContext context, String uniqueId, String clientId, String userName, String password) {
+	public boolean authenticate(ChannelContext context, String uniqueId, String clientId, String username, String password) {
 		// 客户端认证逻辑实现
 		return true;
 	}

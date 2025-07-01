@@ -117,7 +117,7 @@ public final class MqttEncoder {
 			payloadBufferSize += 2 + willMessageBytes.length;
 		}
 
-		String userName = payload.userName();
+		String userName = payload.username();
 		byte[] userNameBytes = userName != null ? encodeStringUtf8(userName) : ByteBufferUtil.EMPTY_BYTES;
 		if (variableHeader.hasUserName()) {
 			payloadBufferSize += 2 + userNameBytes.length;

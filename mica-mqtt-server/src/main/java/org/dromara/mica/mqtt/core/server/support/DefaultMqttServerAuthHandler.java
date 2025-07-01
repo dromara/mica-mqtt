@@ -36,8 +36,8 @@ public class DefaultMqttServerAuthHandler implements IMqttServerAuthHandler {
 	}
 
 	@Override
-	public boolean authenticate(ChannelContext context, String uniqueId, String clientId, String userName, String password) {
-		return authUserName.equals(userName) && authPassword.equals(password);
+	public boolean authenticate(ChannelContext context, String uniqueId, String clientId, String username, String password) {
+		return authUserName.equals(username) && authPassword.equals(password);
 	}
 
 }

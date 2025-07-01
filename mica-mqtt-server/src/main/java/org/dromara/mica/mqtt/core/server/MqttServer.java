@@ -45,7 +45,6 @@ import org.tio.utils.timer.TimerTaskService;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -397,7 +396,6 @@ public final class MqttServer {
 	public static List<ClientInfo> getClients(MqttServerCreator serverCreator, TioConfig tioConfig) {
 		return Tio.getAll(tioConfig)
 			.stream()
-			.filter(MqttServer::isMqtt)
 			.map(context -> ClientInfo.form(serverCreator, context, ClientInfo::new))
 			.collect(Collectors.toList());
 	}
@@ -423,11 +421,7 @@ public final class MqttServer {
 	 * @return 分页
 	 */
 	public static Page<ClientInfo> getClients(MqttServerCreator serverCreator, TioConfig tioConfig, Integer pageIndex, Integer pageSize) {
-		Set<ChannelContext> contextSet = Tio.getAll(tioConfig)
-			.stream()
-			.filter(MqttServer::isMqtt)
-			.collect(Collectors.toSet());
-		return PageUtils.fromSet(contextSet, pageIndex, pageSize, context -> ClientInfo.form(serverCreator, context, ClientInfo::new));
+		return PageUtils.fromSet(Tio.getAll(tioConfig), pageIndex, pageSize, context -> ClientInfo.form(serverCreator, context, ClientInfo::new));
 	}
 
 	/**
@@ -447,16 +441,6 @@ public final class MqttServer {
 	 */
 	public List<Subscribe> getSubscriptions(String clientId) {
 		return serverCreator.getSessionManager().getSubscriptions(clientId);
-	}
-
-	/**
-	 * 判断是否 mqtt 连接
-	 *
-	 * @param context ChannelContext
-	 * @return 是否 mqtt
-	 */
-	private static boolean isMqtt(ChannelContext context) {
-		return StrUtil.isNotBlank(context.getBsId());
 	}
 
 	/**

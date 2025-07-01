@@ -30,7 +30,7 @@ import org.tio.core.Node;
 public class MqttAuthHandler implements IMqttServerAuthHandler {
 
 	@Override
-	public boolean authenticate(ChannelContext context, String uniqueId, String clientId, String userName, String password) {
+	public boolean authenticate(ChannelContext context, String uniqueId, String clientId, String username, String password) {
 		// 获取客户端信息
 		Node clientNode = context.getClientNode();
 		// 客户端认证逻辑实现

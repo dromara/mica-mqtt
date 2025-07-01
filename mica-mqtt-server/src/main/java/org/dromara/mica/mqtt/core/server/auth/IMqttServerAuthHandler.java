@@ -35,15 +35,15 @@ public interface IMqttServerAuthHandler {
 	 * @param context  ChannelContext
 	 * @param uniqueId mqtt 内唯一id，默认和 clientId 相同
 	 * @param clientId 客户端 ID
-	 * @param userName 用户名
+	 * @param username 用户名
 	 * @param password 密码
 	 * @return 是否认证成功
 	 */
-	default boolean verifyAuthenticate(ChannelContext context, String uniqueId, String clientId, String userName, String password) {
+	default boolean verifyAuthenticate(ChannelContext context, String uniqueId, String clientId, String username, String password) {
 		try {
-			return authenticate(context, uniqueId, clientId, userName, password);
+			return authenticate(context, uniqueId, clientId, username, password);
 		} catch (Throwable e) {
-			logger.error("Mqtt client node:{} authenticate error uniqueId:{} clientId:{} username:{} password:{}", context.getClientNode(), uniqueId, clientId, userName, password, e);
+			logger.error("Mqtt client node:{} authenticate error uniqueId:{} clientId:{} username:{} password:{}", context.getClientNode(), uniqueId, clientId, username, password, e);
 			return false;
 		}
 	}
@@ -54,10 +54,10 @@ public interface IMqttServerAuthHandler {
 	 * @param context  ChannelContext
 	 * @param uniqueId mqtt 内唯一id，默认和 clientId 相同
 	 * @param clientId 客户端 ID
-	 * @param userName 用户名
+	 * @param username 用户名
 	 * @param password 密码
 	 * @return 是否认证成功
 	 */
-	boolean authenticate(ChannelContext context, String uniqueId, String clientId, String userName, String password);
+	boolean authenticate(ChannelContext context, String uniqueId, String clientId, String username, String password);
 
 }

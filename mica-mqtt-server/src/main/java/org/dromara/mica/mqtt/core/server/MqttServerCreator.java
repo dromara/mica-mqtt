@@ -44,7 +44,6 @@ import org.slf4j.LoggerFactory;
 import org.tio.core.ssl.ClientAuth;
 import org.tio.core.ssl.SslConfig;
 import org.tio.core.task.HeartbeatMode;
-import org.tio.http.server.HttpServerStarter;
 import org.tio.server.TioServer;
 import org.tio.server.TioServerConfig;
 import org.tio.server.intf.TioServerHandler;
@@ -55,7 +54,6 @@ import org.tio.utils.json.JsonUtil;
 import org.tio.utils.thread.ThreadUtils;
 import org.tio.utils.timer.DefaultTimerTaskService;
 import org.tio.utils.timer.TimerTaskService;
-import org.tio.websocket.server.WsServerStarter;
 
 import java.io.InputStream;
 import java.util.concurrent.ExecutorService;

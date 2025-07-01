@@ -40,7 +40,6 @@ import org.tio.core.ChannelContext;
 import org.tio.core.Node;
 import org.tio.core.Tio;
 import org.tio.core.TioConfig;
-import org.tio.core.intf.Packet;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.mica.Pair;
 import org.tio.utils.timer.TimerTaskService;
@@ -99,7 +98,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		MqttConnectPayload payload = mqttMessage.payload();
 		// 参数
 		String clientId = payload.clientIdentifier();
-		String userName = payload.userName();
+		String userName = payload.username();
 		String password = payload.password();
 		// 1. 获取唯一id，用于 mqtt 内部绑定，部分用户的业务采用 userName 作为唯一id，故抽象之，默认：uniqueId == clientId
 		String uniqueId = uniqueIdService.getUniqueId(context, clientId, userName, password);
