@@ -36,7 +36,6 @@
         <module>mica-mqtt-common</module>
         <module>mica-mqtt-client</module>
         <module>mica-mqtt-server</module>
-        <module>mica-mqtt-broker</module>
         <module>example</module>
         <module>starter</module>
     </modules>

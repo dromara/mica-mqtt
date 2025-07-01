@@ -108,7 +108,7 @@ public class MqttServerConfiguration {
 		// ssl 配置
 		if (ssl.isEnabled()) {
 			SslConfig sslConfig = SslConfig.forServer(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());
-			serverCreator.sslConfig(sslConfig);
+//			serverCreator.sslConfig(sslConfig);
 			sslCustomizers.ifAvailable(sslConfig::setSslEngineCustomizer);
 		}
 		// 自定义消息监听

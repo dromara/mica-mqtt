@@ -43,8 +43,6 @@ import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerProcessor;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerUniqueIdServiceImpl;
 import org.tio.core.Node;
-import org.tio.core.ssl.ClientAuth;
-import org.tio.core.ssl.SslConfig;
 import org.tio.core.task.HeartbeatMode;
 import org.tio.server.TioServerConfig;
 import org.tio.server.intf.TioServerHandler;
@@ -56,7 +54,6 @@ import org.tio.utils.thread.ThreadUtils;
 import org.tio.utils.timer.DefaultTimerTaskService;
 import org.tio.utils.timer.TimerTaskService;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -78,7 +75,7 @@ public class MqttServerCreator {
 	/**
 	 * 监听器
 	 */
-	private List<IMqttProtocolListener> listeners = new ArrayList<>();
+	private final List<IMqttProtocolListener> listeners = new ArrayList<>();
 	/**
 	 * 心跳超时时间(单位: 毫秒 默认: 1000 * 120)，如果用户不希望框架层面做心跳相关工作，请把此值设为0或负数
 	 */
@@ -97,10 +94,6 @@ public class MqttServerCreator {
 	 * 消息解析最大 bytes 长度，默认：10M
 	 */
 	private int maxBytesInMessage = MqttConstant.DEFAULT_MAX_BYTES_IN_MESSAGE;
-	/**
-	 * ssl 证书配置
-	 */
-	private SslConfig sslConfig;
 	/**
 	 * 认证处理器
 	 */
@@ -241,39 +234,6 @@ public class MqttServerCreator {
 			throw new IllegalArgumentException("maxBytesInMessage must be greater than 0.");
 		}
 		this.maxBytesInMessage = maxBytesInMessage;
-		return this;
-	}
-
-	public SslConfig getSslConfig() {
-		return sslConfig;
-	}
-
-	public MqttServerCreator useSsl(InputStream keyStoreInputStream, String keyPasswd) {
-		return sslConfig(SslConfig.forServer(keyStoreInputStream, keyPasswd));
-	}
-
-	public MqttServerCreator useSsl(InputStream keyStoreInputStream, String keyPasswd, ClientAuth clientAuth) {
-		return sslConfig(SslConfig.forServer(keyStoreInputStream, keyPasswd, clientAuth));
-	}
-
-	public MqttServerCreator useSsl(InputStream keyStoreInputStream, String keyPasswd, InputStream trustStoreInputStream, String trustPassword, ClientAuth clientAuth) {
-		return sslConfig(SslConfig.forServer(keyStoreInputStream, keyPasswd, trustStoreInputStream, trustPassword, clientAuth));
-	}
-
-	public MqttServerCreator useSsl(String keyStoreFile, String keyPasswd) {
-		return sslConfig(SslConfig.forServer(keyStoreFile, keyPasswd));
-	}
-
-	public MqttServerCreator useSsl(String keyStoreFile, String keyPasswd, ClientAuth clientAuth) {
-		return sslConfig(SslConfig.forServer(keyStoreFile, keyPasswd, clientAuth));
-	}
-
-	public MqttServerCreator useSsl(String keyStoreFile, String keyPasswd, String trustStoreFile, String trustPassword, ClientAuth clientAuth) {
-		return sslConfig(SslConfig.forServer(keyStoreFile, keyPasswd, trustStoreFile, trustPassword, clientAuth));
-	}
-
-	public MqttServerCreator sslConfig(SslConfig sslConfig) {
-		this.sslConfig = sslConfig;
 		return this;
 	}
 
@@ -579,9 +539,6 @@ public class MqttServerCreator {
 		}
 		tioConfig.setHeartbeatBackoff(this.keepaliveBackoff);
 		tioConfig.setHeartbeatMode(HeartbeatMode.LAST_RESP);
-		if (this.sslConfig != null) {
-			tioConfig.setSslConfig(this.sslConfig);
-		}
 		if (this.debug) {
 			tioConfig.debug = true;
 		}
