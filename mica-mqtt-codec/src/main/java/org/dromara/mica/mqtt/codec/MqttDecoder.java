@@ -419,7 +419,7 @@ public final class MqttDecoder {
 		}
 		Result<String> decodedUserName = null;
 		byte[] decodedPassword = null;
-		if (mqttConnectVariableHeader.hasUserName()) {
+		if (mqttConnectVariableHeader.hasUsername()) {
 			decodedUserName = decodeString(buffer);
 			numberOfBytesConsumed += decodedUserName.numberOfBytesConsumed;
 		}

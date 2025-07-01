@@ -95,7 +95,7 @@ public final class MqttEncoder {
 		MqttCodecUtil.setMqttVersion(ctx, mqttVersion);
 
 		// as MQTT 3.1 & 3.1.1 spec, If the User Name Flag is set to 0, the Password Flag MUST be set to 0
-		if (!variableHeader.hasUserName() && variableHeader.hasPassword()) {
+		if (!variableHeader.hasUsername() && variableHeader.hasPassword()) {
 			throw new EncoderException("Without a username, the password MUST be not set");
 		}
 
@@ -119,7 +119,7 @@ public final class MqttEncoder {
 
 		String userName = payload.username();
 		byte[] userNameBytes = userName != null ? encodeStringUtf8(userName) : ByteBufferUtil.EMPTY_BYTES;
-		if (variableHeader.hasUserName()) {
+		if (variableHeader.hasUsername()) {
 			payloadBufferSize += 2 + userNameBytes.length;
 		}
 
@@ -166,7 +166,7 @@ public final class MqttEncoder {
 			buf.putShort((short) willMessageBytes.length);
 			buf.put(willMessageBytes, 0, willMessageBytes.length);
 		}
-		if (variableHeader.hasUserName()) {
+		if (variableHeader.hasUsername()) {
 			buf.putShort((short) userNameBytes.length);
 			buf.put(userNameBytes, 0, userNameBytes.length);
 		}
@@ -179,7 +179,7 @@ public final class MqttEncoder {
 
 	private static int getConnVariableHeaderFlag(MqttConnectVariableHeader variableHeader) {
 		int flagByte = 0;
-		if (variableHeader.hasUserName()) {
+		if (variableHeader.hasUsername()) {
 			flagByte |= 0x80;
 		}
 		if (variableHeader.hasPassword()) {

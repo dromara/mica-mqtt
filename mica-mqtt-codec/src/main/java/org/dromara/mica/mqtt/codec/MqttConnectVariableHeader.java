@@ -25,7 +25,7 @@ public final class MqttConnectVariableHeader {
 
 	private final String name;
 	private final int version;
-	private final boolean hasUserName;
+	private final boolean hasUsername;
 	private final boolean hasPassword;
 	private final boolean isWillRetain;
 	private final int willQos;
@@ -37,7 +37,7 @@ public final class MqttConnectVariableHeader {
 	public MqttConnectVariableHeader(
 		String name,
 		int version,
-		boolean hasUserName,
+		boolean hasUsername,
 		boolean hasPassword,
 		boolean isWillRetain,
 		int willQos,
@@ -46,7 +46,7 @@ public final class MqttConnectVariableHeader {
 		int keepAliveTimeSeconds) {
 		this(name,
 			version,
-			hasUserName,
+			hasUsername,
 			hasPassword,
 			isWillRetain,
 			willQos,
@@ -59,7 +59,7 @@ public final class MqttConnectVariableHeader {
 	public MqttConnectVariableHeader(
 		String name,
 		int version,
-		boolean hasUserName,
+		boolean hasUsername,
 		boolean hasPassword,
 		boolean isWillRetain,
 		int willQos,
@@ -69,7 +69,7 @@ public final class MqttConnectVariableHeader {
 		MqttProperties properties) {
 		this.name = name;
 		this.version = version;
-		this.hasUserName = hasUserName;
+		this.hasUsername = hasUsername;
 		this.hasPassword = hasPassword;
 		this.isWillRetain = isWillRetain;
 		this.willQos = willQos;
@@ -87,8 +87,8 @@ public final class MqttConnectVariableHeader {
 		return version;
 	}
 
-	public boolean hasUserName() {
-		return hasUserName;
+	public boolean hasUsername() {
+		return hasUsername;
 	}
 
 	public boolean hasPassword() {
@@ -124,11 +124,11 @@ public final class MqttConnectVariableHeader {
 		return "MqttConnectVariableHeader[" +
 			"name=" + name +
 			", version=" + version +
-			", hasUserName=" + hasUserName +
+			", hasUsername=" + hasUsername +
 			", hasPassword=" + hasPassword +
 			", isWillRetain=" + isWillRetain +
 			", isWillFlag=" + isWillFlag +
-			", isCleanSession=" + isCleanStart +
+			", isCleanStart=" + isCleanStart +
 			", keepAliveTimeSeconds=" + keepAliveTimeSeconds +
 			']';
 	}
