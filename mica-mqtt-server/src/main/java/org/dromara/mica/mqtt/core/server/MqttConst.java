@@ -24,10 +24,6 @@ package org.dromara.mica.mqtt.core.server;
 public interface MqttConst {
 
 	/**
-	 * 是 http 协议
-	 */
-	String IS_HTTP = "is_http";
-	/**
 	 * session 有效期，小于等于 0，关闭时清理，大于 0 采用缓存处理
 	 */
 	String SESSION_EXPIRES = "session_expires";

@@ -48,10 +48,6 @@ public class MqttWsMsgHandler implements IWsMsgHandler {
 	 */
 	private static final String MQTT_WS_MSG_BODY_KEY = "MQTT_WS_MSG_BODY_KEY";
 	/**
-	 * MqttServerCreator
-	 */
-	private final MqttServerCreator serverCreator;
-	/**
 	 * websocket 握手端点
 	 */
 	private final String[] supportedSubProtocols;
@@ -65,7 +61,6 @@ public class MqttWsMsgHandler implements IWsMsgHandler {
 	public MqttWsMsgHandler(MqttServerCreator serverCreator,
 							String[] supportedSubProtocols,
 							TioHandler handler) {
-		this.serverCreator = serverCreator;
 		this.supportedSubProtocols = supportedSubProtocols;
 		this.mqttServerAioHandler = handler;
 		this.messageInterceptors = serverCreator.getMessageInterceptors();
@@ -74,14 +69,6 @@ public class MqttWsMsgHandler implements IWsMsgHandler {
 	@Override
 	public String[] getSupportedSubProtocols() {
 		return this.supportedSubProtocols;
-	}
-
-	@Override
-	public HttpResponse handshake(HttpRequest request, HttpResponse httpResponse, ChannelContext channelContext) {
-		if (serverCreator.isWebsocketEnable()) {
-			return httpResponse;
-		}
-		return null;
 	}
 
 	/**

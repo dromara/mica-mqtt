@@ -37,6 +37,7 @@ import org.tio.server.TioServer;
 import org.tio.server.TioServerConfig;
 
 import java.io.InputStream;
+import java.util.Objects;
 
 /**
  * mqtt http api 监听器
@@ -112,6 +113,20 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 		tioServerConfig.setTioUuid(new SeqTioUuid());
 		tioServerConfig.setSslConfig(sslConfig);
 		return new TioServer(serverNode, tioServerConfig);
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		if (o == null || getClass() != o.getClass()) {
+			return false;
+		}
+		IMqttProtocolListener that = (IMqttProtocolListener) o;
+		return Objects.equals(serverNode, that.getServerNode());
+	}
+
+	@Override
+	public int hashCode() {
+		return serverNode.hashCode();
 	}
 
 	public static Builder builder() {

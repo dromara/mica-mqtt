@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.nginx;
 
 
 import org.dromara.mica.mqtt.core.server.MqttServer;
+import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListener;
 
 /**
  * mqtt 服务端测试
@@ -28,8 +29,7 @@ public class MqttServerProxyProtocol {
 
 	public static void main(String[] args) {
 		MqttServer.create()
-			.httpEnable(false)
-			.websocketEnable(true)
+			.enableMqttWs(MqttProtocolListener.Builder::build)
 			.statEnable(false)
 			// 开启代理协议
 			.proxyProtocolEnable()

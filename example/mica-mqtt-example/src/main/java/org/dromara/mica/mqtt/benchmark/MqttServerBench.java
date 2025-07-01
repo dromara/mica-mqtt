@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.benchmark;
 
 import org.dromara.mica.mqtt.core.server.MqttServer;
+import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListener;
 
 /**
  * mqtt 服务端测试
@@ -30,8 +31,7 @@ public class MqttServerBench {
 		System.setProperty("tinylog.writer.level", "error");
 		// 启动 mqtt 服务
 		MqttServer.create()
-			.httpEnable(false)
-			.websocketEnable(false)
+			.enableMqtt(MqttProtocolListener.Builder::build)
 			.statEnable(false)
 			.start();
 	}

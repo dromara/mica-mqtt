@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.core.server.listener;
 
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.http.websocket.MqttWsMsgHandler;
+import org.dromara.mica.mqtt.core.server.http.websocket.MqttWsServerListener;
 import org.dromara.mica.mqtt.core.server.protocol.MqttProtocol;
 import org.tio.core.Node;
 import org.tio.core.ssl.ClientAuth;
@@ -27,7 +28,6 @@ import org.tio.http.common.HttpConfig;
 import org.tio.server.TioServer;
 import org.tio.server.TioServerConfig;
 import org.tio.websocket.server.WsTioServerHandler;
-import org.tio.websocket.server.WsTioServerListener;
 
 import java.io.InputStream;
 import java.util.Objects;
@@ -103,6 +103,20 @@ public class MqttProtocolListener implements IMqttProtocolListener {
 		return new TioServer(serverNode, serverConfig);
 	}
 
+	@Override
+	public boolean equals(Object o) {
+		if (o == null || getClass() != o.getClass()) {
+			return false;
+		}
+		IMqttProtocolListener that = (IMqttProtocolListener) o;
+		return Objects.equals(serverNode, that.getServerNode());
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hashCode(serverNode);
+	}
+
 	/**
 	 * 获取 tcp 服务配置
 	 *
@@ -111,8 +125,12 @@ public class MqttProtocolListener implements IMqttProtocolListener {
 	 * @return TioServerConfig
 	 */
 	private TioServerConfig getTcpServerConfig(MqttServerCreator serverCreator, TioServerConfig mainServerConfig) {
-		return new TioServerConfig(serverCreator.getName() + '/' + this.getProtocol().name(),
+		// tcp 服务配置
+		TioServerConfig serverConfig = new TioServerConfig(serverCreator.getName() + '/' + this.getProtocol().name(),
 			mainServerConfig.getTioServerHandler(), mainServerConfig.getTioServerListener());
+		// 是否开启代理协议
+		serverConfig.enableProxyProtocol(mainServerConfig.isProxyProtocolEnabled());
+		return serverConfig;
 	}
 
 	/**
@@ -123,44 +141,18 @@ public class MqttProtocolListener implements IMqttProtocolListener {
 	 * @return TioServerConfig
 	 */
 	private TioServerConfig getWebSocketServerConfig(MqttServerCreator serverCreator, TioServerConfig mainServerConfig) {
+		// mqtt websocket 处理器
 		MqttWsMsgHandler handler = new MqttWsMsgHandler(serverCreator, mainServerConfig.getTioHandler());
+		// 配置
 		TioServerConfig tioServerConfig = new TioServerConfig(
 			serverCreator.getName() + '/' + this.getProtocol().name(),
 			new WsTioServerHandler(new HttpConfig(), handler),
-			new WsTioServerListener(),
+			new MqttWsServerListener(mainServerConfig.getTioServerListener()),
 			mainServerConfig.tioExecutor,
 			mainServerConfig.groupExecutor
 		);
 		tioServerConfig.setTioUuid(new SnowflakeTioUuid());
 		return tioServerConfig;
-	}
-
-	/**
-	 * 配置 websocket 服务
-	 *
-	 * @param serverCreator    MqttServerCreator
-	 * @param mqttServerConfig ServerTioConfig
-	 * @return TioServer
-	 */
-	private TioServer configWs(MqttServerCreator serverCreator, TioServerConfig mqttServerConfig) {
-		// 1. 配置 websocket
-		MqttWsMsgHandler wsMsgHandler = new MqttWsMsgHandler(serverCreator, mqttServerConfig.getTioHandler());
-		TioServerConfig tioServerConfig = new TioServerConfig(
-			this.getProtocol().name(),
-			new WsTioServerHandler(new HttpConfig(), wsMsgHandler),
-			new WsTioServerListener(),
-			mqttServerConfig.tioExecutor,
-			mqttServerConfig.groupExecutor
-		);
-		tioServerConfig.setTaskService(mqttServerConfig.getTaskService());
-		tioServerConfig.setHeartbeatTimeout(0);
-		tioServerConfig.setTioUuid(new SnowflakeTioUuid());
-		tioServerConfig.setReadBufferSize(mqttServerConfig.getReadBufferSize());
-		tioServerConfig.debug = mqttServerConfig.debug;
-		tioServerConfig.setSslConfig(sslConfig);
-		// 共享数据
-		tioServerConfig.share(mqttServerConfig);
-		return new TioServer(serverNode, tioServerConfig);
 	}
 
 	public static Builder mqttBuilder() {

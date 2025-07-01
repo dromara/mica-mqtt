@@ -22,6 +22,7 @@ import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
+import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListeners;
 import org.dromara.mica.mqtt.core.server.model.ClientInfo;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
@@ -34,8 +35,8 @@ import org.tio.core.ChannelContext;
 import org.tio.core.Tio;
 import org.tio.core.TioConfig;
 import org.tio.core.stat.vo.StatVo;
-import org.tio.server.TioServer;
 import org.tio.server.TioServerConfig;
+import org.tio.server.task.ServerHeartbeatTask;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.mica.Pair;
 import org.tio.utils.page.Page;
@@ -43,7 +44,6 @@ import org.tio.utils.page.PageUtils;
 import org.tio.utils.timer.TimerTask;
 import org.tio.utils.timer.TimerTaskService;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -58,30 +58,23 @@ import java.util.stream.Collectors;
  */
 public final class MqttServer {
 	private static final Logger logger = LoggerFactory.getLogger(MqttServer.class);
-	private final TioServer tioServer;
-	private final TioServer wsServer;
-	private final TioServer httpServer;
 	private final MqttServerCreator serverCreator;
+	private final TioServerConfig serverConfig;
+	private final TimerTaskService taskService;
+	private final MqttProtocolListeners listeners;
 	private final IMqttSessionManager sessionManager;
 	private final IMqttMessageStore messageStore;
 	private final MqttSerializer mqttSerializer;
-	/**
-	 * taskService
-	 */
-	private final TimerTaskService taskService;
 
-	MqttServer(TioServer tioServer,
-			   TioServer wsServer,
-			   TioServer httpServer,
-			   MqttServerCreator serverCreator,
-			   TimerTaskService taskService) {
-		this.tioServer = tioServer;
-		this.wsServer = wsServer;
-		this.httpServer = httpServer;
+	MqttServer(MqttServerCreator serverCreator,
+			   TioServerConfig serverConfig,
+			   MqttProtocolListeners listeners) {
 		this.serverCreator = serverCreator;
+		this.serverConfig = serverConfig;
+		this.taskService = serverConfig.getTaskService();
+		this.listeners = listeners;
 		this.sessionManager = serverCreator.getSessionManager();
 		this.messageStore = serverCreator.getMessageStore();
-		this.taskService = taskService;
 		this.mqttSerializer = serverCreator.getMqttSerializer();
 	}
 
@@ -90,30 +83,12 @@ public final class MqttServer {
 	}
 
 	/**
-	 * 获取 TioServer
-	 *
-	 * @return TioServer
-	 */
-	public TioServer getTioServer() {
-		return this.tioServer;
-	}
-
-	/**
-	 * 获取 http、websocket 服务
-	 *
-	 * @return TioServer
-	 */
-	public TioServer getWebServer() {
-		return wsServer;
-	}
-
-	/**
 	 * 获取 ServerTioConfig
 	 *
 	 * @return the serverTioConfig
 	 */
 	public TioServerConfig getServerConfig() {
-		return this.tioServer.getServerConfig();
+		return this.serverConfig;
 	}
 
 	/**
@@ -430,7 +405,7 @@ public final class MqttServer {
 	 * @return StatVo
 	 */
 	public StatVo getStat() {
-		return tioServer.getServerConfig().getStat();
+		return serverConfig.getStat();
 	}
 
 	/**
@@ -451,7 +426,7 @@ public final class MqttServer {
 	 * @return TimerTask
 	 */
 	public TimerTask schedule(Runnable command, long delay) {
-		return this.tioServer.schedule(command, delay);
+		return schedule(command, delay, null);
 	}
 
 	/**
@@ -463,7 +438,23 @@ public final class MqttServer {
 	 * @return TimerTask
 	 */
 	public TimerTask schedule(Runnable command, long delay, Executor executor) {
-		return this.tioServer.schedule(command, delay, executor);
+		return this.taskService.addTask((systemTimer -> new TimerTask(delay) {
+			@Override
+			public void run() {
+				try {
+					// 1. 再次添加 任务
+					systemTimer.add(this);
+					// 2. 执行任务
+					if (executor == null) {
+						command.run();
+					} else {
+						executor.execute(command);
+					}
+				} catch (Exception e) {
+					logger.error("Mqtt server schedule error", e);
+				}
+			}
+		}));
 	}
 
 	/**
@@ -474,7 +465,7 @@ public final class MqttServer {
 	 * @return TimerTask
 	 */
 	public TimerTask scheduleOnce(Runnable command, long delay) {
-		return this.tioServer.scheduleOnce(command, delay, null);
+		return scheduleOnce(command, delay, null);
 	}
 
 	/**
@@ -486,7 +477,20 @@ public final class MqttServer {
 	 * @return TimerTask
 	 */
 	public TimerTask scheduleOnce(Runnable command, long delay, Executor executor) {
-		return this.tioServer.scheduleOnce(command, delay, executor);
+		return this.taskService.addTask((systemTimer -> new TimerTask(delay) {
+			@Override
+			public void run() {
+				try {
+					if (executor == null) {
+						command.run();
+					} else {
+						executor.execute(command);
+					}
+				} catch (Exception e) {
+					logger.error("Mqtt server schedule once error", e);
+				}
+			}
+		}));
 	}
 
 	/**
@@ -514,31 +518,12 @@ public final class MqttServer {
 	 * @return 是否启动
 	 */
 	public boolean start() {
-		// 1. 启动 mqtt tcp
-		try {
-			tioServer.start();
-		} catch (IOException e) {
-			String message = String.format("Mica mqtt tcp server port %d start fail.", this.serverCreator.getPort());
-			throw new IllegalStateException(message, e);
-		}
-		// 2. 启动 mqtt ws
-		if (wsServer != null) {
-			try {
-				wsServer.start();
-			} catch (IOException e) {
-				String message = String.format("Mica mqtt http server port %d start fail.", this.serverCreator.getHttpPort());
-				throw new IllegalStateException(message, e);
-			}
-		}
-		// 3. 启动 mqtt web
-		if (httpServer != null) {
-			try {
-				httpServer.start();
-			} catch (IOException e) {
-				String message = String.format("Mica mqtt http server port %d start fail.", this.serverCreator.getHttpPort());
-				throw new IllegalStateException(message, e);
-			}
-		}
+		// 1. 启动 task
+		this.taskService.start();
+		// 2. 启动心跳检测
+		this.taskService.addTask(systemTimer -> new ServerHeartbeatTask(systemTimer, serverConfig));
+		// 3. 启动监听器
+		listeners.start();
 		return true;
 	}
 
@@ -549,16 +534,7 @@ public final class MqttServer {
 	 */
 	public boolean stop() {
 		// 停止服务
-		boolean result = this.tioServer.stop();
-		logger.info("Mqtt tcp server stop result:{}", result);
-		if (wsServer != null) {
-			result &= wsServer.stop();
-			logger.info("Mqtt websocket server stop result:{}", result);
-		}
-		if (httpServer != null) {
-			result &= httpServer.stop();
-			logger.info("Mqtt http api server stop result:{}", result);
-		}
+		boolean result = listeners.stop();
 		// 停止工作线程
 		ExecutorService mqttExecutor = serverCreator.getMqttExecutor();
 		try {

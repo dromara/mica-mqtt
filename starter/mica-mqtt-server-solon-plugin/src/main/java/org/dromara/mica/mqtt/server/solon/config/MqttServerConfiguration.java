@@ -30,17 +30,17 @@ public class MqttServerConfiguration {
 	public MqttServerCreator mqttServerCreator(MqttServerProperties properties) {
 		MqttServerCreator serverCreator = MqttServer.create()
 			.name(properties.getName())
-			.ip(properties.getIp())
-			.port(properties.getPort())
+//			.ip(properties.getIp())
+//			.port(properties.getPort())
 			.heartbeatTimeout(properties.getHeartbeatTimeout())
 			.keepaliveBackoff(properties.getKeepaliveBackoff())
 			.readBufferSize((int) DataSize.parse(properties.getReadBufferSize()).getBytes())
 			.maxBytesInMessage((int) DataSize.parse(properties.getMaxBytesInMessage()).getBytes())
 			.maxClientIdLength(properties.getMaxClientIdLength())
-			.websocketEnable(properties.isWebsocketEnable())
-			.websocketPort(properties.getWebsocketPort())
-			.httpEnable(properties.isHttpEnable())
-			.httpPort(properties.getHttpPort())
+//			.websocketEnable(properties.isWebsocketEnable())
+//			.websocketPort(properties.getWebsocketPort())
+//			.httpEnable(properties.isHttpEnable())
+//			.httpPort(properties.getHttpPort())
 			.nodeName(properties.getNodeName())
 			.statEnable(properties.isStatEnable())
 			.proxyProtocolEnable(properties.isProxyProtocolOn());
@@ -50,9 +50,9 @@ public class MqttServerConfiguration {
 
 		// http 认证
 		MqttServerProperties.HttpBasicAuth httpBasicAuth = properties.getHttpBasicAuth();
-		if (serverCreator.isHttpEnable() && httpBasicAuth.isEnable()) {
-			serverCreator.httpBasicAuth(httpBasicAuth.getUsername(), httpBasicAuth.getPassword());
-		}
+//		if (serverCreator.isHttpEnable() && httpBasicAuth.isEnable()) {
+//			serverCreator.httpBasicAuth(httpBasicAuth.getUsername(), httpBasicAuth.getPassword());
+//		}
 		MqttServerProperties.Ssl ssl = properties.getSsl();
 		// ssl 配置
 		if (ssl.isEnabled()) {

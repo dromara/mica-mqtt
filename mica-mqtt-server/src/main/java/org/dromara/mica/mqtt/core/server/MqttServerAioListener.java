@@ -68,14 +68,9 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 	public void onBeforeClose(ChannelContext context, Throwable throwable, String remark, boolean isRemove) {
 		// 标记认证为 false
 		context.setAccepted(false);
-		// 1. http 请求跳过
-		boolean isHttpRequest = context.getAndRemove(MqttConst.IS_HTTP) != null;
-		if (isHttpRequest) {
-			return;
-		}
-		// 2. 业务 id
+		// 1. 业务 id
 		String clientId = context.getBsId();
-		// 3. 判断是否正常断开
+		// 2. 判断是否正常断开
 		boolean isNotNormalDisconnect = !context.isBizStatus();
 		context.setBizStatus(false);
 		if (isNotNormalDisconnect || throwable != null) {
@@ -88,17 +83,17 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		} else {
 			logger.info("Mqtt server close clientId:{} remark:{} isRemove:{}", clientId, remark, isRemove);
 		}
-		// 4. 业务 id 不能为空
+		// 3. 业务 id 不能为空
 		if (StrUtil.isBlank(clientId)) {
 			return;
 		}
-		// 5. 对于异常断开连接，处理遗嘱消息
+		// 4. 对于异常断开连接，处理遗嘱消息
 		if (isNotNormalDisconnect) {
 			sendWillMessage(clientId);
 		}
-		// 6. 会话清理
+		// 5. 会话清理
 		cleanSession(clientId);
-		// 7. 下线事件
+		// 6. 下线事件
 		notify(context, clientId, remark);
 	}
 

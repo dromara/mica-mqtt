@@ -29,8 +29,11 @@ import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
-import org.dromara.mica.mqtt.core.server.http.core.MqttWebServer;
 import org.dromara.mica.mqtt.core.server.interceptor.IMqttMessageInterceptor;
+import org.dromara.mica.mqtt.core.server.listener.IMqttProtocolListener;
+import org.dromara.mica.mqtt.core.server.listener.MqttHttpApiListener;
+import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListener;
+import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListeners;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
@@ -39,12 +42,10 @@ import org.dromara.mica.mqtt.core.server.support.DefaultMqttConnectStatusListene
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerProcessor;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerUniqueIdServiceImpl;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.tio.core.Node;
 import org.tio.core.ssl.ClientAuth;
 import org.tio.core.ssl.SslConfig;
 import org.tio.core.task.HeartbeatMode;
-import org.tio.server.TioServer;
 import org.tio.server.TioServerConfig;
 import org.tio.server.intf.TioServerHandler;
 import org.tio.server.intf.TioServerListener;
@@ -56,8 +57,11 @@ import org.tio.utils.timer.DefaultTimerTaskService;
 import org.tio.utils.timer.TimerTaskService;
 
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * mqtt 服务端参数构造
@@ -66,20 +70,15 @@ import java.util.function.Consumer;
  * @author ChangJin Wei (魏昌进)
  */
 public class MqttServerCreator {
-	private static final Logger logger = LoggerFactory.getLogger(MqttServerCreator.class);
 
 	/**
 	 * 名称
 	 */
 	private String name = "Mica-Mqtt-Server";
 	/**
-	 * 服务端 ip，默认为空，可不设置
+	 * 监听器
 	 */
-	private String ip;
-	/**
-	 * 端口
-	 */
-	private int port = 1883;
+	private List<IMqttProtocolListener> listeners = new ArrayList<>();
 	/**
 	 * 心跳超时时间(单位: 毫秒 默认: 1000 * 120)，如果用户不希望框架层面做心跳相关工作，请把此值设为0或负数
 	 */
@@ -151,30 +150,6 @@ public class MqttServerCreator {
 	 */
 	private int maxClientIdLength = MqttConstant.DEFAULT_MAX_CLIENT_ID_LENGTH;
 	/**
-	 * 开启 http 服务，默认：false
-	 */
-	private boolean httpEnable = false;
-	/**
-	 * http 端口，默认：18083
-	 */
-	private int httpPort = 18083;
-	/**
-	 * 开启 websocket 服务，默认：true
-	 */
-	private boolean websocketEnable = true;
-	/**
-	 * websocket 端口，默认：8083
-	 */
-	private int websocketPort = 8083;
-	/**
-	 * http Basic 认证账号
-	 */
-	private String httpBasicUsername;
-	/**
-	 * http Basic 认证密码
-	 */
-	private String httpBasicPassword;
-	/**
 	 * 节点名称，用于处理集群
 	 */
 	private String nodeName;
@@ -216,10 +191,6 @@ public class MqttServerCreator {
 	private boolean proxyProtocolOn = false;
 
 	private MqttSerializer mqttSerializer;
-	/**
-	 * 开启 mcp 服务
-	 */
-	private boolean enableMcpServer = true;
 
 	public String getName() {
 		return name;
@@ -230,23 +201,6 @@ public class MqttServerCreator {
 		return this;
 	}
 
-	public String getIp() {
-		return ip;
-	}
-
-	public MqttServerCreator ip(String ip) {
-		this.ip = ip;
-		return this;
-	}
-
-	public int getPort() {
-		return port;
-	}
-
-	public MqttServerCreator port(int port) {
-		this.port = port;
-		return this;
-	}
 
 	public Long getHeartbeatTimeout() {
 		return heartbeatTimeout;
@@ -435,59 +389,6 @@ public class MqttServerCreator {
 		return this;
 	}
 
-	public boolean isHttpEnable() {
-		return httpEnable;
-	}
-
-	public MqttServerCreator httpEnable(boolean httpEnable) {
-		this.httpEnable = httpEnable;
-		return this;
-	}
-
-	public int getHttpPort() {
-		return httpPort;
-	}
-
-	public MqttServerCreator httpPort(int httpPort) {
-		this.httpPort = httpPort;
-		return this;
-	}
-
-	public boolean isWebsocketEnable() {
-		return websocketEnable;
-	}
-
-	public MqttServerCreator websocketEnable(boolean websocketEnable) {
-		this.websocketEnable = websocketEnable;
-		return this;
-	}
-
-	public int getWebsocketPort() {
-		return websocketPort;
-	}
-
-	public MqttServerCreator websocketPort(int websocketPort) {
-		this.websocketPort = websocketPort;
-		return this;
-	}
-
-	public String getHttpBasicUsername() {
-		return httpBasicUsername;
-	}
-
-	public MqttServerCreator httpBasicAuth(String username, String password) {
-		if (StrUtil.isBlank(username) || StrUtil.isBlank(password)) {
-			throw new IllegalArgumentException("Mqtt http basic auth username or password is blank.");
-		}
-		this.httpBasicUsername = username;
-		this.httpBasicPassword = password;
-		return this;
-	}
-
-	public String getHttpBasicPassword() {
-		return httpBasicPassword;
-	}
-
 	public String getNodeName() {
 		return nodeName;
 	}
@@ -587,12 +488,34 @@ public class MqttServerCreator {
 		return this;
 	}
 
-	public boolean isMcpServerEnabled() {
-		return enableMcpServer;
+	public MqttServerCreator enableMqtt(Function<MqttProtocolListener.Builder, MqttProtocolListener> function) {
+		return addMqttProtocolListener(function.apply(MqttProtocolListener.mqttBuilder()));
 	}
 
-	public MqttServerCreator enableMcpServer(boolean enableMcpServer) {
-		this.enableMcpServer = enableMcpServer;
+	public MqttServerCreator enableMqttSsl(Function<MqttProtocolListener.Builder, MqttProtocolListener> function) {
+		return addMqttProtocolListener(function.apply(MqttProtocolListener.mqttSslBuilder()));
+	}
+
+	public MqttServerCreator enableMqttWs(Function<MqttProtocolListener.Builder, MqttProtocolListener> function) {
+		return addMqttProtocolListener(function.apply(MqttProtocolListener.wsBuilder()));
+	}
+
+	public MqttServerCreator enableMqttWss(Function<MqttProtocolListener.Builder, MqttProtocolListener> function) {
+		return addMqttProtocolListener(function.apply(MqttProtocolListener.wssBuilder()));
+	}
+
+	public MqttServerCreator enableMqttHttpApi(Function<MqttHttpApiListener.Builder, MqttHttpApiListener> function) {
+		return addMqttProtocolListener(function.apply(MqttHttpApiListener.builder()));
+	}
+
+	private MqttServerCreator addMqttProtocolListener(IMqttProtocolListener listener) {
+		boolean contains = this.listeners.contains(listener);
+		if (contains) {
+			String protocolName = listener.getProtocol().name();
+			Node serverNode = listener.getServerNode();
+			throw new IllegalStateException("Mqtt protocol:" + protocolName + " serverNode:" + serverNode + " already exists");
+		}
+		this.listeners.add(listener);
 		return this;
 	}
 
@@ -628,6 +551,10 @@ public class MqttServerCreator {
 		if (this.mqttSerializer == null) {
 			this.mqttSerializer = new MqttJsonSerializer();
 		}
+		// 监听器为空，开启默认的 mqtt server
+		if (this.listeners.isEmpty()) {
+			this.listeners.add(MqttProtocolListener.mqttBuilder().build());
+		}
 		// AckService
 		DefaultMqttServerProcessor serverProcessor = new DefaultMqttServerProcessor(this, this.taskService, mqttExecutor);
 		// 1. 处理消息
@@ -638,13 +565,13 @@ public class MqttServerCreator {
 		TioServerConfig tioConfig = new TioServerConfig(this.name, handler, listener);
 		tioConfig.setUseQueueDecode(this.useQueueDecode);
 		tioConfig.setUseQueueSend(this.useQueueSend);
+		tioConfig.setTaskService(this.taskService);
+		tioConfig.statOn = this.statEnable;
 		// 4. mqtt 消息最大长度，小于 1 则使用默认的，可通过 property tio.default.read.buffer.size 设置默认大小
 		if (this.readBufferSize > 0) {
 			tioConfig.setReadBufferSize(this.readBufferSize);
 		}
-		// 5. 是否开启监控
-		tioConfig.statOn = this.statEnable;
-		// 是否开启代理协议
+		// 5. 是否开启代理协议
 		tioConfig.enableProxyProtocol(this.proxyProtocolOn);
 		// 6. 设置 t-io 心跳 timeout
 		if (this.heartbeatTimeout != null) {
@@ -662,21 +589,12 @@ public class MqttServerCreator {
 		if (this.tioConfigCustomize != null) {
 			this.tioConfigCustomize.accept(tioConfig);
 		}
-		TioServer tioServer = new TioServer(this.ip, this.port, tioConfig);
-		// 9 配置 mqtt http server
-		TioServer httpServer = null;
-		logger.info("Mica mqtt http api enable:{} websocket enable:{}", this.httpEnable, this.websocketEnable);
-		if (this.httpEnable) {
-			httpServer = MqttWebServer.configHttp(this, tioConfig);
-		}
-		// 9 配置 mqtt websocket server
-		TioServer wsServer = null;
-		if (this.websocketEnable) {
-			wsServer = MqttWebServer.configWs(this, tioConfig);
-		}
+		// 配置 json
+		this.jsonAdapter(JsonUtil.getJsonAdapter(getJsonAdapter()));
 		// MqttServer
-		MqttServer mqttServer = new MqttServer(tioServer, wsServer, httpServer, this, this.taskService);
-		// 9. 如果是默认的消息转发器，设置 mqttServer
+		MqttProtocolListeners listeners = new MqttProtocolListeners(this, tioConfig, this.listeners);
+		MqttServer mqttServer = new MqttServer(this, tioConfig, listeners);
+		// 如果是默认的消息转发器，设置 mqttServer
 		if (this.messageDispatcher instanceof AbstractMqttMessageDispatcher) {
 			((AbstractMqttMessageDispatcher) this.messageDispatcher).config(mqttServer);
 		}

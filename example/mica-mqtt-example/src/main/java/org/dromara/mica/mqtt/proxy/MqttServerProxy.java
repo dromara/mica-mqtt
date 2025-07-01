@@ -18,6 +18,8 @@ package org.dromara.mica.mqtt.proxy;
 
 import org.dromara.mica.mqtt.core.client.MqttClient;
 import org.dromara.mica.mqtt.core.server.MqttServer;
+import org.dromara.mica.mqtt.core.server.listener.MqttHttpApiListener;
+import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListener;
 import org.dromara.mica.mqtt.server.MqttConnectStatusListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,9 +54,9 @@ public class MqttServerProxy {
 			// 客户端连接状态监听
 			.connectStatusListener(new MqttConnectStatusListener())
 			// 开启 http
-			.httpEnable(false)
+			.enableMqttHttpApi(MqttHttpApiListener.Builder::build)
 			// 开启 websocket
-			.websocketEnable(false)
+			.enableMqttWs(MqttProtocolListener.Builder::build)
 			// 开始 stat 监控
 			.statEnable()
 			// 开启 debug 信息日志

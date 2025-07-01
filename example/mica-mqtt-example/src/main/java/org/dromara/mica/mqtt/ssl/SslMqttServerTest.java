@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.ssl;
 
 import org.dromara.mica.mqtt.core.server.MqttServer;
+import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListener;
 import org.dromara.mica.mqtt.server.MqttConnectStatusListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +35,7 @@ public class SslMqttServerTest {
 
 	public static void main(String[] args) {
 		MqttServer mqttServer = MqttServer.create()
-			.port(1883)
+			.enableMqtt(MqttProtocolListener.Builder::build)
 			.useSsl("classpath:ssl/dreamlu.net.jks", "123456")
 			.messageListener((context, clientId, topic, qoS, message) -> {
 				logger.info("clientId:{} message:{} payload:{}", clientId, message, ByteBufferUtil.toString(message.getPayload()));

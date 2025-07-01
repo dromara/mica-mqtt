@@ -105,10 +105,10 @@ public abstract class AbstractMqttMessageDispatcher implements IMqttMessageDispa
 		String clientId = message.getClientId();
 		// 构造 context
 		ServerChannelContext context = new ServerChannelContext(mqttServer.getServerConfig());
-		Node serverNode = mqttServer.getTioServer().getServerNode();
-		context.setServerNode(serverNode);
-		Node clientNode = mqttServer.getWebServer().getServerNode();
-		context.setClientNode(clientNode);
+//		Node serverNode = mqttServer.getTioServer().getServerNode();
+//		context.setServerNode(serverNode);
+//		Node clientNode = mqttServer.getWebServer().getServerNode();
+//		context.setClientNode(clientNode);
 		context.setBsId(clientId);
 		context.setUserId(MessageType.HTTP_API.name());
 		// 构造 MqttPublishMessage
