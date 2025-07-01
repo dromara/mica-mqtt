@@ -32,16 +32,17 @@ import java.io.InputStream;
  * @author L.cm
  */
 public class MqttHttpApiListener implements IMqttProtocolListener {
+	private static final MqttProtocol PROTOCOL = MqttProtocol.MQTT_HTTP_API;
 	private final Node serverNode;
 	private final HttpFilter authFilter;
 	private final McpServer mcpServer;
 	private final SslConfig sslConfig;
 
-	public MqttHttpApiListener(Node serverNode,
+	MqttHttpApiListener(Node serverNode,
 							   HttpFilter authFilter,
 							   McpServer mcpServer,
 							   SslConfig sslConfig) {
-		this.serverNode = serverNode;
+		this.serverNode = IMqttProtocolListener.getServerNode(serverNode, PROTOCOL);
 		this.authFilter = authFilter;
 		this.mcpServer = mcpServer;
 		this.sslConfig = sslConfig;
@@ -49,7 +50,7 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 
 	@Override
 	public MqttProtocol getProtocol() {
-		return MqttProtocol.MQTT_HTTP_API;
+		return PROTOCOL;
 	}
 
 	@Override
@@ -68,6 +69,10 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 	@Override
 	public SslConfig getSslConfig() {
 		return this.sslConfig;
+	}
+
+	public static Builder builder() {
+		return new Builder();
 	}
 
 	public static class Builder {

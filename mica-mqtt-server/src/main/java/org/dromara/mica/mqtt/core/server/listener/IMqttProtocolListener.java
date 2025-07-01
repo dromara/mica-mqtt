@@ -47,6 +47,14 @@ public interface IMqttProtocolListener {
 	 */
 	SslConfig getSslConfig();
 
-
-
+	/**
+	 * 处理默认的 server Node
+	 *
+	 * @param serverNode serverNode
+	 * @param protocol   MqttProtocol
+	 * @return server Node
+	 */
+	static Node getServerNode(Node serverNode, MqttProtocol protocol) {
+		return serverNode == null ? new Node(null, protocol.getPort()) : serverNode;
+	}
 }
