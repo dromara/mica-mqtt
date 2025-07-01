@@ -662,7 +662,7 @@ public class MqttServerCreator {
 		if (this.tioConfigCustomize != null) {
 			this.tioConfigCustomize.accept(tioConfig);
 		}
-		TioServer tioServer = new TioServer(tioConfig);
+		TioServer tioServer = new TioServer(this.ip, this.port, tioConfig);
 		// 9 配置 mqtt http server
 		TioServer httpServer = null;
 		logger.info("Mica mqtt http api enable:{} websocket enable:{}", this.httpEnable, this.websocketEnable);

@@ -262,7 +262,7 @@ public class MqttWebServer {
 		tioServerConfig.setShortConnection(true);
 		tioServerConfig.setReadBufferSize(TcpConst.MAX_DATA_LENGTH);
 		tioServerConfig.setTioUuid(new SeqTioUuid());
-		return new TioServer(tioServerConfig);
+		return new TioServer(serverCreator.getIp(), serverCreator.getHttpPort(), tioServerConfig);
 	}
 
 	/**
@@ -285,7 +285,7 @@ public class MqttWebServer {
 		tioServerConfig.setReadBufferSize(mqttServerConfig.getReadBufferSize());
 		// 共享数据
 		tioServerConfig.share(mqttServerConfig);
-		return new TioServer(tioServerConfig);
+		return new TioServer(serverCreator.getIp(), serverCreator.getWebsocketPort(), tioServerConfig);
 	}
 
 }

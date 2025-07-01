@@ -516,7 +516,7 @@ public final class MqttServer {
 	public boolean start() {
 		// 1. 启动 mqtt tcp
 		try {
-			tioServer.start(this.serverCreator.getIp(), this.serverCreator.getPort());
+			tioServer.start();
 		} catch (IOException e) {
 			String message = String.format("Mica mqtt tcp server port %d start fail.", this.serverCreator.getPort());
 			throw new IllegalStateException(message, e);
@@ -524,7 +524,7 @@ public final class MqttServer {
 		// 2. 启动 mqtt ws
 		if (wsServer != null) {
 			try {
-				wsServer.start(this.serverCreator.getIp(), this.serverCreator.getWebsocketPort());
+				wsServer.start();
 			} catch (IOException e) {
 				String message = String.format("Mica mqtt http server port %d start fail.", this.serverCreator.getHttpPort());
 				throw new IllegalStateException(message, e);
@@ -533,7 +533,7 @@ public final class MqttServer {
 		// 3. 启动 mqtt web
 		if (httpServer != null) {
 			try {
-				httpServer.start(this.serverCreator.getIp(), this.serverCreator.getHttpPort());
+				httpServer.start();
 			} catch (IOException e) {
 				String message = String.format("Mica mqtt http server port %d start fail.", this.serverCreator.getHttpPort());
 				throw new IllegalStateException(message, e);
