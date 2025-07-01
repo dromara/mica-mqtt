@@ -35,8 +35,10 @@ public class SslMqttServerTest {
 
 	public static void main(String[] args) {
 		MqttServer mqttServer = MqttServer.create()
-			.enableMqtt(MqttProtocolListener.Builder::build)
-			.useSsl("classpath:ssl/dreamlu.net.jks", "123456")
+			.enableMqttSsl(builder ->
+				builder.useSsl("classpath:ssl/dreamlu.net.jks", "123456")
+					.build()
+			)
 			.messageListener((context, clientId, topic, qoS, message) -> {
 				logger.info("clientId:{} message:{} payload:{}", clientId, message, ByteBufferUtil.toString(message.getPayload()));
 			})

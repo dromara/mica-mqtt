@@ -452,7 +452,7 @@ public class MqttServerCreator {
 		return addMqttProtocolListener(function.apply(MqttProtocolListener.mqttBuilder()));
 	}
 
-	public MqttServerCreator enableMqttSsl(Function<MqttProtocolListener.Builder, MqttProtocolListener> function) {
+	public MqttServerCreator enableMqttSsl(Function<MqttProtocolListener.SslBuilder, MqttProtocolListener> function) {
 		return addMqttProtocolListener(function.apply(MqttProtocolListener.mqttSslBuilder()));
 	}
 
@@ -460,7 +460,7 @@ public class MqttServerCreator {
 		return addMqttProtocolListener(function.apply(MqttProtocolListener.wsBuilder()));
 	}
 
-	public MqttServerCreator enableMqttWss(Function<MqttProtocolListener.Builder, MqttProtocolListener> function) {
+	public MqttServerCreator enableMqttWss(Function<MqttProtocolListener.SslBuilder, MqttProtocolListener> function) {
 		return addMqttProtocolListener(function.apply(MqttProtocolListener.wssBuilder()));
 	}
 
