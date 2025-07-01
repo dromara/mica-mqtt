@@ -202,6 +202,7 @@ import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRoutes;
 import org.dromara.mica.mqtt.core.server.http.mcp.MqttMcp;
 import org.dromara.mica.mqtt.core.server.http.websocket.MqttWsMsgHandler;
 import org.tio.core.TcpConst;
+import org.tio.core.task.HeartbeatMode;
 import org.tio.core.uuid.SeqTioUuid;
 import org.tio.core.uuid.SnowflakeTioUuid;
 import org.tio.http.common.HttpConfig;
@@ -283,6 +284,7 @@ public class MqttWebServer {
 		tioServerConfig.setHeartbeatTimeout(0);
 		tioServerConfig.setTioUuid(new SnowflakeTioUuid());
 		tioServerConfig.setReadBufferSize(mqttServerConfig.getReadBufferSize());
+		tioServerConfig.debug = mqttServerConfig.debug;
 		// 共享数据
 		tioServerConfig.share(mqttServerConfig);
 		return new TioServer(serverCreator.getIp(), serverCreator.getWebsocketPort(), tioServerConfig);

@@ -16,9 +16,12 @@
 
 package org.dromara.mica.mqtt.core.server.listener;
 
+import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.protocol.MqttProtocol;
 import org.tio.core.Node;
 import org.tio.core.ssl.SslConfig;
+import org.tio.server.TioServer;
+import org.tio.server.TioServerConfig;
 
 /**
  * mqtt 监听器
@@ -46,6 +49,15 @@ public interface IMqttProtocolListener {
 	 * @return SslConfig
 	 */
 	SslConfig getSslConfig();
+
+	/**
+	 * 配置服务
+	 *
+	 * @param serverCreator    serverCreator
+	 * @param mqttServerConfig mqttServerConfig
+	 * @return TioServer
+	 */
+	TioServer config(MqttServerCreator serverCreator, TioServerConfig mqttServerConfig);
 
 	/**
 	 * 处理默认的 server Node

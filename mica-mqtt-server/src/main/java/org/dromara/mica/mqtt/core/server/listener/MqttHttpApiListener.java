@@ -16,13 +16,25 @@
 
 package org.dromara.mica.mqtt.core.server.listener;
 
+import org.dromara.mica.mqtt.core.server.MqttServerCreator;
+import org.dromara.mica.mqtt.core.server.http.api.MqttHttpApi;
 import org.dromara.mica.mqtt.core.server.http.api.auth.BasicAuthFilter;
 import org.dromara.mica.mqtt.core.server.http.handler.HttpFilter;
+import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRequestHandler;
+import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRoutes;
+import org.dromara.mica.mqtt.core.server.http.mcp.MqttMcp;
 import org.dromara.mica.mqtt.core.server.protocol.MqttProtocol;
 import org.tio.core.Node;
+import org.tio.core.TcpConst;
 import org.tio.core.ssl.ClientAuth;
 import org.tio.core.ssl.SslConfig;
+import org.tio.core.uuid.SeqTioUuid;
+import org.tio.http.common.HttpConfig;
 import org.tio.http.mcp.server.McpServer;
+import org.tio.http.server.HttpTioServerHandler;
+import org.tio.http.server.HttpTioServerListener;
+import org.tio.server.TioServer;
+import org.tio.server.TioServerConfig;
 
 import java.io.InputStream;
 
@@ -39,9 +51,9 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 	private final SslConfig sslConfig;
 
 	MqttHttpApiListener(Node serverNode,
-							   HttpFilter authFilter,
-							   McpServer mcpServer,
-							   SslConfig sslConfig) {
+						HttpFilter authFilter,
+						McpServer mcpServer,
+						SslConfig sslConfig) {
 		this.serverNode = IMqttProtocolListener.getServerNode(serverNode, PROTOCOL);
 		this.authFilter = authFilter;
 		this.mcpServer = mcpServer;
@@ -69,6 +81,37 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 	@Override
 	public SslConfig getSslConfig() {
 		return this.sslConfig;
+	}
+
+	@Override
+	public TioServer config(MqttServerCreator serverCreator, TioServerConfig mqttServerConfig) {
+		// 1 http 路由配置
+		MqttHttpApi httpApi = new MqttHttpApi(serverCreator, mqttServerConfig);
+		httpApi.register();
+		// 2 认证配置
+		if (authFilter != null) {
+			MqttHttpRoutes.addFilter(authFilter);
+		}
+		// 3. 是否开启 mcp
+		if (mcpServer != null) {
+			MqttMcp mqttMcp = new MqttMcp(serverCreator, mqttServerConfig, mcpServer);
+			mqttMcp.register();
+		}
+		// 4. http 服务配置
+		TioServerConfig tioServerConfig = new TioServerConfig(
+			serverCreator.getName() + '/' + this.getProtocol().name(),
+			new HttpTioServerHandler(new HttpConfig(), new MqttHttpRequestHandler()),
+			new HttpTioServerListener(),
+			mqttServerConfig.tioExecutor, mqttServerConfig.groupExecutor
+		);
+		tioServerConfig.setTaskService(mqttServerConfig.getTaskService());
+		// 5. 心跳超时时间，默认 30s
+		tioServerConfig.setHeartbeatTimeout(1000 * 30L);
+		tioServerConfig.setShortConnection(true);
+		tioServerConfig.setReadBufferSize(TcpConst.MAX_DATA_LENGTH);
+		tioServerConfig.setTioUuid(new SeqTioUuid());
+		tioServerConfig.setSslConfig(sslConfig);
+		return new TioServer(serverNode, tioServerConfig);
 	}
 
 	public static Builder builder() {
@@ -103,6 +146,10 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 		public Builder mcpServer(McpServer mcpServer) {
 			this.mcpServer = mcpServer;
 			return this;
+		}
+
+		public Builder mcpServer() {
+			return mcpServer(new McpServer());
 		}
 
 		public Builder mcpServer(String sseEndpoint, String messageEndpoint) {

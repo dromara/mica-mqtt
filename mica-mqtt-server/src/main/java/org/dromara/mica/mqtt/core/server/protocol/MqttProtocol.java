@@ -54,4 +54,5 @@ public enum MqttProtocol {
 	public int getPort() {
 		return this.port;
 	}
+
 }
