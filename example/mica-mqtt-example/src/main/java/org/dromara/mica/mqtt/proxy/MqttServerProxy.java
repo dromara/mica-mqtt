@@ -51,12 +51,14 @@ public class MqttServerProxy {
 				// 转发数据
 				client.publish(topic, payload);
 			})
+			// 开启 mqtt tcp 协议
+			.enableMqtt()
+			// 开启 mqtt websocket
+			.enableMqttWs()
+			// 开启 http api 接口
+			.enableMqttHttpApi()
 			// 客户端连接状态监听
 			.connectStatusListener(new MqttConnectStatusListener())
-			// 开启 http
-			.enableMqttHttpApi(MqttHttpApiListener.Builder::build)
-			// 开启 websocket
-			.enableMqttWs(MqttProtocolListener.Builder::build)
 			// 开始 stat 监控
 			.statEnable()
 			// 开启 debug 信息日志

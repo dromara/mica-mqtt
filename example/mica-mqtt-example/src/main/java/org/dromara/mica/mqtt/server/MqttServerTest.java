@@ -17,8 +17,6 @@
 package org.dromara.mica.mqtt.server;
 
 import org.dromara.mica.mqtt.core.server.MqttServer;
-import org.dromara.mica.mqtt.core.server.listener.MqttHttpApiListener;
-import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +34,7 @@ public class MqttServerTest {
 		// 注意：为了能接受更多链接（降低内存），请添加 jvm 参数 -Xss129k
 		MqttServer mqttServer = MqttServer.create()
 			// 服务端 ip 默认为空，0.0.0.0，建议不要设置，端口 默认：1883
-			.enableMqtt(builder -> builder.serverNode("0.0.0.0", 1883).build())
+			.enableMqtt(1883)
 			// 默认为： 8192（mqtt 默认最大消息大小），为了降低内存可以减小小此参数，如果消息过大 t-io 会尝试解析多次（建议根据实际业务情况而定）
 			.readBufferSize(8192)
 //			最大包体长度
@@ -49,11 +47,16 @@ public class MqttServerTest {
 			// 客户端连接状态监听
 			.connectStatusListener(new MqttConnectStatusListener())
 			// 自定义消息拦截器
-//			.addInterceptor(new MqttMessageInterceptor())
-			// 开启 http，http basic 认证，自定义认证，实现 HttpFilter， 注册到 MqttHttpRoutes 即可
-			.enableMqttHttpApi(builder -> builder.basicAuthFilter("mica", "mica").build())
+			.addInterceptor(new MqttMessageInterceptor())
 			// 开启 websocket
-			.enableMqttWs(MqttProtocolListener.Builder::build)
+			.enableMqttWs()
+			// 开启 mqtt http 接口
+			.enableMqttHttpApi(builder ->
+				builder
+					.basicAuth("mica", "mica") // http basic 认证
+					.mcpServer()								// 开启 mcp 服务
+					.build()
+			)
 			// 开始 stat 监控
 			.statEnable()
 			// 开启 debug 信息日志

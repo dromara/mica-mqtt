@@ -154,7 +154,7 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 			return this;
 		}
 
-		public Builder basicAuthFilter(String username, String password) {
+		public Builder basicAuth(String username, String password) {
 			return this.authFilter(new BasicAuthFilter(username, password));
 		}
 
