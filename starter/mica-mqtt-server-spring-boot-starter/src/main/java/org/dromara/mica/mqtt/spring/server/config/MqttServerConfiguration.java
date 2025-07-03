@@ -100,17 +100,17 @@ public class MqttServerConfiguration {
 		}
 
 		// http 认证
-		MqttServerProperties.HttpBasicAuth httpBasicAuth = properties.getHttpBasicAuth();
+//		MqttServerProperties.HttpBasicAuth httpBasicAuth = properties.getHttpBasicAuth();
 //		if (serverCreator.isHttpEnable() && httpBasicAuth.isEnable()) {
 //			serverCreator.httpBasicAuth(httpBasicAuth.getUsername(), httpBasicAuth.getPassword());
 //		}
-		MqttServerProperties.Ssl ssl = properties.getSsl();
+//		MqttServerProperties.Ssl ssl = properties.getSsl();
 		// ssl 配置
-		if (ssl.isEnabled()) {
-			SslConfig sslConfig = SslConfig.forServer(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());
+//		if (ssl.isEnabled()) {
+//			SslConfig sslConfig = SslConfig.forServer(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());
 //			serverCreator.sslConfig(sslConfig);
-			sslCustomizers.ifAvailable(sslConfig::setSslEngineCustomizer);
-		}
+//			sslCustomizers.ifAvailable(sslConfig::setSslEngineCustomizer);
+//		}
 		// 自定义消息监听
 		messageListenerObjectProvider.ifAvailable(serverCreator::messageListener);
 		// 认证处理器

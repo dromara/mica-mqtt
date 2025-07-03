@@ -46,14 +46,6 @@ public class MqttServerProperties {
 	 */
 	private String name = "Mica-Mqtt-Server";
 	/**
-	 * 服务端 ip
-	 */
-	private String ip;
-	/**
-	 * 端口
-	 */
-	private int port = 1883;
-	/**
 	 * mqtt 认证
 	 */
 	private MqttAuth auth = new MqttAuth();
@@ -76,10 +68,6 @@ public class MqttServerProperties {
 	 */
 	private DataSize maxBytesInMessage = DataSize.ofBytes(MqttConstant.DEFAULT_MAX_BYTES_IN_MESSAGE);
 	/**
-	 * ssl 配置
-	 */
-	private Ssl ssl = new Ssl();
-	/**
 	 * debug
 	 */
 	private boolean debug = false;
@@ -87,26 +75,6 @@ public class MqttServerProperties {
 	 * mqtt 3.1 会校验此参数为 23，为了减少问题设置成了 64
 	 */
 	private int maxClientIdLength = MqttConstant.DEFAULT_MAX_CLIENT_ID_LENGTH;
-	/**
-	 * http 端口，默认：18083
-	 */
-	private int httpPort = 18083;
-	/**
-	 * 开启 websocket 服务，默认：true
-	 */
-	private boolean websocketEnable = true;
-	/**
-	 * websocket 端口，默认：8083
-	 */
-	private int websocketPort = 8083;
-	/**
-	 * 开启 http 服务，默认：false
-	 */
-	private boolean httpEnable = false;
-	/**
-	 * http basic auth
-	 */
-	private HttpBasicAuth httpBasicAuth = new HttpBasicAuth();
 	/**
 	 * 节点名称，用于处理集群
 	 */
@@ -119,14 +87,73 @@ public class MqttServerProperties {
 	 * 开启代理协议，支持 nginx proxy_protocol    on;
 	 */
 	private boolean proxyProtocolOn = false;
+	/**
+	 * mqtt tcp 监听器
+	 */
+	private Listener mqttListener = new Listener();
+	/**
+	 * mqtt tcp ssl 监听器
+	 */
+	private SslListener mqttSslListener = new SslListener();
+	/**
+	 * websocket mqtt 监听器
+	 */
+	private Listener wsListener = new Listener();
+	/**
+	 * websocket ssl mqtt 监听器
+	 */
+	private SslListener wssListener = new SslListener();
+	/**
+	 * http api 监听器
+	 */
+	private HttpListener httpListener = new HttpListener();
+
+	@Getter
+	@Setter
+	public static class MqttAuth {
+		/**
+		 * 是否启用，默认：关闭
+		 */
+		private boolean enable = false;
+		/**
+		 * http Basic 认证账号
+		 */
+		private String username;
+		/**
+		 * http Basic 认证密码
+		 */
+		private String password;
+	}
+
+	@Getter
+	@Setter
+	public static class Listener {
+		/**
+		 * 是否启用，默认：关闭
+		 */
+		private boolean enable = false;
+		/**
+		 * 服务端 ip
+		 */
+		private String ip;
+		/**
+		 * 端口
+		 */
+		private int port = 1883;
+	}
+
+	@Getter
+	@Setter
+	public static class SslListener extends Listener {
+		/**
+		 * ssl 配置
+		 */
+		private Ssl ssl = new Ssl();
+	}
 
 	@Getter
 	@Setter
 	public static class Ssl {
-		/**
-		 * 启用 ssl
-		 */
-		private boolean enabled = false;
 		/**
 		 * keystore 证书路径
 		 */
@@ -151,6 +178,19 @@ public class MqttServerProperties {
 
 	@Getter
 	@Setter
+	public static class HttpListener extends SslListener {
+		/**
+		 * basic 认证
+		 */
+		private HttpBasicAuth basicAuth = new HttpBasicAuth();
+		/**
+		 * mcp 配置
+		 */
+		private McpServer mcpServer = new McpServer();
+	}
+
+	@Getter
+	@Setter
 	public static class HttpBasicAuth {
 		/**
 		 * 是否启用，默认：关闭
@@ -168,19 +208,18 @@ public class MqttServerProperties {
 
 	@Getter
 	@Setter
-	public static class MqttAuth {
+	public static class McpServer {
 		/**
 		 * 是否启用，默认：关闭
 		 */
 		private boolean enable = false;
 		/**
-		 * http Basic 认证账号
+		 * sse 端点
 		 */
-		private String username;
+		private String sseEndpoint;
 		/**
-		 * http Basic 认证密码
+		 * message 端点
 		 */
-		private String password;
+		private String messageEndpoint;
 	}
-
 }

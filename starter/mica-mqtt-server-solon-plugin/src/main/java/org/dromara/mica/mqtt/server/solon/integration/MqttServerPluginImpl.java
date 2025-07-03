@@ -78,13 +78,13 @@ public class MqttServerPluginImpl implements Plugin {
 			IMqttMessageInterceptor messageInterceptor = context.getBean(IMqttMessageInterceptor.class);
 			MqttServerCustomizer customizers = context.getBean(MqttServerCustomizer.class);
 			// ssl 自定义配置
-			SslConfig sslConfig = serverCreator.getSslConfig();
-			if (sslConfig != null) {
-				SSLEngineCustomizer sslCustomizer = context.getBean(SSLEngineCustomizer.class);
-				if (sslCustomizer != null) {
-					sslConfig.setSslEngineCustomizer(sslCustomizer);
-				}
-			}
+//			SslConfig sslConfig = serverCreator.getSslConfig();
+//			if (sslConfig != null) {
+//				SSLEngineCustomizer sslCustomizer = context.getBean(SSLEngineCustomizer.class);
+//				if (sslCustomizer != null) {
+//					sslConfig.setSslEngineCustomizer(sslCustomizer);
+//				}
+//			}
 			// 自定义消息监听
 			serverCreator.messageListener(messageListener);
 			// 认证处理器

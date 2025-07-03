@@ -448,6 +448,14 @@ public class MqttServerCreator {
 		return this;
 	}
 
+	public MqttServerCreator enableMqtt() {
+		return enableMqtt(MqttProtocolListener.Builder::build);
+	}
+
+	public MqttServerCreator enableMqtt(int port) {
+		return enableMqtt(builder -> builder.serverNode(port).build());
+	}
+
 	public MqttServerCreator enableMqtt(Function<MqttProtocolListener.Builder, MqttProtocolListener> function) {
 		return addMqttProtocolListener(function.apply(MqttProtocolListener.mqttBuilder()));
 	}
@@ -456,12 +464,28 @@ public class MqttServerCreator {
 		return addMqttProtocolListener(function.apply(MqttProtocolListener.mqttSslBuilder()));
 	}
 
+	public MqttServerCreator enableMqttWs() {
+		return enableMqttWs(MqttProtocolListener.Builder::build);
+	}
+
+	public MqttServerCreator enableMqttWs(int port) {
+		return enableMqttWs(builder -> builder.serverNode(port).build());
+	}
+
 	public MqttServerCreator enableMqttWs(Function<MqttProtocolListener.Builder, MqttProtocolListener> function) {
 		return addMqttProtocolListener(function.apply(MqttProtocolListener.wsBuilder()));
 	}
 
 	public MqttServerCreator enableMqttWss(Function<MqttProtocolListener.SslBuilder, MqttProtocolListener> function) {
 		return addMqttProtocolListener(function.apply(MqttProtocolListener.wssBuilder()));
+	}
+
+	public MqttServerCreator enableMqttHttpApi() {
+		return enableMqttHttpApi(MqttHttpApiListener.Builder::build);
+	}
+
+	public MqttServerCreator enableMqttHttpApi(int port) {
+		return enableMqttHttpApi(builder -> builder.serverNode(port).build());
 	}
 
 	public MqttServerCreator enableMqttHttpApi(Function<MqttHttpApiListener.Builder, MqttHttpApiListener> function) {
