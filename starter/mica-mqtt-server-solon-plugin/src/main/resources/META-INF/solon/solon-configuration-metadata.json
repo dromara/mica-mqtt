@@ -1,0 +1,269 @@
+{
+  "properties": [
+    {
+      "name": "mqtt.server.auth.enable",
+      "type": "java.lang.Boolean",
+      "description": "是否启用，默认：关闭",
+      "defaultValue": "false"
+    },
+    {
+      "name": "mqtt.server.auth.password",
+      "type": "java.lang.String",
+      "description": "http Basic 认证密码"
+    },
+    {
+      "name": "mqtt.server.auth.username",
+      "type": "java.lang.String",
+      "description": "http Basic 认证账号"
+    },
+    {
+      "name": "mqtt.server.debug",
+      "type": "java.lang.Boolean",
+      "description": "debug",
+      "defaultValue": "false"
+    },
+    {
+      "name": "mqtt.server.enabled",
+      "type": "java.lang.Boolean",
+      "description": "是否启用，默认：启用",
+      "defaultValue": "true"
+    },
+    {
+      "name": "mqtt.server.heartbeat-timeout",
+      "type": "java.lang.Long",
+      "description": "心跳超时时间(单位: 毫秒 默认: 1000 * 120)，如果用户不希望框架层面做心跳相关工作，请把此值设为0或负数"
+    },
+    {
+      "name": "mqtt.server.http-listener.basic-auth.enable",
+      "type": "java.lang.Boolean",
+      "description": "是否启用，默认：关闭",
+      "defaultValue": "false"
+    },
+    {
+      "name": "mqtt.server.http-listener.basic-auth.password",
+      "type": "java.lang.String",
+      "description": "http Basic 认证密码"
+    },
+    {
+      "name": "mqtt.server.http-listener.basic-auth.username",
+      "type": "java.lang.String",
+      "description": "http Basic 认证账号"
+    },
+    {
+      "name": "mqtt.server.http-listener.enable",
+      "type": "java.lang.Boolean",
+      "description": "是否启用，默认：关闭",
+      "defaultValue": "false"
+    },
+    {
+      "name": "mqtt.server.http-listener.ip",
+      "type": "java.lang.String",
+      "description": "服务端 ip"
+    },
+    {
+      "name": "mqtt.server.http-listener.mcp-server.enable",
+      "type": "java.lang.Boolean",
+      "description": "是否启用，默认：关闭",
+      "defaultValue": "false"
+    },
+    {
+      "name": "mqtt.server.http-listener.mcp-server.message-endpoint",
+      "type": "java.lang.String",
+      "description": "message 端点"
+    },
+    {
+      "name": "mqtt.server.http-listener.mcp-server.sse-endpoint",
+      "type": "java.lang.String",
+      "description": "sse 端点"
+    },
+    {
+      "name": "mqtt.server.http-listener.port",
+      "type": "java.lang.Integer",
+      "description": "端口"
+    },
+    {
+      "name": "mqtt.server.http-listener.ssl.client-auth",
+      "type": "org.tio.core.ssl.ClientAuth",
+      "description": "认证类型"
+    },
+    {
+      "name": "mqtt.server.http-listener.ssl.enable",
+      "type": "java.lang.Boolean",
+      "description": "是否启用，默认：关闭",
+      "defaultValue": "false"
+    },
+    {
+      "name": "mqtt.server.http-listener.ssl.keystore-pass",
+      "type": "java.lang.String",
+      "description": "keystore 密码"
+    },
+    {
+      "name": "mqtt.server.http-listener.ssl.keystore-path",
+      "type": "java.lang.String",
+      "description": "keystore 证书路径"
+    },
+    {
+      "name": "mqtt.server.http-listener.ssl.truststore-pass",
+      "type": "java.lang.String",
+      "description": "truststore 密码"
+    },
+    {
+      "name": "mqtt.server.http-listener.ssl.truststore-path",
+      "type": "java.lang.String",
+      "description": "truststore 证书路径"
+    },
+    {
+      "name": "mqtt.server.keepalive-backoff",
+      "type": "java.lang.Float",
+      "description": "MQTT 客户端 keepalive 系数，连接超时缺省为连接设置的 keepalive * keepaliveBackoff * 2，默认：0.75 <p> 如果读者想对该值做一些调整，可以在此进行配置。比如设置为 0.75，则变为 keepalive * 1.5。但是该值不得小于 0.5，否则将小于 keepalive 设定的时间。"
+    },
+    {
+      "name": "mqtt.server.max-bytes-in-message",
+      "type": "java.lang.String",
+      "description": "消息解析最大 bytes 长度，默认：10M"
+    },
+    {
+      "name": "mqtt.server.max-client-id-length",
+      "type": "java.lang.Integer",
+      "description": "mqtt 3.1 会校验此参数为 23，为了减少问题设置成了 64"
+    },
+    {
+      "name": "mqtt.server.mqtt-listener.enable",
+      "type": "java.lang.Boolean",
+      "description": "是否启用，默认：关闭",
+      "defaultValue": "false"
+    },
+    {
+      "name": "mqtt.server.mqtt-listener.ip",
+      "type": "java.lang.String",
+      "description": "服务端 ip"
+    },
+    {
+      "name": "mqtt.server.mqtt-listener.port",
+      "type": "java.lang.Integer",
+      "description": "端口"
+    },
+    {
+      "name": "mqtt.server.mqtt-ssl-listener.enable",
+      "type": "java.lang.Boolean",
+      "description": "是否启用，默认：关闭",
+      "defaultValue": "false"
+    },
+    {
+      "name": "mqtt.server.mqtt-ssl-listener.ip",
+      "type": "java.lang.String",
+      "description": "服务端 ip"
+    },
+    {
+      "name": "mqtt.server.mqtt-ssl-listener.port",
+      "type": "java.lang.Integer",
+      "description": "端口"
+    },
+    {
+      "name": "mqtt.server.mqtt-ssl-listener.ssl.client-auth",
+      "type": "org.tio.core.ssl.ClientAuth",
+      "description": "认证类型"
+    },
+    {
+      "name": "mqtt.server.mqtt-ssl-listener.ssl.keystore-pass",
+      "type": "java.lang.String",
+      "description": "keystore 密码"
+    },
+    {
+      "name": "mqtt.server.mqtt-ssl-listener.ssl.keystore-path",
+      "type": "java.lang.String",
+      "description": "keystore 证书路径"
+    },
+    {
+      "name": "mqtt.server.mqtt-ssl-listener.ssl.truststore-pass",
+      "type": "java.lang.String",
+      "description": "truststore 密码"
+    },
+    {
+      "name": "mqtt.server.mqtt-ssl-listener.ssl.truststore-path",
+      "type": "java.lang.String",
+      "description": "truststore 证书路径"
+    },
+    {
+      "name": "mqtt.server.name",
+      "type": "java.lang.String",
+      "description": "名称"
+    },
+    {
+      "name": "mqtt.server.node-name",
+      "type": "java.lang.String",
+      "description": "节点名称，用于处理集群"
+    },
+    {
+      "name": "mqtt.server.proxy-protocol-on",
+      "type": "java.lang.Boolean",
+      "description": "开启代理协议，支持 nginx proxy_protocol    on;",
+      "defaultValue": "false"
+    },
+    {
+      "name": "mqtt.server.read-buffer-size",
+      "type": "java.lang.String",
+      "description": "接收数据的 buffer size，默认：8k"
+    },
+    {
+      "name": "mqtt.server.stat-enable",
+      "type": "java.lang.Boolean",
+      "description": "是否开启监控，不开启可节省内存，默认：true"
+    },
+    {
+      "name": "mqtt.server.ws-listener.enable",
+      "type": "java.lang.Boolean",
+      "description": "是否启用，默认：关闭"
+    },
+    {
+      "name": "mqtt.server.ws-listener.ip",
+      "type": "java.lang.String",
+      "description": "服务端 ip"
+    },
+    {
+      "name": "mqtt.server.ws-listener.port",
+      "type": "java.lang.Integer",
+      "description": "端口"
+    },
+    {
+      "name": "mqtt.server.wss-listener.enable",
+      "type": "java.lang.Boolean",
+      "description": "是否启用，默认：关闭"
+    },
+    {
+      "name": "mqtt.server.wss-listener.ip",
+      "type": "java.lang.String",
+      "description": "服务端 ip"
+    },
+    {
+      "name": "mqtt.server.wss-listener.port",
+      "type": "java.lang.Integer",
+      "description": "端口"
+    },
+    {
+      "name": "mqtt.server.wss-listener.ssl.client-auth",
+      "type": "org.tio.core.ssl.ClientAuth",
+      "description": "认证类型"
+    },
+    {
+      "name": "mqtt.server.wss-listener.ssl.keystore-pass",
+      "type": "java.lang.String",
+      "description": "keystore 密码"
+    },
+    {
+      "name": "mqtt.server.wss-listener.ssl.keystore-path",
+      "type": "java.lang.String",
+      "description": "keystore 证书路径"
+    },
+    {
+      "name": "mqtt.server.wss-listener.ssl.truststore-pass",
+      "type": "java.lang.String",
+      "description": "truststore 密码"
+    },
+    {
+      "name": "mqtt.server.wss-listener.ssl.truststore-path",
+      "type": "java.lang.String",
+      "description": "truststore 证书路径"
+    }
+  ]
+}

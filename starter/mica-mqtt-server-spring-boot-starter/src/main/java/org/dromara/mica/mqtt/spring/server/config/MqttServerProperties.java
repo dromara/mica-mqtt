@@ -140,15 +140,18 @@ public class MqttServerProperties {
 		/**
 		 * 端口
 		 */
-		private int port = 1883;
-
+		private Integer port;
 		/**
 		 * 获取服务节点
 		 *
 		 * @return ServerNode
 		 */
 		public Node getServerNode() {
-			return new Node(this.ip, this.port);
+			if (this.ip == null && this.port == null) {
+				return null;
+			} else {
+				return new Node(this.ip, this.port);
+			}
 		}
 	}
 
