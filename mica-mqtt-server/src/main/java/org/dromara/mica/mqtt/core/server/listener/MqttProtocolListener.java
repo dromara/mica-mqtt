@@ -180,12 +180,15 @@ public class MqttProtocolListener implements IMqttProtocolListener {
 		}
 
 		public Builder serverNode(int port) {
-			this.serverNode = new Node(null, port);
-			return this;
+			return serverNode(null, port);
 		}
 
 		public Builder serverNode(String ip, int port) {
-			this.serverNode = new Node(ip, port);
+			return this.serverNode(new Node(ip, port));
+		}
+
+		public Builder serverNode(Node serverNode) {
+			this.serverNode = serverNode;
 			return this;
 		}
 
@@ -201,32 +204,48 @@ public class MqttProtocolListener implements IMqttProtocolListener {
 			super(protocol);
 		}
 
-		public Builder sslConfig(SslConfig sslConfig) {
+		@Override
+		public SslBuilder serverNode(int port) {
+			return serverNode(null, port);
+		}
+
+		@Override
+		public SslBuilder serverNode(String ip, int port) {
+			return this.serverNode(new Node(ip, port));
+		}
+
+		@Override
+		public SslBuilder serverNode(Node serverNode) {
+			this.serverNode = serverNode;
+			return this;
+		}
+
+		public SslBuilder sslConfig(SslConfig sslConfig) {
 			this.sslConfig = sslConfig;
 			return this;
 		}
 
-		public Builder useSsl(InputStream keyStoreInputStream, String keyPasswd) {
+		public SslBuilder useSsl(InputStream keyStoreInputStream, String keyPasswd) {
 			return sslConfig(SslConfig.forServer(keyStoreInputStream, keyPasswd));
 		}
 
-		public Builder useSsl(InputStream keyStoreInputStream, String keyPasswd, ClientAuth clientAuth) {
+		public SslBuilder useSsl(InputStream keyStoreInputStream, String keyPasswd, ClientAuth clientAuth) {
 			return sslConfig(SslConfig.forServer(keyStoreInputStream, keyPasswd, clientAuth));
 		}
 
-		public Builder useSsl(InputStream keyStoreInputStream, String keyPasswd, InputStream trustStoreInputStream, String trustPassword, ClientAuth clientAuth) {
+		public SslBuilder useSsl(InputStream keyStoreInputStream, String keyPasswd, InputStream trustStoreInputStream, String trustPassword, ClientAuth clientAuth) {
 			return sslConfig(SslConfig.forServer(keyStoreInputStream, keyPasswd, trustStoreInputStream, trustPassword, clientAuth));
 		}
 
-		public Builder useSsl(String keyStoreFile, String keyPasswd) {
+		public SslBuilder useSsl(String keyStoreFile, String keyPasswd) {
 			return sslConfig(SslConfig.forServer(keyStoreFile, keyPasswd));
 		}
 
-		public Builder useSsl(String keyStoreFile, String keyPasswd, ClientAuth clientAuth) {
+		public SslBuilder useSsl(String keyStoreFile, String keyPasswd, ClientAuth clientAuth) {
 			return sslConfig(SslConfig.forServer(keyStoreFile, keyPasswd, clientAuth));
 		}
 
-		public Builder useSsl(String keyStoreFile, String keyPasswd, String trustStoreFile, String trustPassword, ClientAuth clientAuth) {
+		public SslBuilder useSsl(String keyStoreFile, String keyPasswd, String trustStoreFile, String trustPassword, ClientAuth clientAuth) {
 			return sslConfig(SslConfig.forServer(keyStoreFile, keyPasswd, trustStoreFile, trustPassword, clientAuth));
 		}
 

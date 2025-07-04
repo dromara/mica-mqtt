@@ -35,7 +35,7 @@ import org.tio.utils.buffer.ByteBufferAllocator;
 @Getter
 @Setter
 @Configuration
-@Inject(value = "${"+MqttClientProperties.PREFIX+"}",required = false)
+@Inject(value = "${" + MqttClientProperties.PREFIX + "}", required = false)
 public class MqttClientProperties {
 
 	/**
@@ -73,11 +73,11 @@ public class MqttClientProperties {
 	/**
 	 * 超时时间，单位：秒，t-io 配置，可为 null
 	 */
-	private Integer  timeout;
+	private Integer timeout;
 	/**
 	 * 接收数据的 buffer size，默认：8KB
 	 */
-	private String readBufferSize    = "8KB";
+	private String readBufferSize = "8KB";
 	/**
 	 * 消息解析最大 bytes 长度，默认：10MB
 	 */

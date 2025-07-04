@@ -140,12 +140,15 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 		private SslConfig sslConfig;
 
 		public Builder serverNode(int port) {
-			this.serverNode = new Node(null, port);
-			return this;
+			return this.serverNode(new Node(null, port));
 		}
 
 		public Builder serverNode(String ip, int port) {
-			this.serverNode = new Node(ip, port);
+			return this.serverNode(new Node(ip, port));
+		}
+
+		public Builder serverNode(Node serverNode) {
+			this.serverNode = serverNode;
 			return this;
 		}
 

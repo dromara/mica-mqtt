@@ -537,7 +537,7 @@ public class MqttServerCreator {
 		}
 		// 监听器为空，开启默认的 mqtt server
 		if (this.listeners.isEmpty()) {
-			this.listeners.add(MqttProtocolListener.mqttBuilder().build());
+			this.enableMqtt();
 		}
 		// AckService
 		DefaultMqttServerProcessor serverProcessor = new DefaultMqttServerProcessor(this, this.taskService, mqttExecutor);

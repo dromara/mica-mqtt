@@ -12,6 +12,7 @@ open module org.dromara.mica.mqtt.server {
 	exports org.dromara.mica.mqtt.core.server.event;
 	exports org.dromara.mica.mqtt.core.server.http.handler;
 	exports org.dromara.mica.mqtt.core.server.interceptor;
+	exports org.dromara.mica.mqtt.core.server.listener;
 	exports org.dromara.mica.mqtt.core.server.model;
 	exports org.dromara.mica.mqtt.core.server.protocol;
 	exports org.dromara.mica.mqtt.core.server.serializer;

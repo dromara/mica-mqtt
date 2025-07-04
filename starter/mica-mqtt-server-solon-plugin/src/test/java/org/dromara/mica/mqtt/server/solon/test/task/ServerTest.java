@@ -13,7 +13,7 @@ import org.noear.solon.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class ServerTest {
 
-	public static void main(String[] args) throws Throwable {
+	public static void main(String[] args) {
 		Solon.start(ServerTest.class,args);
 	}
 

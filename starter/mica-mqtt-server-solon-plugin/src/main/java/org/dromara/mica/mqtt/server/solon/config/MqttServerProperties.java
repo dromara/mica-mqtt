@@ -8,6 +8,7 @@ import lombok.Setter;
 import org.dromara.mica.mqtt.codec.MqttConstant;
 import org.noear.solon.annotation.Configuration;
 import org.noear.solon.annotation.Inject;
+import org.tio.core.Node;
 import org.tio.core.ssl.ClientAuth;
 
 /**
@@ -128,6 +129,15 @@ public class MqttServerProperties {
 		 * 端口
 		 */
 		private int port = 1883;
+
+		/**
+		 * 获取服务节点
+		 *
+		 * @return ServerNode
+		 */
+		public Node getServerNode() {
+			return new Node(this.ip, this.port);
+		}
 	}
 
 	@Getter
@@ -166,7 +176,7 @@ public class MqttServerProperties {
 
 	@Getter
 	@Setter
-	public static class HttpListener extends SslListener {
+	public static class HttpListener extends Listener {
 		/**
 		 * basic 认证
 		 */
@@ -175,6 +185,19 @@ public class MqttServerProperties {
 		 * mcp 配置
 		 */
 		private McpServer mcpServer = new McpServer();
+		/**
+		 * ssl 配置
+		 */
+		private HttpSsl ssl = new HttpSsl();
+	}
+
+	@Getter
+	@Setter
+	public static class HttpSsl extends Ssl {
+		/**
+		 * 是否启用，默认：关闭
+		 */
+		private boolean enable = false;
 	}
 
 	@Getter
