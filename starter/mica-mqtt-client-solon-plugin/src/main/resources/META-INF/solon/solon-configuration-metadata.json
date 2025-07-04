@@ -1,0 +1,189 @@
+{
+  "properties": [
+    {
+      "name": "mqtt.client.biz-thread-pool-size",
+      "type": "java.lang.Integer",
+      "description": "mqtt 工作线程数，默认：2，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数"
+    },
+    {
+      "name": "mqtt.client.clean-start",
+      "type": "java.lang.Boolean",
+      "description": "清除会话 <p> false 表示如果订阅的客户机断线了，那么要保存其要推送的消息，如果其重新连接时，则将这些消息推送。 true 表示消除，表示客户机是第一次连接，消息所以以前的连接信息。 <\/p>",
+      "defaultValue": true
+    },
+    {
+      "name": "mqtt.client.client-id",
+      "type": "java.lang.String",
+      "description": "客户端ID"
+    },
+    {
+      "name": "mqtt.client.debug",
+      "type": "java.lang.Boolean",
+      "description": "debug",
+      "defaultValue": false
+    },
+    {
+      "name": "mqtt.client.enabled",
+      "type": "java.lang.Boolean",
+      "description": "是否启用，默认：true",
+      "defaultValue": true
+    },
+    {
+      "name": "mqtt.client.global-subscribe",
+      "type": "java.util.List<org.dromara.mica.mqtt.codec.MqttTopicSubscription>",
+      "description": "全局订阅"
+    },
+    {
+      "name": "mqtt.client.heartbeat-mode",
+      "type": "org.tio.core.task.HeartbeatMode",
+      "description": "心跳模式，支持最后发送或接收心跳时间来计算心跳，默认：最后发送心跳的时间"
+    },
+    {
+      "name": "mqtt.client.heartbeat-timeout-strategy",
+      "type": "org.tio.client.task.HeartbeatTimeoutStrategy",
+      "description": "心跳超时策略，支持发送 PING 和 CLOSE 断开连接，默认：最大努力发送 PING"
+    },
+    {
+      "name": "mqtt.client.ip",
+      "type": "java.lang.String",
+      "description": "服务端 ip，默认：127.0.0.1",
+      "defaultValue": "127.0.0.1"
+    },
+    {
+      "name": "mqtt.client.keep-alive-secs",
+      "type": "java.lang.Integer",
+      "description": "Keep Alive (s)",
+      "defaultValue": 60
+    },
+    {
+      "name": "mqtt.client.max-bytes-in-message",
+      "type": "org.springframework.util.unit.DataSize",
+      "description": "消息解析最大 bytes 长度，默认：10M"
+    },
+    {
+      "name": "mqtt.client.max-client-id-length",
+      "type": "java.lang.Integer",
+      "description": "mqtt 3.1 会校验此参数为 23，为了减少问题设置成了 64"
+    },
+    {
+      "name": "mqtt.client.name",
+      "type": "java.lang.String",
+      "description": "名称，默认：Mica-Mqtt-Client",
+      "defaultValue": "Mica-Mqtt-Client"
+    },
+    {
+      "name": "mqtt.client.password",
+      "type": "java.lang.String",
+      "description": "密码"
+    },
+    {
+      "name": "mqtt.client.port",
+      "type": "java.lang.Integer",
+      "description": "端口，默认：1883",
+      "defaultValue": 1883
+    },
+    {
+      "name": "mqtt.client.re-interval",
+      "type": "java.lang.Long",
+      "description": "重连的间隔时间，单位毫秒，默认：5000",
+      "defaultValue": 5000
+    },
+    {
+      "name": "mqtt.client.re-subscribe-batch-size",
+      "type": "java.lang.Integer",
+      "description": "重连，重新订阅一个批次大小，默认：20",
+      "defaultValue": 20
+    },
+    {
+      "name": "mqtt.client.read-buffer-size",
+      "type": "org.springframework.util.unit.DataSize",
+      "description": "接收数据的 buffer size，默认：8k"
+    },
+    {
+      "name": "mqtt.client.reconnect",
+      "type": "java.lang.Boolean",
+      "description": "自动重连",
+      "defaultValue": true
+    },
+    {
+      "name": "mqtt.client.retry-count",
+      "type": "java.lang.Integer",
+      "description": "连续重连次数，当连续重连这么多次都失败时，不再重连。0和负数则一直重连",
+      "defaultValue": 0
+    },
+    {
+      "name": "mqtt.client.session-expiry-interval-secs",
+      "type": "java.lang.Integer",
+      "description": "开启保留 session 时，session 的有效期，默认：0",
+      "defaultValue": 0
+    },
+    {
+      "name": "mqtt.client.ssl.enabled",
+      "type": "java.lang.Boolean",
+      "description": "启用 ssl",
+      "defaultValue": false
+    },
+    {
+      "name": "mqtt.client.ssl.keystore-pass",
+      "type": "java.lang.String",
+      "description": "keystore 密码"
+    },
+    {
+      "name": "mqtt.client.ssl.keystore-path",
+      "type": "java.lang.String",
+      "description": "keystore 证书路径"
+    },
+    {
+      "name": "mqtt.client.ssl.truststore-pass",
+      "type": "java.lang.String",
+      "description": "truststore 密码"
+    },
+    {
+      "name": "mqtt.client.ssl.truststore-path",
+      "type": "java.lang.String",
+      "description": "truststore 证书路径"
+    },
+    {
+      "name": "mqtt.client.stat-enable",
+      "type": "java.lang.Boolean",
+      "description": "是否开启监控，默认：false 不开启，节省内存",
+      "defaultValue": false
+    },
+    {
+      "name": "mqtt.client.timeout",
+      "type": "java.lang.Integer",
+      "description": "超时时间，单位：秒，t-io 配置，可为 null"
+    },
+    {
+      "name": "mqtt.client.username",
+      "type": "java.lang.String",
+      "description": "用户名"
+    },
+    {
+      "name": "mqtt.client.version",
+      "type": "org.dromara.mica.mqtt.codec.MqttVersion",
+      "description": "mqtt 协议，默认：MQTT_5"
+    },
+    {
+      "name": "mqtt.client.will-message.message",
+      "type": "java.lang.String",
+      "description": "遗嘱消息 payload"
+    },
+    {
+      "name": "mqtt.client.will-message.qos",
+      "type": "org.dromara.mica.mqtt.codec.MqttQoS",
+      "description": "遗嘱消息 qos，默认： qos0"
+    },
+    {
+      "name": "mqtt.client.will-message.retain",
+      "type": "java.lang.Boolean",
+      "description": "遗嘱消息保留标识符，默认: false",
+      "defaultValue": false
+    },
+    {
+      "name": "mqtt.client.will-message.topic",
+      "type": "java.lang.String",
+      "description": "遗嘱消息 topic"
+    }
+  ]
+}
