@@ -16,7 +16,6 @@ mqtt:
     version: mqtt_3_1_1         # mqtt 协议版本，可选 MQTT_3_1、mqtt_3_1_1、mqtt_5，默认：mqtt_3_1_1
     read-buffer-size: 8KB       # 接收数据的 buffer size，默认：8k
     max-bytes-in-message: 10MB  # 消息解析最大 bytes 长度，默认：10M
-    buffer-allocator: heap      # 堆内存和堆外内存，默认：堆内存
     keep-alive-secs: 60         # keep-alive 时间，单位：秒
     heartbeat-mode: LAST_REQ    # 心跳模式，支持最后发送或接收心跳时间来计算心跳，默认：最后发送心跳的时间。（2.4.3 开始支持）
     heartbeat-timeout-strategy: PING # 心跳超时策略，支持发送 PING 和 CLOSE 断开连接，默认：最大努力发送 PING。（2.4.3 开始支持）

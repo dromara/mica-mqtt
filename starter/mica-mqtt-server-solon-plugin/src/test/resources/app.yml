@@ -7,7 +7,6 @@ server:
 #    #    ip: 0.0.0.0                # 服务端 ip 默认为空，0.0.0.0，建议不要设置
 #    port: 18889                  # 端口，默认：1883
 #    name: Mica-Mqtt-Server      # 名称，默认：Mica-Mqtt-Server
-##    buffer-allocator: HEAP      # 堆内存和堆外内存，默认：堆内存
 ##    heartbeat-timeout: 120000   # 心跳超时，单位毫秒，默认: 1000 * 120
 ##    read-buffer-size: 8KB       # 接收数据的 buffer size，默认：8k
 ##    max-bytes-in-message: 10MB  # 消息解析最大 bytes 长度，默认：10M
