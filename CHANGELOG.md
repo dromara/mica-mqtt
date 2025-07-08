@@ -2,7 +2,7 @@
 
 ## 发行版本
 
-### v2.5.0 - 2025-06-20
+### v2.5.0 - 2025-07-12
 - :sparkles: mica-mqtt X AI，mica-mqtt-server 支持大模型 mcp
 - :sparkles: mica-mqtt-server 支持同时配置多协议支持，拆分 `http` 和 `websocket`，使统计更加准确
 - :sparkles: mica-mqtt-server spring、solon 插件删除 `EventMqttMessageListener`
