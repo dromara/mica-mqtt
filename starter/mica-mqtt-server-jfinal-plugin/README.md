@@ -27,8 +27,13 @@
 MqttServerPlugin plugin = new MqttServerPlugin();
 plugin.config(mqttServerCreator -> {
     // mqttServerCreator 上有很多方法，详见 mica-mqtt-core
-    mqttServerCreator.port(1883).webPort(8083).websocketEnable(true);
+    mqttServerCreator
+    .enableMqtt()
+		.enableMqttWs()
+		.enableMqttHttpApi()
+    ;
 });
+plugin.start();
 ```
 
 #### 5. 插件使用

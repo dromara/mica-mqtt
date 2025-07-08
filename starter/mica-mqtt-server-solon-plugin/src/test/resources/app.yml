@@ -1,32 +1,20 @@
 server:
   port: 30033
 # mqtt 服务端配置
-#mqtt:
-#  server:
-#    enabled: true               # 是否开启服务端，默认：true
-#    #    ip: 0.0.0.0                # 服务端 ip 默认为空，0.0.0.0，建议不要设置
-#    port: 18889                  # 端口，默认：1883
-#    name: Mica-Mqtt-Server      # 名称，默认：Mica-Mqtt-Server
-##    heartbeat-timeout: 120000   # 心跳超时，单位毫秒，默认: 1000 * 120
-##    read-buffer-size: 8KB       # 接收数据的 buffer size，默认：8k
-##    max-bytes-in-message: 10MB  # 消息解析最大 bytes 长度，默认：10M
-##    auth:
-##      enable: false             # 是否开启 mqtt 认证
-##      username: mica            # mqtt 认证用户名
-##      password: mica            # mqtt 认证密码
-##    debug: true                 # 如果开启 prometheus 指标收集建议关闭
-##    stat-enable: true           # 开启指标收集，debug 和 prometheus 开启时需要打开，默认开启，关闭节省内存
-##    web-port: 8083              # http、websocket 端口，默认：8083
-##    websocket-enable: true      # 是否开启 websocket，默认： true
-##    http-enable: false          # 是否开启 http api，默认： false
-##    http-basic-auth:
-##      enable: false             # 是否开启 http basic auth，默认： false
-##      username: mica            # http basic auth 用户名
-##      password: mica            # http basic auth 密码
-##    ssl:                        # mqtt tcp ssl 认证
-##      enabled: false            # 是否开启 ssl 认证，2.1.0 开始支持双向认证
-##      keystore-path:            # 必须参数：ssl keystore 目录，支持 classpath:/ 路径。
-##      keystore-pass:            # 必选参数：ssl keystore 密码
-##      truststore-path:          # 可选参数：ssl 双向认证 truststore 目录，支持 classpath:/ 路径。
-##      truststore-pass:          # 可选参数：ssl 双向认证 truststore 密码
-##      client-auth: none         # 是否需要客户端认证（双向认证），默认：NONE（不需要）
+mqtt:
+  server:
+    enabled: true               # 是否开启服务端，默认：true
+    name: Mica-Mqtt-Server      # 名称，默认：Mica-Mqtt-Server
+    heartbeat-timeout: 120000   # 心跳超时，单位毫秒，默认: 1000 * 120
+    read-buffer-size: 8KB       # 接收数据的 buffer size，默认：8k
+    max-bytes-in-message: 10MB  # 消息解析最大 bytes 长度，默认：10M
+    auth:
+      enable: false             # 是否开启 mqtt 认证
+      username: mica            # mqtt 认证用户名
+      password: mica            # mqtt 认证密码
+    debug: true                 # 如果开启 prometheus 指标收集建议关闭
+    stat-enable: true           # 开启指标收集，debug 和 prometheus 开启时需要打开，默认开启，关闭节省内存
+    mqtt-listener:              # mqtt 监听器，还有 mqtt-ssl-listener
+      enable: true              # 是否开启，默认：false
+      #      ip: "0.0.0.0"            # 服务端 ip 默认为空，0.0.0.0，建议不要设置
+      port: 1883                # 端口，默认：1883
