@@ -11,7 +11,7 @@
 - :sparkles: mica-mqtt-client 默认 mqtt5.0，cleanSession 改为 cleanStart 感谢 `@tan90` 反馈 (gitee #IBKKAG)
 - :sparkles: mica-mqtt-client MqttClient 和 MqttClientTemplate 支持通过代理接口来进行Publish 感谢 `@galaxy-sea` pr (github #100)
 - :sparkles: mica-mqtt-codec 完全同步成私服版，将 MqttProperties 内部类拆解出来，方便使用
-- :sparkles: solon 插件支持 solon-idea-plugin 配置提示。
+- :sparkles: mica-mqtt client、server solon 插件添加对 [Solon IDEA](https://plugins.jetbrains.com/plugin/21380-solon) 插件配置提示支持。
 - :sparkles: 移除 mica-mqtt-broker，未来重构
 - :sparkles: 统一参数命名，userName 统一为 username。
 - :sparkles: 优化部分日志，使用中文，方便大家排查问题
