@@ -17,13 +17,31 @@ mqtt:
       password: mica            # mqtt 认证密码
     debug: true                 # 如果开启 prometheus 指标收集建议关闭
     stat-enable: true           # 开启指标收集，debug 和 prometheus 开启时需要打开，默认开启，关闭节省内存
-    mqtt-listener:              # mqtt 监听器，还有 mqtt-ssl-listener
+    mqtt-listener:              # mqtt 监听器
       enable: true              # 是否开启，默认：false
 #      ip: "0.0.0.0"            # 服务端 ip 默认为空，0.0.0.0，建议不要设置
       port: 1883                # 端口，默认：1883
-    ws-listener:                # websocket mqtt 监听器，还有 wss-listener
+    mqtt-ssl-listener:          # mqtt ssl 监听器
+      enable: false             # 是否开启，默认：false
+      port: 8883                # 端口，默认：8883
+      ssl:                      # ssl 配置，必须
+        keystore-path:          # 必须参数：ssl keystore 目录，支持 classpath:/ 路径。
+        keystore-pass:          # 必选参数：ssl keystore 密码
+        truststore-path:        # 可选参数：ssl 双向认证 truststore 目录，支持 classpath:/ 路径。
+        truststore-pass:        # 可选参数：ssl 双向认证 truststore 密码
+        client-auth: none       # 是否需要客户端认证（双向认证），默认：NONE（不需要）
+    ws-listener:                # websocket mqtt 监听器
       enable: true              # 是否开启，默认：false
-      port: 8083                # 端口，默认：1883
+      port: 8083                # websocket 端口，默认：8083
+    wss-listener:               # websocket ssl mqtt 监听器
+      enable: false             # 是否开启，默认：false
+      port: 8084                # 端口，默认：8084
+      ssl:                      # ssl 配置，必须
+        keystore-path:          # 必须参数：ssl keystore 目录，支持 classpath:/ 路径。
+        keystore-pass:          # 必选参数：ssl keystore 密码
+        truststore-path:        # 可选参数：ssl 双向认证 truststore 目录，支持 classpath:/ 路径。
+        truststore-pass:        # 可选参数：ssl 双向认证 truststore 密码
+        client-auth: none       # 是否需要客户端认证（双向认证），默认：NONE（不需要）
     http-listener:
       enable: true
       port: 18083

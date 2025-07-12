@@ -51,9 +51,12 @@ Dromara `mica-mqtt` is a **low-latency, high-performance** MQTT IoT component de
 ## 🚨 Default Ports
 
 | Port | Protocol        | Description                      |
-| ---- | --------------- | -------------------------------- |
-| 1883 | tcp             | MQTT TCP port                    |
-| 8083 | http, websocket | HTTP API and WebSocket MQTT port |
+|-------|---------------|--------------------------|
+| 1883  | tcp           | mqtt tcp port              |
+| 8883  | tcp ssl       | mqtt tcp ssl port          |
+| 8083  | websocket     | websocket mqtt port     |
+| 8084  | websocket ssl | websocket ssl mqtt port |
+| 18083 | http          | http api port              |
 
 **Demo Address**: mqtt.dreamlu.net, same ports，username: mica password: mica
 
