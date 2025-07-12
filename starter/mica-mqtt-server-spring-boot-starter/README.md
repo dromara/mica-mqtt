@@ -42,10 +42,10 @@ mqtt:
       port: 1883                # 端口，默认：1883
     ws-listener:                # websocket mqtt 监听器，还有 wss-listener
       enable: true              # 是否开启，默认：false
-      port: 8083                # 端口，默认：1883
+      port: 8083                # websocket 端口，默认：8083
     http-listener:
       enable: true
-      port: 18083
+      port: 18083               # http 端口，默认：18083
       basic-auth:               # 基础认证
         enable: true
         username: mica
