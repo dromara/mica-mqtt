@@ -4,8 +4,8 @@
 
 ### v2.5.0 - 2025-07-12
 - :sparkles: mica-mqtt X AI，mica-mqtt-server 支持大模型 mcp
-- :sparkles: mica-mqtt-server 支持同时配置多协议支持，拆分 `http` 和 `websocket`，使统计更加准确
-- :sparkles: mica-mqtt-server spring、solon 插件删除 `EventMqttMessageListener`
+- :sparkles: mica-mqtt-server 支持同时配置多协议支持，拆分 `http(默认端口18083)` 和 `websocket(默认端口8083)`，使统计更加准确
+- :sparkles: mica-mqtt-server spring、solon 插件删除不推荐使用的 `EventMqttMessageListener`
 - :sparkles: mica-mqtt-server 调整保留消息的规则，支持 `$retain` 带存储周期的保留消息 感谢 `@tan90` pr #ICB9I2 #23
 - :sparkles: mica-mqtt-client 删除 `IMqttClientMessageIdGenerator` 接口合入 `IMqttClientSession` 接口
 - :sparkles: mica-mqtt-client 默认 mqtt5.0，cleanSession 改为 cleanStart 感谢 `@tan90` 反馈 (gitee #IBKKAG)
