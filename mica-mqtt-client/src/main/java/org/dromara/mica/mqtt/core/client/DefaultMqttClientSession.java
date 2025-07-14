@@ -52,8 +52,7 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 
 	@Override
 	public int getPacketId() {
-		packetIdGen.compareAndSet(0xffff, 1);
-		return packetIdGen.getAndIncrement();
+		return packetIdGen.getAndUpdate(current -> (current % 0xffff) == 0 ? 1 : current + 1);
 	}
 
 	@Override
