@@ -165,9 +165,6 @@ Dromara `mica-mqtt` **低延迟**、**高性能**的 `mqtt` 物联网组件。�
 - [mica-mqtt 发行版本](https://mica-mqtt.dreamlu.net/version/changelog.html)
 - [mica-mqtt 老版本迁移指南](https://mica-mqtt.dreamlu.net/version/update.html)
 
-## 🏗️ mqtt 桌面工具
-- [mqttx 优雅的跨平台 MQTT 5.0 GUI工具](https://mqttx.app)
-
 ## 🍻 开源推荐
 - `Avue` 基于 vue 可配置化的前端框架：[https://gitcode.com/superwei/avue](https://gitcode.com/superwei/avue)
 - `pig` 上央视的微服务框架（架构必备）：[https://gitcode.com/pig-mesh/pig](https://gitcode.com/pig-mesh/pig)

@@ -113,11 +113,8 @@ Dromara `mica-mqtt` is a **low-latency, high-performance** MQTT IoT component de
 - [Introduction to MQTT, mqttx, and mica-mqtt **Video**](https://www.bilibili.com/video/BV1wv4y1F7Av/)
 - [Getting Started with mica-mqtt](example/README.md)
 - [mica-mqtt HTTP API Documentation](docs/http-api.md)
-- [Frequently Asked Questions about mica-mqtt Usage](https://gitee.com/596392912/mica-mqtt/issues/I45GO7)
+- [Frequently Asked Questions about mica-mqtt Usage](https://mica-mqtt.dreamlu.net/faq/faq.html)
 - [mica-mqtt Release Versions](CHANGELOG.md)
-
-## 🏗️ MQTT Client Tools
-- [Mqttx: An Elegant Cross-platform MQTT 5.0 Client Tool](https://mqttx.app)
 
 ## 🍻 Open Source Recommendations
 - `Avue`: A Vue-based configurable front-end framework: [https://gitcode.com/superwei/avue](https://gitcode.com/superwei/avue)
