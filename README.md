@@ -160,10 +160,10 @@ Dromara `mica-mqtt` **低延迟**、**高性能**的 `mqtt` 物联网组件。�
 
 ## 📝 文档
 - [mqtt科普、mqttx、mica-mqtt的使用**视频**](https://www.bilibili.com/video/BV1wv4y1F7Av/)
-- [mica-mqtt 快速开始](https://mica-mqtt.dromara.org/guide/)
-- [mica-mqtt 使用常见问题汇总](https://mica-mqtt.dromara.org/faq/faq.html)
-- [mica-mqtt 发行版本](https://mica-mqtt.dromara.org/version/changelog.html)
-- [mica-mqtt 老版本迁移指南](https://mica-mqtt.dromara.org/version/update.html)
+- [mica-mqtt 快速开始](https://mica-mqtt.dreamlu.net/guide/)
+- [mica-mqtt 使用常见问题汇总](https://mica-mqtt.dreamlu.net/faq/faq.html)
+- [mica-mqtt 发行版本](https://mica-mqtt.dreamlu.net/version/changelog.html)
+- [mica-mqtt 老版本迁移指南](https://mica-mqtt.dreamlu.net/version/update.html)
 
 ## 🏗️ mqtt 桌面工具
 - [mqttx 优雅的跨平台 MQTT 5.0 GUI工具](https://mqttx.app)
