@@ -112,6 +112,9 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 		tioServerConfig.setReadBufferSize(TcpConst.MAX_DATA_LENGTH);
 		tioServerConfig.setTioUuid(new SeqTioUuid());
 		tioServerConfig.setSslConfig(sslConfig);
+		// http api 不开启 debug 和 stat
+		tioServerConfig.debug  = false;
+		tioServerConfig.statOn = false;
 		return new TioServer(serverNode, tioServerConfig);
 	}
 

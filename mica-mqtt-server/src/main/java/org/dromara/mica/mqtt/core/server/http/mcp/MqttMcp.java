@@ -15,6 +15,8 @@ import org.tio.server.TioServerConfig;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.json.JsonUtil;
 import org.tio.utils.mica.PayloadEncode;
+import org.tio.utils.timer.TimerTask;
+import org.tio.utils.timer.TimerTaskService;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -272,6 +274,14 @@ public class MqttMcp {
 		// 注册 tools
 		mcpServer.tool(getMqttStatsMcpTool(), this::getMqttStats);
 		mcpServer.tool(getMqttPublishMcpTool(), this::mqttPublish);
+		// 开启心跳
+		TimerTaskService taskService = mqttServerConfig.getTaskService();
+		taskService.addTask((systemTimer -> new TimerTask(30) {
+			@Override
+			public void run() {
+				mcpServer.sendHeartbeat();
+			}
+		}));
 	}
 
 }
