@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * mqtt mcp 接口
@@ -276,9 +277,12 @@ public class MqttMcp {
 		mcpServer.tool(getMqttPublishMcpTool(), this::mqttPublish);
 		// 开启心跳
 		TimerTaskService taskService = mqttServerConfig.getTaskService();
-		taskService.addTask((systemTimer -> new TimerTask(30) {
+		taskService.addTask((systemTimer -> new TimerTask(TimeUnit.SECONDS.toMillis(15)) {
 			@Override
 			public void run() {
+				// 1. 再次添加 任务
+				systemTimer.add(this);
+				// 2. 发送心跳
 				mcpServer.sendHeartbeat();
 			}
 		}));
