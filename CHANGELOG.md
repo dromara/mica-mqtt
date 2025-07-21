@@ -2,8 +2,9 @@
 
 ## 发行版本
 
-### v2.5.1 - 2025-08-03
+### v2.5.1 - 2025-07-24
 - :sparkles: 优化 http mcp sse 心跳
+- :bug: mica-mqtt-client 高CPU下 packetId 生成超限，感谢 `@火焰之魂` 反馈（gitee #ICLXC3）
 
 ### v2.5.0 - 2025-07-12
 - :sparkles: mica-mqtt X AI，mica-mqtt-server 支持大模型 mcp
