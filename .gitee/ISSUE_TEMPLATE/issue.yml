@@ -17,6 +17,7 @@ body:
     attributes:
       label: mica-mqtt版本
       options:
+        - "2.5.x"
         - "2.4.x"
         - "老版本建议先升级"
     validations:
