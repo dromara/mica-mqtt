@@ -2,6 +2,9 @@
 
 ## 发行版本
 
+### v2.5.1 - 2025-08-03
+- :sparkles: 优化 http mcp sse 心跳
+
 ### v2.5.0 - 2025-07-12
 - :sparkles: mica-mqtt X AI，mica-mqtt-server 支持大模型 mcp
 - :sparkles: mica-mqtt-server 支持同时配置多协议支持，拆分 `http(默认端口18083)` 和 `websocket(默认端口8083)`，使统计更加准确
