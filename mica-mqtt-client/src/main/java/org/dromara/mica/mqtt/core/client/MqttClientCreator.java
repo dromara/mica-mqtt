@@ -652,7 +652,13 @@ public final class MqttClientCreator {
 			clientConfig.setReadBufferSize(this.readBufferSize);
 		}
 		// 9. ssl 证书设置
-		clientConfig.setSslConfig(this.sslConfig);
+		if (this.sslConfig != null) {
+			clientConfig.setSslConfig(this.sslConfig);
+			// 内置 ssl 自定义配置，对 SNI 的支持
+			if (this.sslConfig.getSslEngineCustomizer() == null) {
+				this.sslConfig.setSslEngineCustomizer(new MqttSSLEngineCustomizer(ip));
+			}
+		}
 		// 10. 是否开启监控
 		clientConfig.statOn = this.statEnable;
 		if (this.debug) {
