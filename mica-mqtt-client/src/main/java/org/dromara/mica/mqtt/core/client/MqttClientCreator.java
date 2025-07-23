@@ -71,6 +71,10 @@ public final class MqttClientCreator {
 	 */
 	private Integer timeout;
 	/**
+	 * 绑定 ip，绑定网卡，用于多网卡，默认为 null
+	 */
+	private String bindIp;
+	/**
 	 * 接收数据的 buffer size，默认：8k
 	 */
 	private int readBufferSize = MqttConstant.DEFAULT_MAX_READ_BUFFER_SIZE;
@@ -216,6 +220,10 @@ public final class MqttClientCreator {
 		return timeout;
 	}
 
+	public String getBindIp() {
+		return bindIp;
+	}
+
 	public int getReadBufferSize() {
 		return readBufferSize;
 	}
@@ -353,6 +361,11 @@ public final class MqttClientCreator {
 
 	public MqttClientCreator timeout(int timeout) {
 		this.timeout = timeout;
+		return this;
+	}
+
+	public MqttClientCreator bindIp(String bindIp) {
+		this.bindIp = bindIp;
 		return this;
 	}
 
@@ -576,6 +589,7 @@ public final class MqttClientCreator {
 			.ip(this.ip)
 			.port(this.port)
 			.timeout(this.timeout)
+			.bindIp(this.bindIp)
 			.readBufferSize(this.readBufferSize)
 			.maxBytesInMessage(this.maxBytesInMessage)
 			.maxClientIdLength(this.maxClientIdLength)
@@ -732,7 +746,7 @@ public final class MqttClientCreator {
 		TioClient tioClient;
 		try {
 			tioClient = new TioClient(tioConfig);
-			tioClient.asyncConnect(new Node(this.getIp(), this.getPort()));
+			tioClient.asyncConnect(new Node(this.getIp(), this.getPort()), this.bindIp, 0, this.timeout);
 		} catch (Exception e) {
 			throw new IllegalStateException("Mica mqtt client start fail.", e);
 		}

@@ -5,6 +5,7 @@
 ### v2.5.1 - 2025-07-24
 - :sparkles: mica-mqtt-server 优化 sse mcp，添加 sse 心跳
 - :sparkles: mica-mqtt-client 内置 ssl SNI 支持，感谢 `sword007`、`@TomatoLay` 反馈（gitee #ICKBAY #ICEANP）
+- :sparkles: mica-mqtt-client 添加 `bindIp` 配置，支持多网卡下指定对应网卡 `ip`。感谢 `@iovera` 反馈（gitee #ICO699)
 - :bug: mica-mqtt-client 高CPU下 packetId 生成超限，感谢 `@火焰之魂` 反馈（gitee #ICLXC3）
 
 ### v2.5.0 - 2025-07-12

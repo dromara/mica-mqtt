@@ -74,6 +74,10 @@ public class MqttClientProperties {
 	 */
 	private Integer timeout;
 	/**
+	 * 绑定 ip，绑定网卡，用于多网卡，默认为 null
+	 */
+	private String bindIp;
+	/**
 	 * 接收数据的 buffer size，默认：8KB
 	 */
 	private String readBufferSize = "8KB";
