@@ -41,6 +41,9 @@ public class MqttClientTest {
 			.port(1883)
 			.username("mica")
 			.password("mica")
+			// 绑定网卡 v2.5.1 添加，支持 bindIp（网卡ip）和 bindNetworkInterface（网卡名）取一即可
+//			.bindIp("127.0.0.1")
+//			.bindNetworkInterface("lo")
 //			如果包体过大，建议将此参数设置和 maxBytesInMessage 一样大
 //			.readBufferSize(1024 * 10)
 //			最大包体长度,如果包体过大需要设置此参数
