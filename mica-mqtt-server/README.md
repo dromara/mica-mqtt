@@ -26,8 +26,8 @@ MqttServer mqttServer = MqttServer.create()
     // 自定义认证
     .authHandler((clientId, userName, password) -> true)
     // 消息监听
-    .messageListener((context, clientId, message) -> {
-        logger.info("clientId:{} message:{} payload:{}", clientId, message, new String(message.getPayload(), StandardCharsets.UTF_8));
+    .messageListener((context, clientId, topic, qos, message) -> {
+        logger.info("clientId:{} payload:{}", clientId, new String(message.payload(), StandardCharsets.UTF_8));
     })
     // 心跳超时时间，默认：120s
     .heartbeatTimeout(120_1000L)
