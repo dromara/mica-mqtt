@@ -80,6 +80,10 @@ public class MqttClientProperties {
 	 */
 	private String bindIp;
 	/**
+	 * 绑定网卡，网卡名称，和 bindIp 取其一
+	 */
+	private String bindNetworkInterface;
+	/**
 	 * 接收数据的 buffer size，默认：8k
 	 */
 	private DataSize readBufferSize = DataSize.ofBytes(MqttConstant.DEFAULT_MAX_READ_BUFFER_SIZE);

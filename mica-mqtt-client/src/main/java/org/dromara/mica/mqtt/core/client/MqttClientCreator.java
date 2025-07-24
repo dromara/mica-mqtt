@@ -29,6 +29,7 @@ import org.tio.core.Node;
 import org.tio.core.TioConfig;
 import org.tio.core.ssl.SslConfig;
 import org.tio.core.task.HeartbeatMode;
+import org.tio.utils.hutool.NetUtil;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.thread.ThreadUtils;
 import org.tio.utils.thread.pool.SynThreadPoolExecutor;
@@ -36,6 +37,7 @@ import org.tio.utils.timer.DefaultTimerTaskService;
 import org.tio.utils.timer.TimerTaskService;
 
 import java.io.InputStream;
+import java.net.NetworkInterface;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -367,6 +369,11 @@ public final class MqttClientCreator {
 	public MqttClientCreator bindIp(String bindIp) {
 		this.bindIp = bindIp;
 		return this;
+	}
+
+	public MqttClientCreator bindNetworkInterface(String networkInterfaceName) {
+		String ipV4 = NetUtil.getNetworkInterfaceIpV4(networkInterfaceName);
+		return bindIp(Objects.requireNonNull(ipV4, "获取网卡 ip 为 null"));
 	}
 
 	public MqttClientCreator readBufferSize(int readBufferSize) {

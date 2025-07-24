@@ -51,6 +51,7 @@ public class MqttClientConfiguration {
 			.password(properties.getPassword())
 			.clientId(properties.getClientId())
 			.bindIp(properties.getBindIp())
+			.bindNetworkInterface(properties.getBindNetworkInterface())
 			.readBufferSize((int) DataSize.parse(properties.getReadBufferSize()).getBytes())
 			.maxBytesInMessage((int) DataSize.parse(properties.getMaxBytesInMessage()).getBytes())
 			.maxClientIdLength(properties.getMaxClientIdLength())
