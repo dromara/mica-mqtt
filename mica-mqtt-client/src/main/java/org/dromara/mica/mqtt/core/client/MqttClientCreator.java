@@ -372,8 +372,12 @@ public final class MqttClientCreator {
 	}
 
 	public MqttClientCreator bindNetworkInterface(String networkInterfaceName) {
-		String ipV4 = NetUtil.getNetworkInterfaceIpV4(networkInterfaceName);
-		return bindIp(Objects.requireNonNull(ipV4, "获取网卡 ip 为 null"));
+		if (StrUtil.isBlank(networkInterfaceName)) {
+			return this;
+		} else {
+			String ipV4 = NetUtil.getNetworkInterfaceIpV4(networkInterfaceName);
+			return bindIp(Objects.requireNonNull(ipV4, "获取网卡 ip 为 null"));
+		}
 	}
 
 	public MqttClientCreator readBufferSize(int readBufferSize) {
