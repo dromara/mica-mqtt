@@ -65,14 +65,16 @@ public class MqttHttpRequestHandler implements HttpRequestHandler {
 		}
 	}
 
-	private static HttpResponse resp404(HttpRequest request, RequestLine requestLine) {
+	@Override
+	public HttpResponse resp404(HttpRequest request, RequestLine requestLine) {
 		if (logger.isErrorEnabled()) {
 			logger.error("mqtt http {} path:{} 404", requestLine.getMethod().name(), requestLine.getPathAndQuery());
 		}
 		return Result.fail(request, ResultCode.E404);
 	}
 
-	private static HttpResponse resp500(HttpRequest request, RequestLine requestLine, Throwable throwable) {
+	@Override
+	public HttpResponse resp500(HttpRequest request, RequestLine requestLine, Throwable throwable) {
 		if (logger.isErrorEnabled()) {
 			logger.error("mqtt http {} path:{} error", requestLine.getMethod().name(), requestLine.getPathAndQuery(), throwable);
 		}
