@@ -1,6 +1,16 @@
 {
   "properties": [
     {
+      "name": "mqtt.client.bind-ip",
+      "type": "java.lang.String",
+      "description": "绑定 ip，绑定网卡，用于多网卡，默认为 null"
+    },
+    {
+      "name": "mqtt.client.bind-network-interface",
+      "type": "java.lang.String",
+      "description": "绑定网卡，网卡名称，和 bindIp 取其一"
+    },
+    {
       "name": "mqtt.client.biz-thread-pool-size",
       "type": "java.lang.Integer",
       "description": "mqtt 工作线程数，默认：2，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数"
