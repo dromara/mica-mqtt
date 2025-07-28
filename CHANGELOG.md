@@ -2,6 +2,9 @@
 
 ## 发行版本
 
+### v2.5.2 - 2025-07-27
+- :bug: mica-mqtt-server 修复启动报错，感谢 `CoderKK` 反馈（gitee #ICOQ3Q）
+
 ### v2.5.1 - 2025-07-24
 - :sparkles: mica-mqtt-server 优化 sse mcp，添加 sse 心跳
 - :sparkles: mica-mqtt-client 内置 ssl SNI 支持，感谢 `sword007`、`@TomatoLay` 反馈（gitee #ICKBAY #ICEANP）
