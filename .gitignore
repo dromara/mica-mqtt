@@ -28,6 +28,9 @@ dist/
 nbdist/
 .nb-gradle/
 
+### vscode ###
+.vscode
+
 ### maven ###
 target/
 *.war
