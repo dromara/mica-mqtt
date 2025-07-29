@@ -18,8 +18,6 @@ package org.dromara.mica.mqtt.broker;
 
 import org.dromara.mica.mqtt.core.client.MqttClient;
 
-import java.nio.charset.StandardCharsets;
-
 /**
  * 设备 C，每 5 秒上报一个数据
  *

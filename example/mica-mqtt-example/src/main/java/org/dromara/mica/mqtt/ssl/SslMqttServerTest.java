@@ -17,7 +17,6 @@
 package org.dromara.mica.mqtt.ssl;
 
 import org.dromara.mica.mqtt.core.server.MqttServer;
-import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListener;
 import org.dromara.mica.mqtt.server.MqttConnectStatusListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
