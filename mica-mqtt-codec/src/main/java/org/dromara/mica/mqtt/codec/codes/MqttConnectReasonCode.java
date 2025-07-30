@@ -14,7 +14,9 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.codes;
+
+import org.dromara.mica.mqtt.codec.MqttConnAckMessage;
 
 /**
  * Return Code of {@link MqttConnAckMessage}

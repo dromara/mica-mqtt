@@ -14,29 +14,24 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.codes;
 
 /**
- * Reason codes for UNSUBACK MQTT message
+ * Reason codes for PUBREL MQTT message
  *
  * @author vertx-mqtt
  */
-public enum MqttUnsubAckReasonCode implements MqttReasonCode {
+public enum MqttPubRelReasonCode implements MqttReasonCode {
 
 	/**
-	 * UnsubAck ReasonCode
+	 * PubRel ReasonCode
 	 */
 	SUCCESS((byte) 0x0),
-	NO_SUBSCRIPTION_EXISTED((byte) 0x11),
-	UNSPECIFIED_ERROR((byte) 0x80),
-	IMPLEMENTATION_SPECIFIC_ERROR((byte) 0x83),
-	NOT_AUTHORIZED((byte) 0x87),
-	TOPIC_FILTER_INVALID((byte) 0x8F),
-	PACKET_IDENTIFIER_IN_USE((byte) 0x91);
+	PACKET_IDENTIFIER_NOT_FOUND((byte) 0x92);
 
 	private final byte byteValue;
 
-	MqttUnsubAckReasonCode(byte byteValue) {
+	MqttPubRelReasonCode(byte byteValue) {
 		this.byteValue = byteValue;
 	}
 
@@ -45,4 +40,13 @@ public enum MqttUnsubAckReasonCode implements MqttReasonCode {
 		return byteValue;
 	}
 
+	public static MqttPubRelReasonCode valueOf(byte b) {
+		if (b == SUCCESS.byteValue) {
+			return SUCCESS;
+		} else if (b == PACKET_IDENTIFIER_NOT_FOUND.byteValue) {
+			return PACKET_IDENTIFIER_NOT_FOUND;
+		} else {
+			throw new IllegalArgumentException("unknown PUBREL reason code: " + b);
+		}
+	}
 }

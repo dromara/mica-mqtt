@@ -14,7 +14,7 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.codes;
 
 /**
  * Reason codes for DISCONNECT MQTT message

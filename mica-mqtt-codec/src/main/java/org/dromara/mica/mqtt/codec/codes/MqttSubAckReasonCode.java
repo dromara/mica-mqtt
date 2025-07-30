@@ -14,7 +14,10 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.codes;
+
+import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.MqttVersion;
 
 /**
  * Reason codes for SUBACK MQTT message

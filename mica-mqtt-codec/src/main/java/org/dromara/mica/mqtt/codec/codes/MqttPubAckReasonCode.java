@@ -14,25 +14,42 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.codes;
 
 /**
- * Reason codes for PUBREL MQTT message
+ * Reason codes for PUBACK MQTT message
  *
  * @author vertx-mqtt
  */
-public enum MqttPubRelReasonCode implements MqttReasonCode {
+public enum MqttPubAckReasonCode implements MqttReasonCode {
 
 	/**
-	 * PubRel ReasonCode
+	 * PubAck ReasonCode
 	 */
 	SUCCESS((byte) 0x0),
-	PACKET_IDENTIFIER_NOT_FOUND((byte) 0x92);
+	NO_MATCHING_SUBSCRIBERS((byte) 0x10),
+	UNSPECIFIED_ERROR((byte) 0x80),
+	IMPLEMENTATION_SPECIFIC_ERROR((byte) 0x83),
+	NOT_AUTHORIZED((byte) 0x87),
+	TOPIC_NAME_INVALID((byte) 0x90),
+	PACKET_IDENTIFIER_IN_USE((byte) 0x91),
+	QUOTA_EXCEEDED((byte) 0x97),
+	PAYLOAD_FORMAT_INVALID((byte) 0x99);
+
+	private static final MqttPubAckReasonCode[] VALUES = new MqttPubAckReasonCode[0x9A];
+
+	static {
+		ReasonCodeUtils.fillValuesByCode(VALUES, values());
+	}
 
 	private final byte byteValue;
 
-	MqttPubRelReasonCode(byte byteValue) {
+	MqttPubAckReasonCode(byte byteValue) {
 		this.byteValue = byteValue;
+	}
+
+	public static MqttPubAckReasonCode valueOf(byte b) {
+		return ReasonCodeUtils.codeLoopUp(VALUES, b, "PUBACK");
 	}
 
 	@Override
@@ -40,13 +57,4 @@ public enum MqttPubRelReasonCode implements MqttReasonCode {
 		return byteValue;
 	}
 
-	public static MqttPubRelReasonCode valueOf(byte b) {
-		if (b == SUCCESS.byteValue) {
-			return SUCCESS;
-		} else if (b == PACKET_IDENTIFIER_NOT_FOUND.byteValue) {
-			return PACKET_IDENTIFIER_NOT_FOUND;
-		} else {
-			throw new IllegalArgumentException("unknown PUBREL reason code: " + b);
-		}
-	}
 }

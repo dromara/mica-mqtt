@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.server;
 
 import org.dromara.mica.mqtt.codec.*;
+import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.exception.DecoderException;
 import org.dromara.mica.mqtt.codec.exception.MqttIdentifierRejectedException;
 import org.dromara.mica.mqtt.codec.exception.MqttUnacceptableProtocolVersionException;

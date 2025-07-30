@@ -14,39 +14,29 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.codes;
 
 /**
- * Reason codes for PUBCOMP MQTT message
+ * Common interface for MQTT messages reason codes enums
  *
  * @author vertx-mqtt
  */
-public enum MqttPubCompReasonCode implements MqttReasonCode {
+public interface MqttReasonCode {
 
 	/**
-	 * PubComp ReasonCode
+	 * byteValue
+	 *
+	 * @return byteValue
 	 */
-	SUCCESS((byte) 0x0),
-	PACKET_IDENTIFIER_NOT_FOUND((byte) 0x92);
+	byte value();
 
-	private final byte byteValue;
-
-	MqttPubCompReasonCode(byte byteValue) {
-		this.byteValue = byteValue;
+	/**
+	 * isError
+	 *
+	 * @return boolean
+	 */
+	default boolean isError() {
+		return (value() & 0x80) != 0;
 	}
 
-	@Override
-	public byte value() {
-		return byteValue;
-	}
-
-	public static MqttPubCompReasonCode valueOf(byte b) {
-		if (b == SUCCESS.byteValue) {
-			return SUCCESS;
-		} else if (b == PACKET_IDENTIFIER_NOT_FOUND.byteValue) {
-			return PACKET_IDENTIFIER_NOT_FOUND;
-		} else {
-			throw new IllegalArgumentException("unknown PUBCOMP reason code: " + b);
-		}
-	}
 }

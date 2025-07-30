@@ -14,7 +14,7 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.codes;
 
 /**
  * Utilities for MQTT message codes enums

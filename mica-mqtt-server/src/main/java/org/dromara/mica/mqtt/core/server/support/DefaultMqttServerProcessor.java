@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.server.support;
 
 import org.dromara.mica.mqtt.codec.*;
+import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;

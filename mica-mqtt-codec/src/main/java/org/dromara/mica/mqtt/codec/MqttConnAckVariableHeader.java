@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.codec;
 
+import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
+
 /**
  * Variable header of {@link MqttConnectMessage}
  *

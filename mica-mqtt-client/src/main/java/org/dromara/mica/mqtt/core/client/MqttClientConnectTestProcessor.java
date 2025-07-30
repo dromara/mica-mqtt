@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.client;
 
 import org.dromara.mica.mqtt.codec.*;
+import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.tio.core.ChannelContext;
 import org.tio.core.Tio;
 

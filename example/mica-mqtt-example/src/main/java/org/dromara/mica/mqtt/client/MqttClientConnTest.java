@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.client;
 
-import org.dromara.mica.mqtt.codec.MqttConnectReasonCode;
+import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.core.client.MqttClient;
 
 /**
