@@ -25,8 +25,6 @@ import org.noear.solon.annotation.Condition;
 import org.noear.solon.annotation.Configuration;
 import org.tio.utils.hutool.StrUtil;
 
-import java.nio.charset.StandardCharsets;
-
 /**
  * mqtt client 配置
  *
