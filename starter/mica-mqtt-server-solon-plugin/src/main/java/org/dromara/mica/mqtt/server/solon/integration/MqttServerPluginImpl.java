@@ -69,7 +69,14 @@ public class MqttServerPluginImpl implements Plugin {
 	@Override
 	public void start(AppContext context) throws Throwable {
 		this.context = context; //todo: 去掉 Solon.context() 写法，可同时兼容 2.5 之前与之后的版本
-
+		// 查找类上的 MqttServerFunction 注解
+		context.beanBuilderAdd(MqttServerFunction.class, (clz, beanWrap, anno) -> {
+			functionClassTags.add(new ExtractorClassTag<>(clz, beanWrap, anno));
+		});
+		// 查找方法上的 MqttServerFunction 注解
+		context.beanExtractorAdd(MqttServerFunction.class, (bw, method, anno) -> {
+			functionMethodTags.add(new ExtractorMethodTag<>(bw, method, anno));
+		});
 		context.lifecycle(-9, () -> {
 			context.beanMake(MqttServerProperties.class);
 			context.beanMake(MqttServerConfiguration.class);

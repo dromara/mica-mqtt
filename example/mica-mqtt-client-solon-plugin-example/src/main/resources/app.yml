@@ -1,5 +1,11 @@
 server:
   port: 30303
+# solon 配置
+solon:
+  logging:
+    appender:
+      console:
+        level: INFO
 # mqtt-client 配置
 mqtt:
   client:

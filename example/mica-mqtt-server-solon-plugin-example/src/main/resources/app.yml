@@ -1,3 +1,9 @@
+# solon 配置
+solon:
+  logging:
+    appender:
+      console:
+        level: INFO
 # mqtt 服务端配置
 mqtt:
   server:

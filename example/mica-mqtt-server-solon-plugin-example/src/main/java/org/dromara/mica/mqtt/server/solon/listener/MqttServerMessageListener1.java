@@ -11,11 +11,11 @@ import org.tio.core.ChannelContext;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 消息监听器示例1，直接实现 IMqttMessageListener
+ * 消息监听器示例1，直接实现 IMqttMessageListener，注意：如果实现了 IMqttMessageListener，MqttServerFunction 注解就不生效了。
  *
  * @author wsq
  */
-@Component
+//@Component
 public class MqttServerMessageListener1 implements IMqttMessageListener {
 	private static final Logger logger = LoggerFactory.getLogger(MqttServerMessageListener1.class);
 
