@@ -112,7 +112,7 @@ public class MqttClientConfiguration {
 					.qos(willMessage.getQos())
 					.retain(willMessage.isRetain());
 				if (StringUtils.hasText(willMessage.getMessage())) {
-					builder.message(willMessage.getMessage().getBytes(StandardCharsets.UTF_8));
+					builder.messageText(willMessage.getMessage());
 				}
 			});
 		}
