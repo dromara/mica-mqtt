@@ -23,7 +23,7 @@ import org.dromara.mica.mqtt.core.client.MqttClientCreator;
 import org.noear.solon.annotation.Bean;
 import org.noear.solon.annotation.Condition;
 import org.noear.solon.annotation.Configuration;
-import org.noear.solon.lang.Nullable;
+import org.tio.utils.hutool.StrUtil;
 
 import java.nio.charset.StandardCharsets;
 
@@ -83,31 +83,17 @@ public class MqttClientConfiguration {
 		}
 		// 构造遗嘱消息
 		MqttClientProperties.WillMessage willMessage = properties.getWillMessage();
-		if (willMessage != null && hasText(willMessage.getTopic())) {
+		if (willMessage != null && StrUtil.isNotBlank(willMessage.getTopic())) {
 			clientCreator.willMessage(builder -> {
 				builder.topic(willMessage.getTopic())
 						.qos(willMessage.getQos())
 						.retain(willMessage.isRetain());
-				if (hasText(willMessage.getMessage())) {
+				if (StrUtil.isNotBlank(willMessage.getMessage())) {
 					builder.message(willMessage.getMessage().getBytes(StandardCharsets.UTF_8));
 				}
 			});
 		}
-
 		return clientCreator;
 	}
 
-	public static boolean hasText(@Nullable String str) {
-		return (str != null && !str.isEmpty() && containsText(str));
-	}
-
-	private static boolean containsText(CharSequence str) {
-		int strLen = str.length();
-		for (int i = 0; i < strLen; i++) {
-			if (!Character.isWhitespace(str.charAt(i))) {
-				return true;
-			}
-		}
-		return false;
-	}
 }
