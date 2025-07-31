@@ -27,16 +27,20 @@ import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
+import org.dromara.mica.mqtt.core.server.func.MqttFunctionManager;
+import org.dromara.mica.mqtt.core.server.func.MqttFunctionMessageListener;
 import org.dromara.mica.mqtt.core.server.interceptor.IMqttMessageInterceptor;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerAuthHandler;
+import org.dromara.mica.mqtt.spring.server.MqttServerFunctionDetector;
 import org.dromara.mica.mqtt.spring.server.MqttServerTemplate;
 import org.dromara.mica.mqtt.spring.server.event.SpringEventMqttConnectStatusListener;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -182,6 +186,24 @@ public class MqttServerConfiguration {
 	@Bean
 	public MqttServerTemplate mqttServerTemplate(MqttServer mqttServer) {
 		return new MqttServerTemplate(mqttServer);
+	}
+
+	@Bean
+	@ConditionalOnMissingBean(MqttFunctionManager.class)
+	public static MqttFunctionManager mqttFunctionManager() {
+		return new MqttFunctionManager();
+	}
+
+	@Bean
+	@ConditionalOnMissingBean(IMqttMessageListener.class)
+	public IMqttMessageListener mqttFunctionMessageListener(MqttFunctionManager mqttFunctionManager) {
+		return new MqttFunctionMessageListener(mqttFunctionManager);
+	}
+
+	@Bean
+	public static MqttServerFunctionDetector mqttServerFunctionDetector(ApplicationContext applicationContext,
+																		MqttFunctionManager functionManager) {
+		return new MqttServerFunctionDetector(applicationContext, functionManager);
 	}
 
 }

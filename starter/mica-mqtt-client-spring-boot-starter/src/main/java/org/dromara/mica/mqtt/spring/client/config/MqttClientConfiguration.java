@@ -20,6 +20,8 @@ import org.dromara.mica.mqtt.codec.MqttTopicSubscription;
 import org.dromara.mica.mqtt.core.client.IMqttClientConnectListener;
 import org.dromara.mica.mqtt.core.client.MqttClient;
 import org.dromara.mica.mqtt.core.client.MqttClientCreator;
+import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
+import org.dromara.mica.mqtt.core.deserialize.MqttJsonDeserializer;
 import org.dromara.mica.mqtt.spring.client.MqttClientSubscribeDetector;
 import org.dromara.mica.mqtt.spring.client.MqttClientSubscribeLazyFilter;
 import org.dromara.mica.mqtt.spring.client.MqttClientTemplate;
@@ -126,6 +128,12 @@ public class MqttClientConfiguration {
 	@ConditionalOnMissingBean(name = MqttClientTemplate.DEFAULT_CLIENT_TEMPLATE_BEAN)
 	public MqttClientTemplate mqttClientTemplate(MqttClientCreator mqttClientCreator) {
 		return new MqttClientTemplate(mqttClientCreator);
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	public MqttDeserializer mqttDeserializer() {
+		return new MqttJsonDeserializer();
 	}
 
 	@Bean

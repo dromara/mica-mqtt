@@ -21,6 +21,7 @@ import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.mica.Pair;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
 
@@ -31,6 +32,8 @@ import java.util.StringTokenizer;
  */
 public final class TopicUtil {
 	public static final String TOPIC_LAYER = "/";
+	public static final String TOPIC_WILDCARDS_ONE = "+";
+	public static final String TOPIC_WILDCARDS_MORE = "#";
 
 	/**
 	 * 校验 topicFilter
@@ -287,6 +290,45 @@ public final class TopicUtil {
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Failed to resolve field: " + fieldName + " from payload object", e);
 		}
+	}
+
+	/**
+	 * 以 / 切分 topic，如果以 / 开头和 / 结尾会多一级，比 split 性能要好
+	 *
+	 * @param topic topic
+	 * @return part 数组
+	 */
+	public static String[] getTopicParts(String topic) {
+		// 大部分 topic 层级都在 10 以内
+		List<String> tokenList = new ArrayList<>(10);
+		char[] topicChars = topic.toCharArray();
+		int topicLength = topicChars.length;
+		int topicIdxEnd = topicLength - 1;
+		char ch;
+		// 前一个位置
+		int prev = 0;
+		for (int i = 0; i < topicLength; i++) {
+			ch = topicChars[i];
+			if (MqttCodecUtil.TOPIC_LAYER == ch) {
+				// 如果 / 为起始和最后的位置，添加 / 进 topic part
+				if (i == 0) {
+					tokenList.add(TOPIC_LAYER);
+					prev++;
+				} else {
+					tokenList.add(new String(topicChars, prev, i - prev));
+					prev = i;
+					prev++;
+					if (i == topicIdxEnd) {
+						tokenList.add(TOPIC_LAYER);
+					}
+				}
+			} else {
+				if (i == topicIdxEnd) {
+					tokenList.add(new String(topicChars, prev, topicLength - prev));
+				}
+			}
+		}
+		return tokenList.toArray(new String[0]);
 	}
 
 }

@@ -9,17 +9,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.stereotype.Service;
 import org.tio.core.ChannelContext;
 
 import java.nio.charset.StandardCharsets;
 
 /**
- * 消息监听器示例1，直接实现 IMqttMessageListener
+ * 消息监听器示例1，直接实现 IMqttMessageListener，注意：如果实现了 IMqttMessageListener，MqttServerFunction 注解就不生效了。
  *
  * @author wsq
  */
-@Service
+//@Service
 public class MqttServerMessageListener1 implements IMqttMessageListener, SmartInitializingSingleton {
 	private static final Logger logger = LoggerFactory.getLogger(MqttServerMessageListener1.class);
 	@Autowired
