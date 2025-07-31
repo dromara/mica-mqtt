@@ -115,6 +115,7 @@ public class MqttClientPluginImpl implements Plugin {
 	public void stop() throws Throwable {
 		MqttClientTemplate clientTemplate = context.getBean(MqttClientTemplate.class);
 		clientTemplate.destroy();
+		log.info("mqtt client stop...");
 	}
 
 	private MqttClientTemplate getMqttClientTemplate(MqttClientSubscribe anno) {

@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.spring.server;
+package org.dromara.mica.mqtt.server.solon.integration;
 
 import lombok.RequiredArgsConstructor;
 import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.server.func.IMqttFunctionMessageListener;
-import org.springframework.util.ReflectionUtils;
 import org.tio.core.ChannelContext;
+import org.tio.utils.mica.ExceptionUtils;
 
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -33,7 +33,7 @@ import java.nio.ByteBuffer;
  * @author L.cm
  */
 @RequiredArgsConstructor
-class MqttServerFunctionMessageListener implements IMqttFunctionMessageListener {
+class MqttServerFunctionListener implements IMqttFunctionMessageListener {
 	private final Object bean;
 	private final Method method;
 	private final MqttDeserializer deserializer;
@@ -42,8 +42,12 @@ class MqttServerFunctionMessageListener implements IMqttFunctionMessageListener 
 	public void onMessage(ChannelContext context, String clientId, String topic, MqttQoS qoS, MqttPublishMessage message) {
 		// 处理参数
 		Object[] methodParameters = getMethodParameters(method, context, topic, message, message.payload());
-		// 反射调用
-		ReflectionUtils.invokeMethod(method, bean, methodParameters);
+		// 方法调用
+		try {
+			method.invoke(bean, methodParameters);
+		} catch (Throwable e) {
+			throw ExceptionUtils.unchecked(e);
+		}
 	}
 
 	/**

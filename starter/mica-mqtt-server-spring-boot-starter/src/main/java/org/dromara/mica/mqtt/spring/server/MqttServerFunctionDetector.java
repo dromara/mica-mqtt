@@ -81,9 +81,9 @@ public class MqttServerFunctionDetector implements BeanPostProcessor {
 					@SuppressWarnings("unchecked")
 					MqttDeserializer deserializer = getMqttDeserializer((Class<MqttDeserializer>) deserialized);
 					// 5. 监听器
-					MqttServerFunctionMessageListener messageListener = new MqttServerFunctionMessageListener(bean, method, deserializer);
+					MqttServerFunctionListener functionListener = new MqttServerFunctionListener(bean, method, deserializer);
 					// 6. 注册监听器
-					functionManager.register(topicFilters, messageListener);
+					functionManager.register(topicFilters, functionListener);
 				}
 			}, ReflectionUtils.USER_DECLARED_METHODS);
 		}

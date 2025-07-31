@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.spring.server.config;
 
+import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
+import org.dromara.mica.mqtt.core.deserialize.MqttJsonDeserializer;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.MqttServerCustomizer;
@@ -60,6 +62,12 @@ import org.tio.core.Node;
 )
 @EnableConfigurationProperties(MqttServerProperties.class)
 public class MqttServerConfiguration {
+
+	@Bean
+	@ConditionalOnMissingBean
+	public MqttDeserializer mqttDeserializer() {
+		return new MqttJsonDeserializer();
+	}
 
 	@Bean
 	@ConditionalOnMissingBean

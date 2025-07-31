@@ -20,6 +20,8 @@ import org.dromara.mica.mqtt.client.solon.event.SolonEventMqttClientConnectListe
 import org.dromara.mica.mqtt.core.client.IMqttClientConnectListener;
 import org.dromara.mica.mqtt.core.client.MqttClient;
 import org.dromara.mica.mqtt.core.client.MqttClientCreator;
+import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
+import org.dromara.mica.mqtt.core.deserialize.MqttJsonDeserializer;
 import org.noear.solon.annotation.Bean;
 import org.noear.solon.annotation.Condition;
 import org.noear.solon.annotation.Configuration;
@@ -32,6 +34,12 @@ import org.tio.utils.hutool.StrUtil;
  */
 @Configuration
 public class MqttClientConfiguration {
+
+	@Bean
+	@Condition(onMissingBean = MqttDeserializer.class)
+	public MqttDeserializer mqttDeserializer() {
+		return new MqttJsonDeserializer();
+	}
 
 	@Bean
 	@Condition(onMissingBean = IMqttClientConnectListener.class)

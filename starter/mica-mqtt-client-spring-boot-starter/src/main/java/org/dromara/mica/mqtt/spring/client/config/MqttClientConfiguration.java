@@ -57,6 +57,12 @@ public class MqttClientConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
+	public MqttDeserializer mqttDeserializer() {
+		return new MqttJsonDeserializer();
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
 	public IMqttClientConnectListener springEventMqttClientConnectListener(ApplicationEventPublisher eventPublisher) {
 		return new SpringEventMqttClientConnectListener(eventPublisher);
 	}
@@ -127,12 +133,6 @@ public class MqttClientConfiguration {
 	@ConditionalOnMissingBean(name = MqttClientTemplate.DEFAULT_CLIENT_TEMPLATE_BEAN)
 	public MqttClientTemplate mqttClientTemplate(MqttClientCreator mqttClientCreator) {
 		return new MqttClientTemplate(mqttClientCreator);
-	}
-
-	@Bean
-	@ConditionalOnMissingBean
-	public MqttDeserializer mqttDeserializer() {
-		return new MqttJsonDeserializer();
 	}
 
 	@Bean

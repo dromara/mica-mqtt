@@ -16,7 +16,10 @@
 
 package org.dromara.mica.mqtt.server.solon.integration;
 
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.MqttServerCustomizer;
@@ -28,20 +31,26 @@ import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
+import org.dromara.mica.mqtt.core.server.func.IMqttFunctionMessageListener;
+import org.dromara.mica.mqtt.core.server.func.MqttFunctionManager;
 import org.dromara.mica.mqtt.core.server.interceptor.IMqttMessageInterceptor;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerAuthHandler;
+import org.dromara.mica.mqtt.core.util.TopicUtil;
+import org.dromara.mica.mqtt.server.solon.MqttServerFunction;
 import org.dromara.mica.mqtt.server.solon.MqttServerTemplate;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerConfiguration;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerMetricsConfiguration;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerProperties;
+import org.noear.solon.Solon;
 import org.noear.solon.core.AppContext;
+import org.noear.solon.core.BeanWrap;
 import org.noear.solon.core.Plugin;
-import org.tio.core.ssl.SSLEngineCustomizer;
-import org.tio.core.ssl.SslConfig;
+import org.noear.solon.core.util.ClassUtil;
 
-import java.util.Objects;
+import java.lang.reflect.Method;
+import java.util.*;
 
 /**
  * <b>(MqttServerPluginImpl)</b>
@@ -52,6 +61,8 @@ import java.util.Objects;
  */
 @Slf4j
 public class MqttServerPluginImpl implements Plugin {
+	private final List<ExtractorClassTag<MqttServerFunction>> functionClassTags = new ArrayList<>();
+	private final List<ExtractorMethodTag<MqttServerFunction>> functionMethodTags = new ArrayList<>();
 	private volatile boolean running = false;
 	private AppContext context;
 
@@ -77,14 +88,7 @@ public class MqttServerPluginImpl implements Plugin {
 			IMqttConnectStatusListener connectStatusListener = context.getBean(IMqttConnectStatusListener.class);
 			IMqttMessageInterceptor messageInterceptor = context.getBean(IMqttMessageInterceptor.class);
 			MqttServerCustomizer customizers = context.getBean(MqttServerCustomizer.class);
-			// ssl 自定义配置
-//			SslConfig sslConfig = serverCreator.getSslConfig();
-//			if (sslConfig != null) {
-//				SSLEngineCustomizer sslCustomizer = context.getBean(SSLEngineCustomizer.class);
-//				if (sslCustomizer != null) {
-//					sslConfig.setSslEngineCustomizer(sslCustomizer);
-//				}
-//			}
+
 			// 自定义消息监听
 			serverCreator.messageListener(messageListener);
 			// 认证处理器
@@ -135,18 +139,65 @@ public class MqttServerPluginImpl implements Plugin {
 			if (Objects.nonNull(customizers)) {
 				customizers.customize(serverCreator);
 			}
-
 			MqttServer mqttServer = serverCreator.build();
 			MqttServerTemplate mqttServerTemplate = new MqttServerTemplate(mqttServer);
 			context.wrapAndPut(MqttServerTemplate.class, mqttServerTemplate);
 			// Metrics
 			context.beanMake(MqttServerMetricsConfiguration.class);
+			// 添加启动时的函数处理
+			functionDetector();
 			// 启动
 			if (properties.isEnabled() && !running) {
 				running = mqttServerTemplate.getMqttServer().start();
 				log.info("mqtt server start...");
 			}
 		});
+	}
+
+	private void functionDetector() {
+		// functionManager
+		MqttFunctionManager functionManager = context.getBean(MqttFunctionManager.class);
+		// 类级别的注解订阅
+		functionClassTags.forEach(each -> {
+			MqttServerFunction anno = each.getAnno();
+			String[] topicFilters = getTopicFilters(anno);
+			IMqttFunctionMessageListener messageListener = each.getBeanWrap().get();
+			functionManager.register(topicFilters, messageListener);
+		});
+		// 方法级别的注解订阅
+		functionMethodTags.forEach(each -> {
+			MqttServerFunction anno = each.getAnno();
+			String[] topicFilters = getTopicFilters(anno);
+			// 自定义的反序列化，支持 solon bean 或者 无参构造器初始化
+			Class<? extends MqttDeserializer> deserialized = anno.deserialize();
+			MqttDeserializer deserializer = getMqttDeserializer(deserialized);
+			// 构造监听器
+			MqttServerFunctionListener functionListener = new MqttServerFunctionListener(each.getBw().get(), each.getMethod(), deserializer);
+			functionManager.register(topicFilters, functionListener);
+		});
+	}
+
+	/**
+	 * 获取解码器
+	 *
+	 * @param deserializerType deserializerType
+	 * @return 解码器
+	 */
+	private MqttDeserializer getMqttDeserializer(Class<?> deserializerType) {
+		BeanWrap beanWrap = context.getWrap(deserializerType);
+		if (beanWrap == null) {
+			return ClassUtil.newInstance(deserializerType);
+		}
+		return beanWrap.get();
+	}
+
+	private String[] getTopicFilters(MqttServerFunction anno) {
+		// 1. 替换 solon cfg 变量
+		// 2. 替换订阅中的其他变量
+		return Arrays.stream(anno.value())
+			.map((x) -> Optional.ofNullable(Solon.cfg().getByTmpl(x)).orElse(x))
+			.map(TopicUtil::getTopicFilter)
+			.toArray(String[]::new);
 	}
 
 	@Override
@@ -157,4 +208,21 @@ public class MqttServerPluginImpl implements Plugin {
 			log.info("mqtt server stop...");
 		}
 	}
+
+	@Data
+	@RequiredArgsConstructor
+	private static class ExtractorClassTag<T> {
+		private final Class<?> clz;
+		private final BeanWrap beanWrap;
+		private final T anno;
+	}
+
+	@Data
+	@RequiredArgsConstructor
+	private static class ExtractorMethodTag<T> {
+		private final BeanWrap bw;
+		private final Method method;
+		private final T anno;
+	}
+
 }
