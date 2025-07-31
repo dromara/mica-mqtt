@@ -2,6 +2,12 @@
 
 ## 发行版本
 
+### v2.5.3 - 2025-08-10
+- :sparkles: mica-mqtt-server-spring-boot-starter 支持注解 `@MqttServerFunction` 监听
+- :sparkles: mica-mqtt-server-solon-plugin 支持注解 `@MqttServerFunction` 监听
+- :sparkles: mica-mqtt-client-solon-plugin 更新 `solon-configuration-metadata.json`
+- :sparkles: mica-mqtt-codec `ReasonCode` 统一移动到 `codes` 包（不影响老用户升级）
+
 ### v2.5.2 - 2025-07-27
 - :bug: mica-mqtt-server 修复启动报错，感谢 `CoderKK` 反馈（gitee #ICOQ3Q）
 
