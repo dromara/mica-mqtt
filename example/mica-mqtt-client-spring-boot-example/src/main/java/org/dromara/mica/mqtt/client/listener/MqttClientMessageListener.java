@@ -1,10 +1,9 @@
 package org.dromara.mica.mqtt.client.listener;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.dromara.mica.mqtt.spring.client.MqttClientSubscribe;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.tio.core.ChannelContext;
 
@@ -15,14 +14,14 @@ import java.nio.charset.StandardCharsets;
  *
  * @author L.cm
  */
+@Slf4j
 @Service
 @MqttClientSubscribe("${topic1}")
 public class MqttClientMessageListener implements IMqttClientMessageListener {
-	private static final Logger logger = LoggerFactory.getLogger(MqttClientMessageListener.class);
 
 	@Override
 	public void onMessage(ChannelContext context, String topic, MqttPublishMessage message, byte[] payload) {
-		logger.info("topic:{} payload:{}", topic, new String(payload, StandardCharsets.UTF_8));
+		log.info("topic:{} payload:{}", topic, new String(payload, StandardCharsets.UTF_8));
 	}
 }
 

@@ -1,20 +1,19 @@
 package org.dromara.mica.mqtt.client.solon.service;
 
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.client.solon.MqttClientTemplate;
 import org.noear.solon.annotation.Component;
 import org.noear.solon.annotation.Inject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 
 /**
  * @author wsq
  */
+@Slf4j
 @Component
 public class ClientService {
-	private static final Logger             logger = LoggerFactory.getLogger(ClientService.class);
 	@Inject
 	private              MqttClientTemplate client;
 
@@ -25,7 +24,7 @@ public class ClientService {
 
 	public boolean sub() {
 		client.subQos0("/test/#", (context, topic, message, payload) -> {
-			logger.info(topic + '\t' + new String(payload, StandardCharsets.UTF_8));
+			log.info("{}\t{}", topic, new String(payload, StandardCharsets.UTF_8));
 		});
 		return true;
 	}

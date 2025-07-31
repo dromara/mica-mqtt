@@ -16,10 +16,9 @@
 
 package org.dromara.mica.mqtt.server.listener;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.spring.server.event.MqttClientOfflineEvent;
 import org.dromara.mica.mqtt.spring.server.event.MqttClientOnlineEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 
 /**
@@ -27,18 +26,18 @@ import org.springframework.context.event.EventListener;
  *
  * @author L.cm
  */
+@Slf4j
 //@Service
 public class MqttConnectStatusListener1 {
-	private static final Logger logger = LoggerFactory.getLogger(MqttConnectStatusListener1.class);
 
 	@EventListener
 	public void online(MqttClientOnlineEvent event) {
-		logger.info("MqttClientOnlineEvent:{}", event);
+		log.info("MqttClientOnlineEvent:{}", event);
 	}
 
 	@EventListener
 	public void offline(MqttClientOfflineEvent event) {
-		logger.info("MqttClientOfflineEvent:{}", event);
+		log.info("MqttClientOfflineEvent:{}", event);
 	}
 
 }

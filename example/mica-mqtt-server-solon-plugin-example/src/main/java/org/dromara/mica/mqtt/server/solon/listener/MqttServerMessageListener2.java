@@ -1,5 +1,6 @@
 package org.dromara.mica.mqtt.server.solon.listener;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.server.solon.MqttServerFunction;
 import org.dromara.mica.mqtt.server.solon.pojo.User;
 import org.noear.solon.annotation.Component;
@@ -11,18 +12,19 @@ import org.slf4j.LoggerFactory;
  *
  * @author L.cm
  */
+@Slf4j
 @Component
 public class MqttServerMessageListener2 {
 	private static final Logger logger = LoggerFactory.getLogger(MqttServerMessageListener2.class);
 
 	@MqttServerFunction("/test/object")
 	public void func1(String topic, User<?> user) {
-		logger.info("topic:{} user:{}", topic, user);
+		log.info("topic:{} user:{}", topic, user);
 	}
 
 	@MqttServerFunction("/test/client")
 	public void func1(String topic, byte[] message) {
-		logger.info("topic:{} message:{}", topic, new String(message));
+		log.info("topic:{} message:{}", topic, new String(message));
 	}
 
 }

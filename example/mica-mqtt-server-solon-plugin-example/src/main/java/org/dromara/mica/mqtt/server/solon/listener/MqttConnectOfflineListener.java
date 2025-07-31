@@ -16,23 +16,22 @@
 
 package org.dromara.mica.mqtt.server.solon.listener;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.server.solon.event.MqttClientOfflineEvent;
 import org.noear.solon.annotation.Component;
 import org.noear.solon.core.event.EventListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * mqtt 连接状态，使用 solon event 方式，性能有损耗
  *
  * @author L.cm
  */
+@Slf4j
 @Component
 public class MqttConnectOfflineListener implements EventListener<MqttClientOfflineEvent> {
-	private static final Logger logger = LoggerFactory.getLogger(MqttConnectOfflineListener.class);
 
 	@Override
 	public void onEvent(MqttClientOfflineEvent mqttClientOfflineEvent) throws Throwable {
-		logger.info("MqttClientOnlineEvent:{}", mqttClientOfflineEvent);
+		log.info("MqttClientOnlineEvent:{}", mqttClientOfflineEvent);
 	}
 }

@@ -1,11 +1,9 @@
 package org.dromara.mica.mqtt.server.solon.listener;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
-import org.noear.solon.annotation.Component;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.tio.core.ChannelContext;
 
 import java.nio.charset.StandardCharsets;
@@ -15,13 +13,13 @@ import java.nio.charset.StandardCharsets;
  *
  * @author wsq
  */
+@Slf4j
 //@Component
 public class MqttServerMessageListener1 implements IMqttMessageListener {
-	private static final Logger logger = LoggerFactory.getLogger(MqttServerMessageListener1.class);
 
 	@Override
 	public void onMessage(ChannelContext context, String clientId, String topic, MqttQoS qos, MqttPublishMessage message) {
-		logger.info("context:{} clientId:{} message:{} payload:{}", context, clientId, message, new String(message.payload(), StandardCharsets.UTF_8));
+		log.info("context:{} clientId:{} message:{} payload:{}", context, clientId, message, new String(message.payload(), StandardCharsets.UTF_8));
 	}
 
 }

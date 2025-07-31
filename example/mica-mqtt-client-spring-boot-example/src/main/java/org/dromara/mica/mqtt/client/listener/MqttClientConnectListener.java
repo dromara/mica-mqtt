@@ -16,11 +16,10 @@
 
 package org.dromara.mica.mqtt.client.listener;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.core.client.MqttClientCreator;
 import org.dromara.mica.mqtt.spring.client.event.MqttConnectedEvent;
 import org.dromara.mica.mqtt.spring.client.event.MqttDisconnectEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -30,21 +29,21 @@ import org.springframework.stereotype.Service;
  *
  * @author L.cm
  */
+@Slf4j
 @Service
 public class MqttClientConnectListener {
-	private static final Logger logger = LoggerFactory.getLogger(MqttClientConnectListener.class);
 
 	@Autowired
 	private MqttClientCreator mqttClientCreator;
 
 	@EventListener
 	public void onConnected(MqttConnectedEvent event) {
-		logger.info("MqttConnectedEvent:{}", event);
+		log.info("MqttConnectedEvent:{}", event);
 	}
 
 	@EventListener
 	public void onDisconnect(MqttDisconnectEvent event) {
-		logger.info("MqttDisconnectEvent:{}", event);
+		log.info("MqttDisconnectEvent:{}", event);
 		// 在断线时更新 clientId、username、password，只能改这 3 个，不可调用其他方法。
 //		mqttClientCreator.clientId("newClient" + System.currentTimeMillis())
 //			.username("newUserName")

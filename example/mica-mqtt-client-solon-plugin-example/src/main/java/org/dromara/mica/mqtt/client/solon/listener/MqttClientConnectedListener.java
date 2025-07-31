@@ -16,28 +16,26 @@
 
 package org.dromara.mica.mqtt.client.solon.listener;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.client.solon.event.MqttConnectedEvent;
 import org.dromara.mica.mqtt.core.client.MqttClientCreator;
 import org.noear.solon.annotation.Component;
 import org.noear.solon.annotation.Inject;
 import org.noear.solon.core.event.EventListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * 客户端连接状态监听
  *
  * @author L.cm
  */
+@Slf4j
 @Component
 public class MqttClientConnectedListener implements EventListener<MqttConnectedEvent> {
-	private static final Logger logger = LoggerFactory.getLogger(MqttClientConnectedListener.class);
-
 	@Inject
 	private MqttClientCreator mqttClientCreator;
 
 	@Override
 	public void onEvent(MqttConnectedEvent mqttConnectedEvent) throws Throwable {
-		logger.info("MqttConnectedEvent:{}", mqttConnectedEvent);
+		log.info("MqttConnectedEvent:{}", mqttConnectedEvent);
 	}
 }

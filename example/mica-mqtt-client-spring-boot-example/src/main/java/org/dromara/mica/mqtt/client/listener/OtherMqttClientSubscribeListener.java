@@ -1,9 +1,8 @@
 package org.dromara.mica.mqtt.client.listener;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.spring.client.MqttClientSubscribe;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -11,9 +10,9 @@ import org.springframework.stereotype.Service;
  *
  * @author L.cm
  */
+@Slf4j
 @Service
 public class OtherMqttClientSubscribeListener {
-	private static final Logger logger = LoggerFactory.getLogger(OtherMqttClientSubscribeListener.class);
 
 	@MqttClientSubscribe(
 		value = {
@@ -23,7 +22,7 @@ public class OtherMqttClientSubscribeListener {
 		clientTemplateBean = "mqttClientTemplate1"
 	)
 	public void sub(String topic, MqttPublishMessage message, byte[] payload) {
-		logger.info("topic:{} payload:{}", topic, new String(payload));
+		log.info("topic:{} payload:{}", topic, new String(payload));
 	}
 
 }

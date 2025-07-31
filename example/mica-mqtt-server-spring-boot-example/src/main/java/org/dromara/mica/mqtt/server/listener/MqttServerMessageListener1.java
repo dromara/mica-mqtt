@@ -1,11 +1,10 @@
 package org.dromara.mica.mqtt.server.listener;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.codec.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.spring.server.MqttServerTemplate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -18,16 +17,16 @@ import java.nio.charset.StandardCharsets;
  *
  * @author wsq
  */
+@Slf4j
 //@Service
 public class MqttServerMessageListener1 implements IMqttMessageListener, SmartInitializingSingleton {
-	private static final Logger logger = LoggerFactory.getLogger(MqttServerMessageListener1.class);
 	@Autowired
 	private ApplicationContext applicationContext;
 	private MqttServerTemplate mqttServerTemplate;
 
 	@Override
 	public void onMessage(ChannelContext context, String clientId, String topic, MqttQoS qos, MqttPublishMessage message) {
-		logger.info("context:{} clientId:{} message:{} payload:{}", context, clientId, message, new String(message.payload(), StandardCharsets.UTF_8));
+		log.info("context:{} clientId:{} message:{} payload:{}", context, clientId, message, new String(message.payload(), StandardCharsets.UTF_8));
 	}
 
 	@Override
