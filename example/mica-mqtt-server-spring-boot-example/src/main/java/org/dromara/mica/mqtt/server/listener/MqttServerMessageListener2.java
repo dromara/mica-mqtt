@@ -15,7 +15,7 @@ import org.tio.core.ChannelContext;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 消息监听器示例2,优点：性能损失小
+ * 消息监听器示例1，直接实现 IMqttMessageListener
  *
  * @author wsq
  */
