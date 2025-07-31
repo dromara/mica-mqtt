@@ -19,6 +19,7 @@ package org.dromara.mica.mqtt.spring.server;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
+import org.dromara.mica.mqtt.core.server.func.IMqttFunctionMessageListener;
 import org.dromara.mica.mqtt.core.server.func.MqttFunctionManager;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.springframework.beans.BeanUtils;
@@ -48,11 +49,11 @@ public class MqttServerFunctionDetector implements BeanPostProcessor {
 	public Object postProcessAfterInitialization(@NonNull Object bean, String beanName) throws BeansException {
 		Class<?> userClass = ClassUtils.getUserClass(bean);
 		// 1. 查找类上的 MqttServerFunction 注解
-		if (bean instanceof MqttServerFunctionMessageListener) {
+		if (bean instanceof IMqttFunctionMessageListener) {
 			MqttServerFunction subscribe = AnnotationUtils.findAnnotation(userClass, MqttServerFunction.class);
 			if (subscribe != null) {
 				String[] topicFilters = getTopicFilters(applicationContext, subscribe.value());
-				functionManager.register(topicFilters, (MqttServerFunctionMessageListener) bean);
+				functionManager.register(topicFilters, (IMqttFunctionMessageListener) bean);
 			}
 		} else {
 			// 2. 查找方法上的 MqttServerFunction 注解
