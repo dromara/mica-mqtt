@@ -129,7 +129,7 @@ public interface IMqttSessionManager {
 	 * @param clientId clientId
 	 * @return messageId
 	 */
-	int getMessageId(String clientId);
+	int getPacketId(String clientId);
 
 	/**
 	 * 判断是否存在 session

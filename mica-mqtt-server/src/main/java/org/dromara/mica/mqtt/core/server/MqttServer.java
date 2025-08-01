@@ -190,7 +190,7 @@ public final class MqttServer {
 	 */
 	public boolean publish(ChannelContext context, String clientId, String topic, Object payload, MqttQoS qos, boolean retain) {
 		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
-		int messageId = isHighLevelQoS ? sessionManager.getMessageId(clientId) : -1;
+		int messageId = isHighLevelQoS ? sessionManager.getPacketId(clientId) : -1;
 		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
 		MqttPublishMessage message = MqttMessageBuilders.publish()
 			.topicName(topic)

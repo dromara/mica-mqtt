@@ -78,4 +78,13 @@ class MqttSessionManagerTest {
 		Assertions.assertTrue(subscribeList.isEmpty());
 	}
 
+	@Test
+	void testPacketId() {
+		IMqttSessionManager topicManager = new InMemoryMqttSessionManager();
+		for (int i = 0; i < Short.MAX_VALUE * 3; i++) {
+			int packetId = topicManager.getPacketId("client1");
+			System.out.println(packetId);
+		}
+	}
+
 }

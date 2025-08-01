@@ -316,10 +316,9 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 	}
 
 	@Override
-	public int getMessageId(String clientId) {
-		AtomicInteger value = messageIdStore.computeIfAbsent(clientId, (key) -> new AtomicInteger(1));
-		value.compareAndSet(0xffff, 1);
-		return value.getAndIncrement();
+	public int getPacketId(String clientId) {
+		AtomicInteger packetIdGen = messageIdStore.computeIfAbsent(clientId, (key) -> new AtomicInteger(1));
+		return packetIdGen.getAndUpdate(current -> (current % 0xffff) == 0 ? 1 : current + 1);
 	}
 
 	@Override
