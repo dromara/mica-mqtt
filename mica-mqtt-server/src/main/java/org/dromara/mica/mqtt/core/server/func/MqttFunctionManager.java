@@ -56,7 +56,7 @@ public class MqttFunctionManager {
 		}
 
 		public Node(String part, List<IMqttFunctionMessageListener> listeners) {
-			this(part, listeners, new ConcurrentHashMap<>(8));
+			this(part, listeners, new ConcurrentHashMap<>(16));
 		}
 
 		public Node(String part, List<IMqttFunctionMessageListener> listeners, Map<String, Node> children) {
