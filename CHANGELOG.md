@@ -9,7 +9,7 @@
 - :sparkles: mica-mqtt-codec `ReasonCode` 统一移动到 `codes` 包（不影响老用户升级）
 
 ### v2.5.2 - 2025-07-27
-- :bug: mica-mqtt-server 修复启动报错，感谢 `CoderKK` 反馈（gitee #ICOQ3Q）
+- :bug: mica-mqtt-server 修复启动报错（影响范围 `2.5.0` ~ `2.5.1`），感谢 `CoderKK` 反馈（gitee #ICOQ3Q）
 
 ### v2.5.1 - 2025-07-24
 - :sparkles: mica-mqtt-server 优化 sse mcp，添加 sse 心跳
