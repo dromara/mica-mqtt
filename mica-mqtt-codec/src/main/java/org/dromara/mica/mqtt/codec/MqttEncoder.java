@@ -356,7 +356,7 @@ public final class MqttEncoder {
 		MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		MqttFixedHeader mqttFixedHeader = message.fixedHeader();
 		MqttPublishVariableHeader variableHeader = message.variableHeader();
-		byte[] payload = message.payload() == null ? ByteBufferUtil.EMPTY_BYTES : message.getPayload();
+		byte[] payload = message.payload() == null ? ByteBufferUtil.EMPTY_BYTES : message.payload();
 
 		String topicName = variableHeader.topicName();
 		byte[] topicNameBytes = encodeStringUtf8(topicName);

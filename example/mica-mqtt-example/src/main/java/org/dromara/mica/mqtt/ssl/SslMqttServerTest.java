@@ -39,7 +39,7 @@ public class SslMqttServerTest {
 					.build()
 			)
 			.messageListener((context, clientId, topic, qoS, message) -> {
-				logger.info("clientId:{} message:{} payload:{}", clientId, message, ByteBufferUtil.toString(message.getPayload()));
+				logger.info("clientId:{} message:{} payload:{}", clientId, message, ByteBufferUtil.toString(message.payload()));
 			})
 			.connectStatusListener(new MqttConnectStatusListener())
 			.debug()

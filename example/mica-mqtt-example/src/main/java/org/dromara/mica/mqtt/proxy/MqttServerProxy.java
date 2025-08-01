@@ -44,7 +44,7 @@ public class MqttServerProxy {
 		// 接受数据的服务端
 		MqttServer.create()
 			.messageListener((context, clientId, topic, qoS, message) -> {
-				byte[] payload = message.getPayload();
+				byte[] payload = message.payload();
 				logger.info("clientId:{} topic:{} payload:\n{}", clientId, topic, ByteBufferUtil.toString(payload));
 				// 转发数据
 				client.publish(topic, payload);
