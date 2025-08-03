@@ -2,7 +2,7 @@
 
 ## 发行版本
 
-### v2.5.3 - 2025-08-10
+### v2.5.3 - 2025-08-03
 - :sparkles: mica-mqtt-server-spring-boot-starter 支持注解 `@MqttServerFunction` 监听
 - :sparkles: mica-mqtt-server-solon-plugin 支持注解 `@MqttServerFunction` 监听
 - :sparkles: mica-mqtt-client-solon-plugin 更新 `solon-configuration-metadata.json`
