@@ -60,7 +60,7 @@ Dromara `mica-mqtt` **低延迟**、**高性能**的 `mqtt` 物联网组件。�
 | 8883  | tcp ssl       | mqtt tcp ssl 端口          |
 | 8083  | websocket     | websocket mqtt 子协议端口     |
 | 8084  | websocket ssl | websocket ssl mqtt 子协议端口 |
-| 18083 | http          | http api 端口              |
+| 18083 | http          | http、大模型 MCP 接口端口        |
 
 **演示地址**：mqtt.dreamlu.net 端口同上，账号：mica 密码：mica
 
