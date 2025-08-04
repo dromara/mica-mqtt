@@ -31,10 +31,22 @@ import java.util.List;
  * @author L.cm
  */
 public class MqttSSLEngineCustomizer implements SSLEngineCustomizer {
+	/**
+	 * ip 或域名
+	 */
 	private final String host;
+	/**
+	 * 端点识别算法，默认 null，生产环境建议配置成 HTTPS，支持：HTTPS/LDAPS/null
+	 */
+	private final String identificationAlgorithm;
 
 	public MqttSSLEngineCustomizer(String host) {
+		this(host, null);
+	}
+
+	public MqttSSLEngineCustomizer(String host, String identificationAlgorithm) {
 		this.host = host;
+		this.identificationAlgorithm = identificationAlgorithm;
 	}
 
 	@Override
@@ -44,7 +56,10 @@ public class MqttSSLEngineCustomizer implements SSLEngineCustomizer {
 		List<SNIServerName> sniHostNames = new ArrayList<>(1);
 		sniHostNames.add(new SNIHostName(host));
 		sslParameters.setServerNames(sniHostNames);
-		sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
+		// 端点识别算法
+		if (identificationAlgorithm != null) {
+			sslParameters.setEndpointIdentificationAlgorithm(identificationAlgorithm);
+		}
 		engine.setSSLParameters(sslParameters);
 	}
 

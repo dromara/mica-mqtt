@@ -35,11 +35,11 @@ public class SslMqttClientTest {
 		// 初始化 mqtt 客户端
 		MqttClient client = MqttClient.create()
 			.ip("127.0.0.1")
-			.port(1883)
+			.port(8883)
 			.username("mica")
 			.password("mica")
 			.useSsl("classpath:ssl/dreamlu.net.jks", "123456")
-			.connect();
+			.connectSync();
 
 		client.subQos0("/test/#", (context, topic, message, payload) -> {
 			logger.info(topic + '\t' + ByteBufferUtil.toString(payload));
