@@ -75,7 +75,7 @@ public enum MqttPropertyType {
 	TOPIC_ALIAS((byte) 0x23),
 
 	// four bytes properties
-	PUBLICATION_EXPIRY_INTERVAL((byte) 0x02),
+	MESSAGE_EXPIRY_INTERVAL((byte) 0x02),
 	/**
 	 * session 超时时间，连接时使用
 	 */

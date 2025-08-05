@@ -510,7 +510,7 @@ public final class MqttEncoder {
 						((IntegerProperty) property).value().shortValue();
 					writeBuffer.writeShortBE(twoBytesInPropValue);
 					break;
-				case PUBLICATION_EXPIRY_INTERVAL:
+				case MESSAGE_EXPIRY_INTERVAL:
 				case SESSION_EXPIRY_INTERVAL:
 				case WILL_DELAY_INTERVAL:
 				case MAXIMUM_PACKET_SIZE:
