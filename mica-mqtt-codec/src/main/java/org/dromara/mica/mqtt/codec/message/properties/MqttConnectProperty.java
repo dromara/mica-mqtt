@@ -72,7 +72,7 @@ public class MqttConnectProperty {
 	 * @param requestProblemInformation 请求问题信息
 	 */
 	public void setRequestProblemInformation(boolean requestProblemInformation) {
-		properties.add(new IntegerProperty(MqttPropertyType.REQUEST_PROBLEM_INFORMATION, requestProblemInformation ? 1 : 0));
+		properties.add(new BooleanProperty(MqttPropertyType.REQUEST_PROBLEM_INFORMATION, requestProblemInformation));
 	}
 
 	/**
@@ -81,7 +81,7 @@ public class MqttConnectProperty {
 	 * @param requestResponseInformation 请求响应信息
 	 */
 	public void setRequestResponseInformation(boolean requestResponseInformation) {
-		properties.add(new IntegerProperty(MqttPropertyType.REQUEST_RESPONSE_INFORMATION, requestResponseInformation ? 1 : 0));
+		properties.add(new BooleanProperty(MqttPropertyType.REQUEST_RESPONSE_INFORMATION, requestResponseInformation));
 	}
 
 	/**

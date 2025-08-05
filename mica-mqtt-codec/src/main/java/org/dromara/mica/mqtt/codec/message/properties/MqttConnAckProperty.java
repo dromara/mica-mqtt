@@ -135,7 +135,7 @@ public class MqttConnAckProperty {
 	 * @param retainAvailable 是否保留可用
 	 */
 	public void setRetainAvailable(boolean retainAvailable) {
-		properties.add(new IntegerProperty(MqttPropertyType.RETAIN_AVAILABLE, retainAvailable ? 1 : 0));
+		properties.add(new BooleanProperty(MqttPropertyType.RETAIN_AVAILABLE, retainAvailable));
 	}
 
 	/**
@@ -153,7 +153,7 @@ public class MqttConnAckProperty {
 	 * @param wildcardSubscriptionAvailable 是否通配符订阅可用
 	 */
 	public void setWildcardSubscriptionAvailable(boolean wildcardSubscriptionAvailable) {
-		properties.add(new IntegerProperty(MqttPropertyType.WILDCARD_SUBSCRIPTION_AVAILABLE, wildcardSubscriptionAvailable ? 1 : 0));
+		properties.add(new BooleanProperty(MqttPropertyType.WILDCARD_SUBSCRIPTION_AVAILABLE, wildcardSubscriptionAvailable));
 	}
 
 	/**
@@ -162,7 +162,7 @@ public class MqttConnAckProperty {
 	 * @param subscriptionIdentifiersAvailable 是否订阅标识符可用
 	 */
 	public void setSubscriptionIdentifiersAvailable(boolean subscriptionIdentifiersAvailable) {
-		properties.add(new IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER_AVAILABLE, subscriptionIdentifiersAvailable ? 1 : 0));
+		properties.add(new BooleanProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER_AVAILABLE, subscriptionIdentifiersAvailable));
 	}
 
 	/**
@@ -171,9 +171,8 @@ public class MqttConnAckProperty {
 	 * @param sharedSubscriptionAvailable 是否共享订阅可用
 	 */
 	public void setSharedSubscriptionAvailable(boolean sharedSubscriptionAvailable) {
-		properties.add(new IntegerProperty(MqttPropertyType.SHARED_SUBSCRIPTION_AVAILABLE, sharedSubscriptionAvailable ? 1 : 0));
+		properties.add(new BooleanProperty(MqttPropertyType.SHARED_SUBSCRIPTION_AVAILABLE, sharedSubscriptionAvailable));
 	}
-
 
 	/**
 	 * 设置原因字符串

@@ -374,7 +374,7 @@ public final class MqttMessageBuilders {
 			if (maximumQos != null) {
 				props.add(new IntegerProperty(MqttPropertyType.MAXIMUM_QOS.value(), maximumQos.intValue()));
 			}
-			props.add(new IntegerProperty(MqttPropertyType.RETAIN_AVAILABLE.value(), retain ? 1 : 0));
+			props.add(new BooleanProperty(MqttPropertyType.RETAIN_AVAILABLE.value(), retain));
 			if (maximumPacketSize != null) {
 				props.add(new IntegerProperty(MqttPropertyType.MAXIMUM_PACKET_SIZE.value(),
 					maximumPacketSize.intValue()));
@@ -386,16 +386,16 @@ public final class MqttMessageBuilders {
 			}
 			props.add(userProperties);
 			if (wildcardSubscriptionAvailable != null) {
-				props.add(new IntegerProperty(MqttPropertyType.WILDCARD_SUBSCRIPTION_AVAILABLE.value(),
-					wildcardSubscriptionAvailable ? 1 : 0));
+				props.add(new BooleanProperty(MqttPropertyType.WILDCARD_SUBSCRIPTION_AVAILABLE.value(),
+					wildcardSubscriptionAvailable));
 			}
 			if (subscriptionIdentifiersAvailable != null) {
-				props.add(new IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER_AVAILABLE.value(),
-					subscriptionIdentifiersAvailable ? 1 : 0));
+				props.add(new BooleanProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER_AVAILABLE.value(),
+					subscriptionIdentifiersAvailable));
 			}
 			if (sharedSubscriptionAvailable != null) {
-				props.add(new IntegerProperty(MqttPropertyType.SHARED_SUBSCRIPTION_AVAILABLE.value(),
-					sharedSubscriptionAvailable ? 1 : 0));
+				props.add(new BooleanProperty(MqttPropertyType.SHARED_SUBSCRIPTION_AVAILABLE.value(),
+					sharedSubscriptionAvailable));
 			}
 			if (serverKeepAlive != null) {
 				props.add(new IntegerProperty(MqttPropertyType.SERVER_KEEP_ALIVE.value(),
