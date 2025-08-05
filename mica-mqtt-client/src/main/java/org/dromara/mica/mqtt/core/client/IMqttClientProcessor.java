@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.core.client;
 
-import org.dromara.mica.mqtt.codec.*;
+import org.dromara.mica.mqtt.codec.message.*;
 import org.tio.core.ChannelContext;
 
 /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 The Netty Project
+ * Copyright 2014 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -14,30 +14,37 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message.header;
+
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 
 /**
- * Variable Header containing Packet Id, reason code and Properties as in MQTT v5 spec.
+ * Variable Header of the {@link MqttPublishMessage}
  *
  * @author netty
  */
-public final class MqttPubReplyMessageVariableHeader extends MqttMessageIdVariableHeader {
-	private final byte reasonCode;
+public final class MqttPublishVariableHeader {
+	private final String topicName;
+	private final int packetId;
 	private final MqttProperties properties;
 
-	public static final byte REASON_CODE_OK = 0;
+	public MqttPublishVariableHeader(String topicName, int packetId) {
+		this(topicName, packetId, MqttProperties.NO_PROPERTIES);
+	}
 
-	public MqttPubReplyMessageVariableHeader(int messageId, byte reasonCode, MqttProperties properties) {
-		super(messageId);
-		if (messageId < 1 || messageId > 0xffff) {
-			throw new IllegalArgumentException("messageId: " + messageId + " (expected: 1 ~ 65535)");
-		}
-		this.reasonCode = reasonCode;
+	public MqttPublishVariableHeader(String topicName, int packetId, MqttProperties properties) {
+		this.topicName = topicName;
+		this.packetId = packetId;
 		this.properties = MqttProperties.withEmptyDefaults(properties);
 	}
 
-	public byte reasonCode() {
-		return reasonCode;
+	public String topicName() {
+		return topicName;
+	}
+
+	public int packetId() {
+		return packetId;
 	}
 
 	public MqttProperties properties() {
@@ -46,10 +53,9 @@ public final class MqttPubReplyMessageVariableHeader extends MqttMessageIdVariab
 
 	@Override
 	public String toString() {
-		return "MqttPubReplyMessageVariableHeader[" +
-			"messageId=" + messageId() +
-			", reasonCode=" + reasonCode +
-			", properties=" + properties +
+		return "MqttPublishVariableHeader[" +
+			"topicName=" + topicName +
+			", packetId=" + packetId +
 			']';
 	}
 }

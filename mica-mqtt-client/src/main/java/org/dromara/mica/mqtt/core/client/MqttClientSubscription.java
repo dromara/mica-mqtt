@@ -17,7 +17,7 @@
 package org.dromara.mica.mqtt.core.client;
 
 import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.dromara.mica.mqtt.codec.MqttTopicSubscription;
+import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.core.common.TopicFilterType;
 
 import java.io.Serializable;

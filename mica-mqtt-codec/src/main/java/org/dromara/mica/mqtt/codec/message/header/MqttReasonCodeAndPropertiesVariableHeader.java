@@ -14,22 +14,30 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message.header;
+
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
 /**
- * Variable Header containing, Packet Id and Properties as in MQTT v5 spec.
+ * Variable Header for AUTH and DISCONNECT messages represented by {@link MqttMessage}
  *
  * @author netty
  */
-public final class MqttMessageIdAndPropertiesVariableHeader extends MqttMessageIdVariableHeader {
+public final class MqttReasonCodeAndPropertiesVariableHeader {
+	private final byte reasonCode;
 	private final MqttProperties properties;
 
-	public MqttMessageIdAndPropertiesVariableHeader(int messageId, MqttProperties properties) {
-		super(messageId);
-		if (messageId < 1 || messageId > 0xffff) {
-			throw new IllegalArgumentException("messageId: " + messageId + " (expected: 1 ~ 65535)");
-		}
+	public static final byte REASON_CODE_OK = 0;
+
+	public MqttReasonCodeAndPropertiesVariableHeader(byte reasonCode,
+													 MqttProperties properties) {
+		this.reasonCode = reasonCode;
 		this.properties = MqttProperties.withEmptyDefaults(properties);
+	}
+
+	public byte reasonCode() {
+		return reasonCode;
 	}
 
 	public MqttProperties properties() {
@@ -38,14 +46,9 @@ public final class MqttMessageIdAndPropertiesVariableHeader extends MqttMessageI
 
 	@Override
 	public String toString() {
-		return "MqttMessageIdAndPropertiesVariableHeader[" +
-			"messageId=" + messageId() +
+		return "MqttReasonCodeAndPropertiesVariableHeader[" +
+			"reasonCode=" + reasonCode +
 			", properties=" + properties +
 			']';
-	}
-
-	@Override
-	MqttMessageIdAndPropertiesVariableHeader withDefaultEmptyProperties() {
-		return this;
 	}
 }

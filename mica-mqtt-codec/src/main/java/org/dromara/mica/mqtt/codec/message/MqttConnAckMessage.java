@@ -14,21 +14,24 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message;
+
+import org.dromara.mica.mqtt.codec.message.header.MqttConnAckVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 
 /**
- * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#puback">MQTTV3.1/puback</a>
+ * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#connack">MQTTV3.1/connack</a>
  *
  * @author netty
  */
-public final class MqttPubAckMessage extends MqttMessage {
+public final class MqttConnAckMessage extends MqttMessage {
 
-	public MqttPubAckMessage(MqttFixedHeader mqttFixedHeader, MqttMessageIdVariableHeader variableHeader) {
+	public MqttConnAckMessage(MqttFixedHeader mqttFixedHeader, MqttConnAckVariableHeader variableHeader) {
 		super(mqttFixedHeader, variableHeader);
 	}
 
 	@Override
-	public MqttMessageIdVariableHeader variableHeader() {
-		return (MqttMessageIdVariableHeader) super.variableHeader();
+	public MqttConnAckVariableHeader variableHeader() {
+		return (MqttConnAckVariableHeader) super.variableHeader();
 	}
 }

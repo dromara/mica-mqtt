@@ -14,7 +14,13 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message;
+
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
+import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubAckPayload;
 
 /**
  * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#unsuback">

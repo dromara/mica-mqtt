@@ -17,7 +17,7 @@
 package org.dromara.mica.mqtt.core.server.cluster;
 
 import org.dromara.mica.mqtt.codec.MqttMessageBuilders;
-import org.dromara.mica.mqtt.codec.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
@@ -27,7 +27,6 @@ import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tio.core.ChannelContext;
-import org.tio.core.Node;
 import org.tio.core.Tio;
 import org.tio.server.ServerChannelContext;
 

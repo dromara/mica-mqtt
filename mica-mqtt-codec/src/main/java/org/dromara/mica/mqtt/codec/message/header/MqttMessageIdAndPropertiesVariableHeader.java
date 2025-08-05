@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 The Netty Project
+ * Copyright 2020 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -14,34 +14,24 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message.header;
+
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
 /**
- * Variable Header of the {@link MqttPublishMessage}
+ * Variable Header containing, Packet Id and Properties as in MQTT v5 spec.
  *
  * @author netty
  */
-public final class MqttPublishVariableHeader {
-	private final String topicName;
-	private final int packetId;
+public final class MqttMessageIdAndPropertiesVariableHeader extends MqttMessageIdVariableHeader {
 	private final MqttProperties properties;
 
-	public MqttPublishVariableHeader(String topicName, int packetId) {
-		this(topicName, packetId, MqttProperties.NO_PROPERTIES);
-	}
-
-	public MqttPublishVariableHeader(String topicName, int packetId, MqttProperties properties) {
-		this.topicName = topicName;
-		this.packetId = packetId;
+	public MqttMessageIdAndPropertiesVariableHeader(int messageId, MqttProperties properties) {
+		super(messageId);
+		if (messageId < 1 || messageId > 0xffff) {
+			throw new IllegalArgumentException("messageId: " + messageId + " (expected: 1 ~ 65535)");
+		}
 		this.properties = MqttProperties.withEmptyDefaults(properties);
-	}
-
-	public String topicName() {
-		return topicName;
-	}
-
-	public int packetId() {
-		return packetId;
 	}
 
 	public MqttProperties properties() {
@@ -50,9 +40,14 @@ public final class MqttPublishVariableHeader {
 
 	@Override
 	public String toString() {
-		return "MqttPublishVariableHeader[" +
-			"topicName=" + topicName +
-			", packetId=" + packetId +
+		return "MqttMessageIdAndPropertiesVariableHeader[" +
+			"messageId=" + messageId() +
+			", properties=" + properties +
 			']';
+	}
+
+	@Override
+	public MqttMessageIdAndPropertiesVariableHeader withDefaultEmptyProperties() {
+		return this;
 	}
 }

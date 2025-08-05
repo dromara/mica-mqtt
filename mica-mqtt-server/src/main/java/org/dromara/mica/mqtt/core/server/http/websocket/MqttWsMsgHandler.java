@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.core.server.http.websocket;
 
-import org.dromara.mica.mqtt.codec.MqttMessage;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.core.server.MqttMessageInterceptors;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.slf4j.Logger;

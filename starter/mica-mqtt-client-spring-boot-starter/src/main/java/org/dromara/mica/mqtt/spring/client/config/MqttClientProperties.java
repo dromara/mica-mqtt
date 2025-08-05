@@ -20,7 +20,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.dromara.mica.mqtt.codec.MqttConstant;
 import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.dromara.mica.mqtt.codec.MqttTopicSubscription;
+import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.unit.DataSize;

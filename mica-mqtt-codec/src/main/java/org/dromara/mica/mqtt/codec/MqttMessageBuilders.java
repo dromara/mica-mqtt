@@ -17,6 +17,11 @@
 package org.dromara.mica.mqtt.codec;
 
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
+import org.dromara.mica.mqtt.codec.message.*;
+import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
+import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
+import org.dromara.mica.mqtt.codec.message.header.*;
+import org.dromara.mica.mqtt.codec.message.payload.*;
 import org.dromara.mica.mqtt.codec.properties.*;
 
 import java.util.ArrayList;

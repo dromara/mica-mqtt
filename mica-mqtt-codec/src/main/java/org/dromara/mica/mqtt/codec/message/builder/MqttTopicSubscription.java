@@ -14,7 +14,10 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message.builder;
+
+import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.message.payload.MqttSubscribePayload;
 
 /**
  * Contains a topic name and Qos Level.

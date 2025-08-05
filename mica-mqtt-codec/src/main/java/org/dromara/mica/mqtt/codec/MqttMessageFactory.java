@@ -16,6 +16,10 @@
 
 package org.dromara.mica.mqtt.codec;
 
+import org.dromara.mica.mqtt.codec.message.*;
+import org.dromara.mica.mqtt.codec.message.header.*;
+import org.dromara.mica.mqtt.codec.message.payload.*;
+
 /**
  * Utility class with factory methods to create different types of MQTT messages.
  *

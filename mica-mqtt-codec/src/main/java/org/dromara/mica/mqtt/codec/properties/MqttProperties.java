@@ -14,9 +14,7 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
-
-import org.dromara.mica.mqtt.codec.properties.*;
+package org.dromara.mica.mqtt.codec.properties;
 
 import java.util.*;
 
@@ -28,7 +26,7 @@ import java.util.*;
 public final class MqttProperties {
 	public static final MqttProperties NO_PROPERTIES = new MqttProperties(false);
 
-	static MqttProperties withEmptyDefaults(MqttProperties properties) {
+	public static MqttProperties withEmptyDefaults(MqttProperties properties) {
 		if (properties == null) {
 			return MqttProperties.NO_PROPERTIES;
 		}

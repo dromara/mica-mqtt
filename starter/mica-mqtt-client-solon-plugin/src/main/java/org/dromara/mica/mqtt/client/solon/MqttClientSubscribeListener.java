@@ -17,7 +17,7 @@
 package org.dromara.mica.mqtt.client.solon;
 
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.mica.mqtt.codec.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.tio.core.ChannelContext;

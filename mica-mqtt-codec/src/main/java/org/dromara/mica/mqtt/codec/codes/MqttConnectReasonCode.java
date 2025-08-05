@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.codec.codes;
 
-import org.dromara.mica.mqtt.codec.MqttConnAckMessage;
+import org.dromara.mica.mqtt.codec.message.MqttConnAckMessage;
 
 /**
  * Return Code of {@link MqttConnAckMessage}

@@ -14,8 +14,10 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message.header;
 
+import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 
 /**

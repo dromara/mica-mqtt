@@ -14,7 +14,10 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message.payload;
+
+import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;

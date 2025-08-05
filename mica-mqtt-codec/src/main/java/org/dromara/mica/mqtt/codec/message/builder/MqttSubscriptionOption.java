@@ -14,7 +14,9 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message.builder;
+
+import org.dromara.mica.mqtt.codec.MqttQoS;
 
 /**
  * Model the SubscriptionOption used in Subscribe MQTT v5 packet

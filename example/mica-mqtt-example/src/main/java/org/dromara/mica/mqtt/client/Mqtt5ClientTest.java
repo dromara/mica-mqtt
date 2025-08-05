@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.client;
 
-import org.dromara.mica.mqtt.codec.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;

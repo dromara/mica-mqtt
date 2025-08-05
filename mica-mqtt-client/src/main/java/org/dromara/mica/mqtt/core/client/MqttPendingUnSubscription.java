@@ -1,7 +1,7 @@
 package org.dromara.mica.mqtt.core.client;
 
-import org.dromara.mica.mqtt.codec.MqttMessage;
-import org.dromara.mica.mqtt.codec.MqttUnsubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
+import org.dromara.mica.mqtt.codec.message.MqttUnsubscribeMessage;
 import org.dromara.mica.mqtt.core.common.RetryProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

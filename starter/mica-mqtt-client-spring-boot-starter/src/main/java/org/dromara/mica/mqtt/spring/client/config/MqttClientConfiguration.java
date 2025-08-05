@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.spring.client.config;
 
-import org.dromara.mica.mqtt.codec.MqttTopicSubscription;
+import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.core.client.IMqttClientConnectListener;
 import org.dromara.mica.mqtt.core.client.MqttClient;
 import org.dromara.mica.mqtt.core.client.MqttClientCreator;

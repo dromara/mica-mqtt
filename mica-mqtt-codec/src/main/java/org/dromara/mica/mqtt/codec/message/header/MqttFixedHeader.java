@@ -14,7 +14,10 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message.header;
+
+import org.dromara.mica.mqtt.codec.MqttMessageType;
+import org.dromara.mica.mqtt.codec.MqttQoS;
 
 import java.util.Objects;
 
@@ -72,7 +75,7 @@ public final class MqttFixedHeader {
 	/**
 	 * 做 qos 降级，mqtt 规定 qos > 0，messageId 必须大于 0，为了兼容，固做降级处理
 	 */
-	void downgradeQos() {
+	public void downgradeQos() {
 		this.qosLevel = MqttQoS.QOS0;
 	}
 

@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.codec;
 
 import org.dromara.mica.mqtt.codec.exception.DecoderException;
 import org.dromara.mica.mqtt.codec.exception.MqttUnacceptableProtocolVersionException;
+import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.tio.core.ChannelContext;
 
 /**

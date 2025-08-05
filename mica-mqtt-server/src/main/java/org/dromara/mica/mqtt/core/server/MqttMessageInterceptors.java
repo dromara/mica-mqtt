@@ -17,7 +17,7 @@
 package org.dromara.mica.mqtt.core.server;
 
 import org.dromara.mica.mqtt.core.server.interceptor.IMqttMessageInterceptor;
-import org.dromara.mica.mqtt.codec.MqttMessage;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.tio.core.ChannelContext;
 
 import java.util.ArrayList;

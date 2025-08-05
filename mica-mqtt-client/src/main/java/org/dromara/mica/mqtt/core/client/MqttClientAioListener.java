@@ -17,7 +17,9 @@
 package org.dromara.mica.mqtt.core.client;
 
 import org.dromara.mica.mqtt.codec.*;
+import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

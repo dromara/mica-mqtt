@@ -18,6 +18,13 @@ package org.dromara.mica.mqtt.core.server.support;
 
 import org.dromara.mica.mqtt.codec.*;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
+import org.dromara.mica.mqtt.codec.message.*;
+import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
+import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttPublishVariableHeader;
+import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;

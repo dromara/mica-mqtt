@@ -14,7 +14,9 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message.header;
+
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
 /**
  * Variable Header containing only Message Id
@@ -51,7 +53,7 @@ public class MqttMessageIdVariableHeader {
 		return new MqttMessageIdAndPropertiesVariableHeader(messageId, MqttProperties.NO_PROPERTIES);
 	}
 
-	MqttMessageIdAndPropertiesVariableHeader withDefaultEmptyProperties() {
+	public MqttMessageIdAndPropertiesVariableHeader withDefaultEmptyProperties() {
 		return withEmptyProperties();
 	}
 }

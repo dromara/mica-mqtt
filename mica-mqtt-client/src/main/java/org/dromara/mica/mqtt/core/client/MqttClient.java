@@ -17,6 +17,12 @@
 package org.dromara.mica.mqtt.core.client;
 
 import org.dromara.mica.mqtt.codec.*;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.MqttUnsubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.dromara.mica.mqtt.core.util.TopicUtil;

@@ -14,33 +14,24 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message;
+
+import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 
 /**
- * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#publish">MQTTV3.1/publish</a>
+ * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#puback">MQTTV3.1/puback</a>
  *
  * @author netty
  */
-public class MqttPublishMessage extends MqttMessage {
-	public MqttPublishMessage(
-		MqttFixedHeader mqttFixedHeader,
-		MqttPublishVariableHeader variableHeader,
-		byte[] payload) {
-		super(mqttFixedHeader, variableHeader, payload);
+public final class MqttPubAckMessage extends MqttMessage {
+
+	public MqttPubAckMessage(MqttFixedHeader mqttFixedHeader, MqttMessageIdVariableHeader variableHeader) {
+		super(mqttFixedHeader, variableHeader);
 	}
 
 	@Override
-	public MqttPublishVariableHeader variableHeader() {
-		return (MqttPublishVariableHeader) super.variableHeader();
+	public MqttMessageIdVariableHeader variableHeader() {
+		return (MqttMessageIdVariableHeader) super.variableHeader();
 	}
-
-	@Override
-	public byte[] payload() {
-		return (byte[]) super.payload();
-	}
-
-	public byte[] getPayload() {
-		return (byte[]) super.payload();
-	}
-
 }

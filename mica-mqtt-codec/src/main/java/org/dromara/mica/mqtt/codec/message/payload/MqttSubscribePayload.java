@@ -14,7 +14,10 @@
  * under the License.
  */
 
-package org.dromara.mica.mqtt.codec;
+package org.dromara.mica.mqtt.codec.message.payload;
+
+import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 
 import java.util.Collections;
 import java.util.List;

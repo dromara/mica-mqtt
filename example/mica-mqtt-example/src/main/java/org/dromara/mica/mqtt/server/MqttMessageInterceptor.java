@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.server;
 
-import org.dromara.mica.mqtt.codec.MqttMessage;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.core.server.interceptor.IMqttMessageInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

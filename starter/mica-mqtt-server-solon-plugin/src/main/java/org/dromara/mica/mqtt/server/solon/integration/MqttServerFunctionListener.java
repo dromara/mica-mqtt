@@ -17,7 +17,7 @@
 package org.dromara.mica.mqtt.server.solon.integration;
 
 import lombok.RequiredArgsConstructor;
-import org.dromara.mica.mqtt.codec.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.server.func.IMqttFunctionMessageListener;

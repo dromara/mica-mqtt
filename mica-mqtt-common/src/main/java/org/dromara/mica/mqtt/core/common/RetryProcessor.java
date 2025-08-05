@@ -1,8 +1,8 @@
 package org.dromara.mica.mqtt.core.common;
 
 
-import org.dromara.mica.mqtt.codec.MqttFixedHeader;
-import org.dromara.mica.mqtt.codec.MqttMessage;
+import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.core.util.timer.AckTimerTask;
 import org.tio.utils.timer.TimerTaskService;
 

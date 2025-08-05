@@ -1,7 +1,7 @@
 package org.dromara.mica.mqtt.core.common;
 
-import org.dromara.mica.mqtt.codec.MqttMessage;
-import org.dromara.mica.mqtt.codec.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
