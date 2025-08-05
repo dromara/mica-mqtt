@@ -21,6 +21,8 @@ import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.MqttUnsubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.builder.MqttMessageBuilders;
+import org.dromara.mica.mqtt.codec.message.builder.MqttPublishMessageBuilder;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
@@ -342,13 +344,13 @@ public final class MqttClient implements IMqttClient {
 	 * @param builder PublishBuilder
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttMessageBuilders.PublishBuilder> builder) {
+	public boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttPublishMessageBuilder> builder) {
 		// 校验 topic
 		TopicUtil.validateTopicName(topic);
 		// qos 判断
 		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
 		int messageId = isHighLevelQoS ? clientSession.getPacketId() : -1;
-		MqttMessageBuilders.PublishBuilder publishBuilder = MqttMessageBuilders.publish();
+		MqttPublishMessageBuilder publishBuilder = MqttMessageBuilders.publish();
 		// 序列化
 		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
 		// 自定义配置

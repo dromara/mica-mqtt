@@ -25,56 +25,10 @@ import org.dromara.mica.mqtt.codec.MqttQoS;
  */
 public final class MqttSubscriptionOption {
 
-	/**
-	 * 保留处理政策
-	 */
-	public enum RetainedHandlingPolicy {
-		/**
-		 * 订阅发送
-		 */
-		SEND_AT_SUBSCRIBE((byte) 0),
-		/**
-		 * 如果还没有订阅，请发送
-		 */
-		SEND_AT_SUBSCRIBE_IF_NOT_YET_EXISTS((byte) 1),
-		/**
-		 * 请勿发送订阅
-		 */
-		DONT_SEND_AT_SUBSCRIBE((byte) 2);
-
-		private final byte value;
-
-		RetainedHandlingPolicy(byte value) {
-			this.value = value;
-		}
-
-		public byte value() {
-			return value;
-		}
-
-		public static RetainedHandlingPolicy valueOf(int value) {
-			switch (value) {
-				case 0:
-					return SEND_AT_SUBSCRIBE;
-				case 1:
-					return SEND_AT_SUBSCRIBE_IF_NOT_YET_EXISTS;
-				case 2:
-					return DONT_SEND_AT_SUBSCRIBE;
-				default:
-					throw new IllegalArgumentException("invalid RetainedHandlingPolicy: " + value);
-			}
-		}
-	}
-
 	private final MqttQoS qos;
 	private final boolean noLocal;
 	private final boolean retainAsPublished;
 	private final RetainedHandlingPolicy retainHandling;
-
-	public static MqttSubscriptionOption onlyFromQos(MqttQoS qos) {
-		return new MqttSubscriptionOption(qos, false, false, RetainedHandlingPolicy.SEND_AT_SUBSCRIBE);
-	}
-
 	public MqttSubscriptionOption(MqttQoS qos,
 								  boolean noLocal,
 								  boolean retainAsPublished,
@@ -83,6 +37,10 @@ public final class MqttSubscriptionOption {
 		this.noLocal = noLocal;
 		this.retainAsPublished = retainAsPublished;
 		this.retainHandling = retainHandling;
+	}
+
+	public static MqttSubscriptionOption onlyFromQos(MqttQoS qos) {
+		return new MqttSubscriptionOption(qos, false, false, RetainedHandlingPolicy.SEND_AT_SUBSCRIBE);
 	}
 
 	public MqttQoS qos() {
@@ -141,5 +99,46 @@ public final class MqttSubscriptionOption {
 			", retainAsPublished=" + retainAsPublished +
 			", retainHandling=" + retainHandling +
 			']';
+	}
+
+	/**
+	 * 保留处理政策
+	 */
+	public enum RetainedHandlingPolicy {
+		/**
+		 * 订阅发送
+		 */
+		SEND_AT_SUBSCRIBE((byte) 0),
+		/**
+		 * 如果还没有订阅，请发送
+		 */
+		SEND_AT_SUBSCRIBE_IF_NOT_YET_EXISTS((byte) 1),
+		/**
+		 * 请勿发送订阅
+		 */
+		DONT_SEND_AT_SUBSCRIBE((byte) 2);
+
+		private final byte value;
+
+		RetainedHandlingPolicy(byte value) {
+			this.value = value;
+		}
+
+		public static RetainedHandlingPolicy valueOf(int value) {
+			switch (value) {
+				case 0:
+					return SEND_AT_SUBSCRIBE;
+				case 1:
+					return SEND_AT_SUBSCRIBE_IF_NOT_YET_EXISTS;
+				case 2:
+					return DONT_SEND_AT_SUBSCRIBE;
+				default:
+					throw new IllegalArgumentException("invalid RetainedHandlingPolicy: " + value);
+			}
+		}
+
+		public byte value() {
+			return value;
+		}
 	}
 }

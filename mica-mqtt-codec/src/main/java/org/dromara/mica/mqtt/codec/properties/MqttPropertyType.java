@@ -156,10 +156,6 @@ public enum MqttPropertyType {
 		this.value = value;
 	}
 
-	public byte value() {
-		return value;
-	}
-
 	public static MqttPropertyType valueOf(int type) {
 		MqttPropertyType t = null;
 		try {
@@ -171,5 +167,9 @@ public enum MqttPropertyType {
 			throw new IllegalArgumentException("unknown property type: " + type);
 		}
 		return t;
+	}
+
+	public byte value() {
+		return value;
 	}
 }

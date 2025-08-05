@@ -105,15 +105,15 @@ public enum MqttMessageType {
 		this.value = value;
 	}
 
-	public byte value() {
-		return value;
-	}
-
 	public static MqttMessageType valueOf(int type) {
 		if (type <= 0 || type >= VALUES.length) {
 			throw new IllegalArgumentException("unknown message type: " + type);
 		}
 		return VALUES[type];
+	}
+
+	public byte value() {
+		return value;
 	}
 }
 

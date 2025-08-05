@@ -35,11 +35,6 @@ public enum MqttPubCompReasonCode implements MqttReasonCode {
 		this.byteValue = byteValue;
 	}
 
-	@Override
-	public byte value() {
-		return byteValue;
-	}
-
 	public static MqttPubCompReasonCode valueOf(byte b) {
 		if (b == SUCCESS.byteValue) {
 			return SUCCESS;
@@ -48,5 +43,10 @@ public enum MqttPubCompReasonCode implements MqttReasonCode {
 		} else {
 			throw new IllegalArgumentException("unknown PUBCOMP reason code: " + b);
 		}
+	}
+
+	@Override
+	public byte value() {
+		return byteValue;
 	}
 }

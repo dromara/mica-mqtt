@@ -47,11 +47,6 @@ public enum MqttSubAckReasonCode implements MqttReasonCode {
 		this.byteValue = byteValue;
 	}
 
-	@Override
-	public byte value() {
-		return byteValue;
-	}
-
 	public static MqttSubAckReasonCode qosGranted(MqttQoS qos) {
 		switch (qos) {
 			case QOS0:
@@ -65,6 +60,11 @@ public enum MqttSubAckReasonCode implements MqttReasonCode {
 			default:
 				return MqttSubAckReasonCode.UNSPECIFIED_ERROR;
 		}
+	}
+
+	@Override
+	public byte value() {
+		return byteValue;
 	}
 
 	public MqttSubAckReasonCode limitForMqttVersion(MqttVersion version) {

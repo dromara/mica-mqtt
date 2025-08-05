@@ -48,6 +48,10 @@ public enum MqttPubRecReasonCode implements MqttReasonCode {
 		this.byteValue = byteValue;
 	}
 
+	public static MqttPubRecReasonCode valueOf(byte b) {
+		return ReasonCodeUtils.codeLoopUp(VALUES, b, "PUBREC");
+	}
+
 	@Override
 	public byte value() {
 		return byteValue;
@@ -56,10 +60,6 @@ public enum MqttPubRecReasonCode implements MqttReasonCode {
 	@Override
 	public boolean isError() {
 		return Byte.toUnsignedInt(byteValue) >= Byte.toUnsignedInt(UNSPECIFIED_ERROR.byteValue);
-	}
-
-	public static MqttPubRecReasonCode valueOf(byte b) {
-		return ReasonCodeUtils.codeLoopUp(VALUES, b, "PUBREC");
 	}
 
 }

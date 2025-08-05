@@ -27,15 +27,15 @@ import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 public class MqttMessageIdVariableHeader {
 	private final int messageId;
 
+	protected MqttMessageIdVariableHeader(int messageId) {
+		this.messageId = messageId;
+	}
+
 	public static MqttMessageIdVariableHeader from(int messageId) {
 		if (messageId < 1 || messageId > 0xffff) {
 			throw new IllegalArgumentException("messageId: " + messageId + " (expected: 1 ~ 65535)");
 		}
 		return new MqttMessageIdVariableHeader(messageId);
-	}
-
-	protected MqttMessageIdVariableHeader(int messageId) {
-		this.messageId = messageId;
 	}
 
 	public int messageId() {

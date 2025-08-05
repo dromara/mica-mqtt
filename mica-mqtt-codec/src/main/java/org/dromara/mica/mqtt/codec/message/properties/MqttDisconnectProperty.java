@@ -16,11 +16,7 @@
 
 package org.dromara.mica.mqtt.codec.message.properties;
 
-import org.dromara.mica.mqtt.codec.properties.MqttProperties;
-import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
-import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
-import org.dromara.mica.mqtt.codec.properties.StringProperty;
-import org.dromara.mica.mqtt.codec.properties.UserProperty;
+import org.dromara.mica.mqtt.codec.properties.*;
 
 /**
  * MQTT5 DISCONNECT 属性类，用于存储断开连接相关的属性信息

@@ -28,17 +28,8 @@ import java.util.Objects;
  */
 public final class MqttUnsubAckPayload {
 
-	private final List<Short> unsubscribeReasonCodes;
-
 	private static final MqttUnsubAckPayload EMPTY = new MqttUnsubAckPayload();
-
-	public static MqttUnsubAckPayload withEmptyDefaults(MqttUnsubAckPayload payload) {
-		if (payload == null) {
-			return EMPTY;
-		} else {
-			return payload;
-		}
-	}
+	private final List<Short> unsubscribeReasonCodes;
 
 	public MqttUnsubAckPayload() {
 		this.unsubscribeReasonCodes = Collections.emptyList();
@@ -61,6 +52,14 @@ public final class MqttUnsubAckPayload {
 			list.add(v);
 		}
 		this.unsubscribeReasonCodes = Collections.unmodifiableList(list);
+	}
+
+	public static MqttUnsubAckPayload withEmptyDefaults(MqttUnsubAckPayload payload) {
+		if (payload == null) {
+			return EMPTY;
+		} else {
+			return payload;
+		}
 	}
 
 	public List<Short> unsubscribeReasonCodes() {

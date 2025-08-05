@@ -13,15 +13,10 @@ public enum MqttAuthenticateReasonCode implements MqttReasonCode {
 
 	RE_AUTHENTICATE((byte) 0x19);
 
-	MqttAuthenticateReasonCode(byte byteValue) {
-		this.byteValue = byteValue;
-	}
-
 	private final byte byteValue;
 
-	@Override
-	public byte value() {
-		return byteValue;
+	MqttAuthenticateReasonCode(byte byteValue) {
+		this.byteValue = byteValue;
 	}
 
 	public static MqttAuthenticateReasonCode valueOf(byte b) {
@@ -34,5 +29,10 @@ public enum MqttAuthenticateReasonCode implements MqttReasonCode {
 		} else {
 			throw new IllegalArgumentException("unknown AUTHENTICATE reason code: " + b);
 		}
+	}
+
+	@Override
+	public byte value() {
+		return byteValue;
 	}
 }

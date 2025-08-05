@@ -25,6 +25,16 @@ import java.util.*;
  */
 public final class MqttProperties {
 	public static final MqttProperties NO_PROPERTIES = new MqttProperties(false);
+	private final boolean canModify;
+	private Map<Integer, MqttProperty> props;
+	private List<UserProperty> userProperties;
+	private List<IntegerProperty> subscriptionIds;
+	public MqttProperties() {
+		this(true);
+	}
+	private MqttProperties(boolean canModify) {
+		this.canModify = canModify;
+	}
 
 	public static MqttProperties withEmptyDefaults(MqttProperties properties) {
 		if (properties == null) {
@@ -32,19 +42,6 @@ public final class MqttProperties {
 		}
 		return properties;
 	}
-
-	public MqttProperties() {
-		this(true);
-	}
-
-	private MqttProperties(boolean canModify) {
-		this.canModify = canModify;
-	}
-
-	private Map<Integer, MqttProperty> props;
-	private List<UserProperty> userProperties;
-	private List<IntegerProperty> subscriptionIds;
-	private final boolean canModify;
 
 	public void add(MqttProperty property) {
 		if (!canModify) {

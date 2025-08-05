@@ -45,10 +45,6 @@ public enum MqttQoS {
 		this.value = value;
 	}
 
-	public short value() {
-		return value;
-	}
-
 	public static MqttQoS valueOf(int value) {
 		switch (value) {
 			case 0:
@@ -62,6 +58,10 @@ public enum MqttQoS {
 			default:
 				throw new IllegalArgumentException("invalid QoS: " + value);
 		}
+	}
+
+	public short value() {
+		return value;
 	}
 
 	@Override

@@ -27,6 +27,9 @@ import org.dromara.mica.mqtt.codec.message.payload.*;
  */
 public final class MqttMessageFactory {
 
+	private MqttMessageFactory() {
+	}
+
 	public static MqttMessage newMessage(MqttFixedHeader mqttFixedHeader, Object variableHeader, Object payload) {
 		switch (mqttFixedHeader.messageType()) {
 			case CONNECT:
@@ -79,8 +82,5 @@ public final class MqttMessageFactory {
 			default:
 				throw new IllegalArgumentException("unknown message type: " + mqttFixedHeader.messageType());
 		}
-	}
-
-	private MqttMessageFactory() {
 	}
 }

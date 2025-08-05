@@ -33,6 +33,9 @@ public final class MqttCodecUtil {
 	public static final char TOPIC_WILDCARDS_MORE = '#';
 	private static final String MQTT_VERSION_KEY = "MQTT_V";
 
+	private MqttCodecUtil() {
+	}
+
 	/**
 	 * mqtt 版本
 	 *
@@ -153,8 +156,5 @@ public final class MqttCodecUtil {
 			default:
 				return mqttFixedHeader;
 		}
-	}
-
-	private MqttCodecUtil() {
 	}
 }

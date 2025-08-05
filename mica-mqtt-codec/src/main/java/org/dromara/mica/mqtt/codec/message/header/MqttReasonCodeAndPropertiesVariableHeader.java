@@ -25,10 +25,9 @@ import org.dromara.mica.mqtt.codec.properties.MqttProperties;
  * @author netty
  */
 public final class MqttReasonCodeAndPropertiesVariableHeader {
+	public static final byte REASON_CODE_OK = 0;
 	private final byte reasonCode;
 	private final MqttProperties properties;
-
-	public static final byte REASON_CODE_OK = 0;
 
 	public MqttReasonCodeAndPropertiesVariableHeader(byte reasonCode,
 													 MqttProperties properties) {

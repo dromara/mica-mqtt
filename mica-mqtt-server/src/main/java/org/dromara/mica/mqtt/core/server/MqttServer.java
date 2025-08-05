@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.core.server;
 
-import org.dromara.mica.mqtt.codec.MqttMessageBuilders;
+import org.dromara.mica.mqtt.codec.message.builder.MqttMessageBuilders;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;

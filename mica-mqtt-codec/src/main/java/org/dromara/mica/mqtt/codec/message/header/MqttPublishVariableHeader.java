@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.codec.message.header;
 
-import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
 /**
  * Variable Header of the {@link MqttPublishMessage}

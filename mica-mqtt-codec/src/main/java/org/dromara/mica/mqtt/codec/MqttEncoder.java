@@ -50,49 +50,6 @@ public final class MqttEncoder {
 	private MqttEncoder() {
 	}
 
-	/**
-	 * This is the main encoding method.
-	 * It's only visible for testing.
-	 *
-	 * @param ctx       ChannelContext
-	 * @param message   MQTT message to encode
-	 * @return ByteBuf with encoded bytes
-	 */
-	public ByteBuffer doEncode(ChannelContext ctx, MqttMessage message) {
-		switch (message.fixedHeader().messageType()) {
-			case CONNECT:
-				return encodeConnectMessage(ctx, (MqttConnectMessage) message);
-			case CONNACK:
-				return encodeConnAckMessage(ctx, (MqttConnAckMessage) message);
-			case PUBLISH:
-				return encodePublishMessage(ctx, (MqttPublishMessage) message);
-			case SUBSCRIBE:
-				return encodeSubscribeMessage(ctx, (MqttSubscribeMessage) message);
-			case UNSUBSCRIBE:
-				return encodeUnsubscribeMessage(ctx, (MqttUnsubscribeMessage) message);
-			case SUBACK:
-				return encodeSubAckMessage(ctx, (MqttSubAckMessage) message);
-			case UNSUBACK:
-				if (message instanceof MqttUnsubAckMessage) {
-					return encodeUnsubAckMessage(ctx, (MqttUnsubAckMessage) message);
-				}
-				return encodeMessageWithOnlySingleByteFixedHeaderAndMessageId(message);
-			case PUBACK:
-			case PUBREC:
-			case PUBREL:
-			case PUBCOMP:
-				return encodePubReplyMessage(ctx, message);
-			case DISCONNECT:
-			case AUTH:
-				return encodeReasonCodePlusPropertiesMessage(ctx, message);
-			case PINGREQ:
-			case PINGRESP:
-				return encodeMessageWithOnlySingleByteFixedHeader(message);
-			default:
-				throw new IllegalArgumentException("Unknown message type: " + message.fixedHeader().messageType().value());
-		}
-	}
-
 	private static ByteBuffer encodeConnectMessage(ChannelContext ctx, MqttConnectMessage message) {
 		int payloadBufferSize = 0;
 
@@ -614,5 +571,48 @@ public final class MqttEncoder {
 
 	private static byte[] encodeStringUtf8(String s) {
 		return s.getBytes(StandardCharsets.UTF_8);
+	}
+
+	/**
+	 * This is the main encoding method.
+	 * It's only visible for testing.
+	 *
+	 * @param ctx     ChannelContext
+	 * @param message MQTT message to encode
+	 * @return ByteBuf with encoded bytes
+	 */
+	public ByteBuffer doEncode(ChannelContext ctx, MqttMessage message) {
+		switch (message.fixedHeader().messageType()) {
+			case CONNECT:
+				return encodeConnectMessage(ctx, (MqttConnectMessage) message);
+			case CONNACK:
+				return encodeConnAckMessage(ctx, (MqttConnAckMessage) message);
+			case PUBLISH:
+				return encodePublishMessage(ctx, (MqttPublishMessage) message);
+			case SUBSCRIBE:
+				return encodeSubscribeMessage(ctx, (MqttSubscribeMessage) message);
+			case UNSUBSCRIBE:
+				return encodeUnsubscribeMessage(ctx, (MqttUnsubscribeMessage) message);
+			case SUBACK:
+				return encodeSubAckMessage(ctx, (MqttSubAckMessage) message);
+			case UNSUBACK:
+				if (message instanceof MqttUnsubAckMessage) {
+					return encodeUnsubAckMessage(ctx, (MqttUnsubAckMessage) message);
+				}
+				return encodeMessageWithOnlySingleByteFixedHeaderAndMessageId(message);
+			case PUBACK:
+			case PUBREC:
+			case PUBREL:
+			case PUBCOMP:
+				return encodePubReplyMessage(ctx, message);
+			case DISCONNECT:
+			case AUTH:
+				return encodeReasonCodePlusPropertiesMessage(ctx, message);
+			case PINGREQ:
+			case PINGRESP:
+				return encodeMessageWithOnlySingleByteFixedHeader(message);
+			default:
+				throw new IllegalArgumentException("Unknown message type: " + message.fixedHeader().messageType().value());
+		}
 	}
 }

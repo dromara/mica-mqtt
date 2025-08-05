@@ -44,22 +44,6 @@ public enum MqttVersion {
 		this.fullName = fullName;
 	}
 
-	public String protocolName() {
-		return name;
-	}
-
-	public byte[] protocolNameBytes() {
-		return name.getBytes(StandardCharsets.UTF_8);
-	}
-
-	public byte protocolLevel() {
-		return level;
-	}
-
-	public String fullName() {
-		return fullName;
-	}
-
 	public static MqttVersion fromProtocolNameAndLevel(String protocolName, byte protocolLevel) {
 		MqttVersion mv;
 		switch (protocolLevel) {
@@ -79,5 +63,21 @@ public enum MqttVersion {
 			return mv;
 		}
 		throw new MqttUnacceptableProtocolVersionException(protocolName + " and " + protocolLevel + " don't match");
+	}
+
+	public String protocolName() {
+		return name;
+	}
+
+	public byte[] protocolNameBytes() {
+		return name.getBytes(StandardCharsets.UTF_8);
+	}
+
+	public byte protocolLevel() {
+		return level;
+	}
+
+	public String fullName() {
+		return fullName;
 	}
 }

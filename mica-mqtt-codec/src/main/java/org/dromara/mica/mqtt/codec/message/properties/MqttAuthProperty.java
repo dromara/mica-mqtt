@@ -16,11 +16,7 @@
 
 package org.dromara.mica.mqtt.codec.message.properties;
 
-import org.dromara.mica.mqtt.codec.properties.MqttProperties;
-import org.dromara.mica.mqtt.codec.properties.BinaryProperty;
-import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
-import org.dromara.mica.mqtt.codec.properties.StringProperty;
-import org.dromara.mica.mqtt.codec.properties.UserProperty;
+import org.dromara.mica.mqtt.codec.properties.*;
 
 /**
  * mqtt5 认证属性

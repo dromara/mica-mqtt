@@ -17,7 +17,8 @@
 package org.dromara.mica.mqtt.spring.client;
 
 import lombok.Getter;
-import org.dromara.mica.mqtt.codec.MqttMessageBuilders;
+import org.dromara.mica.mqtt.codec.message.builder.MqttMessageBuilders;
+import org.dromara.mica.mqtt.codec.message.builder.MqttPublishMessageBuilder;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.client.*;
@@ -261,7 +262,7 @@ public class MqttClientTemplate implements ApplicationContextAware, SmartInitial
 	 * @param builder PublishBuilder
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttMessageBuilders.PublishBuilder> builder) {
+	public boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttPublishMessageBuilder> builder) {
 		return client.publish(topic, payload, qos, builder);
 	}
 

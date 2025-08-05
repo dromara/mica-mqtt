@@ -31,10 +31,10 @@ public final class MqttFixedHeader {
 
 	private final MqttMessageType messageType;
 	private final boolean isDup;
-	private MqttQoS qosLevel;
 	private final boolean isRetain;
 	private final int headLength;
 	private final int remainingLength;
+	private MqttQoS qosLevel;
 
 	public MqttFixedHeader(
 		MqttMessageType messageType,

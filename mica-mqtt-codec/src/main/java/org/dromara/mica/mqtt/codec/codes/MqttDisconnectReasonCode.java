@@ -68,13 +68,12 @@ public enum MqttDisconnectReasonCode implements MqttReasonCode {
 		this.byteValue = byteValue;
 	}
 
+	public static MqttDisconnectReasonCode valueOf(byte b) {
+		return ReasonCodeUtils.codeLoopUp(VALUES, b, "DISCONNECT");
+	}
 
 	@Override
 	public byte value() {
 		return byteValue;
-	}
-
-	public static MqttDisconnectReasonCode valueOf(byte b) {
-		return ReasonCodeUtils.codeLoopUp(VALUES, b, "DISCONNECT");
 	}
 }
