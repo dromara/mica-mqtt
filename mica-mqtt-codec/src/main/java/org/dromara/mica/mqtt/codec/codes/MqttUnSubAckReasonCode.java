@@ -21,7 +21,7 @@ package org.dromara.mica.mqtt.codec.codes;
  *
  * @author vertx-mqtt
  */
-public enum MqttUnsubAckReasonCode implements MqttReasonCode {
+public enum MqttUnSubAckReasonCode implements MqttReasonCode {
 
 	/**
 	 * UnsubAck ReasonCode
@@ -36,7 +36,7 @@ public enum MqttUnsubAckReasonCode implements MqttReasonCode {
 
 	private final byte byteValue;
 
-	MqttUnsubAckReasonCode(byte byteValue) {
+	MqttUnSubAckReasonCode(byte byteValue) {
 		this.byteValue = byteValue;
 	}
 

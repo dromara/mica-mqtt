@@ -18,10 +18,12 @@ package org.dromara.mica.mqtt.codec.message.builder;
 
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttAuthReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttReasonCodeAndPropertiesVariableHeader;
-import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+import org.dromara.mica.mqtt.codec.message.properties.MqttAuthProperty;
+import org.dromara.mica.mqtt.codec.properties.*;
 
 /**
  * MqttAuthMessage builder
@@ -29,29 +31,78 @@ import org.dromara.mica.mqtt.codec.properties.MqttProperties;
  * @author netty, L.cm
  */
 public final class MqttAuthBuilder {
-
-	private MqttProperties properties;
-	private byte reasonCode;
+	private MqttAuthReasonCode reasonCode;
+	private final MqttAuthProperty properties = new MqttAuthProperty();
 
 	MqttAuthBuilder() {
 	}
 
-	public MqttAuthBuilder properties(MqttProperties properties) {
-		this.properties = properties;
-		return this;
-	}
-
-	public MqttAuthBuilder reasonCode(byte reasonCode) {
+	public MqttAuthBuilder reasonCode(MqttAuthReasonCode reasonCode) {
 		this.reasonCode = reasonCode;
 		return this;
 	}
 
+	/**
+	 * 设置认证方法
+	 *
+	 * @param authenticationMethod 认证方法
+	 */
+	public MqttAuthBuilder authenticationMethod(String authenticationMethod) {
+		properties.setAuthenticationMethod(authenticationMethod);
+		return this;
+	}
+
+	/**
+	 * 设置认证数据
+	 *
+	 * @param authenticationData 认证数据
+	 */
+	public MqttAuthBuilder authenticationData(byte[] authenticationData) {
+		properties.setAuthenticationData(authenticationData);
+		return this;
+	}
+
+	/**
+	 * 设置原因字符串
+	 *
+	 * @param reasonString 原因字符串
+	 */
+	public MqttAuthBuilder reasonString(String reasonString) {
+		properties.setReasonString(reasonString);
+		return this;
+	}
+
+	/**
+	 * 设置用户属性
+	 *
+	 * @param userProperty 用户属性
+	 */
+	public MqttAuthBuilder addUserProperty(UserProperty userProperty) {
+		properties.addUserProperty(userProperty);
+		return this;
+	}
+
+	/**
+	 * 添加用户属性
+	 *
+	 * @param key   key
+	 * @param value value
+	 */
+	public MqttAuthBuilder addUserProperty(String key, String value) {
+		properties.addUserProperty(key, value);
+		return this;
+	}
+
+	/**
+	 * 构建 MqttAuthMessage
+	 *
+	 * @return MqttAuthMessage
+	 */
 	public MqttMessage build() {
 		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.AUTH, false, MqttQoS.QOS0, false, 0);
 		MqttReasonCodeAndPropertiesVariableHeader mqttAuthVariableHeader =
-			new MqttReasonCodeAndPropertiesVariableHeader(reasonCode, properties);
-
+			new MqttReasonCodeAndPropertiesVariableHeader(reasonCode.value(), properties.getProperties());
 		return new MqttMessage(mqttFixedHeader, mqttAuthVariableHeader);
 	}
 }
