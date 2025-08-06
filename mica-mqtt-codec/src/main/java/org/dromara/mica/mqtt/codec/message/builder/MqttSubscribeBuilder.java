@@ -12,40 +12,40 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-public final class SubscribeBuilder {
+public final class MqttSubscribeBuilder {
 
 	private final List<MqttTopicSubscription> subscriptions;
 	private int messageId;
 	private MqttProperties properties;
 
-	SubscribeBuilder() {
+	MqttSubscribeBuilder() {
 		subscriptions = new ArrayList<>(5);
 	}
 
-	public SubscribeBuilder addSubscription(MqttTopicSubscription subscription) {
+	public MqttSubscribeBuilder addSubscription(MqttTopicSubscription subscription) {
 		subscriptions.add(subscription);
 		return this;
 	}
 
-	public SubscribeBuilder addSubscription(MqttQoS qos, String topic) {
+	public MqttSubscribeBuilder addSubscription(MqttQoS qos, String topic) {
 		return addSubscription(new MqttTopicSubscription(topic, qos));
 	}
 
-	public SubscribeBuilder addSubscription(String topic, MqttSubscriptionOption option) {
+	public MqttSubscribeBuilder addSubscription(String topic, MqttSubscriptionOption option) {
 		return addSubscription(new MqttTopicSubscription(topic, option));
 	}
 
-	public SubscribeBuilder addSubscriptions(Collection<MqttTopicSubscription> subscriptionColl) {
+	public MqttSubscribeBuilder addSubscriptions(Collection<MqttTopicSubscription> subscriptionColl) {
 		subscriptions.addAll(subscriptionColl);
 		return this;
 	}
 
-	public SubscribeBuilder messageId(int messageId) {
+	public MqttSubscribeBuilder messageId(int messageId) {
 		this.messageId = messageId;
 		return this;
 	}
 
-	public SubscribeBuilder properties(MqttProperties properties) {
+	public MqttSubscribeBuilder properties(MqttProperties properties) {
 		this.properties = properties;
 		return this;
 	}

@@ -9,7 +9,7 @@ import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
-public final class ConnectBuilder {
+public final class MqttConnectBuilder {
 
 	private MqttVersion version = MqttVersion.MQTT_3_1_1;
 	private String clientId;
@@ -27,82 +27,82 @@ public final class ConnectBuilder {
 	private byte[] password;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
-	ConnectBuilder() {
+	MqttConnectBuilder() {
 	}
 
-	public ConnectBuilder protocolVersion(MqttVersion version) {
+	public MqttConnectBuilder protocolVersion(MqttVersion version) {
 		this.version = version;
 		return this;
 	}
 
-	public ConnectBuilder clientId(String clientId) {
+	public MqttConnectBuilder clientId(String clientId) {
 		this.clientId = clientId;
 		return this;
 	}
 
-	public ConnectBuilder cleanStart(boolean cleanStart) {
+	public MqttConnectBuilder cleanStart(boolean cleanStart) {
 		this.cleanStart = cleanStart;
 		return this;
 	}
 
-	public ConnectBuilder keepAlive(int keepAliveSecs) {
+	public MqttConnectBuilder keepAlive(int keepAliveSecs) {
 		this.keepAliveSecs = keepAliveSecs;
 		return this;
 	}
 
-	public ConnectBuilder willFlag(boolean willFlag) {
+	public MqttConnectBuilder willFlag(boolean willFlag) {
 		this.willFlag = willFlag;
 		return this;
 	}
 
-	public ConnectBuilder willQoS(MqttQoS willQos) {
+	public MqttConnectBuilder willQoS(MqttQoS willQos) {
 		this.willQos = willQos;
 		return this;
 	}
 
-	public ConnectBuilder willTopic(String willTopic) {
+	public MqttConnectBuilder willTopic(String willTopic) {
 		this.willTopic = willTopic;
 		return this;
 	}
 
-	public ConnectBuilder willMessage(byte[] willMessage) {
+	public MqttConnectBuilder willMessage(byte[] willMessage) {
 		this.willMessage = willMessage;
 		return this;
 	}
 
-	public ConnectBuilder willRetain(boolean willRetain) {
+	public MqttConnectBuilder willRetain(boolean willRetain) {
 		this.willRetain = willRetain;
 		return this;
 	}
 
-	public ConnectBuilder willProperties(MqttProperties willProperties) {
+	public MqttConnectBuilder willProperties(MqttProperties willProperties) {
 		this.willProperties = willProperties;
 		return this;
 	}
 
-	public ConnectBuilder hasUser(boolean value) {
+	public MqttConnectBuilder hasUser(boolean value) {
 		this.hasUser = value;
 		return this;
 	}
 
-	public ConnectBuilder hasPassword(boolean value) {
+	public MqttConnectBuilder hasPassword(boolean value) {
 		this.hasPassword = value;
 		return this;
 	}
 
-	public ConnectBuilder username(String username) {
+	public MqttConnectBuilder username(String username) {
 		this.hasUser = username != null;
 		this.username = username;
 		return this;
 	}
 
-	public ConnectBuilder password(byte[] password) {
+	public MqttConnectBuilder password(byte[] password) {
 		this.hasPassword = password != null;
 		this.password = password;
 		return this;
 	}
 
-	public ConnectBuilder properties(MqttProperties properties) {
+	public MqttConnectBuilder properties(MqttProperties properties) {
 		this.properties = properties;
 		return this;
 	}

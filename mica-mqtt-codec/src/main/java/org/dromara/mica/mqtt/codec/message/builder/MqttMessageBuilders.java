@@ -26,43 +26,43 @@ public final class MqttMessageBuilders {
 	private MqttMessageBuilders() {
 	}
 
-	public static ConnectBuilder connect() {
-		return new ConnectBuilder();
+	public static MqttConnectBuilder connect() {
+		return new MqttConnectBuilder();
 	}
 
-	public static ConnAckBuilder connAck() {
-		return new ConnAckBuilder();
+	public static MqttConnAckBuilder connAck() {
+		return new MqttConnAckBuilder();
 	}
 
-	public static MqttPublishMessageBuilder publish() {
-		return new MqttPublishMessageBuilder();
+	public static MqttPublishBuilder publish() {
+		return new MqttPublishBuilder();
 	}
 
-	public static SubscribeBuilder subscribe() {
-		return new SubscribeBuilder();
+	public static MqttSubscribeBuilder subscribe() {
+		return new MqttSubscribeBuilder();
 	}
 
-	public static UnsubscribeBuilder unsubscribe() {
-		return new UnsubscribeBuilder();
+	public static MqttUnSubscribeBuilder unsubscribe() {
+		return new MqttUnSubscribeBuilder();
 	}
 
-	public static PubAckBuilder pubAck() {
-		return new PubAckBuilder();
+	public static MqttPubAckBuilder pubAck() {
+		return new MqttPubAckBuilder();
 	}
 
-	public static SubAckBuilder subAck() {
-		return new SubAckBuilder();
+	public static MqttSubAckBuilder subAck() {
+		return new MqttSubAckBuilder();
 	}
 
-	public static UnsubAckBuilder unsubAck() {
-		return new UnsubAckBuilder();
+	public static MqttUnSubAckBuilder unsubAck() {
+		return new MqttUnSubAckBuilder();
 	}
 
-	public static DisconnectBuilder disconnect() {
-		return new DisconnectBuilder();
+	public static MqttDisconnectBuilder disconnect() {
+		return new MqttDisconnectBuilder();
 	}
 
-	public static AuthBuilder auth() {
-		return new AuthBuilder();
+	public static MqttAuthBuilder auth() {
+		return new MqttAuthBuilder();
 	}
 }

@@ -17,8 +17,7 @@
 package org.dromara.mica.mqtt.client.solon;
 
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.mica.mqtt.codec.message.builder.MqttMessageBuilders;
-import org.dromara.mica.mqtt.codec.message.builder.MqttPublishMessageBuilder;
+import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.client.*;
@@ -271,7 +270,7 @@ public class MqttClientTemplate {
 	 * @param builder PublishBuilder
 	 * @return 是否发送成功
 	 */
-	public boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttPublishMessageBuilder> builder) {
+	public boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttPublishBuilder> builder) {
 		return client.publish(topic, payload, qos, builder);
 	}
 

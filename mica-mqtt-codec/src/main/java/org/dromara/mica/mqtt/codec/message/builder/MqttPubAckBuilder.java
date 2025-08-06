@@ -7,25 +7,25 @@ import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttPubReplyMessageVariableHeader;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
-public final class PubAckBuilder {
+public final class MqttPubAckBuilder {
 	private int packetId;
 	private byte reasonCode;
 	private MqttProperties properties;
 
-	PubAckBuilder() {
+	MqttPubAckBuilder() {
 	}
 
-	public PubAckBuilder reasonCode(byte reasonCode) {
+	public MqttPubAckBuilder reasonCode(byte reasonCode) {
 		this.reasonCode = reasonCode;
 		return this;
 	}
 
-	public PubAckBuilder packetId(int packetId) {
+	public MqttPubAckBuilder packetId(int packetId) {
 		this.packetId = packetId;
 		return this;
 	}
 
-	public PubAckBuilder properties(MqttProperties properties) {
+	public MqttPubAckBuilder properties(MqttProperties properties) {
 		this.properties = properties;
 		return this;
 	}

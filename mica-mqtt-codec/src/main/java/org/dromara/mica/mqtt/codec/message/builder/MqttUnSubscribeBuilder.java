@@ -12,31 +12,31 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-public final class UnsubscribeBuilder {
+public final class MqttUnSubscribeBuilder {
 	private final List<String> topicFilters;
 	private int messageId;
 	private MqttProperties properties;
 
-	UnsubscribeBuilder() {
+	MqttUnSubscribeBuilder() {
 		topicFilters = new ArrayList<>(5);
 	}
 
-	public UnsubscribeBuilder addTopicFilter(String topic) {
+	public MqttUnSubscribeBuilder addTopicFilter(String topic) {
 		topicFilters.add(topic);
 		return this;
 	}
 
-	public UnsubscribeBuilder addTopicFilters(Collection<String> topicColl) {
+	public MqttUnSubscribeBuilder addTopicFilters(Collection<String> topicColl) {
 		topicFilters.addAll(topicColl);
 		return this;
 	}
 
-	public UnsubscribeBuilder messageId(int messageId) {
+	public MqttUnSubscribeBuilder messageId(int messageId) {
 		this.messageId = messageId;
 		return this;
 	}
 
-	public UnsubscribeBuilder properties(MqttProperties properties) {
+	public MqttUnSubscribeBuilder properties(MqttProperties properties) {
 		this.properties = properties;
 		return this;
 	}

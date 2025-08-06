@@ -17,7 +17,7 @@
 package org.dromara.mica.mqtt.core.client;
 
 import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.dromara.mica.mqtt.codec.message.builder.MqttPublishMessageBuilder;
+import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.annotation.MqttClientPublish;
 import org.dromara.mica.mqtt.core.annotation.MqttPayload;
@@ -58,8 +58,8 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 		MqttProperties properties = metadata.getPropertiesIndex() >= 0
 			? (MqttProperties) args[metadata.getPropertiesIndex()]
 			: null;
-		Consumer<MqttPublishMessageBuilder> builder = metadata.getBuilderIndex() >= 0
-			? (Consumer<MqttPublishMessageBuilder>) args[metadata.getBuilderIndex()]
+		Consumer<MqttPublishBuilder> builder = metadata.getBuilderIndex() >= 0
+			? (Consumer<MqttPublishBuilder>) args[metadata.getBuilderIndex()]
 			: null;
 
 		String topic = TopicUtil.resolveTopic(metadata.getMqttPublish().value(), payload);

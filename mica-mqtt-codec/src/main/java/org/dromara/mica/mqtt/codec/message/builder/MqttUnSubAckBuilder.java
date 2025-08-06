@@ -12,30 +12,30 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public final class UnsubAckBuilder {
+public final class MqttUnSubAckBuilder {
 	private final List<Short> reasonCodes = new ArrayList<>();
 	private int packetId;
 	private MqttProperties properties;
 
-	UnsubAckBuilder() {
+	MqttUnSubAckBuilder() {
 	}
 
-	public UnsubAckBuilder packetId(int packetId) {
+	public MqttUnSubAckBuilder packetId(int packetId) {
 		this.packetId = packetId;
 		return this;
 	}
 
-	public UnsubAckBuilder properties(MqttProperties properties) {
+	public MqttUnSubAckBuilder properties(MqttProperties properties) {
 		this.properties = properties;
 		return this;
 	}
 
-	public UnsubAckBuilder addReasonCode(short reasonCode) {
+	public MqttUnSubAckBuilder addReasonCode(short reasonCode) {
 		this.reasonCodes.add(reasonCode);
 		return this;
 	}
 
-	public UnsubAckBuilder addReasonCodes(Short... reasonCodes) {
+	public MqttUnSubAckBuilder addReasonCodes(Short... reasonCodes) {
 		this.reasonCodes.addAll(Arrays.asList(reasonCodes));
 		return this;
 	}

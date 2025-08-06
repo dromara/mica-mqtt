@@ -2,7 +2,7 @@ package org.dromara.mica.mqtt.codec.message.builder;
 
 import org.dromara.mica.mqtt.codec.properties.*;
 
-public final class ConnAckPropertiesBuilder {
+public final class MqttConnAckPropertiesBuilder {
 	private final UserProperties userProperties = new UserProperties();
 	private String clientId;
 	private Long sessionExpiryInterval;
@@ -83,12 +83,12 @@ public final class ConnAckPropertiesBuilder {
 		return props;
 	}
 
-	public ConnAckPropertiesBuilder sessionExpiryInterval(long seconds) {
+	public MqttConnAckPropertiesBuilder sessionExpiryInterval(long seconds) {
 		this.sessionExpiryInterval = seconds;
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder receiveMaximum(int value) {
+	public MqttConnAckPropertiesBuilder receiveMaximum(int value) {
 		if (value <= 0) {
 			throw new IllegalArgumentException("receive maximum property must be > 0");
 		}
@@ -96,7 +96,7 @@ public final class ConnAckPropertiesBuilder {
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder maximumQos(byte value) {
+	public MqttConnAckPropertiesBuilder maximumQos(byte value) {
 		if (value != 0 && value != 1) {
 			throw new IllegalArgumentException("maximum QoS property could be 0 or 1");
 		}
@@ -104,12 +104,12 @@ public final class ConnAckPropertiesBuilder {
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder retainAvailable(boolean retain) {
+	public MqttConnAckPropertiesBuilder retainAvailable(boolean retain) {
 		this.retain = retain;
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder maximumPacketSize(long size) {
+	public MqttConnAckPropertiesBuilder maximumPacketSize(long size) {
 		if (size <= 0) {
 			throw new IllegalArgumentException("maximum packet size property must be > 0");
 		}
@@ -117,62 +117,62 @@ public final class ConnAckPropertiesBuilder {
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder assignedClientId(String clientId) {
+	public MqttConnAckPropertiesBuilder assignedClientId(String clientId) {
 		this.clientId = clientId;
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder topicAliasMaximum(int value) {
+	public MqttConnAckPropertiesBuilder topicAliasMaximum(int value) {
 		this.topicAliasMaximum = value;
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder reasonString(String reason) {
+	public MqttConnAckPropertiesBuilder reasonString(String reason) {
 		this.reasonString = reason;
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder userProperty(String name, String value) {
+	public MqttConnAckPropertiesBuilder userProperty(String name, String value) {
 		userProperties.add(name, value);
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder wildcardSubscriptionAvailable(boolean value) {
+	public MqttConnAckPropertiesBuilder wildcardSubscriptionAvailable(boolean value) {
 		this.wildcardSubscriptionAvailable = value;
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder subscriptionIdentifiersAvailable(boolean value) {
+	public MqttConnAckPropertiesBuilder subscriptionIdentifiersAvailable(boolean value) {
 		this.subscriptionIdentifiersAvailable = value;
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder sharedSubscriptionAvailable(boolean value) {
+	public MqttConnAckPropertiesBuilder sharedSubscriptionAvailable(boolean value) {
 		this.sharedSubscriptionAvailable = value;
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder serverKeepAlive(int seconds) {
+	public MqttConnAckPropertiesBuilder serverKeepAlive(int seconds) {
 		this.serverKeepAlive = seconds;
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder responseInformation(String value) {
+	public MqttConnAckPropertiesBuilder responseInformation(String value) {
 		this.responseInformation = value;
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder serverReference(String host) {
+	public MqttConnAckPropertiesBuilder serverReference(String host) {
 		this.serverReference = host;
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder authenticationMethod(String methodName) {
+	public MqttConnAckPropertiesBuilder authenticationMethod(String methodName) {
 		this.authenticationMethod = methodName;
 		return this;
 	}
 
-	public ConnAckPropertiesBuilder authenticationData(byte[] rawData) {
+	public MqttConnAckPropertiesBuilder authenticationData(byte[] rawData) {
 		this.authenticationData = rawData.clone();
 		return this;
 	}

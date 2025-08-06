@@ -28,7 +28,7 @@ import org.dromara.mica.mqtt.codec.properties.MqttProperties;
  *
  * @author L.cm
  */
-public final class MqttPublishMessageBuilder {
+public final class MqttPublishBuilder {
 	private String topic;
 	private boolean retained;
 	private MqttQoS qos;
@@ -36,35 +36,35 @@ public final class MqttPublishMessageBuilder {
 	private int messageId;
 	private MqttProperties mqttProperties;
 
-	MqttPublishMessageBuilder() {
+	MqttPublishBuilder() {
 	}
 
-	public MqttPublishMessageBuilder topicName(String topic) {
+	public MqttPublishBuilder topicName(String topic) {
 		this.topic = topic;
 		return this;
 	}
 
-	public MqttPublishMessageBuilder retained(boolean retained) {
+	public MqttPublishBuilder retained(boolean retained) {
 		this.retained = retained;
 		return this;
 	}
 
-	public MqttPublishMessageBuilder qos(MqttQoS qos) {
+	public MqttPublishBuilder qos(MqttQoS qos) {
 		this.qos = qos;
 		return this;
 	}
 
-	public MqttPublishMessageBuilder payload(byte[] payload) {
+	public MqttPublishBuilder payload(byte[] payload) {
 		this.payload = payload;
 		return this;
 	}
 
-	public MqttPublishMessageBuilder messageId(int messageId) {
+	public MqttPublishBuilder messageId(int messageId) {
 		this.messageId = messageId;
 		return this;
 	}
 
-	public MqttPublishMessageBuilder properties(MqttProperties properties) {
+	public MqttPublishBuilder properties(MqttProperties properties) {
 		this.mqttProperties = properties;
 		return this;
 	}

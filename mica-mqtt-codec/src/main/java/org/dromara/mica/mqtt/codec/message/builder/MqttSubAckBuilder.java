@@ -12,36 +12,36 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public final class SubAckBuilder {
+public final class MqttSubAckBuilder {
 	private final List<MqttQoS> grantedQosList;
 	private int packetId;
 	private MqttProperties properties;
 
-	SubAckBuilder() {
+	MqttSubAckBuilder() {
 		grantedQosList = new ArrayList<>();
 	}
 
-	public SubAckBuilder packetId(int packetId) {
+	public MqttSubAckBuilder packetId(int packetId) {
 		this.packetId = packetId;
 		return this;
 	}
 
-	public SubAckBuilder properties(MqttProperties properties) {
+	public MqttSubAckBuilder properties(MqttProperties properties) {
 		this.properties = properties;
 		return this;
 	}
 
-	public SubAckBuilder addGrantedQos(MqttQoS qos) {
+	public MqttSubAckBuilder addGrantedQos(MqttQoS qos) {
 		this.grantedQosList.add(qos);
 		return this;
 	}
 
-	public SubAckBuilder addGrantedQoses(MqttQoS... qoses) {
+	public MqttSubAckBuilder addGrantedQoses(MqttQoS... qoses) {
 		this.grantedQosList.addAll(Arrays.asList(qoses));
 		return this;
 	}
 
-	public SubAckBuilder addGrantedQosList(List<MqttQoS> qosList) {
+	public MqttSubAckBuilder addGrantedQosList(List<MqttQoS> qosList) {
 		this.grantedQosList.addAll(qosList);
 		return this;
 	}

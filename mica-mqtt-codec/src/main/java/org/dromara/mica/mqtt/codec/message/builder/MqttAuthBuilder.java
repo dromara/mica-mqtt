@@ -7,20 +7,20 @@ import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttReasonCodeAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
-public final class AuthBuilder {
+public final class MqttAuthBuilder {
 
 	private MqttProperties properties;
 	private byte reasonCode;
 
-	AuthBuilder() {
+	MqttAuthBuilder() {
 	}
 
-	public AuthBuilder properties(MqttProperties properties) {
+	public MqttAuthBuilder properties(MqttProperties properties) {
 		this.properties = properties;
 		return this;
 	}
 
-	public AuthBuilder reasonCode(byte reasonCode) {
+	public MqttAuthBuilder reasonCode(byte reasonCode) {
 		this.reasonCode = reasonCode;
 		return this;
 	}

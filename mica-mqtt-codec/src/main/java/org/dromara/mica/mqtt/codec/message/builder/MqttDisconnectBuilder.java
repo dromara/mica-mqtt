@@ -7,19 +7,19 @@ import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttReasonCodeAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
-public final class DisconnectBuilder {
+public final class MqttDisconnectBuilder {
 	private MqttProperties properties;
 	private byte reasonCode;
 
-	DisconnectBuilder() {
+	MqttDisconnectBuilder() {
 	}
 
-	public DisconnectBuilder properties(MqttProperties properties) {
+	public MqttDisconnectBuilder properties(MqttProperties properties) {
 		this.properties = properties;
 		return this;
 	}
 
-	public DisconnectBuilder reasonCode(byte reasonCode) {
+	public MqttDisconnectBuilder reasonCode(byte reasonCode) {
 		this.reasonCode = reasonCode;
 		return this;
 	}

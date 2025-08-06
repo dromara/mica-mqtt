@@ -17,7 +17,7 @@
 package org.dromara.mica.mqtt.jfinal.client;
 
 import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.dromara.mica.mqtt.codec.message.builder.MqttPublishMessageBuilder;
+import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.dromara.mica.mqtt.core.client.MqttClient;
@@ -277,7 +277,7 @@ public class MqttClientKit {
 	 * @param builder PublishBuilder
 	 * @return 是否发送成功
 	 */
-	public static boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttPublishMessageBuilder> builder) {
+	public static boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttPublishBuilder> builder) {
 		return client.publish(topic, payload, qos, builder);
 	}
 
