@@ -26,7 +26,7 @@ import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 /**
  * MqttPublishMessage builder
  *
- * @author L.cm
+ * @author netty, L.cm
  */
 public final class MqttPublishBuilder {
 	private String topic;
