@@ -55,7 +55,7 @@ public interface IMqttClientProcessor {
 	 *
 	 * @param message MqttSubAckMessage
 	 */
-	void processUnSubAck(MqttUnsubAckMessage message);
+	void processUnSubAck(MqttUnSubAckMessage message);
 
 	/**
 	 * 处理服务端 publish 的 ack

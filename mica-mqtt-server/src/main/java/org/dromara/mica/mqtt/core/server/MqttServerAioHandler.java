@@ -128,7 +128,7 @@ public class MqttServerAioHandler implements TioServerHandler {
 				processor.processSubscribe(context, (MqttSubscribeMessage) mqttMessage);
 				break;
 			case UNSUBSCRIBE:
-				processor.processUnSubscribe(context, (MqttUnsubscribeMessage) mqttMessage);
+				processor.processUnSubscribe(context, (MqttUnSubscribeMessage) mqttMessage);
 				break;
 			case PINGREQ:
 				processor.processPingReq(context);

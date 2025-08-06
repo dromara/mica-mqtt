@@ -54,7 +54,7 @@ public class MqttClientConnectTestProcessor implements IMqttClientProcessor {
 	}
 
 	@Override
-	public void processUnSubAck(MqttUnsubAckMessage message) {
+	public void processUnSubAck(MqttUnSubAckMessage message) {
 
 	}
 

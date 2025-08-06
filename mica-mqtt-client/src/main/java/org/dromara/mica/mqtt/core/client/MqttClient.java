@@ -20,7 +20,7 @@ import org.dromara.mica.mqtt.codec.*;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
-import org.dromara.mica.mqtt.codec.message.MqttUnsubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.builder.MqttMessageBuilders;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
@@ -258,7 +258,7 @@ public final class MqttClient implements IMqttClient {
 		clientSession.removeSubscriptions(topicFilters);
 		// 3. 发送取消订阅到服务端
 		int messageId = clientSession.getPacketId();
-		MqttUnsubscribeMessage message = MqttMessageBuilders.unsubscribe()
+		MqttUnSubscribeMessage message = MqttMessageBuilders.unsubscribe()
 			.addTopicFilters(topicFilters)
 			.messageId(messageId)
 			.build();

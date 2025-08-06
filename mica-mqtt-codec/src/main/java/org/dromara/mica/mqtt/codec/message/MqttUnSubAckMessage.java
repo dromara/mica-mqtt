@@ -28,21 +28,21 @@ import org.dromara.mica.mqtt.codec.properties.MqttProperties;
  *
  * @author netty
  */
-public final class MqttUnsubAckMessage extends MqttMessage {
+public final class MqttUnSubAckMessage extends MqttMessage {
 
-	public MqttUnsubAckMessage(MqttFixedHeader mqttFixedHeader,
+	public MqttUnSubAckMessage(MqttFixedHeader mqttFixedHeader,
 							   MqttMessageIdAndPropertiesVariableHeader variableHeader,
 							   MqttUnsubAckPayload payload) {
 		super(mqttFixedHeader, variableHeader, MqttUnsubAckPayload.withEmptyDefaults(payload));
 	}
 
-	public MqttUnsubAckMessage(MqttFixedHeader mqttFixedHeader,
+	public MqttUnSubAckMessage(MqttFixedHeader mqttFixedHeader,
 							   MqttMessageIdVariableHeader variableHeader,
 							   MqttUnsubAckPayload payload) {
 		this(mqttFixedHeader, fallbackVariableHeader(variableHeader), payload);
 	}
 
-	public MqttUnsubAckMessage(MqttFixedHeader mqttFixedHeader,
+	public MqttUnSubAckMessage(MqttFixedHeader mqttFixedHeader,
 							   MqttMessageIdVariableHeader variableHeader) {
 		this(mqttFixedHeader, variableHeader, null);
 	}

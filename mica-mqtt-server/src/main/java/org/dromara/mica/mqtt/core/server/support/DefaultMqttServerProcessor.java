@@ -406,7 +406,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	}
 
 	@Override
-	public void processUnSubscribe(ChannelContext context, MqttUnsubscribeMessage message) {
+	public void processUnSubscribe(ChannelContext context, MqttUnSubscribeMessage message) {
 		String clientId = context.getBsId();
 		int packetId = message.variableHeader().messageId();
 		List<String> topicFilterList = message.payload().topics();

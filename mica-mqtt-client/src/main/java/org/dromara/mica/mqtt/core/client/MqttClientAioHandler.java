@@ -76,7 +76,7 @@ public class MqttClientAioHandler implements TioClientHandler {
 				processor.processPublish(context, (MqttPublishMessage) message);
 				break;
 			case UNSUBACK:
-				processor.processUnSubAck((MqttUnsubAckMessage) message);
+				processor.processUnSubAck((MqttUnSubAckMessage) message);
 				break;
 			case PUBACK:
 				processor.processPubAck((MqttPubAckMessage) message);

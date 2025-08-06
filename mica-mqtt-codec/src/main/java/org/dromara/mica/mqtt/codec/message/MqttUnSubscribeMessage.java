@@ -27,16 +27,16 @@ import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubscribePayload;
  *
  * @author netty
  */
-public final class MqttUnsubscribeMessage extends MqttMessage {
+public final class MqttUnSubscribeMessage extends MqttMessage {
 
-	public MqttUnsubscribeMessage(
+	public MqttUnSubscribeMessage(
 		MqttFixedHeader mqttFixedHeader,
 		MqttMessageIdAndPropertiesVariableHeader variableHeader,
 		MqttUnsubscribePayload payload) {
 		super(mqttFixedHeader, variableHeader, payload);
 	}
 
-	public MqttUnsubscribeMessage(
+	public MqttUnSubscribeMessage(
 		MqttFixedHeader mqttFixedHeader,
 		MqttMessageIdVariableHeader variableHeader,
 		MqttUnsubscribePayload payload) {

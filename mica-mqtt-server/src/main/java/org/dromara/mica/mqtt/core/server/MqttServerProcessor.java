@@ -19,7 +19,7 @@ package org.dromara.mica.mqtt.core.server;
 import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
-import org.dromara.mica.mqtt.codec.message.MqttUnsubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.tio.core.ChannelContext;
 
@@ -92,7 +92,7 @@ public interface MqttServerProcessor {
 	 * @param context ChannelContext
 	 * @param message MqttUnsubscribeMessage
 	 */
-	void processUnSubscribe(ChannelContext context, MqttUnsubscribeMessage message);
+	void processUnSubscribe(ChannelContext context, MqttUnSubscribeMessage message);
 
 	/**
 	 * ping 消息处理

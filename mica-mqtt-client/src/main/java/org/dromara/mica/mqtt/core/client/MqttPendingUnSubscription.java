@@ -1,7 +1,7 @@
 package org.dromara.mica.mqtt.core.client;
 
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
-import org.dromara.mica.mqtt.codec.message.MqttUnsubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
 import org.dromara.mica.mqtt.core.common.RetryProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,9 +18,9 @@ import java.util.Objects;
 final class MqttPendingUnSubscription {
 	private static final Logger logger = LoggerFactory.getLogger(MqttPendingUnSubscription.class);
 	private final List<String> topics;
-	private final RetryProcessor<MqttUnsubscribeMessage> retryProcessor = new RetryProcessor<>();
+	private final RetryProcessor<MqttUnSubscribeMessage> retryProcessor = new RetryProcessor<>();
 
-	MqttPendingUnSubscription(List<String> topics, MqttUnsubscribeMessage unSubscribeMessage) {
+	MqttPendingUnSubscription(List<String> topics, MqttUnSubscribeMessage unSubscribeMessage) {
 		this.topics = topics;
 		this.retryProcessor.setOriginalMessage(unSubscribeMessage);
 	}
@@ -31,7 +31,7 @@ final class MqttPendingUnSubscription {
 
 	void startRetransmissionTimer(TimerTaskService taskService, ChannelContext context) {
 		this.retryProcessor.setHandle((fixedHeader, originalMessage) -> {
-			MqttMessage message = new MqttUnsubscribeMessage(fixedHeader, originalMessage.variableHeader(), originalMessage.payload());
+			MqttMessage message = new MqttUnSubscribeMessage(fixedHeader, originalMessage.variableHeader(), originalMessage.payload());
 			boolean result = Tio.send(context, message);
 			logger.info("retry send Unsubscribe topics:{} result:{}", topics, result);
 		});

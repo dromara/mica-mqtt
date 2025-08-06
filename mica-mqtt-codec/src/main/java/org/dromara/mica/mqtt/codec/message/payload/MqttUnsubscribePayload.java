@@ -16,13 +16,13 @@
 
 package org.dromara.mica.mqtt.codec.message.payload;
 
-import org.dromara.mica.mqtt.codec.message.MqttUnsubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
 
 import java.util.Collections;
 import java.util.List;
 
 /**
- * Payload of the {@link MqttUnsubscribeMessage}
+ * Payload of the {@link MqttUnSubscribeMessage}
  *
  * @author netty
  */

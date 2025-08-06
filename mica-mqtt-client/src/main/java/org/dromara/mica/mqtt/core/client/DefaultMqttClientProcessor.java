@@ -287,7 +287,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 	}
 
 	@Override
-	public void processUnSubAck(MqttUnsubAckMessage message) {
+	public void processUnSubAck(MqttUnSubAckMessage message) {
 		int packetId = message.variableHeader().messageId();
 		logger.debug("MqttClient UnSubAck packetId:{}", packetId);
 		MqttPendingUnSubscription pendingUnSubscription = clientSession.getPaddingUnSubscribe(packetId);

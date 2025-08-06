@@ -2,7 +2,7 @@ package org.dromara.mica.mqtt.codec.message.builder;
 
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.dromara.mica.mqtt.codec.message.MqttUnsubAckMessage;
+import org.dromara.mica.mqtt.codec.message.MqttUnSubAckMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubAckPayload;
@@ -40,13 +40,13 @@ public final class MqttUnSubAckBuilder {
 		return this;
 	}
 
-	public MqttUnsubAckMessage build() {
+	public MqttUnSubAckMessage build() {
 		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.UNSUBACK, false, MqttQoS.QOS0, false, 0);
 		MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader =
 			new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
 
 		MqttUnsubAckPayload subAckPayload = new MqttUnsubAckPayload(reasonCodes);
-		return new MqttUnsubAckMessage(mqttFixedHeader, mqttSubAckVariableHeader, subAckPayload);
+		return new MqttUnSubAckMessage(mqttFixedHeader, mqttSubAckVariableHeader, subAckPayload);
 	}
 }

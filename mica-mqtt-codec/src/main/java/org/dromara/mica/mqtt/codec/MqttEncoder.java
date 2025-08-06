@@ -232,7 +232,7 @@ public final class MqttEncoder {
 		return buf;
 	}
 
-	private static ByteBuffer encodeUnsubscribeMessage(ChannelContext ctx, MqttUnsubscribeMessage message) {
+	private static ByteBuffer encodeUnsubscribeMessage(ChannelContext ctx, MqttUnSubscribeMessage message) {
 		MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		byte[] propertiesBytes = encodePropertiesIfNeeded(mqttVersion,
 			message.idAndPropertiesVariableHeader().properties());
@@ -290,7 +290,7 @@ public final class MqttEncoder {
 		return buf;
 	}
 
-	private static ByteBuffer encodeUnsubAckMessage(ChannelContext ctx, MqttUnsubAckMessage message) {
+	private static ByteBuffer encodeUnsubAckMessage(ChannelContext ctx, MqttUnSubAckMessage message) {
 		if (message.variableHeader() instanceof MqttMessageIdAndPropertiesVariableHeader) {
 			MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 			byte[] propertiesBytes = encodePropertiesIfNeeded(mqttVersion, message.idAndPropertiesVariableHeader().properties());
@@ -592,12 +592,12 @@ public final class MqttEncoder {
 			case SUBSCRIBE:
 				return encodeSubscribeMessage(ctx, (MqttSubscribeMessage) message);
 			case UNSUBSCRIBE:
-				return encodeUnsubscribeMessage(ctx, (MqttUnsubscribeMessage) message);
+				return encodeUnsubscribeMessage(ctx, (MqttUnSubscribeMessage) message);
 			case SUBACK:
 				return encodeSubAckMessage(ctx, (MqttSubAckMessage) message);
 			case UNSUBACK:
-				if (message instanceof MqttUnsubAckMessage) {
-					return encodeUnsubAckMessage(ctx, (MqttUnsubAckMessage) message);
+				if (message instanceof MqttUnSubAckMessage) {
+					return encodeUnsubAckMessage(ctx, (MqttUnSubAckMessage) message);
 				}
 				return encodeMessageWithOnlySingleByteFixedHeaderAndMessageId(message);
 			case PUBACK:
