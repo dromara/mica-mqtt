@@ -39,7 +39,7 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 	/**
 	 * 较大的 qos
 	 */
-	public static final BinaryOperator<Integer> MAX_QOS = (a, b) -> (a > b) ? a : b;
+	public static final BinaryOperator<Integer> MAX_QOS = Math::max;
 	/**
 	 * messageId 存储 clientId: messageId
 	 */
@@ -101,10 +101,9 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 			}
 			map = groupMap.get(topicFilter);
 		}
-		if (map == null) {
-			return;
+		if (map != null) {
+			map.remove(clientId);
 		}
-		map.remove(clientId);
 	}
 
 	@Override
@@ -118,7 +117,7 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 				return qos;
 			}
 		}
-		// 2. 如果订阅的事通配符
+		// 2. 如果订阅的是通配符
 		Integer subscribeQos = searchSubscribeQos(topicName, clientId, subscribeStore, TopicFilterType.NONE);
 		if (subscribeQos != null) {
 			return subscribeQos;
@@ -128,7 +127,7 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 		if (subscribeQos != null) {
 			return subscribeQos;
 		}
-		// 4. 分组订阅有
+		// 4. 分组订阅
 		for (Map<String, Map<String, Integer>> shareSubscribeStoreMap : shareSubscribeStore.values()) {
 			subscribeQos = searchSubscribeQos(topicName, clientId, shareSubscribeStoreMap, TopicFilterType.SHARE);
 			if (subscribeQos != null) {
@@ -271,13 +270,13 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void addPendingPublish(String clientId, int messageId, MqttPendingPublish pendingPublish) {
-		Map<Integer, MqttPendingPublish> data = pendingPublishStore.computeIfAbsent(clientId, (key) -> new IntObjectHashMap<>(16));
+		IntObjectMap<MqttPendingPublish> data = pendingPublishStore.computeIfAbsent(clientId, (key) -> new IntObjectHashMap<>(16));
 		data.put(messageId, pendingPublish);
 	}
 
 	@Override
 	public MqttPendingPublish getPendingPublish(String clientId, int messageId) {
-		Map<Integer, MqttPendingPublish> data = pendingPublishStore.get(clientId);
+		IntObjectMap<MqttPendingPublish> data = pendingPublishStore.get(clientId);
 		if (data == null) {
 			return null;
 		}
@@ -286,7 +285,7 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void removePendingPublish(String clientId, int messageId) {
-		Map<Integer, MqttPendingPublish> data = pendingPublishStore.get(clientId);
+		IntObjectMap<MqttPendingPublish> data = pendingPublishStore.get(clientId);
 		if (data != null) {
 			data.remove(messageId);
 		}
@@ -294,13 +293,13 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void addPendingQos2Publish(String clientId, int messageId, MqttPendingQos2Publish pendingQos2Publish) {
-		Map<Integer, MqttPendingQos2Publish> data = pendingQos2PublishStore.computeIfAbsent(clientId, (key) -> new IntObjectHashMap<>());
+		IntObjectMap<MqttPendingQos2Publish> data = pendingQos2PublishStore.computeIfAbsent(clientId, (key) -> new IntObjectHashMap<>());
 		data.put(messageId, pendingQos2Publish);
 	}
 
 	@Override
 	public MqttPendingQos2Publish getPendingQos2Publish(String clientId, int messageId) {
-		Map<Integer, MqttPendingQos2Publish> data = pendingQos2PublishStore.get(clientId);
+		IntObjectMap<MqttPendingQos2Publish> data = pendingQos2PublishStore.get(clientId);
 		if (data == null) {
 			return null;
 		}
@@ -309,7 +308,7 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void removePendingQos2Publish(String clientId, int messageId) {
-		Map<Integer, MqttPendingQos2Publish> data = pendingQos2PublishStore.get(clientId);
+		IntObjectMap<MqttPendingQos2Publish> data = pendingQos2PublishStore.get(clientId);
 		if (data != null) {
 			data.remove(messageId);
 		}
