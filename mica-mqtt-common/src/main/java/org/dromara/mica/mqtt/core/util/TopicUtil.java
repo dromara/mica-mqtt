@@ -52,8 +52,8 @@ public final class TopicUtil {
 	 * @param topicFilter topicFilter
 	 */
 	public static void validateTopicFilter(String topicFilter) throws IllegalArgumentException {
-		if (topicFilter == null || topicFilter.isEmpty()) {
-			throw new IllegalArgumentException("TopicFilter is blank:" + topicFilter);
+		if (StrUtil.isEmpty(topicFilter)) {
+			throw new IllegalArgumentException("TopicFilter is empty:" + topicFilter);
 		}
 		char[] topicFilterChars = topicFilter.toCharArray();
 		int topicFilterLength = topicFilterChars.length;
@@ -83,7 +83,7 @@ public final class TopicUtil {
 	 * @param topicName topicName
 	 */
 	public static void validateTopicName(String topicName) throws IllegalArgumentException {
-		if (topicName == null || topicName.isEmpty()) {
+		if (StrUtil.isBlank(topicName)) {
 			throw new IllegalArgumentException("Topic is blank:" + topicName);
 		}
 		if (MqttCodecUtil.isTopicFilter(topicName)) {
@@ -230,7 +230,7 @@ public final class TopicUtil {
 		// 替换 ${name} 为 +
 		StringTokenizer tokenizer = new StringTokenizer(topicTemplate, TOPIC_LAYER, true);
 		String token;
-		StringBuilder topicFilterBuilder = new StringBuilder();
+		StringBuilder topicFilterBuilder = new StringBuilder(topicTemplate.length());
 		while (tokenizer.hasMoreTokens()) {
 			token = tokenizer.nextToken();
 			if (TOPIC_LAYER.equals(token)) {
@@ -255,9 +255,13 @@ public final class TopicUtil {
 			return false;
 		}
 		int startIndex = input.indexOf("${");
+		// 检查是否存在 "${"
+		if (startIndex == -1) {
+			return false;
+		}
 		int endIndex = input.indexOf('}', startIndex);
 		// 检查是否同时存在 "${" 和 "}"，并且 "}" 在 "${" 之后
-		return startIndex != -1 && endIndex != -1 && endIndex > startIndex + 2;
+		return endIndex != -1 && endIndex > startIndex + 2;
 	}
 
 	public static String resolveTopic(String topicTemplate, Object payload) {
