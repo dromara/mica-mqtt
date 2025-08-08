@@ -16,9 +16,10 @@
 
 package org.dromara.mica.mqtt.core.server.session;
 
-import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
+import org.dromara.mica.mqtt.core.common.TopicFilter;
+import org.dromara.mica.mqtt.core.server.model.Subscribe;
 
 import java.util.List;
 
@@ -36,7 +37,18 @@ public interface IMqttSessionManager {
 	 * @param clientId    客户端 Id
 	 * @param mqttQoS     MqttQoS
 	 */
-	void addSubscribe(String topicFilter, String clientId, int mqttQoS);
+	void addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS);
+
+	/**
+	 * 添加订阅存储
+	 *
+	 * @param topicFilter topicFilter
+	 * @param clientId    客户端 Id
+	 * @param mqttQoS     MqttQoS
+	 */
+	default void addSubscribe(String topicFilter, String clientId, int mqttQoS) {
+		this.addSubscribe(new TopicFilter(topicFilter), clientId, mqttQoS);
+	}
 
 	/**
 	 * 删除订阅
@@ -53,7 +65,7 @@ public interface IMqttSessionManager {
 	 * @param clientId  客户端 Id
 	 * @return 订阅存储列表
 	 */
-	Integer searchSubscribe(String topicName, String clientId);
+	Short searchSubscribe(String topicName, String clientId);
 
 	/**
 	 * 查找订阅信息
