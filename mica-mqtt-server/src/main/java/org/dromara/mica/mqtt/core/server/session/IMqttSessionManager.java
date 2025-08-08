@@ -65,7 +65,7 @@ public interface IMqttSessionManager {
 	 * @param clientId  客户端 Id
 	 * @return 订阅存储列表
 	 */
-	Short searchSubscribe(String topicName, String clientId);
+	Byte searchSubscribe(String topicName, String clientId);
 
 	/**
 	 * 查找订阅信息

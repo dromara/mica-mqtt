@@ -42,7 +42,7 @@ public class TrieTopicManager {
 	/**
 	 * 较大的 qos
 	 */
-	public static final BinaryOperator<Short> MAX_QOS = (a, b) -> (a > b) ? a : b;
+	public static final BinaryOperator<Byte> MAX_QOS = (a, b) -> (a > b) ? a : b;
 	/**
 	 * root 节点
 	 */
@@ -64,13 +64,13 @@ public class TrieTopicManager {
 		/**
 		 * 订阅的数据存储 {clientId: qos}
 		 */
-		private final Map<String, Short> subscriptions;
+		private final Map<String, Byte> subscriptions;
 		/**
 		 * 子节点
 		 */
 		private final Map<String, Node> children;
 
-		private Node(String part, Map<String, Short> subscriptions, Map<String, Node> children) {
+		private Node(String part, Map<String, Byte> subscriptions, Map<String, Node> children) {
 			this.part = part;
 			this.subscriptions = subscriptions;
 			this.children = children;
@@ -141,8 +141,8 @@ public class TrieTopicManager {
 	 * @param clientId    clientId
 	 * @param mqttQoS     mqttQoS
 	 */
-	public void addSubscribe(String topicFilter, String clientId, short mqttQoS) {
-		addSubscribe(new TopicFilter(topicFilter), clientId, mqttQoS);
+	public void addSubscribe(String topicFilter, String clientId, int mqttQoS) {
+		addSubscribe(new TopicFilter(topicFilter), clientId, (short) mqttQoS);
 	}
 
 	/**
@@ -152,20 +152,20 @@ public class TrieTopicManager {
 	 * @param clientId    clientId
 	 * @param mqttQoS     mqttQoS
 	 */
-	public void addSubscribe(TopicFilter topicFilter, String clientId, short mqttQoS) {
+	public void addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS) {
 		String topic = topicFilter.getTopic();
 		TopicFilterType topicFilterType = topicFilter.getType();
 		if (TopicFilterType.NONE == topicFilterType) {
-			addSubscribe(root, topic, clientId, mqttQoS);
+			addSubscribe(root, topic, clientId, (byte) mqttQoS);
 		} else if (TopicFilterType.QUEUE == topicFilterType) {
 			int prefixLen = TopicFilterType.SHARE_QUEUE_PREFIX.length();
-			addSubscribe(queue, topic.substring(prefixLen), clientId, mqttQoS);
+			addSubscribe(queue, topic.substring(prefixLen), clientId, (byte) mqttQoS);
 		} else if (TopicFilterType.SHARE == topicFilterType) {
 			int prefixLen = TopicFilterType.SHARE_GROUP_PREFIX.length();
 			String groupName = TopicFilterType.getShareGroupName(topic);
 			Node groupNode = share.computeIfAbsent(groupName, Node::getNode);
 			prefixLen = prefixLen + groupName.length() + 1;
-			addSubscribe(groupNode, topic.substring(prefixLen), clientId, mqttQoS);
+			addSubscribe(groupNode, topic.substring(prefixLen), clientId, (byte) mqttQoS);
 		}
 	}
 
@@ -177,7 +177,7 @@ public class TrieTopicManager {
 	 * @param clientId    clientId
 	 * @param mqttQoS     mqttQoS
 	 */
-	private static void addSubscribe(Node node, String topicFilter, String clientId, short mqttQoS) {
+	private static void addSubscribe(Node node, String topicFilter, String clientId, byte mqttQoS) {
 		Node prev = node;
 		String[] topicParts = TopicUtil.getTopicParts(topicFilter);
 		int partLength = topicParts.length - 1;
@@ -188,7 +188,7 @@ public class TrieTopicManager {
 			if (isEnd) {
 				// 如果不存在或者老的订阅 qos 比较小也重新设置
 				assert prev.subscriptions != null;
-				Short existingQos = prev.subscriptions.get(clientId);
+				Byte existingQos = prev.subscriptions.get(clientId);
 				if (existingQos == null || existingQos < mqttQoS) {
 					prev.subscriptions.put(clientId, mqttQoS);
 				}
@@ -335,7 +335,7 @@ public class TrieTopicManager {
 	private static void getSubscribeRecursively(List<Subscribe> subscribeList, Node child, String childPart, String clientId) {
 		// 删除订阅
 		assert child.subscriptions != null;
-		Short qos = child.subscriptions.get(clientId);
+		Byte qos = child.subscriptions.get(clientId);
 		if (qos != null) {
 			subscribeList.add(new Subscribe(childPart, clientId, qos));
 		}
@@ -366,11 +366,11 @@ public class TrieTopicManager {
 	 * @param clientId  客户端 Id
 	 * @return 订阅存储列表
 	 */
-	public Short searchSubscribe(String topicName, String clientId) {
+	public Byte searchSubscribe(String topicName, String clientId) {
 		String[] topicParts = TopicUtil.getTopicParts(topicName);
-		Map<String, Short> subscribeMap = new HashMap<>(32);
+		Map<String, Byte> subscribeMap = new HashMap<>(32);
 		searchSubscribeRecursively(root, subscribeMap, topicParts, 0);
-		Short qos = subscribeMap.get(clientId);
+		Byte qos = subscribeMap.get(clientId);
 		if (qos != null) {
 			return qos;
 		}
@@ -394,17 +394,17 @@ public class TrieTopicManager {
 	 */
 	public List<Subscribe> searchSubscribe(String topicName) {
 		String[] topicParts = TopicUtil.getTopicParts(topicName);
-		Map<String, Short> subscribeMap = new HashMap<>(32);
+		Map<String, Byte> subscribeMap = new HashMap<>(32);
 		searchSubscribeRecursively(root, subscribeMap, topicParts, 0);
 		// 共享订阅
-		Map<String, Short> queueSubscribeMap = new HashMap<>(8);
+		Map<String, Byte> queueSubscribeMap = new HashMap<>(8);
 		searchSubscribeRecursively(queue, queueSubscribeMap, topicParts, 0);
 		if (!queueSubscribeMap.isEmpty()) {
 			randomStrategy(subscribeMap, queueSubscribeMap);
 		}
 		// 分组订阅
 		for (Node node : share.values()) {
-			Map<String, Short> shareSubscribeMap = new HashMap<>(8);
+			Map<String, Byte> shareSubscribeMap = new HashMap<>(8);
 			searchSubscribeRecursively(node, shareSubscribeMap, topicParts, 0);
 			if (!shareSubscribeMap.isEmpty()) {
 				randomStrategy(subscribeMap, shareSubscribeMap);
@@ -425,7 +425,7 @@ public class TrieTopicManager {
 	 * @param topicParts   topicParts
 	 * @param index        index
 	 */
-	private static void searchSubscribeRecursively(Node node, Map<String, Short> subscribeMap, String[] topicParts, int index) {
+	private static void searchSubscribeRecursively(Node node, Map<String, Byte> subscribeMap, String[] topicParts, int index) {
 		// 层级已经超过，跳出
 		if (index >= topicParts.length) {
 			return;
@@ -433,7 +433,7 @@ public class TrieTopicManager {
 		// # 单独处理
 		Node nodeMore = node.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_MORE);
 		if (nodeMore != null) {
-			for (Map.Entry<String, Short> entry : nodeMore.subscriptions.entrySet()) {
+			for (Map.Entry<String, Byte> entry : nodeMore.subscriptions.entrySet()) {
 				subscribeMap.merge(entry.getKey(), entry.getValue(), MAX_QOS);
 			}
 		}
@@ -443,7 +443,7 @@ public class TrieTopicManager {
 		if (nodeOne != null) {
 			// 最后一位为 +
 			if (index == topicPartLen) {
-				for (Map.Entry<String, Short> entry : nodeOne.subscriptions.entrySet()) {
+				for (Map.Entry<String, Byte> entry : nodeOne.subscriptions.entrySet()) {
 					subscribeMap.merge(entry.getKey(), entry.getValue(), MAX_QOS);
 				}
 			} else {
@@ -455,13 +455,13 @@ public class TrieTopicManager {
 		if (nodePart != null) {
 			// 跳出循环
 			if (index == topicPartLen) {
-				for (Map.Entry<String, Short> entry : nodePart.subscriptions.entrySet()) {
+				for (Map.Entry<String, Byte> entry : nodePart.subscriptions.entrySet()) {
 					subscribeMap.merge(entry.getKey(), entry.getValue(), MAX_QOS);
 				}
 				// 判断是否还有 #
 				Node nodePartMore = nodePart.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_MORE);
 				if (nodePartMore != null) {
-					for (Map.Entry<String, Short> entry : nodePartMore.subscriptions.entrySet()) {
+					for (Map.Entry<String, Byte> entry : nodePartMore.subscriptions.entrySet()) {
 						subscribeMap.merge(entry.getKey(), entry.getValue(), MAX_QOS);
 					}
 				}
@@ -498,7 +498,7 @@ public class TrieTopicManager {
 	 * @param subscribeMap       订阅的 map
 	 * @param randomSubscribeMap 分组订阅的 map
 	 */
-	private static void randomStrategy(Map<String, Short> subscribeMap, Map<String, Short> randomSubscribeMap) {
+	private static void randomStrategy(Map<String, Byte> subscribeMap, Map<String, Byte> randomSubscribeMap) {
 		String[] keys = randomSubscribeMap.keySet().toArray(new String[0]);
 		int keyLength = keys.length;
 		// 大于 1 随机

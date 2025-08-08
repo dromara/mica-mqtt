@@ -168,7 +168,7 @@ public final class MqttServer {
 			logger.warn("Mqtt Topic:{} publish to clientId:{} ChannelContext is null may be disconnected.", topic, clientId);
 			return false;
 		}
-		Short subMqttQoS = sessionManager.searchSubscribe(topic, clientId);
+		Byte subMqttQoS = sessionManager.searchSubscribe(topic, clientId);
 		if (subMqttQoS == null) {
 			logger.warn("Mqtt Topic:{} publish but clientId:{} not subscribed.", topic, clientId);
 			return false;

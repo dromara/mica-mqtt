@@ -67,7 +67,7 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 	}
 
 	@Override
-	public Short searchSubscribe(String topicName, String clientId) {
+	public Byte searchSubscribe(String topicName, String clientId) {
 		return topicManager.searchSubscribe(topicName, clientId);
 	}
 
