@@ -130,7 +130,11 @@ public class TrieTopicManager {
 
 		@Override
 		public String toString() {
-			return "Node{part='" + part + "'}";
+			return "Node{" +
+				"part='" + part + '\'' +
+				", subscriptions=" + subscriptions +
+				", children=" + children +
+				'}';
 		}
 	}
 
