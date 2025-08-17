@@ -24,14 +24,14 @@ import org.dromara.mica.mqtt.codec.properties.UserProperty;
  *
  * @author L.cm
  */
-public class MqttUnsubscribeProperty {
+public class MqttUnSubscribeProperty {
 	private final MqttProperties properties;
 
-	public MqttUnsubscribeProperty() {
+	public MqttUnSubscribeProperty() {
 		this(new MqttProperties());
 	}
 
-	public MqttUnsubscribeProperty(MqttProperties properties) {
+	public MqttUnSubscribeProperty(MqttProperties properties) {
 		this.properties = properties;
 	}
 

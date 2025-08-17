@@ -26,14 +26,14 @@ import org.dromara.mica.mqtt.codec.properties.UserProperty;
  *
  * @author L.cm
  */
-public class MqttUnsubAckProperty {
+public class MqttUnSubAckProperty {
 	private final MqttProperties properties;
 
-	public MqttUnsubAckProperty() {
+	public MqttUnSubAckProperty() {
 		this(new MqttProperties());
 	}
 
-	public MqttUnsubAckProperty(MqttProperties properties) {
+	public MqttUnSubAckProperty(MqttProperties properties) {
 		this.properties = properties;
 	}
 
