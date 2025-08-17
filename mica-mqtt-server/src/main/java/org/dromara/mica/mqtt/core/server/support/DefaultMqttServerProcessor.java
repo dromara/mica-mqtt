@@ -415,7 +415,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			publishUnsubscribedEvent(context, clientId, topicFilter);
 		}
 		logger.info("UnSubscribe - clientId:{} Topic:{} packetId:{}", clientId, topicFilterList, packetId);
-		MqttMessage unSubMessage = MqttMessageBuilders.unsubAck()
+		MqttMessage unSubMessage = MqttMessageBuilders.unSubAck()
 			.packetId(packetId)
 			.build();
 		boolean result = Tio.send(context, unSubMessage);

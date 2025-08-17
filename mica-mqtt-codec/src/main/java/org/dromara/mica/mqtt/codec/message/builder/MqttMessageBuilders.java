@@ -54,7 +54,7 @@ public final class MqttMessageBuilders {
 		return new MqttSubAckBuilder();
 	}
 
-	public static MqttUnSubAckBuilder unsubAck() {
+	public static MqttUnSubAckBuilder unSubAck() {
 		return new MqttUnSubAckBuilder();
 	}
 
