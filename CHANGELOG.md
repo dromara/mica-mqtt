@@ -3,7 +3,8 @@
 ## 发行版本
 
 ### v2.5.4 - 2025-09-07
-- :sparkles: mica-mqtt-server 使用前缀树管理 MQTT 订阅
+- :sparkles: mica-mqtt-server 使用前缀树管理 MQTT 订阅。
+- :sparkles: mica-mqtt-server 心跳超时小于等于0时，不开启心跳检测。（不建议这样使用）
 - :sparkles: mica-mqtt-codec 包调整，重命名类名、方法名，重构 MQTT 消息构建器类，不兼容
 
 ### v2.5.3 - 2025-08-03
