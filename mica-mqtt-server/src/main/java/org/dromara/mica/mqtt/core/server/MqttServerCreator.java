@@ -558,7 +558,7 @@ public class MqttServerCreator {
 		// 5. 是否开启代理协议
 		tioConfig.enableProxyProtocol(this.proxyProtocolOn);
 		// 6. 设置 t-io 心跳 timeout
-		if (this.heartbeatTimeout != null) {
+		if (this.heartbeatTimeout != null && this.heartbeatTimeout > 0) {
 			tioConfig.setHeartbeatTimeout(this.heartbeatTimeout);
 		}
 		tioConfig.setHeartbeatBackoff(this.keepaliveBackoff);
