@@ -22,11 +22,13 @@ import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubscribePayload;
+import org.dromara.mica.mqtt.codec.message.properties.MqttUnSubscribeProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * MqttUnSubscribeMessage builder
@@ -35,7 +37,7 @@ import java.util.List;
 public final class MqttUnSubscribeBuilder {
 	private final List<String> topicFilters;
 	private int messageId;
-	private MqttProperties properties;
+	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
 	MqttUnSubscribeBuilder() {
 		topicFilters = new ArrayList<>(5);
@@ -59,6 +61,12 @@ public final class MqttUnSubscribeBuilder {
 	public MqttUnSubscribeBuilder properties(MqttProperties properties) {
 		this.properties = properties;
 		return this;
+	}
+
+	public MqttUnSubscribeBuilder properties(Consumer<MqttUnSubscribeProperties> consumer) {
+		MqttUnSubscribeProperties unSubscribeProperties = new MqttUnSubscribeProperties(properties);
+		consumer.accept(unSubscribeProperties);
+		return properties(unSubscribeProperties.getProperties());
 	}
 
 	public MqttUnSubscribeMessage build() {

@@ -21,7 +21,10 @@ import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttPublishVariableHeader;
+import org.dromara.mica.mqtt.codec.message.properties.MqttPublishProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+
+import java.util.function.Consumer;
 
 /**
  * MqttPublishMessage builder
@@ -34,7 +37,7 @@ public final class MqttPublishBuilder {
 	private MqttQoS qos;
 	private byte[] payload;
 	private int messageId;
-	private MqttProperties mqttProperties;
+	private MqttProperties mqttProperties = MqttProperties.NO_PROPERTIES;
 
 	MqttPublishBuilder() {
 	}
@@ -67,6 +70,12 @@ public final class MqttPublishBuilder {
 	public MqttPublishBuilder properties(MqttProperties properties) {
 		this.mqttProperties = properties;
 		return this;
+	}
+
+	public MqttPublishBuilder properties(Consumer<MqttPublishProperties> consumer) {
+		MqttPublishProperties publishProperties = new MqttPublishProperties(mqttProperties);
+		consumer.accept(publishProperties);
+		return properties(publishProperties.getProperties());
 	}
 
 	public boolean isRetained() {

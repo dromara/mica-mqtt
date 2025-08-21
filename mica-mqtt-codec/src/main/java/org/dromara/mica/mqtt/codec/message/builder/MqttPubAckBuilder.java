@@ -18,10 +18,14 @@ package org.dromara.mica.mqtt.codec.message.builder;
 
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttPubAckReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttPubReplyMessageVariableHeader;
+import org.dromara.mica.mqtt.codec.message.properties.MqttPubAckProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+
+import java.util.function.Consumer;
 
 /**
  * MqttPubAckMessage builder
@@ -29,13 +33,18 @@ import org.dromara.mica.mqtt.codec.properties.MqttProperties;
  */
 public final class MqttPubAckBuilder {
 	private int packetId;
-	private byte reasonCode;
-	private MqttProperties properties;
+	private MqttPubAckReasonCode reasonCode;
+	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
 	MqttPubAckBuilder() {
 	}
 
 	public MqttPubAckBuilder reasonCode(byte reasonCode) {
+		this.reasonCode = MqttPubAckReasonCode.valueOf(reasonCode);
+		return this;
+	}
+
+	public MqttPubAckBuilder reasonCode(MqttPubAckReasonCode reasonCode) {
 		this.reasonCode = reasonCode;
 		return this;
 	}
@@ -50,11 +59,17 @@ public final class MqttPubAckBuilder {
 		return this;
 	}
 
+	public MqttPubAckBuilder properties(Consumer<MqttPubAckProperties> consumer) {
+		MqttPubAckProperties pubAckProperties = new MqttPubAckProperties(properties);
+		consumer.accept(pubAckProperties);
+		return properties(pubAckProperties.getProperties());
+	}
+
 	public MqttMessage build() {
-		MqttFixedHeader mqttFixedHeader =
+		MqttFixedHeader mqttFixedHeader = 
 			new MqttFixedHeader(MqttMessageType.PUBACK, false, MqttQoS.QOS0, false, 0);
-		MqttPubReplyMessageVariableHeader mqttPubAckVariableHeader =
-			new MqttPubReplyMessageVariableHeader(packetId, reasonCode, properties);
+		MqttPubReplyMessageVariableHeader mqttPubAckVariableHeader = 
+			new MqttPubReplyMessageVariableHeader(packetId, reasonCode != null ? reasonCode.value() : 0, properties);
 		return new MqttMessage(mqttFixedHeader, mqttPubAckVariableHeader);
 	}
 }

@@ -22,18 +22,18 @@ import org.dromara.mica.mqtt.codec.properties.StringProperty;
 import org.dromara.mica.mqtt.codec.properties.UserProperty;
 
 /**
- * mqtt5 发布完成属性
+ * mqtt5 发布确认属性
  *
  * @author L.cm
  */
-public class MqttPubCompProperty {
+public class MqttPubRelProperties {
 	private final MqttProperties properties;
 
-	public MqttPubCompProperty() {
+	public MqttPubRelProperties() {
 		this(new MqttProperties());
 	}
 
-	public MqttPubCompProperty(MqttProperties properties) {
+	public MqttPubRelProperties(MqttProperties properties) {
 		this.properties = properties;
 	}
 
@@ -45,20 +45,18 @@ public class MqttPubCompProperty {
 	 * 设置原因字符串
 	 *
 	 * @param reasonString 原因字符串
-	 * @return MqttPubCompProperty
 	 */
-	public MqttPubCompProperty setReasonString(String reasonString) {
+	public MqttPubRelProperties setReasonString(String reasonString) {
 		properties.add(new StringProperty(MqttPropertyType.REASON_STRING, reasonString));
 		return this;
 	}
 
 	/**
-	 * 添加用户属性
+	 * 设置用户属性
 	 *
 	 * @param userProperty 用户属性
-	 * @return MqttPubCompProperty
 	 */
-	public MqttPubCompProperty addUserProperty(UserProperty userProperty) {
+	public MqttPubRelProperties addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
 		return this;
 	}
@@ -68,9 +66,8 @@ public class MqttPubCompProperty {
 	 *
 	 * @param key   key
 	 * @param value value
-	 * @return MqttPubCompProperty
 	 */
-	public MqttPubCompProperty addUserProperty(String key, String value) {
+	public MqttPubRelProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
 		return this;
 	}

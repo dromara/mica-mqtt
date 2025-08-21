@@ -18,27 +18,30 @@ package org.dromara.mica.mqtt.codec.message.builder;
 
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttSubAckReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttSubAckMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttSubAckPayload;
+import org.dromara.mica.mqtt.codec.message.properties.MqttSubAckProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * MqttSubAckMessage builder
  * @author netty, L.cm
  */
 public final class MqttSubAckBuilder {
-	private final List<MqttQoS> grantedQosList;
+	private final List<MqttSubAckReasonCode> reasonCodes;
 	private int packetId;
-	private MqttProperties properties;
+	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
 	MqttSubAckBuilder() {
-		grantedQosList = new ArrayList<>();
+		reasonCodes = new ArrayList<>();
 	}
 
 	public MqttSubAckBuilder packetId(int packetId) {
@@ -51,31 +54,51 @@ public final class MqttSubAckBuilder {
 		return this;
 	}
 
+	public MqttSubAckBuilder properties(Consumer<MqttSubAckProperties> consumer) {
+		MqttSubAckProperties subAckProperties = new MqttSubAckProperties(properties);
+		consumer.accept(subAckProperties);
+		return properties(subAckProperties.getProperties());
+	}
+
 	public MqttSubAckBuilder addGrantedQos(MqttQoS qos) {
-		this.grantedQosList.add(qos);
+		this.reasonCodes.add(MqttSubAckReasonCode.qosGranted(qos));
+		return this;
+	}
+
+	public MqttSubAckBuilder addReasonCode(MqttSubAckReasonCode reasonCode) {
+		this.reasonCodes.add(reasonCode);
 		return this;
 	}
 
 	public MqttSubAckBuilder addGrantedQoses(MqttQoS... qoses) {
-		this.grantedQosList.addAll(Arrays.asList(qoses));
+		for (MqttQoS qos : qoses) {
+			this.reasonCodes.add(MqttSubAckReasonCode.qosGranted(qos));
+		}
+		return this;
+	}
+
+	public MqttSubAckBuilder addReasonCodes(MqttSubAckReasonCode... reasonCodes) {
+		this.reasonCodes.addAll(Arrays.asList(reasonCodes));
 		return this;
 	}
 
 	public MqttSubAckBuilder addGrantedQosList(List<MqttQoS> qosList) {
-		this.grantedQosList.addAll(qosList);
+		for (MqttQoS qos : qosList) {
+			this.reasonCodes.add(MqttSubAckReasonCode.qosGranted(qos));
+		}
 		return this;
 	}
 
 	public MqttSubAckMessage build() {
-		MqttFixedHeader mqttFixedHeader =
+		MqttFixedHeader mqttFixedHeader = 
 			new MqttFixedHeader(MqttMessageType.SUBACK, false, MqttQoS.QOS0, false, 0);
-		MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader =
+		MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader = 
 			new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
 		// transform to primitive types
-		short[] grantedQosArray = new short[this.grantedQosList.size()];
+		short[] grantedQosArray = new short[this.reasonCodes.size()];
 		int i = 0;
-		for (MqttQoS grantedQos : this.grantedQosList) {
-			grantedQosArray[i++] = grantedQos.value();
+		for (MqttSubAckReasonCode reasonCode : this.reasonCodes) {
+			grantedQosArray[i++] = reasonCode.value();
 		}
 		MqttSubAckPayload subAckPayload = new MqttSubAckPayload(grantedQosArray);
 		return new MqttSubAckMessage(mqttFixedHeader, mqttSubAckVariableHeader, subAckPayload);

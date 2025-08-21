@@ -22,17 +22,20 @@ import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttConnAckMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnAckVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
+import org.dromara.mica.mqtt.codec.message.properties.MqttConnAckProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+
+import java.util.function.Consumer;
 
 /**
  * MqttConnAckMessage builder
+ *
  * @author netty, L.cm
  */
 public final class MqttConnAckBuilder {
 	private MqttConnectReasonCode returnCode;
 	private boolean sessionPresent;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
-	private MqttConnAckPropertiesBuilder propsBuilder;
 
 	MqttConnAckBuilder() {
 	}
@@ -52,18 +55,13 @@ public final class MqttConnAckBuilder {
 		return this;
 	}
 
-	public MqttConnAckBuilder properties(PropertiesInitializer<MqttConnAckPropertiesBuilder> consumer) {
-		if (propsBuilder == null) {
-			propsBuilder = new MqttConnAckPropertiesBuilder();
-		}
-		consumer.apply(propsBuilder);
-		return this;
+	public MqttConnAckBuilder properties(Consumer<MqttConnAckProperties> consumer) {
+		MqttConnAckProperties connAckProperties = new MqttConnAckProperties();
+		consumer.accept(connAckProperties);
+		return properties(connAckProperties.getProperties());
 	}
 
 	public MqttConnAckMessage build() {
-		if (propsBuilder != null) {
-			properties = propsBuilder.build();
-		}
 		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.CONNACK, false, MqttQoS.QOS0, false, 0);
 		MqttConnAckVariableHeader mqttConnAckVariableHeader =

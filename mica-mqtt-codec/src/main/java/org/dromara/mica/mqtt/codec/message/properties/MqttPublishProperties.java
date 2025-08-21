@@ -23,14 +23,14 @@ import org.dromara.mica.mqtt.codec.properties.*;
  *
  * @author L.cm
  */
-public class MqttPublishProperty {
+public class MqttPublishProperties {
 	private final MqttProperties properties;
 
-	public MqttPublishProperty() {
+	public MqttPublishProperties() {
 		this(new MqttProperties());
 	}
 
-	public MqttPublishProperty(MqttProperties properties) {
+	public MqttPublishProperties(MqttProperties properties) {
 		this.properties = properties;
 	}
 
@@ -42,9 +42,9 @@ public class MqttPublishProperty {
 	 * 设置负载格式指示器
 	 *
 	 * @param indicator 负载格式指示器 (0 表示未指定, 1 表示 UTF-8 编码)
-	 * @return MqttPublishProperty
+	 * @return MqttPublishProperties
 	 */
-	public MqttPublishProperty setPayloadFormatIndicator(int indicator) {
+	public MqttPublishProperties setPayloadFormatIndicator(int indicator) {
 		properties.add(new IntegerProperty(MqttPropertyType.PAYLOAD_FORMAT_INDICATOR, indicator));
 		return this;
 	}
@@ -55,7 +55,7 @@ public class MqttPublishProperty {
 	 * @param interval 消息过期时间间隔（秒）
 	 * @return MqttPublishProperty
 	 */
-	public MqttPublishProperty setMessageExpiryInterval(int interval) {
+	public MqttPublishProperties setMessageExpiryInterval(int interval) {
 		properties.add(new IntegerProperty(MqttPropertyType.MESSAGE_EXPIRY_INTERVAL, interval));
 		return this;
 	}
@@ -66,7 +66,7 @@ public class MqttPublishProperty {
 	 * @param correlationData 关联数据
 	 * @return MqttPublishProperty
 	 */
-	public MqttPublishProperty setCorrelationData(byte[] correlationData) {
+	public MqttPublishProperties setCorrelationData(byte[] correlationData) {
 		properties.add(new BinaryProperty(MqttPropertyType.CORRELATION_DATA, correlationData));
 		return this;
 	}
@@ -77,7 +77,7 @@ public class MqttPublishProperty {
 	 * @param contentType 内容类型
 	 * @return MqttPublishProperty
 	 */
-	public MqttPublishProperty setContentType(String contentType) {
+	public MqttPublishProperties setContentType(String contentType) {
 		properties.add(new StringProperty(MqttPropertyType.CONTENT_TYPE, contentType));
 		return this;
 	}
@@ -88,7 +88,7 @@ public class MqttPublishProperty {
 	 * @param responseTopic 响应主题
 	 * @return MqttPublishProperty
 	 */
-	public MqttPublishProperty setResponseTopic(String responseTopic) {
+	public MqttPublishProperties setResponseTopic(String responseTopic) {
 		properties.add(new StringProperty(MqttPropertyType.RESPONSE_TOPIC, responseTopic));
 		return this;
 	}
@@ -99,7 +99,7 @@ public class MqttPublishProperty {
 	 * @param subscriptionIdentifier 订阅标识符
 	 * @return MqttPublishProperty
 	 */
-	public MqttPublishProperty setSubscriptionIdentifier(int subscriptionIdentifier) {
+	public MqttPublishProperties setSubscriptionIdentifier(int subscriptionIdentifier) {
 		properties.add(new IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER, subscriptionIdentifier));
 		return this;
 	}
@@ -110,7 +110,7 @@ public class MqttPublishProperty {
 	 * @param topicAlias 主题别名
 	 * @return MqttPublishProperty
 	 */
-	public MqttPublishProperty setTopicAlias(int topicAlias) {
+	public MqttPublishProperties setTopicAlias(int topicAlias) {
 		properties.add(new IntegerProperty(MqttPropertyType.TOPIC_ALIAS, topicAlias));
 		return this;
 	}
@@ -121,7 +121,7 @@ public class MqttPublishProperty {
 	 * @param userProperty 用户属性
 	 * @return MqttPublishProperty
 	 */
-	public MqttPublishProperty addUserProperty(UserProperty userProperty) {
+	public MqttPublishProperties addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
 		return this;
 	}
@@ -133,7 +133,7 @@ public class MqttPublishProperty {
 	 * @param value value
 	 * @return MqttPublishProperty
 	 */
-	public MqttPublishProperty addUserProperty(String key, String value) {
+	public MqttPublishProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
 		return this;
 	}

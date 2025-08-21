@@ -22,11 +22,13 @@ import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttSubscribePayload;
+import org.dromara.mica.mqtt.codec.message.properties.MqttSubscribeProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * MqttSubscribeMessage builder
@@ -36,7 +38,7 @@ public final class MqttSubscribeBuilder {
 
 	private final List<MqttTopicSubscription> subscriptions;
 	private int messageId;
-	private MqttProperties properties;
+	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
 	MqttSubscribeBuilder() {
 		subscriptions = new ArrayList<>(5);
@@ -68,6 +70,12 @@ public final class MqttSubscribeBuilder {
 	public MqttSubscribeBuilder properties(MqttProperties properties) {
 		this.properties = properties;
 		return this;
+	}
+
+	public MqttSubscribeBuilder properties(Consumer<MqttSubscribeProperties> consumer) {
+		MqttSubscribeProperties subscribeProperties = new MqttSubscribeProperties(properties);
+		consumer.accept(subscribeProperties);
+		return properties(subscribeProperties.getProperties());
 	}
 
 	public MqttSubscribeMessage build() {

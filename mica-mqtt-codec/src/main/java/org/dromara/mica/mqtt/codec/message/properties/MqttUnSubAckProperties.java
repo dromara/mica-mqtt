@@ -22,18 +22,18 @@ import org.dromara.mica.mqtt.codec.properties.StringProperty;
 import org.dromara.mica.mqtt.codec.properties.UserProperty;
 
 /**
- * mqtt5 发布 ack 属性
+ * mqtt5 取消订阅确认属性
  *
  * @author L.cm
  */
-public class MqttPubAckProperty {
+public class MqttUnSubAckProperties {
 	private final MqttProperties properties;
 
-	public MqttPubAckProperty() {
+	public MqttUnSubAckProperties() {
 		this(new MqttProperties());
 	}
 
-	public MqttPubAckProperty(MqttProperties properties) {
+	public MqttUnSubAckProperties(MqttProperties properties) {
 		this.properties = properties;
 	}
 
@@ -45,20 +45,18 @@ public class MqttPubAckProperty {
 	 * 设置原因字符串
 	 *
 	 * @param reasonString 原因字符串
-	 * @return MqttPubAckProperty
 	 */
-	public MqttPubAckProperty setReasonString(String reasonString) {
+	public MqttUnSubAckProperties setReasonString(String reasonString) {
 		properties.add(new StringProperty(MqttPropertyType.REASON_STRING, reasonString));
 		return this;
 	}
 
 	/**
-	 * 添加用户属性
+	 * 设置用户属性
 	 *
 	 * @param userProperty 用户属性
-	 * @return MqttPubAckProperty
 	 */
-	public MqttPubAckProperty addUserProperty(UserProperty userProperty) {
+	public MqttUnSubAckProperties addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
 		return this;
 	}
@@ -68,9 +66,8 @@ public class MqttPubAckProperty {
 	 *
 	 * @param key   key
 	 * @param value value
-	 * @return MqttPubAckProperty
 	 */
-	public MqttPubAckProperty addUserProperty(String key, String value) {
+	public MqttUnSubAckProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
 		return this;
 	}

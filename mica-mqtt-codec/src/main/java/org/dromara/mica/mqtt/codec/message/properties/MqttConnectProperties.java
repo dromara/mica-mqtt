@@ -23,14 +23,14 @@ import org.dromara.mica.mqtt.codec.properties.*;
  *
  * @author L.cm
  */
-public class MqttConnectProperty {
+public class MqttConnectProperties {
 	private final MqttProperties properties;
 
-	public MqttConnectProperty() {
+	public MqttConnectProperties() {
 		this(new MqttProperties());
 	}
 
-	public MqttConnectProperty(MqttProperties properties) {
+	public MqttConnectProperties(MqttProperties properties) {
 		this.properties = properties;
 	}
 
@@ -44,7 +44,7 @@ public class MqttConnectProperty {
 	 * @param sessionExpiryInterval 会话过期时间
 	 * @return MqttConnectProperty
 	 */
-	public MqttConnectProperty setSessionExpiryInterval(int sessionExpiryInterval) {
+	public MqttConnectProperties setSessionExpiryInterval(int sessionExpiryInterval) {
 		properties.add(new IntegerProperty(MqttPropertyType.SESSION_EXPIRY_INTERVAL, sessionExpiryInterval));
 		return this;
 	}
@@ -55,7 +55,7 @@ public class MqttConnectProperty {
 	 * @param authenticationMethod 认证方法
 	 * @return MqttConnectProperty
 	 */
-	public MqttConnectProperty setAuthenticationMethod(String authenticationMethod) {
+	public MqttConnectProperties setAuthenticationMethod(String authenticationMethod) {
 		properties.add(new StringProperty(MqttPropertyType.AUTHENTICATION_METHOD, authenticationMethod));
 		return this;
 	}
@@ -66,7 +66,7 @@ public class MqttConnectProperty {
 	 * @param authenticationData 认证数据
 	 * @return MqttConnectProperty
 	 */
-	public MqttConnectProperty setAuthenticationData(byte[] authenticationData) {
+	public MqttConnectProperties setAuthenticationData(byte[] authenticationData) {
 		properties.add(new BinaryProperty(MqttPropertyType.AUTHENTICATION_DATA, authenticationData));
 		return this;
 	}
@@ -77,7 +77,7 @@ public class MqttConnectProperty {
 	 * @param requestProblemInformation 请求问题信息
 	 * @return MqttConnectProperty
 	 */
-	public MqttConnectProperty setRequestProblemInformation(boolean requestProblemInformation) {
+	public MqttConnectProperties setRequestProblemInformation(boolean requestProblemInformation) {
 		properties.add(new BooleanProperty(MqttPropertyType.REQUEST_PROBLEM_INFORMATION, requestProblemInformation));
 		return this;
 	}
@@ -88,7 +88,7 @@ public class MqttConnectProperty {
 	 * @param requestResponseInformation 请求响应信息
 	 * @return MqttConnectProperty
 	 */
-	public MqttConnectProperty setRequestResponseInformation(boolean requestResponseInformation) {
+	public MqttConnectProperties setRequestResponseInformation(boolean requestResponseInformation) {
 		properties.add(new BooleanProperty(MqttPropertyType.REQUEST_RESPONSE_INFORMATION, requestResponseInformation));
 		return this;
 	}
@@ -99,7 +99,7 @@ public class MqttConnectProperty {
 	 * @param receiveMaximum 接收最大包数
 	 * @return MqttConnectProperty
 	 */
-	public MqttConnectProperty setReceiveMaximum(int receiveMaximum) {
+	public MqttConnectProperties setReceiveMaximum(int receiveMaximum) {
 		properties.add(new IntegerProperty(MqttPropertyType.RECEIVE_MAXIMUM, receiveMaximum));
 		return this;
 	}
@@ -110,7 +110,7 @@ public class MqttConnectProperty {
 	 * @param topicAliasMaximum 主题别名最大数
 	 * @return MqttConnectProperty
 	 */
-	public MqttConnectProperty setTopicAliasMaximum(int topicAliasMaximum) {
+	public MqttConnectProperties setTopicAliasMaximum(int topicAliasMaximum) {
 		properties.add(new IntegerProperty(MqttPropertyType.TOPIC_ALIAS_MAXIMUM, topicAliasMaximum));
 		return this;
 	}
@@ -121,7 +121,7 @@ public class MqttConnectProperty {
 	 * @param maximumPacketSize 最大包大小
 	 * @return MqttConnectProperty
 	 */
-	public MqttConnectProperty setMaximumPacketSize(int maximumPacketSize) {
+	public MqttConnectProperties setMaximumPacketSize(int maximumPacketSize) {
 		properties.add(new IntegerProperty(MqttPropertyType.MAXIMUM_PACKET_SIZE, maximumPacketSize));
 		return this;
 	}
@@ -132,7 +132,7 @@ public class MqttConnectProperty {
 	 * @param userProperty 用户属性
 	 * @return MqttConnectProperty
 	 */
-	public MqttConnectProperty addUserProperty(UserProperty userProperty) {
+	public MqttConnectProperties addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
 		return this;
 	}
@@ -144,7 +144,7 @@ public class MqttConnectProperty {
 	 * @param value value
 	 * @return MqttConnectProperty
 	 */
-	public MqttConnectProperty addUserProperty(String key, String value) {
+	public MqttConnectProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
 		return this;
 	}

@@ -18,24 +18,27 @@ package org.dromara.mica.mqtt.codec.message.builder;
 
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttUnSubAckReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttUnSubAckMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubAckPayload;
+import org.dromara.mica.mqtt.codec.message.properties.MqttUnSubAckProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * MqttUnSubAckMessage builder
  * @author netty, L.cm
  */
 public final class MqttUnSubAckBuilder {
-	private final List<Short> reasonCodes = new ArrayList<>();
+	private final List<MqttUnSubAckReasonCode> reasonCodes = new ArrayList<>();
 	private int packetId;
-	private MqttProperties properties;
+	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
 	MqttUnSubAckBuilder() {
 	}
@@ -50,23 +53,45 @@ public final class MqttUnSubAckBuilder {
 		return this;
 	}
 
+	public MqttUnSubAckBuilder properties(Consumer<MqttUnSubAckProperties> consumer) {
+		MqttUnSubAckProperties unSubAckProperties = new MqttUnSubAckProperties(properties);
+		consumer.accept(unSubAckProperties);
+		return properties(unSubAckProperties.getProperties());
+	}
+
 	public MqttUnSubAckBuilder addReasonCode(short reasonCode) {
+		this.reasonCodes.add(MqttUnSubAckReasonCode.values()[reasonCode]);
+		return this;
+	}
+
+	public MqttUnSubAckBuilder addReasonCode(MqttUnSubAckReasonCode reasonCode) {
 		this.reasonCodes.add(reasonCode);
 		return this;
 	}
 
 	public MqttUnSubAckBuilder addReasonCodes(Short... reasonCodes) {
+		for (Short reasonCode : reasonCodes) {
+			this.reasonCodes.add(MqttUnSubAckReasonCode.values()[reasonCode]);
+		}
+		return this;
+	}
+
+	public MqttUnSubAckBuilder addReasonCodes(MqttUnSubAckReasonCode... reasonCodes) {
 		this.reasonCodes.addAll(Arrays.asList(reasonCodes));
 		return this;
 	}
 
 	public MqttUnSubAckMessage build() {
-		MqttFixedHeader mqttFixedHeader =
+		MqttFixedHeader mqttFixedHeader = 
 			new MqttFixedHeader(MqttMessageType.UNSUBACK, false, MqttQoS.QOS0, false, 0);
-		MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader =
+		MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader = 
 			new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
 
-		MqttUnsubAckPayload subAckPayload = new MqttUnsubAckPayload(reasonCodes);
+		List<Short> reasonCodeValues = new ArrayList<>();
+		for (MqttUnSubAckReasonCode reasonCode : reasonCodes) {
+			reasonCodeValues.add((short) reasonCode.value());
+		}
+		MqttUnsubAckPayload subAckPayload = new MqttUnsubAckPayload(reasonCodeValues);
 		return new MqttUnSubAckMessage(mqttFixedHeader, mqttSubAckVariableHeader, subAckPayload);
 	}
 }

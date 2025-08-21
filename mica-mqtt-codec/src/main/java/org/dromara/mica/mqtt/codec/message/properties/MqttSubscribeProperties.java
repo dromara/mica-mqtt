@@ -26,14 +26,14 @@ import org.dromara.mica.mqtt.codec.properties.UserProperty;
  *
  * @author L.cm
  */
-public class MqttSubscribeProperty {
+public class MqttSubscribeProperties {
 	private final MqttProperties properties;
 
-	public MqttSubscribeProperty() {
+	public MqttSubscribeProperties() {
 		this(new MqttProperties());
 	}
 
-	public MqttSubscribeProperty(MqttProperties properties) {
+	public MqttSubscribeProperties(MqttProperties properties) {
 		this.properties = properties;
 	}
 
@@ -45,9 +45,9 @@ public class MqttSubscribeProperty {
 	 * 设置订阅标识符
 	 *
 	 * @param subscriptionIdentifier 订阅标识符
-	 * @return MqttSubscribeProperty
+	 * @return MqttSubscribeProperties
 	 */
-	public MqttSubscribeProperty setSubscriptionIdentifier(int subscriptionIdentifier) {
+	public MqttSubscribeProperties setSubscriptionIdentifier(int subscriptionIdentifier) {
 		properties.add(new IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER, subscriptionIdentifier));
 		return this;
 	}
@@ -58,7 +58,7 @@ public class MqttSubscribeProperty {
 	 * @param userProperty 用户属性
 	 * @return MqttSubscribeProperty
 	 */
-	public MqttSubscribeProperty addUserProperty(UserProperty userProperty) {
+	public MqttSubscribeProperties addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
 		return this;
 	}
@@ -70,7 +70,7 @@ public class MqttSubscribeProperty {
 	 * @param value value
 	 * @return MqttSubscribeProperty
 	 */
-	public MqttSubscribeProperty addUserProperty(String key, String value) {
+	public MqttSubscribeProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
 		return this;
 	}

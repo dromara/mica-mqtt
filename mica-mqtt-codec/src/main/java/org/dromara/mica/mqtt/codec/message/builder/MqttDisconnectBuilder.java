@@ -18,20 +18,29 @@ package org.dromara.mica.mqtt.codec.message.builder;
 
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttReasonCodeAndPropertiesVariableHeader;
+import org.dromara.mica.mqtt.codec.message.properties.MqttDisconnectProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+
+import java.util.function.Consumer;
 
 /**
  * MqttDisconnectMessage builder
  * @author netty, L.cm
  */
 public final class MqttDisconnectBuilder {
-	private MqttProperties properties;
-	private byte reasonCode;
+	private MqttDisconnectReasonCode reasonCode;
+	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
 	MqttDisconnectBuilder() {
+	}
+
+	public MqttDisconnectBuilder reasonCode(MqttDisconnectReasonCode reasonCode) {
+		this.reasonCode = reasonCode;
+		return this;
 	}
 
 	public MqttDisconnectBuilder properties(MqttProperties properties) {
@@ -39,16 +48,17 @@ public final class MqttDisconnectBuilder {
 		return this;
 	}
 
-	public MqttDisconnectBuilder reasonCode(byte reasonCode) {
-		this.reasonCode = reasonCode;
-		return this;
+	public MqttDisconnectBuilder properties(Consumer<MqttDisconnectProperties> consumer) {
+		MqttDisconnectProperties disconnectProperties = new MqttDisconnectProperties(properties);
+		consumer.accept(disconnectProperties);
+		return properties(disconnectProperties.getProperties());
 	}
 
 	public MqttMessage build() {
 		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.DISCONNECT, false, MqttQoS.QOS0, false, 0);
 		MqttReasonCodeAndPropertiesVariableHeader mqttDisconnectVariableHeader =
-			new MqttReasonCodeAndPropertiesVariableHeader(reasonCode, properties);
+			new MqttReasonCodeAndPropertiesVariableHeader(reasonCode.value(), properties);
 
 		return new MqttMessage(mqttFixedHeader, mqttDisconnectVariableHeader);
 	}

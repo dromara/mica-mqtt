@@ -23,14 +23,14 @@ import org.dromara.mica.mqtt.codec.properties.*;
  *
  * @author L.cm
  */
-public class MqttConnAckProperty {
+public class MqttConnAckProperties {
 	private final MqttProperties properties;
 
-	public MqttConnAckProperty() {
+	public MqttConnAckProperties() {
 		this(new MqttProperties());
 	}
 
-	public MqttConnAckProperty(MqttProperties properties) {
+	public MqttConnAckProperties(MqttProperties properties) {
 		this.properties = properties;
 	}
 
@@ -44,7 +44,7 @@ public class MqttConnAckProperty {
 	 * @param sessionExpiryInterval 会话过期间隔
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setSessionExpiryInterval(int sessionExpiryInterval) {
+	public MqttConnAckProperties setSessionExpiryInterval(int sessionExpiryInterval) {
 		properties.add(new IntegerProperty(MqttPropertyType.SESSION_EXPIRY_INTERVAL, sessionExpiryInterval));
 		return this;
 	}
@@ -55,7 +55,7 @@ public class MqttConnAckProperty {
 	 * @param assignedClientIdentifier 客户端标识符
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setAssignedClientIdentifier(String assignedClientIdentifier) {
+	public MqttConnAckProperties setAssignedClientIdentifier(String assignedClientIdentifier) {
 		properties.add(new StringProperty(MqttPropertyType.ASSIGNED_CLIENT_IDENTIFIER, assignedClientIdentifier));
 		return this;
 	}
@@ -66,7 +66,7 @@ public class MqttConnAckProperty {
 	 * @param serverKeepAlive 保持连接时间
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setServerKeepAlive(int serverKeepAlive) {
+	public MqttConnAckProperties setServerKeepAlive(int serverKeepAlive) {
 		properties.add(new IntegerProperty(MqttPropertyType.SERVER_KEEP_ALIVE, serverKeepAlive));
 		return this;
 	}
@@ -77,7 +77,7 @@ public class MqttConnAckProperty {
 	 * @param authenticationMethod 认证方法
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setAuthenticationMethod(String authenticationMethod) {
+	public MqttConnAckProperties setAuthenticationMethod(String authenticationMethod) {
 		properties.add(new StringProperty(MqttPropertyType.AUTHENTICATION_METHOD, authenticationMethod));
 		return this;
 	}
@@ -88,7 +88,7 @@ public class MqttConnAckProperty {
 	 * @param authenticationData 认证数据
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setAuthenticationData(byte[] authenticationData) {
+	public MqttConnAckProperties setAuthenticationData(byte[] authenticationData) {
 		properties.add(new BinaryProperty(MqttPropertyType.AUTHENTICATION_DATA, authenticationData));
 		return this;
 	}
@@ -99,7 +99,7 @@ public class MqttConnAckProperty {
 	 * @param responseInformation 响应信息
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setResponseInformation(String responseInformation) {
+	public MqttConnAckProperties setResponseInformation(String responseInformation) {
 		properties.add(new StringProperty(MqttPropertyType.RESPONSE_INFORMATION, responseInformation));
 		return this;
 	}
@@ -110,7 +110,7 @@ public class MqttConnAckProperty {
 	 * @param serverReference 服务器引用
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setServerReference(String serverReference) {
+	public MqttConnAckProperties setServerReference(String serverReference) {
 		properties.add(new StringProperty(MqttPropertyType.SERVER_REFERENCE, serverReference));
 		return this;
 	}
@@ -121,7 +121,7 @@ public class MqttConnAckProperty {
 	 * @param receiveMaximum 接收最大数量
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setReceiveMaximum(int receiveMaximum) {
+	public MqttConnAckProperties setReceiveMaximum(int receiveMaximum) {
 		properties.add(new IntegerProperty(MqttPropertyType.RECEIVE_MAXIMUM, receiveMaximum));
 		return this;
 	}
@@ -132,7 +132,7 @@ public class MqttConnAckProperty {
 	 * @param topicAliasMaximum 主题别名最大值
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setTopicAliasMaximum(int topicAliasMaximum) {
+	public MqttConnAckProperties setTopicAliasMaximum(int topicAliasMaximum) {
 		properties.add(new IntegerProperty(MqttPropertyType.TOPIC_ALIAS_MAXIMUM, topicAliasMaximum));
 		return this;
 	}
@@ -143,7 +143,7 @@ public class MqttConnAckProperty {
 	 * @param maximumQos 最大QOS
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setMaximumQos(int maximumQos) {
+	public MqttConnAckProperties setMaximumQos(int maximumQos) {
 		properties.add(new IntegerProperty(MqttPropertyType.MAXIMUM_QOS, maximumQos));
 		return this;
 	}
@@ -154,7 +154,7 @@ public class MqttConnAckProperty {
 	 * @param retainAvailable 是否保留可用
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setRetainAvailable(boolean retainAvailable) {
+	public MqttConnAckProperties setRetainAvailable(boolean retainAvailable) {
 		properties.add(new BooleanProperty(MqttPropertyType.RETAIN_AVAILABLE, retainAvailable));
 		return this;
 	}
@@ -165,7 +165,7 @@ public class MqttConnAckProperty {
 	 * @param maximumPacketSize 最大数据包大小
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setMaximumPacketSize(int maximumPacketSize) {
+	public MqttConnAckProperties setMaximumPacketSize(int maximumPacketSize) {
 		properties.add(new IntegerProperty(MqttPropertyType.MAXIMUM_PACKET_SIZE, maximumPacketSize));
 		return this;
 	}
@@ -176,7 +176,7 @@ public class MqttConnAckProperty {
 	 * @param wildcardSubscriptionAvailable 是否通配符订阅可用
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setWildcardSubscriptionAvailable(boolean wildcardSubscriptionAvailable) {
+	public MqttConnAckProperties setWildcardSubscriptionAvailable(boolean wildcardSubscriptionAvailable) {
 		properties.add(new BooleanProperty(MqttPropertyType.WILDCARD_SUBSCRIPTION_AVAILABLE, wildcardSubscriptionAvailable));
 		return this;
 	}
@@ -187,7 +187,7 @@ public class MqttConnAckProperty {
 	 * @param subscriptionIdentifiersAvailable 是否订阅标识符可用
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setSubscriptionIdentifiersAvailable(boolean subscriptionIdentifiersAvailable) {
+	public MqttConnAckProperties setSubscriptionIdentifiersAvailable(boolean subscriptionIdentifiersAvailable) {
 		properties.add(new BooleanProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER_AVAILABLE, subscriptionIdentifiersAvailable));
 		return this;
 	}
@@ -198,7 +198,7 @@ public class MqttConnAckProperty {
 	 * @param sharedSubscriptionAvailable 是否共享订阅可用
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setSharedSubscriptionAvailable(boolean sharedSubscriptionAvailable) {
+	public MqttConnAckProperties setSharedSubscriptionAvailable(boolean sharedSubscriptionAvailable) {
 		properties.add(new BooleanProperty(MqttPropertyType.SHARED_SUBSCRIPTION_AVAILABLE, sharedSubscriptionAvailable));
 		return this;
 	}
@@ -209,7 +209,7 @@ public class MqttConnAckProperty {
 	 * @param reasonString 原因字符串
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty setReasonString(String reasonString) {
+	public MqttConnAckProperties setReasonString(String reasonString) {
 		properties.add(new StringProperty(MqttPropertyType.REASON_STRING, reasonString));
 		return this;
 	}
@@ -220,7 +220,7 @@ public class MqttConnAckProperty {
 	 * @param userProperty 用户属性
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty addUserProperty(UserProperty userProperty) {
+	public MqttConnAckProperties addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
 		return this;
 	}
@@ -232,7 +232,7 @@ public class MqttConnAckProperty {
 	 * @param value value
 	 * @return MqttConnAckProperty
 	 */
-	public MqttConnAckProperty addUserProperty(String key, String value) {
+	public MqttConnAckProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
 		return this;
 	}

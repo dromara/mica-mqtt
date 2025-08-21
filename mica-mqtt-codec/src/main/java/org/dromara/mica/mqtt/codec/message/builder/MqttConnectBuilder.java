@@ -23,14 +23,18 @@ import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
+import org.dromara.mica.mqtt.codec.message.properties.MqttConnectProperties;
+import org.dromara.mica.mqtt.codec.message.properties.MqttWillPublishProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+
+import java.util.function.Consumer;
 
 /**
  * MqttConnectMessage builder
+ *
  * @author netty, L.cm
  */
 public final class MqttConnectBuilder {
-
 	private MqttVersion version = MqttVersion.MQTT_3_1_1;
 	private String clientId;
 	private boolean cleanStart;
@@ -100,6 +104,12 @@ public final class MqttConnectBuilder {
 		return this;
 	}
 
+	public MqttConnectBuilder willProperties(Consumer<MqttWillPublishProperties> consumer) {
+		MqttWillPublishProperties willPublishProperties = new MqttWillPublishProperties();
+		consumer.accept(willPublishProperties);
+		return willProperties(willPublishProperties.getProperties());
+	}
+
 	public MqttConnectBuilder hasUser(boolean value) {
 		this.hasUser = value;
 		return this;
@@ -125,6 +135,12 @@ public final class MqttConnectBuilder {
 	public MqttConnectBuilder properties(MqttProperties properties) {
 		this.properties = properties;
 		return this;
+	}
+
+	public MqttConnectBuilder properties(Consumer<MqttConnectProperties> consumer) {
+		MqttConnectProperties connectProperties = new MqttConnectProperties();
+		consumer.accept(connectProperties);
+		return properties(connectProperties.getProperties());
 	}
 
 	public MqttConnectMessage build() {

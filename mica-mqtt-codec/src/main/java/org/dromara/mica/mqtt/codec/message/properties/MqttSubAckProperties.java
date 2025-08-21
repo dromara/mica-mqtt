@@ -26,14 +26,14 @@ import org.dromara.mica.mqtt.codec.properties.UserProperty;
  *
  * @author L.cm
  */
-public class MqttSubAckProperty {
+public class MqttSubAckProperties {
 	private final MqttProperties properties;
 
-	public MqttSubAckProperty() {
+	public MqttSubAckProperties() {
 		this(new MqttProperties());
 	}
 
-	public MqttSubAckProperty(MqttProperties properties) {
+	public MqttSubAckProperties(MqttProperties properties) {
 		this.properties = properties;
 	}
 
@@ -45,9 +45,9 @@ public class MqttSubAckProperty {
 	 * 设置原因字符串
 	 *
 	 * @param reasonString 原因字符串
-	 * @return MqttSubAckProperty
+	 * @return MqttSubAckProperties
 	 */
-	public MqttSubAckProperty setReasonString(String reasonString) {
+	public MqttSubAckProperties setReasonString(String reasonString) {
 		properties.add(new StringProperty(MqttPropertyType.REASON_STRING, reasonString));
 		return this;
 	}
@@ -58,7 +58,7 @@ public class MqttSubAckProperty {
 	 * @param userProperty 用户属性
 	 * @return MqttSubAckProperty
 	 */
-	public MqttSubAckProperty addUserProperty(UserProperty userProperty) {
+	public MqttSubAckProperties addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
 		return this;
 	}
@@ -70,7 +70,7 @@ public class MqttSubAckProperty {
 	 * @param value value
 	 * @return MqttSubAckProperty
 	 */
-	public MqttSubAckProperty addUserProperty(String key, String value) {
+	public MqttSubAckProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
 		return this;
 	}

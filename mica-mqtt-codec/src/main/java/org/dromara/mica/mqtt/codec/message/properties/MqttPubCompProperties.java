@@ -16,21 +16,24 @@
 
 package org.dromara.mica.mqtt.codec.message.properties;
 
-import org.dromara.mica.mqtt.codec.properties.*;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
+import org.dromara.mica.mqtt.codec.properties.StringProperty;
+import org.dromara.mica.mqtt.codec.properties.UserProperty;
 
 /**
- * MQTT5 DISCONNECT 属性类，用于存储断开连接相关的属性信息
+ * mqtt5 发布完成属性
  *
  * @author L.cm
  */
-public class MqttDisconnectProperty {
+public class MqttPubCompProperties {
 	private final MqttProperties properties;
 
-	public MqttDisconnectProperty() {
+	public MqttPubCompProperties() {
 		this(new MqttProperties());
 	}
 
-	public MqttDisconnectProperty(MqttProperties properties) {
+	public MqttPubCompProperties(MqttProperties properties) {
 		this.properties = properties;
 	}
 
@@ -39,45 +42,23 @@ public class MqttDisconnectProperty {
 	}
 
 	/**
-	 * 设置会话过期间隔
-	 *
-	 * @param interval 会话过期间隔
-	 * @return MqttDisconnectProperty
-	 */
-	public MqttDisconnectProperty setSessionExpiryInterval(int interval) {
-		properties.add(new IntegerProperty(MqttPropertyType.SESSION_EXPIRY_INTERVAL, interval));
-		return this;
-	}
-
-	/**
-	 * 设置服务器引用
-	 *
-	 * @param serverReference 服务器引用
-	 * @return MqttDisconnectProperty
-	 */
-	public MqttDisconnectProperty setServerReference(String serverReference) {
-		properties.add(new StringProperty(MqttPropertyType.SERVER_REFERENCE, serverReference));
-		return this;
-	}
-
-	/**
 	 * 设置原因字符串
 	 *
 	 * @param reasonString 原因字符串
-	 * @return MqttDisconnectProperty
+	 * @return MqttPubCompProperties
 	 */
-	public MqttDisconnectProperty setReasonString(String reasonString) {
+	public MqttPubCompProperties setReasonString(String reasonString) {
 		properties.add(new StringProperty(MqttPropertyType.REASON_STRING, reasonString));
 		return this;
 	}
 
 	/**
-	 * 设置用户属性
+	 * 添加用户属性
 	 *
 	 * @param userProperty 用户属性
-	 * @return MqttDisconnectProperty
+	 * @return MqttPubCompProperty
 	 */
-	public MqttDisconnectProperty addUserProperty(UserProperty userProperty) {
+	public MqttPubCompProperties addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
 		return this;
 	}
@@ -87,11 +68,10 @@ public class MqttDisconnectProperty {
 	 *
 	 * @param key   key
 	 * @param value value
-	 * @return MqttDisconnectProperty
+	 * @return MqttPubCompProperty
 	 */
-	public MqttDisconnectProperty addUserProperty(String key, String value) {
+	public MqttPubCompProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
 		return this;
 	}
-
 }

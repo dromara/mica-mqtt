@@ -23,14 +23,14 @@ import org.dromara.mica.mqtt.codec.properties.*;
  *
  * @author L.cm
  */
-public class MqttAuthProperty {
+public class MqttAuthProperties {
 	private final MqttProperties properties;
 
-	public MqttAuthProperty() {
+	public MqttAuthProperties() {
 		this(new MqttProperties());
 	}
 
-	public MqttAuthProperty(MqttProperties properties) {
+	public MqttAuthProperties(MqttProperties properties) {
 		this.properties = properties;
 	}
 
@@ -44,7 +44,7 @@ public class MqttAuthProperty {
 	 * @param authenticationMethod 认证方法
 	 * @return MqttAuthProperty
 	 */
-	public MqttAuthProperty setAuthenticationMethod(String authenticationMethod) {
+	public MqttAuthProperties setAuthenticationMethod(String authenticationMethod) {
 		properties.add(new StringProperty(MqttPropertyType.AUTHENTICATION_METHOD, authenticationMethod));
 		return this;
 	}
@@ -55,7 +55,7 @@ public class MqttAuthProperty {
 	 * @param authenticationData 认证数据
 	 * @return MqttAuthProperty
 	 */
-	public MqttAuthProperty setAuthenticationData(byte[] authenticationData) {
+	public MqttAuthProperties setAuthenticationData(byte[] authenticationData) {
 		properties.add(new BinaryProperty(MqttPropertyType.AUTHENTICATION_DATA, authenticationData));
 		return this;
 	}
@@ -66,7 +66,7 @@ public class MqttAuthProperty {
 	 * @param reasonString 原因字符串
 	 * @return MqttAuthProperty
 	 */
-	public MqttAuthProperty setReasonString(String reasonString) {
+	public MqttAuthProperties setReasonString(String reasonString) {
 		properties.add(new StringProperty(MqttPropertyType.REASON_STRING, reasonString));
 		return this;
 	}
@@ -77,7 +77,7 @@ public class MqttAuthProperty {
 	 * @param userProperty 用户属性
 	 * @return MqttAuthProperty
 	 */
-	public MqttAuthProperty addUserProperty(UserProperty userProperty) {
+	public MqttAuthProperties addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
 		return this;
 	}
@@ -89,7 +89,7 @@ public class MqttAuthProperty {
 	 * @param value value
 	 * @return MqttAuthProperty
 	 */
-	public MqttAuthProperty addUserProperty(String key, String value) {
+	public MqttAuthProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
 		return this;
 	}
