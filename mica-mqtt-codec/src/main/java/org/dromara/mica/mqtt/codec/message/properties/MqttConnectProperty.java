@@ -42,81 +42,99 @@ public class MqttConnectProperty {
 	 * 设置会话过期时间
 	 *
 	 * @param sessionExpiryInterval 会话过期时间
+	 * @return MqttConnectProperty
 	 */
-	public void setSessionExpiryInterval(int sessionExpiryInterval) {
+	public MqttConnectProperty setSessionExpiryInterval(int sessionExpiryInterval) {
 		properties.add(new IntegerProperty(MqttPropertyType.SESSION_EXPIRY_INTERVAL, sessionExpiryInterval));
+		return this;
 	}
 
 	/**
 	 * 设置认证方法
 	 *
 	 * @param authenticationMethod 认证方法
+	 * @return MqttConnectProperty
 	 */
-	public void setAuthenticationMethod(String authenticationMethod) {
+	public MqttConnectProperty setAuthenticationMethod(String authenticationMethod) {
 		properties.add(new StringProperty(MqttPropertyType.AUTHENTICATION_METHOD, authenticationMethod));
+		return this;
 	}
 
 	/**
 	 * 设置认证数据
 	 *
 	 * @param authenticationData 认证数据
+	 * @return MqttConnectProperty
 	 */
-	public void setAuthenticationData(byte[] authenticationData) {
+	public MqttConnectProperty setAuthenticationData(byte[] authenticationData) {
 		properties.add(new BinaryProperty(MqttPropertyType.AUTHENTICATION_DATA, authenticationData));
+		return this;
 	}
 
 	/**
 	 * 设置请求问题信息
 	 *
 	 * @param requestProblemInformation 请求问题信息
+	 * @return MqttConnectProperty
 	 */
-	public void setRequestProblemInformation(boolean requestProblemInformation) {
+	public MqttConnectProperty setRequestProblemInformation(boolean requestProblemInformation) {
 		properties.add(new BooleanProperty(MqttPropertyType.REQUEST_PROBLEM_INFORMATION, requestProblemInformation));
+		return this;
 	}
 
 	/**
 	 * 设置请求响应信息
 	 *
 	 * @param requestResponseInformation 请求响应信息
+	 * @return MqttConnectProperty
 	 */
-	public void setRequestResponseInformation(boolean requestResponseInformation) {
+	public MqttConnectProperty setRequestResponseInformation(boolean requestResponseInformation) {
 		properties.add(new BooleanProperty(MqttPropertyType.REQUEST_RESPONSE_INFORMATION, requestResponseInformation));
+		return this;
 	}
 
 	/**
 	 * 设置接收最大包数
 	 *
 	 * @param receiveMaximum 接收最大包数
+	 * @return MqttConnectProperty
 	 */
-	public void setReceiveMaximum(int receiveMaximum) {
+	public MqttConnectProperty setReceiveMaximum(int receiveMaximum) {
 		properties.add(new IntegerProperty(MqttPropertyType.RECEIVE_MAXIMUM, receiveMaximum));
+		return this;
 	}
 
 	/**
 	 * 设置主题别名最大数
 	 *
 	 * @param topicAliasMaximum 主题别名最大数
+	 * @return MqttConnectProperty
 	 */
-	public void setTopicAliasMaximum(int topicAliasMaximum) {
+	public MqttConnectProperty setTopicAliasMaximum(int topicAliasMaximum) {
 		properties.add(new IntegerProperty(MqttPropertyType.TOPIC_ALIAS_MAXIMUM, topicAliasMaximum));
+		return this;
 	}
 
 	/**
 	 * 设置最大包大小
 	 *
 	 * @param maximumPacketSize 最大包大小
+	 * @return MqttConnectProperty
 	 */
-	public void setMaximumPacketSize(int maximumPacketSize) {
+	public MqttConnectProperty setMaximumPacketSize(int maximumPacketSize) {
 		properties.add(new IntegerProperty(MqttPropertyType.MAXIMUM_PACKET_SIZE, maximumPacketSize));
+		return this;
 	}
 
 	/**
 	 * 设置用户属性
 	 *
 	 * @param userProperty 用户属性
+	 * @return MqttConnectProperty
 	 */
-	public void addUserProperty(UserProperty userProperty) {
+	public MqttConnectProperty addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
+		return this;
 	}
 
 	/**
@@ -124,8 +142,10 @@ public class MqttConnectProperty {
 	 *
 	 * @param key   key
 	 * @param value value
+	 * @return MqttConnectProperty
 	 */
-	public void addUserProperty(String key, String value) {
+	public MqttConnectProperty addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
+		return this;
 	}
 }

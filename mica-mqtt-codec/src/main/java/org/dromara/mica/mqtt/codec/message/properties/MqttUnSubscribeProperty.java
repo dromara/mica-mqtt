@@ -43,9 +43,11 @@ public class MqttUnSubscribeProperty {
 	 * 设置用户属性
 	 *
 	 * @param userProperty 用户属性
+	 * @return MqttUnSubscribeProperty
 	 */
-	public void addUserProperty(UserProperty userProperty) {
+	public MqttUnSubscribeProperty addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
+		return this;
 	}
 
 	/**
@@ -53,9 +55,11 @@ public class MqttUnSubscribeProperty {
 	 *
 	 * @param key   key
 	 * @param value value
+	 * @return MqttUnSubscribeProperty
 	 */
-	public void addUserProperty(String key, String value) {
+	public MqttUnSubscribeProperty addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
+		return this;
 	}
 
 }

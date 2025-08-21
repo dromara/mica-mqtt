@@ -42,63 +42,77 @@ public class MqttWillPublishProperty {
 	 * 设置负载格式指示器
 	 *
 	 * @param indicator 负载格式指示器 (0 表示未指定, 1 表示 UTF-8 编码)
+	 * @return MqttWillPublishProperty
 	 */
-	public void setPayloadFormatIndicator(int indicator) {
+	public MqttWillPublishProperty setPayloadFormatIndicator(int indicator) {
 		properties.add(new IntegerProperty(MqttPropertyType.PAYLOAD_FORMAT_INDICATOR, indicator));
+		return this;
 	}
 
 	/**
 	 * 设置消息过期时间间隔
 	 *
 	 * @param interval 消息过期时间间隔（秒）
+	 * @return MqttWillPublishProperty
 	 */
-	public void setMessageExpiryInterval(int interval) {
+	public MqttWillPublishProperty setMessageExpiryInterval(int interval) {
 		properties.add(new IntegerProperty(MqttPropertyType.MESSAGE_EXPIRY_INTERVAL, interval));
+		return this;
 	}
 
 	/**
 	 * 设置关联数据
 	 *
 	 * @param correlationData 关联数据
+	 * @return MqttWillPublishProperty
 	 */
-	public void setCorrelationData(byte[] correlationData) {
+	public MqttWillPublishProperty setCorrelationData(byte[] correlationData) {
 		properties.add(new BinaryProperty(MqttPropertyType.CORRELATION_DATA, correlationData));
+		return this;
 	}
 
 	/**
 	 * 设置内容类型
 	 *
 	 * @param contentType 内容类型
+	 * @return MqttWillPublishProperty
 	 */
-	public void setContentType(String contentType) {
+	public MqttWillPublishProperty setContentType(String contentType) {
 		properties.add(new StringProperty(MqttPropertyType.CONTENT_TYPE, contentType));
+		return this;
 	}
 
 	/**
 	 * 设置响应主题
 	 *
 	 * @param responseTopic 响应主题
+	 * @return MqttWillPublishProperty
 	 */
-	public void setResponseTopic(String responseTopic) {
+	public MqttWillPublishProperty setResponseTopic(String responseTopic) {
 		properties.add(new StringProperty(MqttPropertyType.RESPONSE_TOPIC, responseTopic));
+		return this;
 	}
 
 	/**
 	 * 设置遗嘱延迟时间间隔
 	 *
 	 * @param interval 遗嘱延迟时间间隔（秒）
+	 * @return MqttWillPublishProperty
 	 */
-	public void setWillDelayInterval(int interval) {
+	public MqttWillPublishProperty setWillDelayInterval(int interval) {
 		properties.add(new IntegerProperty(MqttPropertyType.WILL_DELAY_INTERVAL, interval));
+		return this;
 	}
 
 	/**
 	 * 设置用户属性
 	 *
 	 * @param userProperty 用户属性
+	 * @return MqttWillPublishProperty
 	 */
-	public void addUserProperty(UserProperty userProperty) {
+	public MqttWillPublishProperty addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
+		return this;
 	}
 
 	/**
@@ -106,9 +120,11 @@ public class MqttWillPublishProperty {
 	 *
 	 * @param key   key
 	 * @param value value
+	 * @return MqttWillPublishProperty
 	 */
-	public void addUserProperty(String key, String value) {
+	public MqttWillPublishProperty addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
+		return this;
 	}
 
 }

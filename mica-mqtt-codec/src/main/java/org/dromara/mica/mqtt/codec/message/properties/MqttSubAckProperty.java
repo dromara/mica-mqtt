@@ -45,18 +45,22 @@ public class MqttSubAckProperty {
 	 * 设置原因字符串
 	 *
 	 * @param reasonString 原因字符串
+	 * @return MqttSubAckProperty
 	 */
-	public void setReasonString(String reasonString) {
+	public MqttSubAckProperty setReasonString(String reasonString) {
 		properties.add(new StringProperty(MqttPropertyType.REASON_STRING, reasonString));
+		return this;
 	}
 
 	/**
 	 * 设置用户属性
 	 *
 	 * @param userProperty 用户属性
+	 * @return MqttSubAckProperty
 	 */
-	public void addUserProperty(UserProperty userProperty) {
+	public MqttSubAckProperty addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
+		return this;
 	}
 
 	/**
@@ -64,9 +68,11 @@ public class MqttSubAckProperty {
 	 *
 	 * @param key   key
 	 * @param value value
+	 * @return MqttSubAckProperty
 	 */
-	public void addUserProperty(String key, String value) {
+	public MqttSubAckProperty addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
+		return this;
 	}
 
 }

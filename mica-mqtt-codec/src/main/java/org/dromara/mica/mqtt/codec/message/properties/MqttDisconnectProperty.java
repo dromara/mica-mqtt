@@ -42,36 +42,44 @@ public class MqttDisconnectProperty {
 	 * 设置会话过期间隔
 	 *
 	 * @param interval 会话过期间隔
+	 * @return MqttDisconnectProperty
 	 */
-	public void setSessionExpiryInterval(int interval) {
+	public MqttDisconnectProperty setSessionExpiryInterval(int interval) {
 		properties.add(new IntegerProperty(MqttPropertyType.SESSION_EXPIRY_INTERVAL, interval));
+		return this;
 	}
 
 	/**
 	 * 设置服务器引用
 	 *
 	 * @param serverReference 服务器引用
+	 * @return MqttDisconnectProperty
 	 */
-	public void setServerReference(String serverReference) {
+	public MqttDisconnectProperty setServerReference(String serverReference) {
 		properties.add(new StringProperty(MqttPropertyType.SERVER_REFERENCE, serverReference));
+		return this;
 	}
 
 	/**
 	 * 设置原因字符串
 	 *
 	 * @param reasonString 原因字符串
+	 * @return MqttDisconnectProperty
 	 */
-	public void setReasonString(String reasonString) {
+	public MqttDisconnectProperty setReasonString(String reasonString) {
 		properties.add(new StringProperty(MqttPropertyType.REASON_STRING, reasonString));
+		return this;
 	}
 
 	/**
 	 * 设置用户属性
 	 *
 	 * @param userProperty 用户属性
+	 * @return MqttDisconnectProperty
 	 */
-	public void addUserProperty(UserProperty userProperty) {
+	public MqttDisconnectProperty addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
+		return this;
 	}
 
 	/**
@@ -79,9 +87,11 @@ public class MqttDisconnectProperty {
 	 *
 	 * @param key   key
 	 * @param value value
+	 * @return MqttDisconnectProperty
 	 */
-	public void addUserProperty(String key, String value) {
+	public MqttDisconnectProperty addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
+		return this;
 	}
 
 }

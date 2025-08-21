@@ -42,36 +42,44 @@ public class MqttAuthProperty {
 	 * 设置认证方法
 	 *
 	 * @param authenticationMethod 认证方法
+	 * @return MqttAuthProperty
 	 */
-	public void setAuthenticationMethod(String authenticationMethod) {
+	public MqttAuthProperty setAuthenticationMethod(String authenticationMethod) {
 		properties.add(new StringProperty(MqttPropertyType.AUTHENTICATION_METHOD, authenticationMethod));
+		return this;
 	}
 
 	/**
 	 * 设置认证数据
 	 *
 	 * @param authenticationData 认证数据
+	 * @return MqttAuthProperty
 	 */
-	public void setAuthenticationData(byte[] authenticationData) {
+	public MqttAuthProperty setAuthenticationData(byte[] authenticationData) {
 		properties.add(new BinaryProperty(MqttPropertyType.AUTHENTICATION_DATA, authenticationData));
+		return this;
 	}
 
 	/**
 	 * 设置原因字符串
 	 *
 	 * @param reasonString 原因字符串
+	 * @return MqttAuthProperty
 	 */
-	public void setReasonString(String reasonString) {
+	public MqttAuthProperty setReasonString(String reasonString) {
 		properties.add(new StringProperty(MqttPropertyType.REASON_STRING, reasonString));
+		return this;
 	}
 
 	/**
 	 * 设置用户属性
 	 *
 	 * @param userProperty 用户属性
+	 * @return MqttAuthProperty
 	 */
-	public void addUserProperty(UserProperty userProperty) {
+	public MqttAuthProperty addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
+		return this;
 	}
 
 	/**
@@ -79,9 +87,11 @@ public class MqttAuthProperty {
 	 *
 	 * @param key   key
 	 * @param value value
+	 * @return MqttAuthProperty
 	 */
-	public void addUserProperty(String key, String value) {
+	public MqttAuthProperty addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
+		return this;
 	}
 
 }

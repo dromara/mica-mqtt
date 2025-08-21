@@ -45,18 +45,22 @@ public class MqttSubscribeProperty {
 	 * 设置订阅标识符
 	 *
 	 * @param subscriptionIdentifier 订阅标识符
+	 * @return MqttSubscribeProperty
 	 */
-	public void setSubscriptionIdentifier(int subscriptionIdentifier) {
+	public MqttSubscribeProperty setSubscriptionIdentifier(int subscriptionIdentifier) {
 		properties.add(new IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER, subscriptionIdentifier));
+		return this;
 	}
 
 	/**
 	 * 设置用户属性
 	 *
 	 * @param userProperty 用户属性
+	 * @return MqttSubscribeProperty
 	 */
-	public void addUserProperty(UserProperty userProperty) {
+	public MqttSubscribeProperty addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
+		return this;
 	}
 
 	/**
@@ -64,8 +68,10 @@ public class MqttSubscribeProperty {
 	 *
 	 * @param key   key
 	 * @param value value
+	 * @return MqttSubscribeProperty
 	 */
-	public void addUserProperty(String key, String value) {
+	public MqttSubscribeProperty addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
+		return this;
 	}
 }

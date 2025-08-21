@@ -42,72 +42,88 @@ public class MqttPublishProperty {
 	 * 设置负载格式指示器
 	 *
 	 * @param indicator 负载格式指示器 (0 表示未指定, 1 表示 UTF-8 编码)
+	 * @return MqttPublishProperty
 	 */
-	public void setPayloadFormatIndicator(int indicator) {
+	public MqttPublishProperty setPayloadFormatIndicator(int indicator) {
 		properties.add(new IntegerProperty(MqttPropertyType.PAYLOAD_FORMAT_INDICATOR, indicator));
+		return this;
 	}
 
 	/**
 	 * 设置消息过期时间间隔
 	 *
 	 * @param interval 消息过期时间间隔（秒）
+	 * @return MqttPublishProperty
 	 */
-	public void setMessageExpiryInterval(int interval) {
+	public MqttPublishProperty setMessageExpiryInterval(int interval) {
 		properties.add(new IntegerProperty(MqttPropertyType.MESSAGE_EXPIRY_INTERVAL, interval));
+		return this;
 	}
 
 	/**
 	 * 设置关联数据
 	 *
 	 * @param correlationData 关联数据
+	 * @return MqttPublishProperty
 	 */
-	public void setCorrelationData(byte[] correlationData) {
+	public MqttPublishProperty setCorrelationData(byte[] correlationData) {
 		properties.add(new BinaryProperty(MqttPropertyType.CORRELATION_DATA, correlationData));
+		return this;
 	}
 
 	/**
 	 * 设置内容类型
 	 *
 	 * @param contentType 内容类型
+	 * @return MqttPublishProperty
 	 */
-	public void setContentType(String contentType) {
+	public MqttPublishProperty setContentType(String contentType) {
 		properties.add(new StringProperty(MqttPropertyType.CONTENT_TYPE, contentType));
+		return this;
 	}
 
 	/**
 	 * 设置响应主题
 	 *
 	 * @param responseTopic 响应主题
+	 * @return MqttPublishProperty
 	 */
-	public void setResponseTopic(String responseTopic) {
+	public MqttPublishProperty setResponseTopic(String responseTopic) {
 		properties.add(new StringProperty(MqttPropertyType.RESPONSE_TOPIC, responseTopic));
+		return this;
 	}
 
 	/**
 	 * 设置订阅标识符
 	 *
 	 * @param subscriptionIdentifier 订阅标识符
+	 * @return MqttPublishProperty
 	 */
-	public void setSubscriptionIdentifier(int subscriptionIdentifier) {
+	public MqttPublishProperty setSubscriptionIdentifier(int subscriptionIdentifier) {
 		properties.add(new IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER, subscriptionIdentifier));
+		return this;
 	}
 
 	/**
 	 * 设置主题别名
 	 *
 	 * @param topicAlias 主题别名
+	 * @return MqttPublishProperty
 	 */
-	public void setTopicAlias(int topicAlias) {
+	public MqttPublishProperty setTopicAlias(int topicAlias) {
 		properties.add(new IntegerProperty(MqttPropertyType.TOPIC_ALIAS, topicAlias));
+		return this;
 	}
 
 	/**
 	 * 设置用户属性
 	 *
 	 * @param userProperty 用户属性
+	 * @return MqttPublishProperty
 	 */
-	public void addUserProperty(UserProperty userProperty) {
+	public MqttPublishProperty addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
+		return this;
 	}
 
 	/**
@@ -115,8 +131,10 @@ public class MqttPublishProperty {
 	 *
 	 * @param key   key
 	 * @param value value
+	 * @return MqttPublishProperty
 	 */
-	public void addUserProperty(String key, String value) {
+	public MqttPublishProperty addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
+		return this;
 	}
 }
