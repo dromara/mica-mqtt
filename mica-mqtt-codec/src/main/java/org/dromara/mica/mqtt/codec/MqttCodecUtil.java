@@ -71,17 +71,6 @@ public final class MqttCodecUtil {
 		return false;
 	}
 
-	/**
-	 * 是否校验过的 topicName
-	 *
-	 * @param topicName topicName
-	 * @return 是否校验过的 topicName
-	 */
-	public static boolean isValidPublishTopicName(String topicName) {
-		// publish topic name must not contain any wildcard
-		return !isTopicFilter(topicName);
-	}
-
 	protected static boolean isValidClientId(MqttVersion mqttVersion, int maxClientIdLength, String clientId) {
 		if (clientId == null) {
 			return false;

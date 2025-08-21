@@ -686,7 +686,8 @@ public final class MqttDecoder {
 		MqttFixedHeader mqttFixedHeader) {
 		final MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		final Result<String> decodedTopic = decodeString(buffer);
-		if (!MqttCodecUtil.isValidPublishTopicName(decodedTopic.value)) {
+		// 校验发布的 topic name，不能包含通配符
+		if (MqttCodecUtil.isTopicFilter(decodedTopic.value)) {
 			throw new DecoderException("invalid publish topic name: " + decodedTopic.value + " (contains wildcards)");
 		}
 		int numberOfBytesConsumed = decodedTopic.numberOfBytesConsumed;
