@@ -68,6 +68,9 @@ public class FastTemplateParser {
 	 * 提取变量值
 	 * 示例输入："abcDreamluxxHellocc"
 	 * 输出：{name=Dreamlu, like=Hello}
+	 * 
+	 * @param input 输入字符串
+	 * @return 变量映射，解析失败时返回空Map
 	 */
 	public Map<String, String> parse(String input) {
 		// 预检查：长度不匹配时快速失败
@@ -114,14 +117,35 @@ public class FastTemplateParser {
 		return (currentPos == input.length()) ? result : Collections.emptyMap();
 	}
 
+	/**
+	 * 尝试解析并返回 Optional 结果
+	 * 
+	 * @param input 输入字符串
+	 * @return 解析结果的 Optional，解析失败时为空
+	 */
+	public Optional<Map<String, String>> tryParse(String input) {
+		Map<String, String> result = parse(input);
+		return result.isEmpty() ? Optional.empty() : Optional.of(result);
+	}
+
 	// 测试用例
 	public static void main(String[] args) {
 		FastTemplateParser parser = new FastTemplateParser("/abc/${name}xx${like}/cc");
+		
+		// 测试成功解析
 		Map<String, String> res = parser.parse("/abc/DreamluxxHello/cc");
-		System.out.println(res); // {name=Dreamlu, like=Hello}
+		System.out.println("成功解析: " + res); // {name=Dreamlu, like=Hello}
+		
+		// 测试新的 Optional API
+		Optional<Map<String, String>> optResult = parser.tryParse("/abc/DreamluxxHello/cc");
+		System.out.println("Optional 解析成功: " + optResult.isPresent()); // true
+		
 		// 异常测试
 		Map<String, String> errRes = parser.parse("/abc/ERRORxxHello/cc");
-		System.out.println(errRes); // {}
+		System.out.println("解析失败: " + errRes); // {}
+		
+		Optional<Map<String, String>> optErrRes = parser.tryParse("/abc/ERRORxxHello/cc");
+		System.out.println("Optional 解析失败: " + optErrRes.isPresent()); // false
 	}
 
 }

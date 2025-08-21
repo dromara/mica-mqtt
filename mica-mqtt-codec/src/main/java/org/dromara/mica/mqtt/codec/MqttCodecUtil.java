@@ -60,8 +60,20 @@ public final class MqttCodecUtil {
 	 * @return 是否 topic filter
 	 */
 	public static boolean isTopicFilter(String topicFilter) {
-		// 从尾部开始遍历，因为 + # 一般出现在 topicFilter 的尾部
-		for (int i = topicFilter.length() - 1; i >= 0; i--) {
+		if (topicFilter == null || topicFilter.isEmpty()) {
+			return false;
+		}
+		
+		// 优化：先检查最常见的通配符位置
+		int length = topicFilter.length();
+		
+		// 检查末尾是否为 '#'（最常见的情况）
+		if (topicFilter.charAt(length - 1) == TOPIC_WILDCARDS_MORE) {
+			return true;
+		}
+		
+		// 从尾部开始遍历查找 '+' 或其他位置的 '#'
+		for (int i = length - 2; i >= 0; i--) {
 			char ch = topicFilter.charAt(i);
 			if (TOPIC_WILDCARDS_ONE == ch || TOPIC_WILDCARDS_MORE == ch) {
 				return true;
@@ -78,7 +90,8 @@ public final class MqttCodecUtil {
 	 */
 	public static boolean isValidPublishTopicName(String topicName) {
 		// publish topic name must not contain any wildcard
-		return !isTopicFilter(topicName);
+		// 优化：直接调用 isTopicFilter 并取反，避免重复逻辑
+		return topicName != null && !isTopicFilter(topicName);
 	}
 
 	protected static boolean isValidClientId(MqttVersion mqttVersion, int maxClientIdLength, String clientId) {
@@ -98,26 +111,11 @@ public final class MqttCodecUtil {
 		}
 	}
 
-	protected static MqttFixedHeader validateFixedHeader(ChannelContext ctx, MqttFixedHeader mqttFixedHeader) {
-		switch (mqttFixedHeader.messageType()) {
-			case PUBREL:
-			case SUBSCRIBE:
-			case UNSUBSCRIBE:
-				if (MqttQoS.QOS1 != mqttFixedHeader.qosLevel()) {
-					throw new DecoderException(mqttFixedHeader.messageType().name() + " message must have QoS 1");
-				}
-				return mqttFixedHeader;
-			case AUTH:
-				if (MqttVersion.MQTT_5 != MqttCodecUtil.getMqttVersion(ctx)) {
-					throw new DecoderException("AUTH message requires at least MQTT 5");
-				}
-				return mqttFixedHeader;
-			default:
-				return mqttFixedHeader;
-		}
-	}
-
 	// 预定义消息类型集合，提高查找性能
+	private static final Set<MqttMessageType> QOS1_REQUIRED_TYPES = EnumSet.of(
+		MqttMessageType.PUBREL, MqttMessageType.SUBSCRIBE, MqttMessageType.UNSUBSCRIBE
+	);
+
 	private static final Set<MqttMessageType> RESET_ALL_FLAGS_TYPES = EnumSet.of(
 		MqttMessageType.CONNECT, MqttMessageType.CONNACK, MqttMessageType.PUBACK,
 		MqttMessageType.PUBREC, MqttMessageType.PUBCOMP, MqttMessageType.SUBACK,
@@ -128,6 +126,22 @@ public final class MqttCodecUtil {
 	private static final Set<MqttMessageType> RESET_RETAIN_ONLY_TYPES = EnumSet.of(
 		MqttMessageType.PUBREL, MqttMessageType.SUBSCRIBE, MqttMessageType.UNSUBSCRIBE
 	);
+
+	protected static MqttFixedHeader validateFixedHeader(ChannelContext ctx, MqttFixedHeader mqttFixedHeader) {
+		MqttMessageType messageType = mqttFixedHeader.messageType();
+		
+		if (QOS1_REQUIRED_TYPES.contains(messageType)) {
+			if (MqttQoS.QOS1 != mqttFixedHeader.qosLevel()) {
+				throw new DecoderException(messageType.name() + " message must have QoS 1");
+			}
+		} else if (MqttMessageType.AUTH == messageType) {
+			if (MqttVersion.MQTT_5 != MqttCodecUtil.getMqttVersion(ctx)) {
+				throw new DecoderException("AUTH message requires at least MQTT 5");
+			}
+		}
+		
+		return mqttFixedHeader;
+	}
 
 	protected static MqttFixedHeader resetUnusedFields(MqttFixedHeader mqttFixedHeader) {
 		MqttMessageType messageType = mqttFixedHeader.messageType();
