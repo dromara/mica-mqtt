@@ -54,7 +54,7 @@ public final class MqttUnSubAckBuilder {
 	}
 
 	public MqttUnSubAckBuilder properties(Consumer<MqttUnSubAckProperties> consumer) {
-		MqttUnSubAckProperties unSubAckProperties = new MqttUnSubAckProperties(properties);
+		MqttUnSubAckProperties unSubAckProperties = new MqttUnSubAckProperties();
 		consumer.accept(unSubAckProperties);
 		return properties(unSubAckProperties.getProperties());
 	}
@@ -82,9 +82,9 @@ public final class MqttUnSubAckBuilder {
 	}
 
 	public MqttUnSubAckMessage build() {
-		MqttFixedHeader mqttFixedHeader = 
+		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.UNSUBACK, false, MqttQoS.QOS0, false, 0);
-		MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader = 
+		MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader =
 			new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
 
 		List<Short> reasonCodeValues = new ArrayList<>();

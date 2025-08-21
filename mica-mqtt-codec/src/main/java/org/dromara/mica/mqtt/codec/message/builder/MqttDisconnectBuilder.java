@@ -49,7 +49,7 @@ public final class MqttDisconnectBuilder {
 	}
 
 	public MqttDisconnectBuilder properties(Consumer<MqttDisconnectProperties> consumer) {
-		MqttDisconnectProperties disconnectProperties = new MqttDisconnectProperties(properties);
+		MqttDisconnectProperties disconnectProperties = new MqttDisconnectProperties();
 		consumer.accept(disconnectProperties);
 		return properties(disconnectProperties.getProperties());
 	}

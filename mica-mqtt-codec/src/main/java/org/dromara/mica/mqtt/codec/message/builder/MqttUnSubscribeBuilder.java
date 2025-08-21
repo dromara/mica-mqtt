@@ -64,7 +64,7 @@ public final class MqttUnSubscribeBuilder {
 	}
 
 	public MqttUnSubscribeBuilder properties(Consumer<MqttUnSubscribeProperties> consumer) {
-		MqttUnSubscribeProperties unSubscribeProperties = new MqttUnSubscribeProperties(properties);
+		MqttUnSubscribeProperties unSubscribeProperties = new MqttUnSubscribeProperties();
 		consumer.accept(unSubscribeProperties);
 		return properties(unSubscribeProperties.getProperties());
 	}

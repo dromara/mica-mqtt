@@ -50,7 +50,7 @@ public final class MqttAuthBuilder {
 	}
 
 	public MqttAuthBuilder properties(Consumer<MqttAuthProperties> consumer) {
-		MqttAuthProperties authProperties = new MqttAuthProperties(properties);
+		MqttAuthProperties authProperties = new MqttAuthProperties();
 		consumer.accept(authProperties);
 		return properties(authProperties.getProperties());
 	}

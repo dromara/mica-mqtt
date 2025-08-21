@@ -37,7 +37,7 @@ public final class MqttPublishBuilder {
 	private MqttQoS qos;
 	private byte[] payload;
 	private int messageId;
-	private MqttProperties mqttProperties = MqttProperties.NO_PROPERTIES;
+	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
 	MqttPublishBuilder() {
 	}
@@ -68,12 +68,12 @@ public final class MqttPublishBuilder {
 	}
 
 	public MqttPublishBuilder properties(MqttProperties properties) {
-		this.mqttProperties = properties;
+		this.properties = properties;
 		return this;
 	}
 
 	public MqttPublishBuilder properties(Consumer<MqttPublishProperties> consumer) {
-		MqttPublishProperties publishProperties = new MqttPublishProperties(mqttProperties);
+		MqttPublishProperties publishProperties = new MqttPublishProperties();
 		consumer.accept(publishProperties);
 		return properties(publishProperties.getProperties());
 	}
@@ -85,7 +85,7 @@ public final class MqttPublishBuilder {
 	public MqttPublishMessage build() {
 		MqttFixedHeader mqttFixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, retained, 0);
 		MqttPublishVariableHeader mqttVariableHeader =
-			new MqttPublishVariableHeader(topic, messageId, mqttProperties);
+			new MqttPublishVariableHeader(topic, messageId, properties);
 		return new MqttPublishMessage(mqttFixedHeader, mqttVariableHeader, payload);
 	}
 }

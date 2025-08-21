@@ -55,7 +55,7 @@ public final class MqttSubAckBuilder {
 	}
 
 	public MqttSubAckBuilder properties(Consumer<MqttSubAckProperties> consumer) {
-		MqttSubAckProperties subAckProperties = new MqttSubAckProperties(properties);
+		MqttSubAckProperties subAckProperties = new MqttSubAckProperties();
 		consumer.accept(subAckProperties);
 		return properties(subAckProperties.getProperties());
 	}
@@ -90,9 +90,9 @@ public final class MqttSubAckBuilder {
 	}
 
 	public MqttSubAckMessage build() {
-		MqttFixedHeader mqttFixedHeader = 
+		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.SUBACK, false, MqttQoS.QOS0, false, 0);
-		MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader = 
+		MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader =
 			new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
 		// transform to primitive types
 		short[] grantedQosArray = new short[this.reasonCodes.size()];

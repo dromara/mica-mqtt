@@ -60,15 +60,15 @@ public final class MqttPubAckBuilder {
 	}
 
 	public MqttPubAckBuilder properties(Consumer<MqttPubAckProperties> consumer) {
-		MqttPubAckProperties pubAckProperties = new MqttPubAckProperties(properties);
+		MqttPubAckProperties pubAckProperties = new MqttPubAckProperties();
 		consumer.accept(pubAckProperties);
 		return properties(pubAckProperties.getProperties());
 	}
 
 	public MqttMessage build() {
-		MqttFixedHeader mqttFixedHeader = 
+		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.PUBACK, false, MqttQoS.QOS0, false, 0);
-		MqttPubReplyMessageVariableHeader mqttPubAckVariableHeader = 
+		MqttPubReplyMessageVariableHeader mqttPubAckVariableHeader =
 			new MqttPubReplyMessageVariableHeader(packetId, reasonCode != null ? reasonCode.value() : 0, properties);
 		return new MqttMessage(mqttFixedHeader, mqttPubAckVariableHeader);
 	}

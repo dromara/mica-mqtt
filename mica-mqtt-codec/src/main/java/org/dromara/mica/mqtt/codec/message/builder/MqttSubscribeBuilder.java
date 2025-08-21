@@ -73,7 +73,7 @@ public final class MqttSubscribeBuilder {
 	}
 
 	public MqttSubscribeBuilder properties(Consumer<MqttSubscribeProperties> consumer) {
-		MqttSubscribeProperties subscribeProperties = new MqttSubscribeProperties(properties);
+		MqttSubscribeProperties subscribeProperties = new MqttSubscribeProperties();
 		consumer.accept(subscribeProperties);
 		return properties(subscribeProperties.getProperties());
 	}
