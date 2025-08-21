@@ -20,6 +20,9 @@ import org.dromara.mica.mqtt.codec.exception.DecoderException;
 import org.dromara.mica.mqtt.codec.exception.MqttUnacceptableProtocolVersionException;
 import org.tio.core.ChannelContext;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 /**
  * 编解码工具
  *
@@ -114,44 +117,44 @@ public final class MqttCodecUtil {
 		}
 	}
 
+	// 预定义消息类型集合，提高查找性能
+	private static final Set<MqttMessageType> RESET_ALL_FLAGS_TYPES = EnumSet.of(
+		MqttMessageType.CONNECT, MqttMessageType.CONNACK, MqttMessageType.PUBACK,
+		MqttMessageType.PUBREC, MqttMessageType.PUBCOMP, MqttMessageType.SUBACK,
+		MqttMessageType.UNSUBACK, MqttMessageType.PINGREQ, MqttMessageType.PINGRESP,
+		MqttMessageType.DISCONNECT
+	);
+	
+	private static final Set<MqttMessageType> RESET_RETAIN_ONLY_TYPES = EnumSet.of(
+		MqttMessageType.PUBREL, MqttMessageType.SUBSCRIBE, MqttMessageType.UNSUBSCRIBE
+	);
+
 	protected static MqttFixedHeader resetUnusedFields(MqttFixedHeader mqttFixedHeader) {
-		switch (mqttFixedHeader.messageType()) {
-			case CONNECT:
-			case CONNACK:
-			case PUBACK:
-			case PUBREC:
-			case PUBCOMP:
-			case SUBACK:
-			case UNSUBACK:
-			case PINGREQ:
-			case PINGRESP:
-			case DISCONNECT:
-				if (mqttFixedHeader.isDup() ||
-					MqttQoS.QOS0 != mqttFixedHeader.qosLevel() ||
-					mqttFixedHeader.isRetain()) {
-					return new MqttFixedHeader(
-						mqttFixedHeader.messageType(),
-						false,
-						MqttQoS.QOS0,
-						false,
-						mqttFixedHeader.remainingLength());
-				}
-				return mqttFixedHeader;
-			case PUBREL:
-			case SUBSCRIBE:
-			case UNSUBSCRIBE:
-				if (mqttFixedHeader.isRetain()) {
-					return new MqttFixedHeader(
-						mqttFixedHeader.messageType(),
-						mqttFixedHeader.isDup(),
-						mqttFixedHeader.qosLevel(),
-						false,
-						mqttFixedHeader.remainingLength());
-				}
-				return mqttFixedHeader;
-			default:
-				return mqttFixedHeader;
+		MqttMessageType messageType = mqttFixedHeader.messageType();
+		
+		if (RESET_ALL_FLAGS_TYPES.contains(messageType)) {
+			if (mqttFixedHeader.isDup() ||
+				MqttQoS.QOS0 != mqttFixedHeader.qosLevel() ||
+				mqttFixedHeader.isRetain()) {
+				return new MqttFixedHeader(
+					messageType,
+					false,
+					MqttQoS.QOS0,
+					false,
+					mqttFixedHeader.remainingLength());
+			}
+		} else if (RESET_RETAIN_ONLY_TYPES.contains(messageType)) {
+			if (mqttFixedHeader.isRetain()) {
+				return new MqttFixedHeader(
+					messageType,
+					mqttFixedHeader.isDup(),
+					mqttFixedHeader.qosLevel(),
+					false,
+					mqttFixedHeader.remainingLength());
+			}
 		}
+		
+		return mqttFixedHeader;
 	}
 
 	private MqttCodecUtil() {

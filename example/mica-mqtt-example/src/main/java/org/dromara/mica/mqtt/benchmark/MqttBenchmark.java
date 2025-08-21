@@ -23,8 +23,8 @@ import org.tio.utils.thread.pool.SynThreadPoolExecutor;
 import org.tio.utils.timer.DefaultTimerTaskService;
 import org.tio.utils.timer.TimerTaskService;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -39,7 +39,9 @@ public class MqttBenchmark {
 		// 《修改Windows服务器最大的Tcp连接数》：https://www.jianshu.com/p/00136a97d2d8
 		int connCount = 5_0000;
 		String ip = "127.0.0.1";
-		final List<MqttClient> clientList = new CopyOnWriteArrayList<>();
+		// 优化：使用ArrayList+预分配容量，性能比CopyOnWriteArrayList好很多
+		// 对于压测场景，不需要线程安全的写操作（因为是单线程创建客户端）
+		final List<MqttClient> clientList = new ArrayList<>(connCount);
 		SynThreadPoolExecutor tioExecutor = ThreadUtils.getTioExecutor();
 		ExecutorService groupExecutor = ThreadUtils.getGroupExecutor();
 		// 自定义全局 taskService，避免每个 client new，创建过多线程
