@@ -8,9 +8,9 @@
         <artifactId>starter</artifactId>
         <version>${revision}</version>
     </parent>
-
     <artifactId>mica-mqtt-server-solon-plugin</artifactId>
     <name>${project.artifactId}</name>
+    <url>https://mica-mqtt.dreamlu.net/guide/solon/server.html</url>
 
     <dependencies>
         <dependency>

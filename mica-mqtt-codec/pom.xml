@@ -10,6 +10,7 @@
     </parent>
     <artifactId>mica-mqtt-codec</artifactId>
     <name>${project.artifactId}</name>
+    <url>https://mica-mqtt.dreamlu.net</url>
 
     <dependencies>
         <dependency>

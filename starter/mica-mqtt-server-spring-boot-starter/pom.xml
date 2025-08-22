@@ -3,14 +3,14 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <artifactId>mica-mqtt-server-spring-boot-starter</artifactId>
-    <name>${project.artifactId}</name>
-
     <parent>
         <groupId>org.dromara.mica-mqtt</groupId>
         <artifactId>starter</artifactId>
         <version>${revision}</version>
     </parent>
+    <artifactId>mica-mqtt-server-spring-boot-starter</artifactId>
+    <name>${project.artifactId}</name>
+    <url>https://mica-mqtt.dreamlu.net/guide/spring/server.html</url>
 
     <dependencies>
         <dependency>

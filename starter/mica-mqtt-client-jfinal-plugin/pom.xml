@@ -10,6 +10,7 @@
     </parent>
     <artifactId>mica-mqtt-client-jfinal-plugin</artifactId>
     <name>${project.artifactId}</name>
+    <url>https://mica-mqtt.dreamlu.net/guide/jfinal/client.html</url>
 
     <dependencies>
         <dependency>

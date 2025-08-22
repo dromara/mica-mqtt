@@ -9,7 +9,7 @@
 
     <name>${project.artifactId}</name>
     <description>Mica mqtt client and server!</description>
-    <url>https://www.dreamlu.net</url>
+    <url>https://mica-mqtt.dreamlu.net</url>
 
     <properties>
         <!-- mica-mqtt version -->
