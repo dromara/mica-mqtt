@@ -83,7 +83,7 @@ public class MqttClientSubscribeListener implements IMqttClientMessageListener {
 			Type parameterType = parameterTypes[i];
 			if (parameterType == String.class) {
 				parameters[i] = topic;
-			} else if (parameterType == Map.class && isStringStringMap(parameterType)) {
+			} else if (parameterType instanceof ParameterizedType && isStringStringMap(parameterType)) {
 				// TODO L.cm 未来重构，从底层采用 ${} 占位符的订阅，并生成 StrTemplateParser 解析对象
 				parameters[i] = getTopicVars(topicTemplates, topicFilters, topic);
 			} else if (parameterType == MqttPublishMessage.class) {
@@ -127,6 +127,11 @@ public class MqttClientSubscribeListener implements IMqttClientMessageListener {
 	 */
 	private static boolean isStringStringMap(Type parameterType) {
 		ParameterizedType parameterizedType = (ParameterizedType) parameterType;
+		Type rawType = parameterizedType.getRawType();
+		// 检查是否为 Map 类型
+		if (rawType != Map.class) {
+			return false;
+		}
 		// 获取泛型参数
 		Type[] typeArguments = parameterizedType.getActualTypeArguments();
 		// 检查键和值类型是否为 String
