@@ -33,6 +33,7 @@ import java.util.function.Consumer;
  */
 public final class MqttPublishBuilder {
 	private String topic;
+	private boolean isDup = false;
 	private boolean retained;
 	private MqttQoS qos;
 	private byte[] payload;
@@ -44,6 +45,11 @@ public final class MqttPublishBuilder {
 
 	public MqttPublishBuilder topicName(String topic) {
 		this.topic = topic;
+		return this;
+	}
+
+	public MqttPublishBuilder isDup(boolean isDup) {
+		this.isDup = isDup;
 		return this;
 	}
 
@@ -78,12 +84,24 @@ public final class MqttPublishBuilder {
 		return properties(publishProperties.getProperties());
 	}
 
+	public String getTopicName() {
+		return topic;
+	}
+
 	public boolean isRetained() {
 		return retained;
 	}
 
+	public MqttQoS getQos() {
+		return qos;
+	}
+
+	public byte[] getPayload() {
+		return payload;
+	}
+
 	public MqttPublishMessage build() {
-		MqttFixedHeader mqttFixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, false, qos, retained, 0);
+		MqttFixedHeader mqttFixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, isDup, qos, retained, 0);
 		MqttPublishVariableHeader mqttVariableHeader =
 			new MqttPublishVariableHeader(topic, messageId, properties);
 		return new MqttPublishMessage(mqttFixedHeader, mqttVariableHeader, payload);
