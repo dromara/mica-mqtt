@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.client.solon;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
@@ -40,20 +41,12 @@ import java.util.Map;
 public class MqttClientSubscribeListener implements IMqttClientMessageListener {
 	private final Object bean;
 	private final Method method;
-	private final String[] topicTemplates;
-	private final String[] topicFilters;
-	private final int paramCount;
-	private final Type[] parameterTypes;
-	private final MqttDeserializer deserializer;
+	private final ParamValueFunc[] paramValueFunctions;
 
-	public MqttClientSubscribeListener(Object bean, Method method,String[] topicTemplates, String[] topicFilters, MqttDeserializer deserializer) {
+	public MqttClientSubscribeListener(Object bean, Method method, String[] topicTemplates, String[] topicFilters, MqttDeserializer deserializer) {
 		this.bean = bean;
 		this.method = method;
-		this.topicTemplates = topicTemplates;
-		this.topicFilters = topicFilters;
-		this.paramCount = method.getParameterCount();
-		this.parameterTypes = method.getGenericParameterTypes();
-		this.deserializer = deserializer;
+		this.paramValueFunctions = getParamValueFunc(method, topicTemplates, topicFilters, deserializer);
 	}
 
 	@Override
@@ -77,26 +70,45 @@ public class MqttClientSubscribeListener implements IMqttClientMessageListener {
 	 * @return Object array
 	 */
 	protected Object[] getMethodParameters(String topic, MqttPublishMessage message, byte[] payload) {
-		// TODO L.cm 未来做优化，提前根据类型生成对应的函数
-		Object[] parameters = new Object[paramCount];
-		for (int i = 0; i < paramCount; i++) {
-			Type parameterType = parameterTypes[i];
-			if (parameterType == String.class) {
-				parameters[i] = topic;
-			} else if (parameterType instanceof ParameterizedType && isStringStringMap(parameterType)) {
-				// TODO L.cm 未来重构，从底层采用 ${} 占位符的订阅，并生成 StrTemplateParser 解析对象
-				parameters[i] = getTopicVars(topicTemplates, topicFilters, topic);
-			} else if (parameterType == MqttPublishMessage.class) {
-				parameters[i] = message;
-			} else if (parameterType == byte[].class) {
-				parameters[i] = payload;
-			} else if (parameterType == ByteBuffer.class) {
-				parameters[i] = ByteBuffer.wrap(payload);
-			} else {
-				parameters[i] = deserializer.deserialize(payload, parameterType);
-			}
+		int length = paramValueFunctions.length;
+		Object[] parameters = new Object[length];
+		for (int i = 0; i < length; i++) {
+			ParamValueFunc function = paramValueFunctions[i];
+			parameters[i] = function.getValue(topic, message, payload);
 		}
 		return parameters;
+	}
+
+	/**
+	 * 获取参数值函数
+	 *
+	 * @param method         方法
+	 * @param topicTemplates 主题模板
+	 * @param topicFilters   主题过滤器
+	 * @param deserializer   反序列化
+	 * @return ParamValueFunc[]
+	 */
+	private static ParamValueFunc[] getParamValueFunc(Method method, String[] topicTemplates, String[] topicFilters, MqttDeserializer deserializer) {
+		int parameterCount = method.getParameterCount();
+		ParamValueFunc[] functions = new ParamValueFunc[parameterCount];
+		Type[] parameterTypes = method.getGenericParameterTypes();
+		for (int i = 0; i < parameterCount; i++) {
+			Type parameterType = parameterTypes[i];
+			if (parameterType == String.class) {
+				functions[i] = new TopicParamValueFunc();
+			} else if (parameterType instanceof ParameterizedType && isStringStringMap(parameterType)) {
+				functions[i] = new TopicVarsParamValueFunc(topicTemplates, topicFilters);
+			} else if (parameterType == MqttPublishMessage.class) {
+				functions[i] = new MessageParamValueFunc();
+			} else if (parameterType == byte[].class) {
+				functions[i] = new PayloadParamValueFunc();
+			} else if (parameterType == ByteBuffer.class) {
+				functions[i] = new ByteBufferParamValueFunc();
+			} else {
+				functions[i] = new DeserializerParamValueFunc(deserializer, parameterType);
+			}
+		}
+		return functions;
 	}
 
 	/**
@@ -137,4 +149,71 @@ public class MqttClientSubscribeListener implements IMqttClientMessageListener {
 		// 检查键和值类型是否为 String
 		return typeArguments[0].equals(String.class) && typeArguments[1].equals(String.class);
 	}
+
+	@FunctionalInterface
+	public interface ParamValueFunc {
+
+		Object getValue(String topic, MqttPublishMessage message, byte[] payload);
+
+	}
+
+	public static class TopicParamValueFunc implements ParamValueFunc {
+
+		@Override
+		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
+			return topic;
+		}
+
+	}
+
+	@RequiredArgsConstructor
+	public static class TopicVarsParamValueFunc implements ParamValueFunc {
+		private final String[] topicTemplates;
+		private final String[] topicFilters;
+
+		@Override
+		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
+			return getTopicVars(topicTemplates, topicFilters, topic);
+		}
+
+	}
+
+	public static class MessageParamValueFunc implements ParamValueFunc {
+
+		@Override
+		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
+			return message;
+		}
+
+	}
+
+	public static class PayloadParamValueFunc implements ParamValueFunc {
+
+		@Override
+		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
+			return payload;
+		}
+
+	}
+
+	public static class ByteBufferParamValueFunc implements ParamValueFunc {
+
+		@Override
+		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
+			return ByteBuffer.wrap(payload);
+		}
+
+	}
+
+	@RequiredArgsConstructor
+	public static class DeserializerParamValueFunc implements ParamValueFunc {
+		private final MqttDeserializer deserializer;
+		private final Type parameterType;
+
+		@Override
+		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
+			return deserializer.deserialize(payload, parameterType);
+		}
+	}
+
 }
