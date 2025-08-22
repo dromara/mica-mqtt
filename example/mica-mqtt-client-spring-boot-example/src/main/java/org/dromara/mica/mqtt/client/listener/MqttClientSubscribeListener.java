@@ -36,8 +36,9 @@ public class MqttClientSubscribeListener {
 		deserialize = MqttJsonDeserializer.class // 2.4.5 开始支持 自定义序列化，默认 json 序列化
 	)
 	public void testJson(String topic, MqttPublishMessage message, Map<String, Object> data) {
-		// 2.4.5 开始支持，支持 2 到 3 个参数，字段类型映射规则如下
+		// 2.4.5 开始支持，支持 2 到 3 个参数，字段类型映射规则（顺序）如下：
 		// String 字符串会默认映射到 topic，
+		// Map<String, String> topicVars 会默认映射到 topic 中的变量解析（v2.5.4支持），注意：别跟消息序列化的冲突，消息反序列化不要用 Map<String, String>
 		// MqttPublishMessage 会默认映射到 原始的消息，可以拿到 mqtt5 的 props 参数
 		// byte[] 会映射到 mqtt 消息内容 payload
 		// ByteBuffer 会映射到 mqtt 消息内容 payload
