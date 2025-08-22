@@ -30,7 +30,7 @@ import java.util.Optional;
 /**
  * <b>(MqttClientPluginImpl)</b>
  *
- * @author Lihai
+ * @author Lihai、L.cm
  * @version 1.0.0
  * @since 2023/7/20
  */
@@ -93,7 +93,10 @@ public class MqttClientPluginImpl implements Plugin {
 		subscribeClassTags.forEach(each -> {
 			MqttClientSubscribe anno = each.getAnno();
 			MqttClientTemplate clientTemplate = getMqttClientTemplate(anno);
-			String[] topicFilters = getTopicFilters(anno);
+			// 订阅的 topic 转换
+			String[] topicTemplates = anno.value();
+			String[] topicFilters = getTopicFilters(topicTemplates);
+			// 订阅
 			IMqttClientMessageListener clientMessageListener = each.getBeanWrap().get();
 			clientTemplate.addSubscriptionList(topicFilters, anno.qos(), clientMessageListener);
 		});
@@ -101,12 +104,17 @@ public class MqttClientPluginImpl implements Plugin {
 		subscribeMethodTags.forEach(each -> {
 			MqttClientSubscribe anno = each.getAnno();
 			MqttClientTemplate clientTemplate = getMqttClientTemplate(anno);
-			String[] topicFilters = getTopicFilters(anno);
+			// 订阅的 topic 转换
+			String[] topicTemplates = anno.value();
+			String[] topicFilters = getTopicFilters(topicTemplates);
 			// 自定义的反序列化，支持 solon bean 或者 无参构造器初始化
 			Class<? extends MqttDeserializer> deserialized = anno.deserialize();
 			MqttDeserializer deserializer = getMqttDeserializer(deserialized);
 			// 构造监听器
-			MqttClientSubscribeListener listener = new MqttClientSubscribeListener(each.getBw().get(), each.getMethod(), deserializer);
+			Object bean = each.getBw().get();
+			Method method = each.getMethod();
+			// 订阅
+			MqttClientSubscribeListener listener = new MqttClientSubscribeListener(bean, method, topicTemplates, topicFilters, deserializer);
 			clientTemplate.addSubscriptionList(topicFilters, anno.qos(), listener);
 		});
 	}
@@ -136,10 +144,10 @@ public class MqttClientPluginImpl implements Plugin {
 		return beanWrap.get();
 	}
 
-	private String[] getTopicFilters(MqttClientSubscribe anno) {
+	private String[] getTopicFilters(String[] topicTemplates) {
 		// 1. 替换 solon cfg 变量
 		// 2. 替换订阅中的其他变量
-		return Arrays.stream(anno.value())
+		return Arrays.stream(topicTemplates)
 			.map((x) -> Optional.ofNullable(Solon.cfg().getByTmpl(x)).orElse(x))
 			.map(TopicUtil::getTopicFilter)
 			.toArray(String[]::new);

@@ -96,13 +96,14 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 				// 3. 订阅存储，保存后，连接成功后会自动订阅
 				IMqttClientSession clientSession = getMqttClientSession(subscribe.clientTemplateBean());
 				// 4. 订阅的 topic 转换
-				String[] topicFilters = getTopicFilters(subscribe.value());
+				String[] topicTemplates = subscribe.value();
+				String[] topicFilters = getTopicFilters(topicTemplates);
 				// 5. 自定义的反序列化，支持 Spring bean 或者 无参构造器初始化
 				Class<? extends MqttDeserializer> deserialized = subscribe.deserialize();
 				@SuppressWarnings("unchecked")
 				MqttDeserializer deserializer = getMqttDeserializer((Class<MqttDeserializer>) deserialized);
 				// 6. 构造监听器
-				MqttClientSubscribeListener listener = new MqttClientSubscribeListener(bean, method, deserializer);
+				MqttClientSubscribeListener listener = new MqttClientSubscribeListener(bean, method, topicTemplates, topicFilters, deserializer);
 				// 7. mqtt 订阅
 				clientSession.addSubscriptionList(topicFilters, subscribe.qos(), listener);
 			}
