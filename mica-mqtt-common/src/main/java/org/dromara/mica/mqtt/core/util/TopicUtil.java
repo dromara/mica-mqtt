@@ -19,10 +19,12 @@ package org.dromara.mica.mqtt.core.util;
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.mica.Pair;
+import org.tio.utils.mica.StrTemplateParser;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.StringTokenizer;
 
 /**
@@ -264,6 +266,13 @@ public final class TopicUtil {
 		return endIndex != -1 && endIndex > startIndex + 2;
 	}
 
+	/**
+	 * 解析 topic 中的变量，变量的格式为 ${x}，x 为 payload 中的字段名
+	 *
+	 * @param topicTemplate topic 模板
+	 * @param payload       payload
+	 * @return 解析后的 topic
+	 */
 	public static String resolveTopic(String topicTemplate, Object payload) {
 		if (payload == null) {
 			return topicTemplate;
@@ -286,6 +295,13 @@ public final class TopicUtil {
 		}
 	}
 
+	/**
+	 * 获取字段值
+	 *
+	 * @param obj       obj
+	 * @param fieldName fieldName
+	 * @return fieldValue
+	 */
 	public static Object getFieldValue(Object obj, String fieldName) {
 		try {
 			Field field = obj.getClass().getDeclaredField(fieldName);
@@ -333,6 +349,22 @@ public final class TopicUtil {
 			}
 		}
 		return tokenList.toArray(new String[0]);
+	}
+
+	/**
+	 * 解析 topic 模板中的变量，不匹配时返回空 Map
+	 *
+	 * <p>
+	 * 例如 $SYS/brokers/${node}/clients/${clientid}/disconnected 中提取 node 和 clientid
+	 * </p>
+	 *
+	 * @param topicTemplate topicTemplate
+	 * @param topic         topic
+	 * @return 获取变量值
+	 */
+	public static Map<String, String> getTopicVars(String topicTemplate, String topic) {
+		StrTemplateParser templateParser = new StrTemplateParser(topicTemplate);
+		return templateParser.getVariables(topic);
 	}
 
 }

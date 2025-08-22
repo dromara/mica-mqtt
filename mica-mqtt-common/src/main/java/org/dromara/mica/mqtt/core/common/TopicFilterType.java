@@ -18,6 +18,8 @@ package org.dromara.mica.mqtt.core.common;
 
 import org.dromara.mica.mqtt.core.util.TopicUtil;
 
+import java.util.Map;
+
 /**
  * TopicFilter 类型
  *
@@ -33,6 +35,11 @@ public enum TopicFilterType {
 		public boolean match(String topicFilter, String topicName) {
 			return TopicUtil.match(topicFilter, topicName);
 		}
+
+		@Override
+		public Map<String, String> getTopicVars(String topicTemplate, String topicName) {
+			return TopicUtil.getTopicVars(topicTemplate, topicName);
+		}
 	},
 
 	/**
@@ -41,8 +48,16 @@ public enum TopicFilterType {
 	QUEUE {
 		@Override
 		public boolean match(String topicFilter, String topicName) {
+			// $queue/ 共享订阅前缀去除
 			int prefixLen = TopicFilterType.SHARE_QUEUE_PREFIX.length();
 			return TopicUtil.match(topicFilter.substring(prefixLen), topicName);
+		}
+
+		@Override
+		public Map<String, String> getTopicVars(String topicTemplate, String topicName) {
+			// $queue/ 共享订阅前缀去除
+			int prefixLen = TopicFilterType.SHARE_QUEUE_PREFIX.length();
+			return TopicUtil.getTopicVars(topicTemplate.substring(prefixLen), topicName);
 		}
 	},
 
@@ -55,6 +70,13 @@ public enum TopicFilterType {
 			// 去除前缀 $share/<group-name>/ ,匹配 topicName / 前缀
 			int prefixLen = TopicFilterType.findShareTopicIndex(topicFilter);
 			return TopicUtil.match(topicFilter.substring(prefixLen), topicName);
+		}
+
+		@Override
+		public Map<String, String> getTopicVars(String topicTemplate, String topicName) {
+			// 去除前缀 $share/<group-name>/ ,匹配 topicName / 前缀
+			int prefixLen = TopicFilterType.findShareTopicIndex(topicTemplate);
+			return TopicUtil.getTopicVars(topicTemplate.substring(prefixLen), topicName);
 		}
 	};
 
@@ -72,6 +94,15 @@ public enum TopicFilterType {
 	 * @return 是否匹配
 	 */
 	public abstract boolean match(String topicFilter, String topicName);
+
+	/**
+	 * 解析 topic 模板中的变量 例如 $SYS/brokers/${node}/clients/${clientid}/disconnected 中提取 node 和 clientid
+	 *
+	 * @param topicTemplate topicTemplate
+	 * @param topic         topic
+	 * @return 提取的变量
+	 */
+	public abstract Map<String, String> getTopicVars(String topicTemplate, String topic);
 
 	/**
 	 * 获取 topicFilter 类型
@@ -104,7 +135,7 @@ public enum TopicFilterType {
 				return topicFilter.substring(prefixLength, i);
 			}
 		}
-		throw new IllegalArgumentException("Share subscription topicFilter: " + topicFilter + " not conform to the $share/<group-name>/xxx");
+		throw new IllegalArgumentException("共享订阅 topicFilter: " + topicFilter + " 不符合规范 $share/<group-name>/xxx");
 	}
 
 	private static int findShareTopicIndex(String topicFilter) {
@@ -116,7 +147,7 @@ public enum TopicFilterType {
 				return i + 1;
 			}
 		}
-		throw new IllegalArgumentException("Share subscription topicFilter: " + topicFilter + " not conform to the $share/<group-name>/xxx");
+		throw new IllegalArgumentException("共享订阅 topicFilter: " + topicFilter + " 不符合规范 $share/<group-name>/xxx");
 	}
 
 }

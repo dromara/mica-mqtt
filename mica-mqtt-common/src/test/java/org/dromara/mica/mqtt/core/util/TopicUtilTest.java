@@ -20,6 +20,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.tio.utils.mica.Pair;
 
+import java.util.Map;
+
 /**
  * TopicUtil 测试
  *
@@ -136,6 +138,22 @@ class TopicUtilTest {
 		Assertions.assertEquals(-1, pair3.getRight());
 		Pair<String, Integer> pair4 = TopicUtil.retainTopicName("$retain/");
 		Assertions.assertEquals(-1, pair4.getRight());
+	}
+
+	@Test
+	void testGetTopicVars() {
+		// 测试匹配
+		String s1 = "$SYS/brokers/${node}/clients/${clientId}/disconnected";
+		String s2 = "$SYS/brokers/node1/clients/test1/disconnected";
+		Map<String, String> vars = TopicUtil.getTopicVars(s1, s2);
+		Assertions.assertEquals("node1", vars.get("node"));
+		Assertions.assertEquals("test1", vars.get("clientId"));
+		// 测试不匹配
+		String s3 = "$SYS/brokers/${node}/clients/${clientId}/disconnected";
+		String s4 = "abc/brokers/node1/clients/test1/disconnected";
+		Map<String, String> vars1 = TopicUtil.getTopicVars(s3, s4);
+		// 不匹配会返回空
+		Assertions.assertTrue(vars1.isEmpty());
 	}
 
 }
