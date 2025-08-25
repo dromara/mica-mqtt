@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.server.solon;
+package org.dromara.mica.mqtt.core.annotation;
 
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.deserialize.MqttJsonDeserializer;

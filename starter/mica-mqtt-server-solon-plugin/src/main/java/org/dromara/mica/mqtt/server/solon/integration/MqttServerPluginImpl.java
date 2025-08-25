@@ -38,7 +38,7 @@ import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
-import org.dromara.mica.mqtt.server.solon.MqttServerFunction;
+import org.dromara.mica.mqtt.core.annotation.MqttServerFunction;
 import org.dromara.mica.mqtt.server.solon.MqttServerTemplate;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerConfiguration;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerMetricsConfiguration;

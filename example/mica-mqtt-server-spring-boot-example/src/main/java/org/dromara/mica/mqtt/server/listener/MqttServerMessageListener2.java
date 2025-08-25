@@ -3,7 +3,7 @@ package org.dromara.mica.mqtt.server.listener;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.server.pojo.User;
-import org.dromara.mica.mqtt.spring.server.MqttServerFunction;
+import org.dromara.mica.mqtt.core.annotation.MqttServerFunction;
 import org.springframework.stereotype.Service;
 import org.tio.core.ChannelContext;
 import org.tio.core.Node;

@@ -1,7 +1,7 @@
 package org.dromara.mica.mqtt.server.solon.listener;
 
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.mica.mqtt.server.solon.MqttServerFunction;
+import org.dromara.mica.mqtt.core.annotation.MqttServerFunction;
 import org.dromara.mica.mqtt.server.solon.pojo.User;
 import org.noear.solon.annotation.Component;
 import org.slf4j.Logger;
