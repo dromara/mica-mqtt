@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.function;
 
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
+import org.tio.core.ChannelContext;
 
 /**
  * 参数值函数
@@ -29,11 +30,12 @@ public interface ParamValueFunction {
 	/**
 	 * 获取值
 	 *
+	 * @param context ChannelContext
 	 * @param topic   topic
 	 * @param message message
 	 * @param payload payload
 	 * @return value
 	 */
-	Object getValue(String topic, MqttPublishMessage message, byte[] payload);
+	Object getValue(ChannelContext context, String topic, MqttPublishMessage message, byte[] payload);
 
 }

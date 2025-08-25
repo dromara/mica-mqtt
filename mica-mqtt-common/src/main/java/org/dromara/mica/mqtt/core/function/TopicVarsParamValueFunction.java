@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.core.function;
 
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.common.TopicFilterType;
+import org.tio.core.ChannelContext;
 
 import java.util.Collections;
 import java.util.Map;
@@ -37,7 +38,7 @@ public class TopicVarsParamValueFunction implements ParamValueFunction {
 	}
 
 	@Override
-	public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
+	public Object getValue(ChannelContext context, String topic, MqttPublishMessage message, byte[] payload) {
 		return getTopicVars(topicTemplates, topicFilters, topic);
 	}
 

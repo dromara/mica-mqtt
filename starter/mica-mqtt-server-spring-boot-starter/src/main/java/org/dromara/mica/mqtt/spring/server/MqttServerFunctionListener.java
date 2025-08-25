@@ -46,7 +46,7 @@ class MqttServerFunctionListener implements IMqttFunctionMessageListener {
 	@Override
 	public void onMessage(ChannelContext context, String clientId, String topic, MqttQoS qoS, MqttPublishMessage message) {
 		// 处理参数
-		Object[] methodParameters = getMethodParameters(topic, message, message.payload());
+		Object[] methodParameters = getMethodParameters(context, topic, message, message.payload());
 		// 反射调用
 		ReflectionUtils.invokeMethod(method, bean, methodParameters);
 	}
@@ -54,17 +54,18 @@ class MqttServerFunctionListener implements IMqttFunctionMessageListener {
 	/**
 	 * 获取反射参数
 	 *
+	 * @param context context
 	 * @param topic   topic
 	 * @param message message
 	 * @param payload payload
 	 * @return Object array
 	 */
-	protected Object[] getMethodParameters(String topic, MqttPublishMessage message, byte[] payload) {
+	protected Object[] getMethodParameters(ChannelContext context, String topic, MqttPublishMessage message, byte[] payload) {
 		int length = paramValueFunctions.length;
 		Object[] parameters = new Object[length];
 		for (int i = 0; i < length; i++) {
 			ParamValueFunction function = paramValueFunctions[i];
-			parameters[i] = function.getValue(topic, message, payload);
+			parameters[i] = function.getValue(context, topic, message, payload);
 		}
 		return parameters;
 	}

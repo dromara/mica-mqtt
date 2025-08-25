@@ -22,6 +22,7 @@ import org.dromara.mica.mqtt.core.function.ObjectParamValueFunction;
 import org.dromara.mica.mqtt.core.function.ParamValueFunction;
 import org.dromara.mica.mqtt.core.function.ParamValueFunctions;
 import org.dromara.mica.mqtt.core.function.TopicVarsParamValueFunction;
+import org.tio.core.ChannelContext;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
@@ -51,7 +52,9 @@ public class MethodParamUtil {
 		Type[] parameterTypes = method.getGenericParameterTypes();
 		for (int i = 0; i < parameterCount; i++) {
 			Type parameterType = parameterTypes[i];
-			if (parameterType == String.class) {
+			if (parameterType == ChannelContext.class) {
+				functions[i] = ParamValueFunctions.Context;
+			} else if (parameterType == String.class) {
 				functions[i] = ParamValueFunctions.Topic;
 			} else if (parameterType instanceof ParameterizedType && isStringStringMap(parameterType)) {
 				functions[i] = new TopicVarsParamValueFunction(topicTemplates, topicFilters);

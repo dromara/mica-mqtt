@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.function;
 
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
+import org.tio.core.ChannelContext;
 
 import java.nio.ByteBuffer;
 
@@ -27,30 +28,37 @@ import java.nio.ByteBuffer;
  */
 public enum ParamValueFunctions implements ParamValueFunction {
 
+	Context() {
+		@Override
+		public Object getValue(ChannelContext context, String topic, MqttPublishMessage message, byte[] payload) {
+			return context;
+		}
+	},
+
 	Topic() {
 		@Override
-		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
+		public Object getValue(ChannelContext context, String topic, MqttPublishMessage message, byte[] payload) {
 			return topic;
 		}
 	},
 
 	Message() {
 		@Override
-		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
+		public Object getValue(ChannelContext context, String topic, MqttPublishMessage message, byte[] payload) {
 			return message;
 		}
 	},
 
 	Payload() {
 		@Override
-		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
-			return null;
+		public Object getValue(ChannelContext context, String topic, MqttPublishMessage message, byte[] payload) {
+			return payload;
 		}
 	},
 
 	ByteBuff() {
 		@Override
-		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
+		public Object getValue(ChannelContext context, String topic, MqttPublishMessage message, byte[] payload) {
 			return ByteBuffer.wrap(payload);
 		}
 	};

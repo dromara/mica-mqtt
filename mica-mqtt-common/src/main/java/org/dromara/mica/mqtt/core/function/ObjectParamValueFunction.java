@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.core.function;
 
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
+import org.tio.core.ChannelContext;
 
 import java.lang.reflect.Type;
 
@@ -36,7 +37,7 @@ public class ObjectParamValueFunction implements ParamValueFunction {
 	}
 
 	@Override
-	public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
+	public Object getValue(ChannelContext context, String topic, MqttPublishMessage message, byte[] payload) {
 		return deserializer.deserialize(payload, parameterType);
 	}
 }
