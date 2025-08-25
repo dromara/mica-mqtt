@@ -20,18 +20,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
-import org.dromara.mica.mqtt.core.function.ObjectParamValueFunction;
 import org.dromara.mica.mqtt.core.function.ParamValueFunction;
-import org.dromara.mica.mqtt.core.function.ParamValueFunctions;
-import org.dromara.mica.mqtt.core.function.TopicVarsParamValueFunction;
+import org.dromara.mica.mqtt.core.util.MethodParamUtil;
 import org.tio.core.ChannelContext;
 import org.tio.utils.mica.ExceptionUtils;
 
 import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.nio.ByteBuffer;
-import java.util.Map;
 
 /**
  * MqttClientSubscribe 注解订阅监听
@@ -47,7 +41,7 @@ public class MqttClientSubscribeListener implements IMqttClientMessageListener {
 	public MqttClientSubscribeListener(Object bean, Method method, String[] topicTemplates, String[] topicFilters, MqttDeserializer deserializer) {
 		this.bean = bean;
 		this.method = method;
-		this.paramValueFunctions = getParamValueFunc(method, topicTemplates, topicFilters, deserializer);
+		this.paramValueFunctions = MethodParamUtil.getParamValueFunctions(method, topicTemplates, topicFilters, deserializer);
 	}
 
 	@Override
@@ -78,57 +72,6 @@ public class MqttClientSubscribeListener implements IMqttClientMessageListener {
 			parameters[i] = function.getValue(topic, message, payload);
 		}
 		return parameters;
-	}
-
-	/**
-	 * 获取参数值函数
-	 *
-	 * @param method         方法
-	 * @param topicTemplates 主题模板
-	 * @param topicFilters   主题过滤器
-	 * @param deserializer   反序列化
-	 * @return ParamValueFunc[]
-	 */
-	private static ParamValueFunction[] getParamValueFunc(Method method, String[] topicTemplates, String[] topicFilters, MqttDeserializer deserializer) {
-		int parameterCount = method.getParameterCount();
-		ParamValueFunction[] functions = new ParamValueFunction[parameterCount];
-		Type[] parameterTypes = method.getGenericParameterTypes();
-		for (int i = 0; i < parameterCount; i++) {
-			Type parameterType = parameterTypes[i];
-			if (parameterType == String.class) {
-				functions[i] = ParamValueFunctions.Topic;
-			} else if (parameterType instanceof ParameterizedType && isStringStringMap(parameterType)) {
-				functions[i] = new TopicVarsParamValueFunction(topicTemplates, topicFilters);
-			} else if (parameterType == MqttPublishMessage.class) {
-				functions[i] = ParamValueFunctions.Message;
-			} else if (parameterType == byte[].class) {
-				functions[i] = ParamValueFunctions.Payload;
-			} else if (parameterType == ByteBuffer.class) {
-				functions[i] = ParamValueFunctions.ByteBuff;
-			} else {
-				functions[i] = new ObjectParamValueFunction(deserializer, parameterType);
-			}
-		}
-		return functions;
-	}
-
-	/**
-	 * 判断是否 Map String String
-	 *
-	 * @param parameterType parameterType
-	 * @return 是否 Map String String
-	 */
-	private static boolean isStringStringMap(Type parameterType) {
-		ParameterizedType parameterizedType = (ParameterizedType) parameterType;
-		Type rawType = parameterizedType.getRawType();
-		// 检查是否为 Map 类型
-		if (rawType != Map.class) {
-			return false;
-		}
-		// 获取泛型参数
-		Type[] typeArguments = parameterizedType.getActualTypeArguments();
-		// 检查键和值类型是否为 String
-		return typeArguments[0].equals(String.class) && typeArguments[1].equals(String.class);
 	}
 
 }
