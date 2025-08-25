@@ -16,12 +16,14 @@
 
 package org.dromara.mica.mqtt.spring.client;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
-import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
+import org.dromara.mica.mqtt.core.function.ObjectParamValueFunction;
+import org.dromara.mica.mqtt.core.function.ParamValueFunction;
+import org.dromara.mica.mqtt.core.function.ParamValueFunctions;
+import org.dromara.mica.mqtt.core.function.TopicVarsParamValueFunction;
 import org.springframework.util.ReflectionUtils;
 import org.tio.core.ChannelContext;
 
@@ -29,7 +31,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
-import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -41,7 +42,7 @@ import java.util.Map;
 public class MqttClientSubscribeListener implements IMqttClientMessageListener {
 	private final Object bean;
 	private final Method method;
-	private final ParamValueFunc[] paramValueFunctions;
+	private final ParamValueFunction[] paramValueFunctions;
 
 	public MqttClientSubscribeListener(Object bean, Method method, String[] topicTemplates, String[] topicFilters, MqttDeserializer deserializer) {
 		this.bean = bean;
@@ -69,7 +70,7 @@ public class MqttClientSubscribeListener implements IMqttClientMessageListener {
 		int length = paramValueFunctions.length;
 		Object[] parameters = new Object[length];
 		for (int i = 0; i < length; i++) {
-			ParamValueFunc function = paramValueFunctions[i];
+			ParamValueFunction function = paramValueFunctions[i];
 			parameters[i] = function.getValue(topic, message, payload);
 		}
 		return parameters;
@@ -84,47 +85,27 @@ public class MqttClientSubscribeListener implements IMqttClientMessageListener {
 	 * @param deserializer   反序列化
 	 * @return ParamValueFunc[]
 	 */
-	private static ParamValueFunc[] getParamValueFunc(Method method, String[] topicTemplates, String[] topicFilters, MqttDeserializer deserializer) {
+	private static ParamValueFunction[] getParamValueFunc(Method method, String[] topicTemplates, String[] topicFilters, MqttDeserializer deserializer) {
 		int parameterCount = method.getParameterCount();
-		ParamValueFunc[] functions = new ParamValueFunc[parameterCount];
+		ParamValueFunction[] functions = new ParamValueFunction[parameterCount];
 		Type[] parameterTypes = method.getGenericParameterTypes();
 		for (int i = 0; i < parameterCount; i++) {
 			Type parameterType = parameterTypes[i];
 			if (parameterType == String.class) {
-				functions[i] = new TopicParamValueFunc();
+				functions[i] = ParamValueFunctions.Topic;
 			} else if (parameterType instanceof ParameterizedType && isStringStringMap(parameterType)) {
-				functions[i] = new TopicVarsParamValueFunc(topicTemplates, topicFilters);
+				functions[i] = new TopicVarsParamValueFunction(topicTemplates, topicFilters);
 			} else if (parameterType == MqttPublishMessage.class) {
-				functions[i] = new MessageParamValueFunc();
+				functions[i] = ParamValueFunctions.Message;
 			} else if (parameterType == byte[].class) {
-				functions[i] = new PayloadParamValueFunc();
+				functions[i] = ParamValueFunctions.Payload;
 			} else if (parameterType == ByteBuffer.class) {
-				functions[i] = new ByteBufferParamValueFunc();
+				functions[i] = ParamValueFunctions.ByteBuff;
 			} else {
-				functions[i] = new DeserializerParamValueFunc(deserializer, parameterType);
+				functions[i] = new ObjectParamValueFunction(deserializer, parameterType);
 			}
 		}
 		return functions;
-	}
-
-	/**
-	 * 获取 topic 变量
-	 *
-	 * @param topicTemplates topicTemplates
-	 * @param topicFilters   topicFilters
-	 * @param topic          topic
-	 * @return 变量集合
-	 */
-	private static Map<String, String> getTopicVars(String[] topicTemplates, String[] topicFilters, String topic) {
-		for (int j = 0; j < topicFilters.length; j++) {
-			String topicFilter = topicFilters[j];
-			TopicFilterType topicFilterType = TopicFilterType.getType(topicFilter);
-			if (topicFilterType.match(topicFilter, topic)) {
-				String topicTemplate = topicTemplates[j];
-				return topicFilterType.getTopicVars(topicTemplate, topic);
-			}
-		}
-		return Collections.emptyMap();
 	}
 
 	/**
@@ -144,72 +125,6 @@ public class MqttClientSubscribeListener implements IMqttClientMessageListener {
 		Type[] typeArguments = parameterizedType.getActualTypeArguments();
 		// 检查键和值类型是否为 String
 		return typeArguments[0].equals(String.class) && typeArguments[1].equals(String.class);
-	}
-
-	@FunctionalInterface
-	public interface ParamValueFunc {
-
-		Object getValue(String topic, MqttPublishMessage message, byte[] payload);
-
-	}
-
-	public static class TopicParamValueFunc implements ParamValueFunc {
-
-		@Override
-		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
-			return topic;
-		}
-
-	}
-
-	@RequiredArgsConstructor
-	public static class TopicVarsParamValueFunc implements ParamValueFunc {
-		private final String[] topicTemplates;
-		private final String[] topicFilters;
-
-		@Override
-		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
-			return getTopicVars(topicTemplates, topicFilters, topic);
-		}
-
-	}
-
-	public static class MessageParamValueFunc implements ParamValueFunc {
-
-		@Override
-		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
-			return message;
-		}
-
-	}
-
-	public static class PayloadParamValueFunc implements ParamValueFunc {
-
-		@Override
-		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
-			return payload;
-		}
-
-	}
-
-	public static class ByteBufferParamValueFunc implements ParamValueFunc {
-
-		@Override
-		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
-			return ByteBuffer.wrap(payload);
-		}
-
-	}
-
-	@RequiredArgsConstructor
-	public static class DeserializerParamValueFunc implements ParamValueFunc {
-		private final MqttDeserializer deserializer;
-		private final Type parameterType;
-
-		@Override
-		public Object getValue(String topic, MqttPublishMessage message, byte[] payload) {
-			return deserializer.deserialize(payload, parameterType);
-		}
 	}
 
 }
