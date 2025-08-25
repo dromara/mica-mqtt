@@ -1,6 +1,6 @@
 package org.dromara.mica.mqtt.client.solon.test.listener;
 
-import org.dromara.mica.mqtt.client.solon.MqttClientSubscribe;
+import org.dromara.mica.mqtt.core.annotation.MqttClientSubscribe;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.noear.solon.annotation.Component;
 import org.slf4j.Logger;

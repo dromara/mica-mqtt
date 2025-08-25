@@ -39,7 +39,6 @@ import java.util.function.Consumer;
  */
 @Slf4j
 public class MqttClientTemplate {
-	public static final String DEFAULT_CLIENT_TEMPLATE_BEAN = "mqttClientTemplate";
 	private final MqttClientCreator clientCreator;
 	private final IMqttClientConnectListener clientConnectListener;
 	private final MqttClientCustomizer customizer;

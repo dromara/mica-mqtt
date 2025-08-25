@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.spring.client;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.mica.mqtt.core.annotation.MqttClientSubscribe;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.dromara.mica.mqtt.core.client.IMqttClientSession;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;

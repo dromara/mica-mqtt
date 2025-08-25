@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.client.solon;
+package org.dromara.mica.mqtt.core.annotation;
 
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
@@ -31,6 +31,11 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
 public @interface MqttClientSubscribe {
+
+	/**
+	 * 默认的客户端模板 bean 名称
+	 */
+	String DEFAULT_CLIENT_TEMPLATE_BEAN = "mqttClientTemplate";
 
 	/**
 	 * 订阅的 topic filter
@@ -58,6 +63,6 @@ public @interface MqttClientSubscribe {
 	 *
 	 * @return bean name
 	 */
-	String clientTemplateBean() default MqttClientTemplate.DEFAULT_CLIENT_TEMPLATE_BEAN;
+	String clientTemplateBean() default MqttClientSubscribe.DEFAULT_CLIENT_TEMPLATE_BEAN;
 
 }

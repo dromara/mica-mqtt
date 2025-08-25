@@ -5,7 +5,7 @@ package org.dromara.mica.mqtt.client.solon.integration;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.mica.mqtt.client.solon.MqttClientSubscribe;
+import org.dromara.mica.mqtt.core.annotation.MqttClientSubscribe;
 import org.dromara.mica.mqtt.client.solon.MqttClientSubscribeListener;
 import org.dromara.mica.mqtt.client.solon.MqttClientTemplate;
 import org.dromara.mica.mqtt.client.solon.config.MqttClientConfiguration;
@@ -62,7 +62,7 @@ public class MqttClientPluginImpl implements Plugin {
 			MqttClientCustomizer customizers = context.getBean(MqttClientCustomizer.class);
 			MqttClientTemplate clientTemplate = new MqttClientTemplate(clientCreator, clientConnectListener, customizers);
 			BeanWrap mqttClientTemplateWrap = context.wrap(MqttClientTemplate.class, clientTemplate);
-			context.putWrap(MqttClientTemplate.DEFAULT_CLIENT_TEMPLATE_BEAN, mqttClientTemplateWrap);
+			context.putWrap(MqttClientSubscribe.DEFAULT_CLIENT_TEMPLATE_BEAN, mqttClientTemplateWrap);
 			context.putWrap(MqttClientTemplate.class, mqttClientTemplateWrap);
 
 			// ssl 自定义配置

@@ -2,7 +2,7 @@ package org.dromara.mica.mqtt.client.listener;
 
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
-import org.dromara.mica.mqtt.spring.client.MqttClientSubscribe;
+import org.dromara.mica.mqtt.core.annotation.MqttClientSubscribe;
 import org.springframework.stereotype.Service;
 
 /**

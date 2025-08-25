@@ -5,7 +5,7 @@ import org.dromara.mica.mqtt.client.pojo.User;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.deserialize.MqttJsonDeserializer;
-import org.dromara.mica.mqtt.spring.client.MqttClientSubscribe;
+import org.dromara.mica.mqtt.core.annotation.MqttClientSubscribe;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;

@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.spring.client;
 
+import org.dromara.mica.mqtt.core.annotation.MqttClientSubscribe;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.LazyInitializationExcludeFilter;
 import org.springframework.core.annotation.AnnotationUtils;
