@@ -94,8 +94,7 @@ public class MqttClientPluginImpl implements Plugin {
 			MqttClientSubscribe anno = each.getAnno();
 			MqttClientTemplate clientTemplate = getMqttClientTemplate(anno);
 			// 订阅的 topic 转换
-			String[] topicTemplates = anno.value();
-			String[] topicFilters = getTopicFilters(topicTemplates);
+			String[] topicFilters = getTopicFilters(anno.value());
 			// 订阅
 			IMqttClientMessageListener clientMessageListener = each.getBeanWrap().get();
 			clientTemplate.addSubscriptionList(topicFilters, anno.qos(), clientMessageListener);

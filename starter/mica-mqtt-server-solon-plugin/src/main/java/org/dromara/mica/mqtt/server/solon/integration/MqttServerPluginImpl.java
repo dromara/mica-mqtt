@@ -167,19 +167,24 @@ public class MqttServerPluginImpl implements Plugin {
 		// 类级别的注解订阅
 		functionClassTags.forEach(each -> {
 			MqttServerFunction anno = each.getAnno();
-			String[] topicFilters = getTopicFilters(anno);
+			String[] topicFilters = getTopicFilters(anno.value());
 			IMqttFunctionMessageListener messageListener = each.getBeanWrap().get();
 			functionManager.register(topicFilters, messageListener);
 		});
 		// 方法级别的注解订阅
 		functionMethodTags.forEach(each -> {
 			MqttServerFunction anno = each.getAnno();
-			String[] topicFilters = getTopicFilters(anno);
+			// topic 信息
+			String[] topicTemplates = anno.value();
+			String[] topicFilters = getTopicFilters(topicTemplates);
 			// 自定义的反序列化，支持 solon bean 或者 无参构造器初始化
 			Class<? extends MqttDeserializer> deserialized = anno.deserialize();
 			MqttDeserializer deserializer = getMqttDeserializer(deserialized);
 			// 构造监听器
-			MqttServerFunctionListener functionListener = new MqttServerFunctionListener(each.getBw().get(), each.getMethod(), deserializer);
+			Object bean = each.getBw().get();
+			Method method = each.getMethod();
+			// 注册监听器
+			MqttServerFunctionListener functionListener = new MqttServerFunctionListener(bean, method, topicTemplates, topicFilters, deserializer);
 			functionManager.register(topicFilters, functionListener);
 		});
 	}
@@ -198,10 +203,10 @@ public class MqttServerPluginImpl implements Plugin {
 		return beanWrap.get();
 	}
 
-	private String[] getTopicFilters(MqttServerFunction anno) {
+	private String[] getTopicFilters(String[] topicTemplates) {
 		// 1. 替换 solon cfg 变量
 		// 2. 替换订阅中的其他变量
-		return Arrays.stream(anno.value())
+		return Arrays.stream(topicTemplates)
 			.map((x) -> Optional.ofNullable(Solon.cfg().getByTmpl(x)).orElse(x))
 			.map(TopicUtil::getTopicFilter)
 			.toArray(String[]::new);
