@@ -17,11 +17,10 @@
 package org.dromara.mica.mqtt.core.function;
 
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
-import org.dromara.mica.mqtt.core.common.TopicFilterType;
+import org.dromara.mica.mqtt.core.common.TopicTemplate;
 import org.tio.core.ChannelContext;
 
 import java.util.Collections;
-import java.util.Map;
 
 /**
  * topic 参数函数
@@ -29,36 +28,35 @@ import java.util.Map;
  * @author L.cm
  */
 public class TopicVarsParamValueFunction implements ParamValueFunction {
-	private final String[] topicTemplates;
-	private final String[] topicFilters;
+	private final TopicTemplate[] topicTemplates;
 
 	public TopicVarsParamValueFunction(String[] topicTemplates, String[] topicFilters) {
-		this.topicTemplates = topicTemplates;
-		this.topicFilters = topicFilters;
+		this.topicTemplates = getTopicTemplates(topicTemplates, topicFilters);
+	}
+
+	/**
+	 * 获取 topic 模板列表
+	 *
+	 * @param topicTemplates topicTemplates
+	 * @param topicFilters   topicFilters
+	 * @return TopicTemplate array
+	 */
+	private static TopicTemplate[] getTopicTemplates(String[] topicTemplates, String[] topicFilters) {
+		TopicTemplate[] templates = new TopicTemplate[topicTemplates.length];
+		for (int i = 0; i < templates.length; i++) {
+			templates[i] = new TopicTemplate(topicTemplates[i], topicFilters[i]);
+		}
+		return templates;
 	}
 
 	@Override
 	public Object getValue(ChannelContext context, String topic, MqttPublishMessage message, byte[] payload) {
-		return getTopicVars(topicTemplates, topicFilters, topic);
-	}
-
-	/**
-	 * 获取 topic 变量
-	 *
-	 * @param topicTemplates topicTemplates
-	 * @param topicFilters   topicFilters
-	 * @param topic          topic
-	 * @return 变量集合
-	 */
-	private static Map<String, String> getTopicVars(String[] topicTemplates, String[] topicFilters, String topic) {
-		for (int j = 0; j < topicFilters.length; j++) {
-			String topicFilter = topicFilters[j];
-			TopicFilterType topicFilterType = TopicFilterType.getType(topicFilter);
-			if (topicFilterType.match(topicFilter, topic)) {
-				String topicTemplate = topicTemplates[j];
-				return topicFilterType.getTopicVars(topicTemplate, topic);
+		for (TopicTemplate topicTemplate : topicTemplates) {
+			if (topicTemplate.match(topic)) {
+				return topicTemplate.getVariables(topic);
 			}
 		}
 		return Collections.emptyMap();
 	}
+
 }
