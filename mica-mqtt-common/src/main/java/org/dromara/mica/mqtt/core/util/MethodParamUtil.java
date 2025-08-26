@@ -77,7 +77,7 @@ public class MethodParamUtil {
 	 * @param parameterType parameterType
 	 * @return 是否 Map String String
 	 */
-	private static boolean isStringStringMap(Type parameterType) {
+	public static boolean isStringStringMap(Type parameterType) {
 		ParameterizedType parameterizedType = (ParameterizedType) parameterType;
 		Type rawType = parameterizedType.getRawType();
 		// 检查是否为 Map 类型
