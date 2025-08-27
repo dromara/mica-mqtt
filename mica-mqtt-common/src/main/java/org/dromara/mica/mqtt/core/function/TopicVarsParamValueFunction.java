@@ -51,6 +51,12 @@ public class TopicVarsParamValueFunction implements ParamValueFunction {
 
 	@Override
 	public Object getValue(ChannelContext context, String topic, MqttPublishMessage message, byte[] payload) {
+		// 大部分情况下只有一个 topic，直接返回
+		int length = topicTemplates.length;
+		if (length == 1) {
+			return topicTemplates[0].getVariables(topic);
+		}
+		// 多个 topic 时，需要根据 topic 匹配
 		for (TopicTemplate topicTemplate : topicTemplates) {
 			if (topicTemplate.match(topic)) {
 				return topicTemplate.getVariables(topic);
