@@ -11,6 +11,7 @@
 - :sparkles: mica-mqtt-client solon 和 spring 插件，`@MqttClientSubscribe` 注解订阅，增加 topic 变量解析功能，支持解析 Map<String, String> 类型的 topic 中的 ${topicVars} 变量参数。
 - :sparkles: mica-mqtt-codec 移除了 MqttCodecUtil 中的 `isValidPublishTopicName` 方法 ，直接使用 `isTopicFilter` 校验发布主题名称是否包含通配符。
 - :sparkles: mica-mqtt-codec 包调整，重命名类名、方法名，重构 MQTT 消息构建器类（为后续方便做准备），不兼容。
+- :sparkles: mica-mqtt-common `TopicUtil` 调整 validateTopicFilter 方法，移除了对空白字符的校验，因为 MQTT 协议中允许使用空白字符。
 
 ### v2.5.3 - 2025-08-03
 - :sparkles: mica-mqtt-server-spring-boot-starter 支持注解 `@MqttServerFunction` 监听

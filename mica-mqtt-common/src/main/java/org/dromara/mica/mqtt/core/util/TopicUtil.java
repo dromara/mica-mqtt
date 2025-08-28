@@ -83,9 +83,6 @@ public final class TopicUtil {
 	 * @param topicName topicName
 	 */
 	public static void validateTopicName(String topicName) throws IllegalArgumentException {
-		if (StrUtil.isBlank(topicName)) {
-			throw new IllegalArgumentException("Topic is blank:" + topicName);
-		}
 		if (MqttCodecUtil.isTopicFilter(topicName)) {
 			throw new IllegalArgumentException("Topic has wildcards char [+] or [#], topicName:" + topicName);
 		}
