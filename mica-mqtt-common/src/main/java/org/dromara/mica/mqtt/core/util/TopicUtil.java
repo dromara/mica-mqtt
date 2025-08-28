@@ -63,9 +63,7 @@ public final class TopicUtil {
 		char ch;
 		for (int i = 0; i < topicFilterLength; i++) {
 			ch = topicFilterChars[i];
-			if (Character.isWhitespace(ch)) {
-				throw new IllegalArgumentException("Mqtt subscribe topicFilter has white space:" + topicFilter);
-			} else if (ch == MqttCodecUtil.TOPIC_WILDCARDS_MORE) {
+			if (ch == MqttCodecUtil.TOPIC_WILDCARDS_MORE) {
 				// 校验: # 通配符只能在最后一位
 				if (i < topicFilterIdxEnd) {
 					throw new IllegalArgumentException("Mqtt subscribe topicFilter illegal:" + topicFilter);
