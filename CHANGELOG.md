@@ -2,7 +2,7 @@
 
 ## 发行版本
 
-### v2.5.4 - 2025-09-07
+### v2.5.4 - 2025-08-29
 - :sparkles: mica-mqtt-server 使用前缀树管理 MQTT 订阅。
 - :sparkles: mica-mqtt-server 心跳超时小于等于0时，不开启心跳检测。（不建议这样使用）感谢 `@刘业兴` 反馈（gitee #ICTT2V）
 - :sparkles: mica-mqtt-server solon 和 spring 插件，将 `@MqttServerFunction` 统一到 mica-mqtt-common 包中，不兼容。
