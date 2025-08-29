@@ -17,6 +17,8 @@
 package org.dromara.mica.mqtt.core.util;
 
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.mica.Pair;
 import org.tio.utils.mica.StrTemplateParser;
@@ -33,6 +35,7 @@ import java.util.StringTokenizer;
  * @author L.cm
  */
 public final class TopicUtil {
+	private static final Logger logger = LoggerFactory.getLogger(TopicUtil.class);
 	public static final String TOPIC_LAYER = "/";
 	public static final String TOPIC_WILDCARDS_ONE = "+";
 	public static final String TOPIC_WILDCARDS_MORE = "#";
@@ -63,7 +66,9 @@ public final class TopicUtil {
 		char ch;
 		for (int i = 0; i < topicFilterLength; i++) {
 			ch = topicFilterChars[i];
-			if (ch == MqttCodecUtil.TOPIC_WILDCARDS_MORE) {
+			if (Character.isWhitespace(ch)) {
+				logger.warn("注意：topic:[{}] 中包含空白字符串:[{}]，请检查是否正确", topicFilter, ch);
+			} else if (ch == MqttCodecUtil.TOPIC_WILDCARDS_MORE) {
 				// 校验: # 通配符只能在最后一位
 				if (i < topicFilterIdxEnd) {
 					throw new IllegalArgumentException("Mqtt subscribe topicFilter illegal:" + topicFilter);

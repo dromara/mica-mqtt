@@ -19,6 +19,8 @@ package org.dromara.mica.mqtt.codec;
 import org.dromara.mica.mqtt.codec.exception.DecoderException;
 import org.dromara.mica.mqtt.codec.exception.MqttUnacceptableProtocolVersionException;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tio.core.ChannelContext;
 
 /**
@@ -28,6 +30,7 @@ import org.tio.core.ChannelContext;
  * @author L.cm
  */
 public final class MqttCodecUtil {
+	private static final Logger logger = LoggerFactory.getLogger(MqttCodecUtil.class);
 	public static final char TOPIC_LAYER = '/';
 	public static final char TOPIC_WILDCARDS_ONE = '+';
 	public static final char TOPIC_WILDCARDS_MORE = '#';
@@ -64,7 +67,10 @@ public final class MqttCodecUtil {
 		// 从尾部开始遍历，因为 + # 一般出现在 topicFilter 的尾部
 		for (int i = topicFilter.length() - 1; i >= 0; i--) {
 			char ch = topicFilter.charAt(i);
-			if (TOPIC_WILDCARDS_ONE == ch || TOPIC_WILDCARDS_MORE == ch) {
+			// topic 中有空白符打印提示
+			if (Character.isWhitespace(ch)) {
+				logger.warn("注意：topic:[{}] 中包含空白字符串:[{}]，请检查是否正确", topicFilter, ch);
+			} else if (TOPIC_WILDCARDS_ONE == ch || TOPIC_WILDCARDS_MORE == ch) {
 				return true;
 			}
 		}
