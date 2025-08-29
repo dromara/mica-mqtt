@@ -13,7 +13,7 @@
 
     <properties>
         <!-- mica-mqtt version -->
-        <revision>2.5.4</revision>
+        <revision>2.5.5-SNAPSHOT</revision>
         <!-- java version -->
         <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
