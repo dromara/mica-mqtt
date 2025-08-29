@@ -56,7 +56,7 @@ public class MqttClientSubscribeListener {
 	 *
 	 * @param topic topic 参数，可选参数
 	 * @param topicVars 订阅 topic 模板 ${productKey} 中的变量解析（v2.5.4支持），可选参数，注意：类型必须为 Map<String, String>
-	 * @param payload 消息内容
+	 * @param payload 消息内容，以字节数组形式提供，可选参数，也可支持对象形式，默认 json 序列化
 	 */
 	@MqttClientSubscribe("/sys/${productKey}/${deviceName}/thing/sub/register")
 	public void thingSubRegister(String topic, Map<String, String> topicVars, byte[] payload) {
