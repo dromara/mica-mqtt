@@ -45,6 +45,7 @@ public class MqttUnSubAckProperties {
 	 * 设置原因字符串
 	 *
 	 * @param reasonString 原因字符串
+	 * @return MqttUnSubAckProperties
 	 */
 	public MqttUnSubAckProperties setReasonString(String reasonString) {
 		properties.add(new StringProperty(MqttPropertyType.REASON_STRING, reasonString));
@@ -55,6 +56,7 @@ public class MqttUnSubAckProperties {
 	 * 设置用户属性
 	 *
 	 * @param userProperty 用户属性
+	 * @return MqttUnSubAckProperties
 	 */
 	public MqttUnSubAckProperties addUserProperty(UserProperty userProperty) {
 		properties.add(userProperty);
@@ -66,6 +68,7 @@ public class MqttUnSubAckProperties {
 	 *
 	 * @param key   key
 	 * @param value value
+	 * @return MqttUnSubAckProperties
 	 */
 	public MqttUnSubAckProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));

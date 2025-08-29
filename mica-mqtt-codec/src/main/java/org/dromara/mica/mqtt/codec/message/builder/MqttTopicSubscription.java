@@ -49,8 +49,6 @@ public final class MqttTopicSubscription {
 
 	/**
 	 * Rewrite topic filter.
-	 * <p>
-	 * <p>
 	 * Many IoT devices do not support reconfiguration or upgrade, so it is hard to
 	 * change their subscribed topics. To resolve this issue, MQTT server may offer
 	 * topic rewrite capability.
