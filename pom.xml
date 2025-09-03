@@ -26,6 +26,7 @@
         <solon.version>3.5.1</solon.version>
         <jfinal.version>5.2.7</jfinal.version>
         <tinylog.version>2.7.0</tinylog.version>
+        <snakeyaml.version>2.5</snakeyaml.version>
     </properties>
 
     <modules>
@@ -141,6 +142,12 @@
                 <groupId>org.tinylog</groupId>
                 <artifactId>tinylog-impl</artifactId>
                 <version>${tinylog.version}</version>
+            </dependency>
+            <!-- 依赖新版，减少一些安全提示（实际上并未依赖） -->
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>${snakeyaml.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
