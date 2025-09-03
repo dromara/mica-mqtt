@@ -21,14 +21,11 @@
         <maven-flatten.version>1.7.2</maven-flatten.version>
         <!-- mica-net version -->
         <mica-net.version>1.1.20</mica-net.version>
-        <mica.version>2.7.18.9</mica.version>
+        <mica-auto.version>2.3.5</mica-auto.version>
         <spring.boot.version>2.7.18</spring.boot.version>
-        <gson.version>2.13.1</gson.version>
-        <solon.version>3.5.0</solon.version>
+        <solon.version>3.5.1</solon.version>
         <jfinal.version>5.2.7</jfinal.version>
         <tinylog.version>2.7.0</tinylog.version>
-        <undertow.version>2.2.37.Final</undertow.version>
-        <snakeyaml.version>2.4</snakeyaml.version>
     </properties>
 
     <modules>
@@ -36,7 +33,6 @@
         <module>mica-mqtt-common</module>
         <module>mica-mqtt-client</module>
         <module>mica-mqtt-server</module>
-        <module>example</module>
         <module>starter</module>
     </modules>
 
@@ -46,64 +42,6 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring.boot.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-web</artifactId>
-                <version>${spring.boot.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-tomcat</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-            <!-- undertow -->
-            <dependency>
-                <groupId>io.undertow</groupId>
-                <artifactId>undertow-core</artifactId>
-                <version>${undertow.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.undertow</groupId>
-                <artifactId>undertow-servlet</artifactId>
-                <version>${undertow.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <artifactId>jboss-servlet-api_4.0_spec</artifactId>
-                        <groupId>org.jboss.spec.javax.servlet</groupId>
-                    </exclusion>
-                    <exclusion>
-                        <artifactId>jboss-annotations-api_1.3_spec</artifactId>
-                        <groupId>org.jboss.spec.javax.annotation</groupId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-            <dependency>
-                <groupId>io.undertow</groupId>
-                <artifactId>undertow-websockets-jsr</artifactId>
-                <version>${undertow.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <artifactId>jboss-websocket-api_1.1_spec</artifactId>
-                        <groupId>org.jboss.spec.javax.websocket</groupId>
-                    </exclusion>
-                    <exclusion>
-                        <artifactId>jboss-servlet-api_4.0_spec</artifactId>
-                        <groupId>org.jboss.spec.javax.servlet</groupId>
-                    </exclusion>
-                    <exclusion>
-                        <artifactId>jboss-annotations-api_1.3_spec</artifactId>
-                        <groupId>org.jboss.spec.javax.annotation</groupId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
-            <dependency>
-                <groupId>net.dreamlu</groupId>
-                <artifactId>mica-bom</artifactId>
-                <version>${mica.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -118,15 +56,10 @@
                 <version>${mica-net.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.google.code.gson</groupId>
-                <artifactId>gson</artifactId>
-                <version>${gson.version}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>com.google.errorprone</groupId>
-                        <artifactId>error_prone_annotations</artifactId>
-                    </exclusion>
-                </exclusions>
+                <groupId>net.dreamlu</groupId>
+                <artifactId>mica-auto</artifactId>
+                <version>${mica-auto.version}</version>
+                <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>org.noear</groupId>
@@ -208,11 +141,6 @@
                 <groupId>org.tinylog</groupId>
                 <artifactId>tinylog-impl</artifactId>
                 <version>${tinylog.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.yaml</groupId>
-                <artifactId>snakeyaml</artifactId>
-                <version>${snakeyaml.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -375,6 +303,13 @@
             <activation>
                 <activeByDefault>true</activeByDefault>
             </activation>
+            <modules>
+                <module>mica-mqtt-common</module>
+                <module>mica-mqtt-client</module>
+                <module>mica-mqtt-server</module>
+                <module>starter</module>
+                <module>example</module>
+            </modules>
             <repositories>
                 <repository>
                     <id>aliyun</id>
