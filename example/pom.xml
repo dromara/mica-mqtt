@@ -12,6 +12,17 @@
     <name>${project.artifactId}</name>
     <packaging>pom</packaging>
 
+    <properties>
+        <!-- Spring Boot 3 需要 Java 17 -->
+        <java.version>17</java.version>
+        <!-- 覆盖父项目的 Spring Boot 版本 -->
+        <spring.boot.version>3.5.5</spring.boot.version>
+        <!-- 更新兼容 Spring Boot 3 的其他依赖版本 -->
+        <mica.version>3.5.4</mica.version>
+        <!-- gson 版本 -->
+        <gson.version>2.13.1</gson.version>
+    </properties>
+
     <modules>
         <module>mica-mqtt-example</module>
         <module>mica-mqtt-client-spring-boot-example</module>
@@ -19,5 +30,42 @@
         <module>mica-mqtt-client-solon-plugin-example</module>
         <module>mica-mqtt-server-solon-plugin-example</module>
     </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 使用 Spring Boot 3 的依赖管理 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring.boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-web</artifactId>
+                <version>${spring.boot.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.code.gson</groupId>
+                <artifactId>gson</artifactId>
+                <version>${gson.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.google.errorprone</groupId>
+                        <artifactId>error_prone_annotations</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <!-- mica 相关依赖 -->
+            <dependency>
+                <groupId>net.dreamlu</groupId>
+                <artifactId>mica-bom</artifactId>
+                <version>${mica.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
 </project>
