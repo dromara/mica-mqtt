@@ -9,11 +9,8 @@
   "packageRules": [
     {
       "matchPackagePatterns": [
-        "^com.alibaba:fastjson$",
         "^net.dreamlu:mica-bom$",
-        "^io.undertow:undertow-core$",
-        "^io.undertow:undertow-servlet$",
-        "^io.undertow:undertow-websockets-jsr$",
+        "^net.dreamlu:mica-auto$",
         "^org.springframework.boot:spring-boot-dependencies$",
         "^org.springframework.boot:spring-boot-maven-plugin$"
       ],
