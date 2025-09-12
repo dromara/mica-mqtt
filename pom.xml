@@ -20,7 +20,7 @@
         <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
         <maven-flatten.version>1.7.2</maven-flatten.version>
         <!-- mica-net version -->
-        <mica-net.version>1.1.20</mica-net.version>
+        <mica-net.version>1.1.21-SNAPSHOT</mica-net.version>
         <mica-auto.version>2.3.5</mica-auto.version>
         <spring.boot.version>2.7.18</spring.boot.version>
         <solon.version>3.5.1</solon.version>
