@@ -44,7 +44,6 @@ import java.util.Arrays;
 @RequiredArgsConstructor
 public class MqttServerFunctionDetector implements BeanPostProcessor {
 	private final ApplicationContext applicationContext;
-	private final MqttFunctionManager functionManager;
 
 	@Override
 	public Object postProcessAfterInitialization(@NonNull Object bean, String beanName) throws BeansException {
@@ -54,6 +53,8 @@ public class MqttServerFunctionDetector implements BeanPostProcessor {
 			MqttServerFunction subscribe = AnnotationUtils.findAnnotation(userClass, MqttServerFunction.class);
 			if (subscribe != null) {
 				String[] topicFilters = getTopicFilters(applicationContext, subscribe.value());
+				// 3. 注册监听器
+				MqttFunctionManager functionManager = getFunctionManager();
 				functionManager.register(topicFilters, (IMqttFunctionMessageListener) bean);
 			}
 		} else {
@@ -84,11 +85,21 @@ public class MqttServerFunctionDetector implements BeanPostProcessor {
 					// 5. 监听器
 					MqttServerFunctionListener functionListener = new MqttServerFunctionListener(bean, method, topicTemplates, topicFilters, deserializer);
 					// 6. 注册监听器
+					MqttFunctionManager functionManager = getFunctionManager();
 					functionManager.register(topicFilters, functionListener);
 				}
 			}, ReflectionUtils.USER_DECLARED_METHODS);
 		}
 		return bean;
+	}
+
+	/**
+	 * 获取 MqttFunctionManager
+	 *
+	 * @return MqttFunctionManager
+	 */
+	protected MqttFunctionManager getFunctionManager() {
+		return applicationContext.getBean(MqttFunctionManager.class);
 	}
 
 	/**

@@ -209,9 +209,8 @@ public class MqttServerConfiguration {
 	}
 
 	@Bean
-	public static MqttServerFunctionDetector mqttServerFunctionDetector(ApplicationContext applicationContext,
-																		MqttFunctionManager functionManager) {
-		return new MqttServerFunctionDetector(applicationContext, functionManager);
+	public static MqttServerFunctionDetector mqttServerFunctionDetector(ApplicationContext applicationContext) {
+		return new MqttServerFunctionDetector(applicationContext);
 	}
 
 }
