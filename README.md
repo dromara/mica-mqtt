@@ -35,8 +35,8 @@ Dromara `mica-mqtt` **低延迟**、**高性能**的 `mqtt` 物联网组件。�
 - [x] 支持 MQTT v3.1、v3.1.1 以及 v5.0 协议。
 - [x] 支持 websocket mqtt 子协议（支持 mqtt.js）。
 - [x] 支持 http rest api，[http api 文档详见](docs/http-api.md)。
-- [x] 支持 MQTT client 客户端，支持 **Android**。
-- [x] 支持 MQTT server 服务端，支持 **Android**。
+- [x] 支持 MQTT client 客户端，支持 **Android** 最低要求 API 26（Android 8.0）。
+- [x] 支持 MQTT server 服务端，支持 **Android** 最低要求 API 26（Android 8.0）。
 - [x] 支持 MQTT client、server 共享订阅支持。
 - [x] 支持 MQTT 遗嘱消息。
 - [x] 支持 MQTT 保留消息。
