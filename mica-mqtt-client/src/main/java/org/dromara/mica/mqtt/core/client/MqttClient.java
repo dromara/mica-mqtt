@@ -530,7 +530,9 @@ public final class MqttClient implements IMqttClient {
 	 */
 	public boolean stop() {
 		// 1. 断开连接
-		this.disconnect();
+		if (config.isDisconnectBeforeStop()) {
+			this.disconnect();
+		}
 		// 2. 停止 tio
 		boolean result = tioClient.stop();
 		// 3. 停止工作线程

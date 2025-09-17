@@ -202,11 +202,14 @@ public final class MqttClientCreator {
 	 * TioConfig 自定义配置
 	 */
 	private Consumer<TioConfig> tioConfigCustomize;
-
 	/**
 	 * 序列化
 	 */
 	private MqttSerializer mqttSerializer;
+	/**
+	 * 停止前是否发送 disconnect 消息，默认：true 不会触发遗嘱消息
+	 */
+	private boolean disconnectBeforeStop = true;
 
 	public String getName() {
 		return name;
@@ -346,6 +349,10 @@ public final class MqttClientCreator {
 
 	public MqttSerializer getMqttSerializer() {
 		return mqttSerializer;
+	}
+
+	public boolean isDisconnectBeforeStop() {
+		return disconnectBeforeStop;
 	}
 
 	public MqttClientCreator name(String name) {
@@ -596,6 +603,21 @@ public final class MqttClientCreator {
 		return this;
 	}
 
+	/**
+	 * 停止前是否发送 disconnect 消息，默认：true 不会触发遗嘱消息
+	 */
+	public MqttClientCreator disconnectBeforeStop() {
+		return disconnectBeforeStop(true);
+	}
+
+	/**
+	 * 停止前是否发送 disconnect 消息，默认：true 不会触发遗嘱消息
+	 */
+	public MqttClientCreator disconnectBeforeStop(boolean disconnectBeforeStop) {
+		this.disconnectBeforeStop = disconnectBeforeStop;
+		return this;
+	}
+
 	public MqttClientCreator newCreator() {
 		return new MqttClientCreator()
 			.name(this.name)
@@ -621,7 +643,9 @@ public final class MqttClientCreator {
 			.willMessage(this.willMessage)
 			.connectListener(this.connectListener)
 			.statEnable(this.statEnable)
-			.debug(this.debug);
+			.debug(this.debug)
+			.mqttJsonSerializer(this.mqttSerializer)
+			.disconnectBeforeStop(this.disconnectBeforeStop);
 	}
 
 	private MqttClient build() {

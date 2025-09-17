@@ -160,6 +160,10 @@ public class MqttClientProperties {
 	 */
 	private Integer bizThreadPoolSize;
 	/**
+	 * 停止前是否发送 disconnect 消息，默认：true 不会触发遗嘱消息
+	 */
+	private boolean disconnectBeforeStop = true;
+	/**
 	 * ssl 配置
 	 */
 	private Ssl ssl = new Ssl();
