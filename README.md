@@ -26,16 +26,17 @@ Dromara `mica-mqtt` **低延迟**、**高性能**的 `mqtt` 物联网组件。�
 - 简单易用的 mqtt 客户端
 
 ## 🚀 优势
-- 平凡却不单调，简单却不失精彩。
-- 手动档（更加易于二次开发或扩展）。
-- 牛犊初生，无限可能。
+- ✓ 轻如蝉翼 - 核心依赖仅 500KB
+- ✓ 新手友好 - 5 分钟极速上手
+- ✓ 自由操控 - 手动档设计，扩展随心
+- ✓ 潜力无限 - 小而强大，未来可期
 
 ## ✨ 功能
 - [x] 支持 MQTT v3.1、v3.1.1 以及 v5.0 协议。
 - [x] 支持 websocket mqtt 子协议（支持 mqtt.js）。
 - [x] 支持 http rest api，[http api 文档详见](docs/http-api.md)。
-- [x] 支持 MQTT client 客户端，支持 Android。
-- [x] 支持 MQTT server 服务端，支持 Android。
+- [x] 支持 MQTT client 客户端，支持 **Android**。
+- [x] 支持 MQTT server 服务端，支持 **Android**。
 - [x] 支持 MQTT client、server 共享订阅支持。
 - [x] 支持 MQTT 遗嘱消息。
 - [x] 支持 MQTT 保留消息。
