@@ -46,7 +46,7 @@ Dromara `mica-mqtt` **低延迟**、**高性能**的 `mqtt` 物联网组件。�
 - [x] 支持 Spring boot、Solon 和 JFinal 项目快速接入。
 - [x] Spring boot、Solon client 插件支持保留 session。
 - [x] 支持对接 Prometheus + Grafana 实现监控。
-- [x] 基于 redis stream 实现集群，详见 [mica-mqtt-broker 模块](mica-mqtt-broker)。
+- [x] 基于 redis stream 实现集群，详见 [mica-mqtt-broker 模块](https://gitee.com/dromara/mica-mqtt/tree/2.4.x/mica-mqtt-broker)。
 
 ## 🌱 待办
 
