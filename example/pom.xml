@@ -16,7 +16,7 @@
         <!-- Spring Boot 3 需要 Java 17 -->
         <java.version>17</java.version>
         <!-- 覆盖父项目的 Spring Boot 版本 -->
-        <spring.boot.version>3.5.5</spring.boot.version>
+        <spring.boot.version>3.5.6</spring.boot.version>
         <!-- 更新兼容 Spring Boot 3 的其他依赖版本 -->
         <mica.version>3.5.4</mica.version>
         <!-- gson 版本 -->
