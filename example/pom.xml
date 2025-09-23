@@ -18,7 +18,7 @@
         <!-- 覆盖父项目的 Spring Boot 版本 -->
         <spring.boot.version>3.5.6</spring.boot.version>
         <!-- 更新兼容 Spring Boot 3 的其他依赖版本 -->
-        <mica.version>3.5.4</mica.version>
+        <mica.version>3.5.6</mica.version>
         <!-- gson 版本 -->
         <gson.version>2.13.2</gson.version>
     </properties>
