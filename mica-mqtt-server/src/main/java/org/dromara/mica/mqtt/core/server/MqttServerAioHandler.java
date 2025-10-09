@@ -16,13 +16,14 @@
 
 package org.dromara.mica.mqtt.core.server;
 
-import org.dromara.mica.mqtt.codec.*;
+import org.dromara.mica.mqtt.codec.MqttDecoder;
+import org.dromara.mica.mqtt.codec.MqttEncoder;
+import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.exception.DecoderException;
 import org.dromara.mica.mqtt.codec.exception.MqttIdentifierRejectedException;
 import org.dromara.mica.mqtt.codec.exception.MqttUnacceptableProtocolVersionException;
 import org.dromara.mica.mqtt.codec.message.*;
-import org.dromara.mica.mqtt.codec.message.builder.MqttMessageBuilders;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.slf4j.Logger;
@@ -150,14 +151,14 @@ public class MqttServerAioHandler implements TioServerHandler {
 	private void processFailure(ChannelContext context, DecoderException cause) {
 		if (cause instanceof MqttUnacceptableProtocolVersionException) {
 			// 不支持的协议版本
-			MqttConnAckMessage message = MqttMessageBuilders.connAck()
+			MqttConnAckMessage message = MqttConnAckMessage.builder()
 				.returnCode(MqttConnectReasonCode.CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION)
 				.sessionPresent(false)
 				.build();
 			Tio.bSend(context, message);
 		} else if (cause instanceof MqttIdentifierRejectedException) {
 			// 不合格的 clientId
-			MqttConnAckMessage message = MqttMessageBuilders.connAck()
+			MqttConnAckMessage message = MqttConnAckMessage.builder()
 				.returnCode(MqttConnectReasonCode.CONNECTION_REFUSED_IDENTIFIER_REJECTED)
 				.sessionPresent(false)
 				.build();

@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.codec.message;
 
+import org.dromara.mica.mqtt.codec.message.builder.MqttUnSubscribeBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
@@ -55,5 +56,14 @@ public final class MqttUnSubscribeMessage extends MqttMessage {
 	@Override
 	public MqttUnsubscribePayload payload() {
 		return (MqttUnsubscribePayload) super.payload();
+	}
+
+	/**
+	 * Create a builder for a {@link MqttUnSubscribeMessage}
+	 *
+	 * @return a new instance of {@link MqttUnSubscribeBuilder}
+	 */
+	public static MqttUnSubscribeBuilder builder() {
+		return new MqttUnSubscribeBuilder();
 	}
 }

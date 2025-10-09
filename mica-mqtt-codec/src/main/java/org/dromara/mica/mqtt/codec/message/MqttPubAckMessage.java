@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.codec.message;
 
+import org.dromara.mica.mqtt.codec.message.builder.MqttPubAckBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 
@@ -33,5 +34,14 @@ public final class MqttPubAckMessage extends MqttMessage {
 	@Override
 	public MqttMessageIdVariableHeader variableHeader() {
 		return (MqttMessageIdVariableHeader) super.variableHeader();
+	}
+
+	/**
+	 * Create a builder for a {@link MqttPubAckMessage}
+	 *
+	 * @return a new instance of {@link MqttPubAckBuilder}
+	 */
+	public static MqttPubAckBuilder builder() {
+		return new MqttPubAckBuilder();
 	}
 }

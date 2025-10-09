@@ -16,9 +16,8 @@
 
 package org.dromara.mica.mqtt.core.server;
 
-import org.dromara.mica.mqtt.codec.message.builder.MqttMessageBuilders;
-import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
@@ -192,7 +191,7 @@ public final class MqttServer {
 		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
 		int messageId = isHighLevelQoS ? sessionManager.getPacketId(clientId) : -1;
 		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
-		MqttPublishMessage message = MqttMessageBuilders.publish()
+		MqttPublishMessage message = MqttPublishMessage.builder()
 			.topicName(topic)
 			.payload(newPayload)
 			.qos(qos)

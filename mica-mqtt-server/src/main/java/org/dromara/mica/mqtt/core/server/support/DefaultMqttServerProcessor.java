@@ -16,10 +16,11 @@
 
 package org.dromara.mica.mqtt.core.server.support;
 
-import org.dromara.mica.mqtt.codec.*;
+import org.dromara.mica.mqtt.codec.MqttMessageFactory;
+import org.dromara.mica.mqtt.codec.MqttMessageType;
+import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.*;
-import org.dromara.mica.mqtt.codec.message.builder.MqttMessageBuilders;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
@@ -190,7 +191,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	}
 
 	private static void connAckByReturnCode(String clientId, String uniqueId, ChannelContext context, MqttConnectReasonCode returnCode) {
-		MqttConnAckMessage message = MqttMessageBuilders.connAck()
+		MqttConnAckMessage message = MqttConnAckMessage.builder()
 			.returnCode(returnCode)
 			.sessionPresent(false)
 			.build();
@@ -243,7 +244,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			case QOS1:
 				invokeListenerForPublish(context, clientId, mqttQoS, topicName, message);
 				if (packetId != -1) {
-					MqttMessage messageAck = MqttMessageBuilders.pubAck()
+					MqttMessage messageAck = MqttPubAckMessage.builder()
 						.packetId(packetId)
 						.build();
 					boolean resultPubAck = Tio.send(context, messageAck);
@@ -365,7 +366,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			}
 		}
 		// 3. 返回 ack
-		MqttMessage subAckMessage = MqttMessageBuilders.subAck()
+		MqttMessage subAckMessage = MqttSubAckMessage.builder()
 			.addGrantedQosList(grantedQosList)
 			.packetId(packetId)
 			.build();
@@ -415,7 +416,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			publishUnsubscribedEvent(context, clientId, topicFilter);
 		}
 		logger.info("UnSubscribe - clientId:{} Topic:{} packetId:{}", clientId, topicFilterList, packetId);
-		MqttMessage unSubMessage = MqttMessageBuilders.unSubAck()
+		MqttMessage unSubMessage = MqttUnSubAckMessage.builder()
 			.packetId(packetId)
 			.build();
 		boolean result = Tio.send(context, unSubMessage);

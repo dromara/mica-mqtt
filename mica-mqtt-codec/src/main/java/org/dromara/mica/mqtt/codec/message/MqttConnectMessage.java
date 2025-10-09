@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.codec.message;
 
+import org.dromara.mica.mqtt.codec.message.builder.MqttConnectBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
@@ -42,5 +43,14 @@ public final class MqttConnectMessage extends MqttMessage {
 	@Override
 	public MqttConnectPayload payload() {
 		return (MqttConnectPayload) super.payload();
+	}
+
+	/**
+	 * Create a builder for a {@link MqttConnectMessage}
+	 *
+	 * @return a new instance of {@link MqttConnectBuilder}
+	 */
+	public static MqttConnectBuilder builder() {
+		return new MqttConnectBuilder();
 	}
 }

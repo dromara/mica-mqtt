@@ -16,10 +16,10 @@
 
 package org.dromara.mica.mqtt.core.client;
 
-import org.dromara.mica.mqtt.codec.*;
+import org.dromara.mica.mqtt.codec.MqttMessageType;
+import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.*;
-import org.dromara.mica.mqtt.codec.message.builder.MqttMessageBuilders;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnAckVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
@@ -152,7 +152,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 	 */
 	private void globalReSendSubscription(ChannelContext context, Set<MqttTopicSubscription> globalReSubscriptionList) {
 		int packetId = clientSession.getPacketId();
-		MqttSubscribeMessage message = MqttMessageBuilders.subscribe()
+		MqttSubscribeMessage message = MqttSubscribeMessage.builder()
 			.addSubscriptions(globalReSubscriptionList)
 			.messageId(packetId)
 			.build();
@@ -172,7 +172,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			.map(MqttClientSubscription::toTopicSubscription)
 			.collect(Collectors.toList());
 		int packetId = clientSession.getPacketId();
-		MqttSubscribeMessage message = MqttMessageBuilders.subscribe()
+		MqttSubscribeMessage message = MqttSubscribeMessage.builder()
 			.addSubscriptions(topicSubscriptionList)
 			.messageId(packetId)
 			.build();
@@ -264,7 +264,9 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			case QOS1:
 				invokeListenerForPublish(context, topicName, message);
 				if (packetId != -1) {
-					MqttMessage messageAck = MqttMessageBuilders.pubAck().packetId(packetId).build();
+					MqttMessage messageAck = MqttPubAckMessage.builder()
+						.packetId(packetId)
+						.build();
 					boolean resultPubAck = Tio.send(context, messageAck);
 					logger.debug("Publish - PubAck send topicName:{} mqttQoS:{} packetId:{} result:{}", topicName, mqttQoS, packetId, resultPubAck);
 				}

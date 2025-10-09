@@ -16,12 +16,11 @@
 
 package org.dromara.mica.mqtt.core.client;
 
-import org.dromara.mica.mqtt.codec.*;
+import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
-import org.dromara.mica.mqtt.codec.message.builder.MqttMessageBuilders;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
@@ -214,7 +213,7 @@ public final class MqttClient implements IMqttClient {
 			.collect(Collectors.toList());
 		// 3. 没有订阅过
 		int messageId = clientSession.getPacketId();
-		MqttSubscribeMessage message = MqttMessageBuilders.subscribe()
+		MqttSubscribeMessage message = MqttSubscribeMessage.builder()
 			.addSubscriptions(topicSubscriptionList)
 			.messageId(messageId)
 			.properties(properties)
@@ -258,7 +257,7 @@ public final class MqttClient implements IMqttClient {
 		clientSession.removeSubscriptions(topicFilters);
 		// 3. 发送取消订阅到服务端
 		int messageId = clientSession.getPacketId();
-		MqttUnSubscribeMessage message = MqttMessageBuilders.unsubscribe()
+		MqttUnSubscribeMessage message = MqttUnSubscribeMessage.builder()
 			.addTopicFilters(topicFilters)
 			.messageId(messageId)
 			.build();
@@ -345,7 +344,7 @@ public final class MqttClient implements IMqttClient {
 	 * @return 是否发送成功
 	 */
 	public boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttPublishBuilder> builder) {
-		MqttPublishBuilder publishBuilder = MqttMessageBuilders.publish();
+		MqttPublishBuilder publishBuilder = MqttPublishMessage.builder();
 		// 序列化
 		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
 		// 自定义配置

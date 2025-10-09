@@ -16,10 +16,9 @@
 
 package org.dromara.mica.mqtt.core.client;
 
-import org.dromara.mica.mqtt.codec.*;
+import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.builder.MqttConnectBuilder;
-import org.dromara.mica.mqtt.codec.message.builder.MqttMessageBuilders;
 import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
@@ -91,7 +90,7 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 		MqttVersion version = mqttClientCreator.getVersion();
 		int keepAliveSecs = mqttClientCreator.getKeepAliveSecs();
 		// 1. 建立连接后发送 mqtt 连接的消息
-		MqttConnectBuilder builder = MqttMessageBuilders.connect()
+		MqttConnectBuilder builder = MqttConnectMessage.builder()
 			.clientId(mqttClientCreator.getClientId())
 			.username(mqttClientCreator.getUsername())
 			.cleanStart(mqttClientCreator.isCleanStart())

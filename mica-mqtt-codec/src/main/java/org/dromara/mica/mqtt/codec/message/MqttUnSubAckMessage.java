@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.codec.message;
 
+import org.dromara.mica.mqtt.codec.message.builder.MqttUnSubAckBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
@@ -67,5 +68,14 @@ public final class MqttUnSubAckMessage extends MqttMessage {
 	@Override
 	public MqttUnsubAckPayload payload() {
 		return (MqttUnsubAckPayload) super.payload();
+	}
+
+	/**
+	 * Create a builder for a {@link MqttUnSubAckMessage}
+	 *
+	 * @return a new instance of {@link MqttUnSubAckBuilder}
+	 */
+	public static MqttUnSubAckBuilder builder() {
+		return new MqttUnSubAckBuilder();
 	}
 }

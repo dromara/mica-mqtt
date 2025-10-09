@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.codec.message;
 
+import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttPublishVariableHeader;
 
@@ -46,4 +47,12 @@ public class MqttPublishMessage extends MqttMessage {
 		return (byte[]) super.payload();
 	}
 
+	/**
+	 * Create a builder for a {@link MqttPublishMessage}
+	 *
+	 * @return a new instance of {@link MqttPublishBuilder}
+	 */
+	public static MqttPublishBuilder builder() {
+		return new MqttPublishBuilder();
+	}
 }

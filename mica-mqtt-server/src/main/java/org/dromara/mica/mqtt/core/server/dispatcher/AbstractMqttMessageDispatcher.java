@@ -16,9 +16,8 @@
 
 package org.dromara.mica.mqtt.core.server.dispatcher;
 
-import org.dromara.mica.mqtt.codec.message.builder.MqttMessageBuilders;
-import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
@@ -111,7 +110,7 @@ public abstract class AbstractMqttMessageDispatcher implements IMqttMessageDispa
 		context.setBsId(clientId);
 		context.setUserId(MessageType.HTTP_API.name());
 		// 构造 MqttPublishMessage
-		MqttPublishMessage publishMessage = MqttMessageBuilders.publish()
+		MqttPublishMessage publishMessage = MqttPublishMessage.builder()
 			.topicName(topic)
 			.qos(mqttQoS)
 			.retained(message.isRetain())

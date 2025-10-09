@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.codec.message;
 
+import org.dromara.mica.mqtt.codec.message.builder.MqttSubscribeBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
@@ -55,5 +56,14 @@ public final class MqttSubscribeMessage extends MqttMessage {
 	@Override
 	public MqttSubscribePayload payload() {
 		return (MqttSubscribePayload) super.payload();
+	}
+
+	/**
+	 * Create a builder for a {@link MqttSubscribeMessage}
+	 *
+	 * @return a new instance of {@link MqttSubscribeBuilder}
+	 */
+	public static MqttSubscribeBuilder builder() {
+		return new MqttSubscribeBuilder();
 	}
 }
