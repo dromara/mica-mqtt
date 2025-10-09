@@ -51,11 +51,17 @@ public class MqttClientTest {
 //			.version(MqttVersion.MQTT_5)
 //			连接监听
 			.connectListener(new MqttClientConnectListener())
+			// 遗嘱消息
 			.willMessage(builder -> {
 				builder.topic("/test/offline")
 					.messageText("down")
 					.retain(false)
-					.qos(MqttQoS.QOS0);    // 遗嘱消息
+					.qos(MqttQoS.QOS0)
+					// mqtt5 遗嘱消息属性
+					.willProperties(props -> {
+						props.setWillDelayInterval(1000);
+						props.setContentType("text/plain");
+					});
 			})
 			// 同步连接，也可以使用 connect() 异步（可以避免 broker 没启动照成启动卡住），但是下面的订阅和发布可能还没连接成功。
 			.connectSync();
