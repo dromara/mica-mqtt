@@ -266,6 +266,16 @@ public class MqttClientTemplate implements ApplicationContextAware, SmartInitial
 	}
 
 	/**
+	 * 发布消息
+	 *
+	 * @param builder PublishBuilder
+	 * @return 是否发送成功
+	 */
+	public boolean publish(MqttPublishBuilder builder) {
+		return client.publish(builder);
+	}
+
+	/**
 	 * 添加定时任务，注意：如果抛出异常，会终止后续任务，请自行处理异常
 	 *
 	 * @param command runnable

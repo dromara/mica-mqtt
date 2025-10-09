@@ -345,11 +345,6 @@ public final class MqttClient implements IMqttClient {
 	 * @return 是否发送成功
 	 */
 	public boolean publish(String topic, Object payload, MqttQoS qos, Consumer<MqttPublishBuilder> builder) {
-		// 校验 topic
-		TopicUtil.validateTopicName(topic);
-		// qos 判断
-		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
-		int messageId = isHighLevelQoS ? clientSession.getPacketId() : -1;
 		MqttPublishBuilder publishBuilder = MqttMessageBuilders.publish();
 		// 序列化
 		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
@@ -358,9 +353,28 @@ public final class MqttClient implements IMqttClient {
 		// 内置配置
 		publishBuilder.topicName(topic)
 			.payload(newPayload)
-			.messageId(messageId)
 			.qos(qos);
-		MqttPublishMessage message = publishBuilder.build();
+		return publish(publishBuilder);
+	}
+
+	/**
+	 * 发布消息
+	 *
+	 * @param builder PublishBuilder
+	 * @return 是否发送成功
+	 */
+	public boolean publish(MqttPublishBuilder builder) {
+		String topic = Objects.requireNonNull(builder.getTopicName(), "topic is null");
+		// 校验 topic
+		TopicUtil.validateTopicName(topic);
+		MqttQoS qos = Objects.requireNonNull(builder.getQos(), "qos is null");
+		// qos 判断
+		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
+		int messageId = isHighLevelQoS ? clientSession.getPacketId() : -1;
+		// 内置配置
+		MqttPublishMessage message = builder
+			.messageId(messageId)
+			.build();
 		ClientChannelContext clientContext = getContext();
 		if (clientContext == null) {
 			logger.error("MQTT client publish fail, TCP not connected.");
@@ -380,7 +394,7 @@ public final class MqttClient implements IMqttClient {
 		}
 		// 发送消息
 		boolean result = Tio.send(clientContext, message);
-		logger.debug("MQTT Topic:{} qos:{} retain:{} publish result:{}", topic, qos, publishBuilder.isRetained(), result);
+		logger.debug("MQTT Topic:{} qos:{} retain:{} publish result:{}", topic, qos, builder.isRetained(), result);
 		return result;
 	}
 
