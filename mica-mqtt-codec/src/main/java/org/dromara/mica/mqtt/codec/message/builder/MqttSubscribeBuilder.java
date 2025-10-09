@@ -35,12 +35,11 @@ import java.util.function.Consumer;
  * @author netty, L.cm
  */
 public final class MqttSubscribeBuilder {
-
 	private final List<MqttTopicSubscription> subscriptions;
 	private int messageId;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
-	MqttSubscribeBuilder() {
+	public MqttSubscribeBuilder() {
 		subscriptions = new ArrayList<>(5);
 	}
 

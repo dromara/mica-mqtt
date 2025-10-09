@@ -36,7 +36,7 @@ public final class MqttAuthBuilder {
 	private MqttAuthReasonCode reasonCode;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
-	MqttAuthBuilder() {
+	public MqttAuthBuilder() {
 	}
 
 	public MqttAuthBuilder reasonCode(MqttAuthReasonCode reasonCode) {

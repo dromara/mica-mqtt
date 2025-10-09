@@ -37,7 +37,7 @@ public final class MqttConnAckBuilder {
 	private boolean sessionPresent;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
-	MqttConnAckBuilder() {
+	public MqttConnAckBuilder() {
 	}
 
 	public MqttConnAckBuilder returnCode(MqttConnectReasonCode returnCode) {

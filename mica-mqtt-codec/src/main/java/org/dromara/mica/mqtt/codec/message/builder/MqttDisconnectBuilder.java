@@ -35,7 +35,7 @@ public final class MqttDisconnectBuilder {
 	private MqttDisconnectReasonCode reasonCode;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
-	MqttDisconnectBuilder() {
+	public MqttDisconnectBuilder() {
 	}
 
 	public MqttDisconnectBuilder reasonCode(MqttDisconnectReasonCode reasonCode) {

@@ -39,7 +39,7 @@ public final class MqttUnSubscribeBuilder {
 	private int messageId;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
-	MqttUnSubscribeBuilder() {
+	public MqttUnSubscribeBuilder() {
 		topicFilters = new ArrayList<>(5);
 	}
 

@@ -36,7 +36,7 @@ public final class MqttPubAckBuilder {
 	private MqttPubAckReasonCode reasonCode;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
-	MqttPubAckBuilder() {
+	public MqttPubAckBuilder() {
 	}
 
 	public MqttPubAckBuilder reasonCode(byte reasonCode) {

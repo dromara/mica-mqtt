@@ -40,7 +40,7 @@ public final class MqttUnSubAckBuilder {
 	private int packetId;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
-	MqttUnSubAckBuilder() {
+	public MqttUnSubAckBuilder() {
 	}
 
 	public MqttUnSubAckBuilder packetId(int packetId) {

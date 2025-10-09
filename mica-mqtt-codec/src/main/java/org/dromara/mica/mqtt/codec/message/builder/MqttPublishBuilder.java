@@ -40,7 +40,7 @@ public final class MqttPublishBuilder {
 	private int messageId;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
-	MqttPublishBuilder() {
+	public MqttPublishBuilder() {
 	}
 
 	public MqttPublishBuilder topicName(String topic) {

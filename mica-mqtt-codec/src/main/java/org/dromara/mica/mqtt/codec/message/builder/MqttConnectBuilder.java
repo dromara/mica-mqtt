@@ -51,7 +51,7 @@ public final class MqttConnectBuilder {
 	private byte[] password;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
-	MqttConnectBuilder() {
+	public MqttConnectBuilder() {
 	}
 
 	public MqttConnectBuilder protocolVersion(MqttVersion version) {

@@ -40,7 +40,7 @@ public final class MqttSubAckBuilder {
 	private int packetId;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
-	MqttSubAckBuilder() {
+	public MqttSubAckBuilder() {
 		reasonCodes = new ArrayList<>();
 	}
 
