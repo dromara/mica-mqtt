@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.core.client;
 
+import org.dromara.mica.mqtt.codec.message.properties.MqttWillPublishProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
@@ -23,6 +24,7 @@ import org.dromara.mica.mqtt.core.util.TopicUtil;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * 遗嘱消息
@@ -119,6 +121,12 @@ public final class MqttWillMessage {
 		public Builder willProperties(MqttProperties willProperties) {
 			this.willProperties = Objects.requireNonNull(willProperties);
 			return this;
+		}
+
+		public Builder willProperties(Consumer<MqttWillPublishProperties> consumer) {
+			MqttWillPublishProperties willPublishProperties = new MqttWillPublishProperties();
+			consumer.accept(willPublishProperties);
+			return willProperties(willPublishProperties.getProperties());
 		}
 
 		public MqttWillMessage build() {
