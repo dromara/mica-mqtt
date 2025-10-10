@@ -2,6 +2,14 @@
 
 ## 发行版本
 
+### v2.5.5 - 2025-10-10
+- :sparkles: mqtt-client 添加通过 `Consumer<MqttWillPublishProperties>` 函数式接口自定义遗嘱属性
+- :sparkles: mqtt-client 添加直接使用 MqttPublishBuilder 发布消息
+- :sparkles: mqtt-client 添加 disconnectBeforeStop 配置（默认 true），断开连接前是否发送 disconnect 消息，感谢 `@steven` 反馈（gitee #ICXY4A）
+- :sparkles: mica-mqtt-server 使用 ConcurrentHashMap 替代 IntObjectHashMap，优化内存会话管理
+- :sparkles: mica-mqtt-server-spring-boot-starter bean 加载顺序优化，避免出现提示
+- :arrow_up: 升级 mica-net 到 1.1.21，调整慢包攻击规则，感谢 `@well` 反馈（gitee #ICXF5N）
+
 ### v2.5.4 - 2025-08-29
 - :sparkles: mica-mqtt-server 使用前缀树管理 MQTT 订阅。
 - :sparkles: mica-mqtt-server 心跳超时小于等于0时，不开启心跳检测。（不建议这样使用）感谢 `@刘业兴` 反馈（gitee #ICTT2V）
