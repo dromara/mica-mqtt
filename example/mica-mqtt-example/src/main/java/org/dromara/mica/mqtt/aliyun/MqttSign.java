@@ -16,12 +16,8 @@
 
 package org.dromara.mica.mqtt.aliyun;
 
-import org.tio.utils.mica.HexUtils;
+import org.tio.utils.mica.DigestUtils;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 
 /**
@@ -79,15 +75,7 @@ public class MqttSign {
 		if (plainText == null || key == null) {
 			return null;
 		}
-		try {
-			Mac mac = Mac.getInstance("HmacSHA256");
-			SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "HmacSHA256");
-			mac.init(secretKeySpec);
-			byte[] hmacResult = mac.doFinal(plainText.getBytes());
-			return HexUtils.encodeToString(hmacResult);
-		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
-			throw new IllegalArgumentException(e);
-		}
+		return DigestUtils.hmacSha256Hex(plainText, key);
 	}
 
 }
