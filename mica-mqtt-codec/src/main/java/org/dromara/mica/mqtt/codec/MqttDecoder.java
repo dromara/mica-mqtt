@@ -79,8 +79,10 @@ public final class MqttDecoder {
 		int multiplier = 1;
 		short digit;
 		int loops = 0;
+		buffer.mark();
 		do {
 			if (!buffer.hasRemaining()) {
+				buffer.reset();
 				return null;
 			}
 			digit = ByteBufferUtil.readUnsignedByte(buffer);
