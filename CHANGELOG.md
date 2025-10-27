@@ -2,6 +2,10 @@
 
 ## 发行版本
 
+### v2.5.6 - 2025-10-27
+- :bug: 修复 MQTT 解码器中的缓冲区读取问题，修复解码异常重连后无法恢复的问题。
+- :arrow_up: 升级 mica-net 到 1.2.1，修改慢包读取 (gitee #ID3IAU)
+
 ### v2.5.5 - 2025-10-10
 - :sparkles: mqtt-client 添加通过 `Consumer<MqttWillPublishProperties>` 函数式接口自定义遗嘱属性
 - :sparkles: mqtt-client 添加直接使用 MqttPublishBuilder 发布消息
