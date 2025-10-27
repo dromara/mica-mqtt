@@ -70,7 +70,6 @@ public final class MqttDecoder {
 	 * @return the fixed header
 	 */
 	private static MqttFixedHeader decodeFixedHeader(ChannelContext ctx, ByteBuffer buffer) {
-		buffer.mark();
 		short b1 = ByteBufferUtil.readUnsignedByte(buffer);
 		MqttMessageType messageType = MqttMessageType.valueOf(b1 >> 4);
 		boolean dupFlag = (b1 & 0x08) == 0x08;
@@ -82,7 +81,6 @@ public final class MqttDecoder {
 		int loops = 0;
 		do {
 			if (!buffer.hasRemaining()) {
-				buffer.reset();
 				return null;
 			}
 			digit = ByteBufferUtil.readUnsignedByte(buffer);
@@ -603,9 +601,11 @@ public final class MqttDecoder {
 			return null;
 		}
 		// 3. 解析 FixedHeader 2~5 个字节
+		buffer.mark();
 		mqttFixedHeader = decodeFixedHeader(ctx, buffer);
 		// 不够读
 		if (mqttFixedHeader == null) {
+			buffer.reset();
 			return null;
 		}
 		int messageLength = mqttFixedHeader.getMessageLength();
