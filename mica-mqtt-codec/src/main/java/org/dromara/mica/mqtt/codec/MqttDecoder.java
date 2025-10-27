@@ -70,6 +70,7 @@ public final class MqttDecoder {
 	 * @return the fixed header
 	 */
 	private static MqttFixedHeader decodeFixedHeader(ChannelContext ctx, ByteBuffer buffer) {
+		buffer.mark();
 		short b1 = ByteBufferUtil.readUnsignedByte(buffer);
 		MqttMessageType messageType = MqttMessageType.valueOf(b1 >> 4);
 		boolean dupFlag = (b1 & 0x08) == 0x08;
@@ -79,7 +80,6 @@ public final class MqttDecoder {
 		int multiplier = 1;
 		short digit;
 		int loops = 0;
-		buffer.mark();
 		do {
 			if (!buffer.hasRemaining()) {
 				buffer.reset();
