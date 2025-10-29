@@ -16,10 +16,8 @@
 
 package org.dromara.mica.mqtt.huawei;
 
-import org.tio.utils.mica.HexUtils;
+import org.tio.utils.mica.DigestUtils;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -27,7 +25,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 
 /**
- * 阿里云 mqtt 签名方式
+ * 华为云 mqtt 签名方式
  *
  * @author L.cm
  */
@@ -85,15 +83,7 @@ public class MqttSign {
 	 * 调用sha256算法进行哈希
 	 */
 	private static String hmacSha256(String message, String tStamp) {
-		try {
-			Mac hmacSHA256 = Mac.getInstance("HmacSHA256");
-			hmacSHA256.init(new SecretKeySpec(tStamp.getBytes(), "HmacSHA256"));
-			byte[] bytes = hmacSHA256.doFinal(message.getBytes());
-			return HexUtils.encodeToString(bytes);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return null;
+		return DigestUtils.hmacSha256Hex(message, tStamp);
 	}
 
 }
