@@ -29,16 +29,22 @@ import org.dromara.mica.mqtt.core.server.model.ClientInfo;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tio.core.ChannelContext;
 import org.tio.core.Tio;
 import org.tio.http.common.HttpConst;
 import org.tio.http.common.HttpRequest;
 import org.tio.http.common.HttpResponse;
 import org.tio.http.common.Method;
+import org.tio.http.mcp.server.McpServerSession;
+import org.tio.http.sse.SseEmitter;
 import org.tio.server.TioServerConfig;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.json.JsonUtil;
 import org.tio.utils.mica.PayloadEncode;
+import org.tio.utils.timer.TimerTask;
+import org.tio.utils.timer.TimerTaskService;
 
 import java.util.List;
 import java.util.function.Function;
@@ -49,6 +55,7 @@ import java.util.function.Function;
  * @author L.cm
  */
 public class MqttHttpApi {
+	private static final Logger log = LoggerFactory.getLogger(MqttHttpApi.class);
 	private final MqttServerCreator serverCreator;
 	private final TioServerConfig mqttServerConfig;
 
@@ -70,7 +77,7 @@ public class MqttHttpApi {
 	}
 
 	/**
-	 * 获取 api 列表
+	 * 获取统计信息
 	 * <p>
 	 * GET /api/v1/stats
 	 *
@@ -79,6 +86,45 @@ public class MqttHttpApi {
 	 */
 	public HttpResponse stats(HttpRequest request) {
 		return Result.ok(request, this.mqttServerConfig.getStat());
+	}
+
+	/**
+	 * 获取统计信息（sse 流）
+	 * <p>
+	 * GET /api/v1/stats/sse
+	 *
+	 * @param request HttpRequest
+	 * @return HttpResponse
+	 */
+	public HttpResponse statsSse(HttpRequest request) {
+		// sse 频率，默认 3s
+		int delay = request.getInt("delay", 3000);
+		HttpResponse httpResponse = new HttpResponse(request);
+		SseEmitter emitter = SseEmitter.getEmitter(request, httpResponse);
+		// 响应包发送后，再发送 sse 回包
+		httpResponse.setPacketListener((context, packet, isSentSuccess) -> {
+			if (isSentSuccess) {
+				TimerTaskService taskService = mqttServerConfig.getTaskService();
+				if (taskService != null) {
+					taskService.addTask((systemTimer -> new TimerTask(delay) {
+						@Override
+						public void run() {
+							try {
+								if (context != null && !context.isClosed()) {
+									// 1. 再次添加 任务
+									systemTimer.add(this);
+									// 2. 执行任务
+									emitter.send(JsonUtil.toJsonString(mqttServerConfig.getStat()));
+								}
+							} catch (Exception e) {
+								log.error("Tio client schedule error", e);
+							}
+						}
+					}));
+				}
+			}
+		});
+		return httpResponse;
 	}
 
 	/**
@@ -410,6 +456,7 @@ public class MqttHttpApi {
 		// @formatter:off
 		MqttHttpRoutes.register(Method.GET, "/api/v1/endpoints", this::endpoints);
 		MqttHttpRoutes.register(Method.GET, "/api/v1/stats", this::stats);
+		MqttHttpRoutes.register(Method.GET, "/api/v1/stats/sse", this::statsSse);
 		MqttHttpRoutes.register(Method.POST, "/api/v1/mqtt/publish", this::publish);
 		MqttHttpRoutes.register(Method.POST, "/api/v1/mqtt/publish/batch", this::publishBatch);
 		MqttHttpRoutes.register(Method.POST, "/api/v1/mqtt/subscribe", this::subscribe);
