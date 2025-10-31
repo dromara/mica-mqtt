@@ -99,10 +99,10 @@ public class MqttHttpApi {
 	public HttpResponse statsSse(HttpRequest request) {
 		// sse 频率，默认 3s
 		int delay = request.getInt("delay", 3000);
-		HttpResponse httpResponse = new HttpResponse(request);
-		SseEmitter emitter = SseEmitter.getEmitter(request, httpResponse);
+		HttpResponse response = new HttpResponse(request);
+		SseEmitter emitter = SseEmitter.getEmitter(request, response);
 		// 响应包发送后，再发送 sse 回包
-		httpResponse.setPacketListener((context, packet, isSentSuccess) -> {
+		response.setPacketListener((context, packet, isSentSuccess) -> {
 			if (isSentSuccess) {
 				TimerTaskService taskService = mqttServerConfig.getTaskService();
 				if (taskService != null) {
@@ -124,7 +124,7 @@ public class MqttHttpApi {
 				}
 			}
 		});
-		return httpResponse;
+		return response;
 	}
 
 	/**
