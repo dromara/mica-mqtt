@@ -62,8 +62,7 @@ public class BasicAuthFilter implements HttpFilter {
 	public HttpResponse response(HttpRequest request) {
 		HttpResponse response = new HttpResponse(request);
 		response.addHeader(WWW_AUTHENTICATE, BASIC_REALM);
-		Result.fail(response, ResultCode.E103);
-		return response;
+		return Result.fail(response, ResultCode.E103);
 	}
 
 	private static String getBasicToken(String username, String password) {
