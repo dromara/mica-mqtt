@@ -40,7 +40,7 @@ public class MqttServerConfiguration {
 
 	@Bean
 	@Condition(onMissingBean = MqttFunctionManager.class)
-	public static MqttFunctionManager mqttFunctionManager() {
+	public MqttFunctionManager mqttFunctionManager() {
 		return new MqttFunctionManager();
 	}
 
