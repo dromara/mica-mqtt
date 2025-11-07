@@ -36,12 +36,12 @@
         </dependency>
         <dependency>
             <groupId>org.noear</groupId>
-            <artifactId>solon.scheduling.simple</artifactId>
+            <artifactId>solon-scheduling-simple</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.noear</groupId>
-            <artifactId>solon.logging.simple</artifactId>
+            <artifactId>solon-logging-simple</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

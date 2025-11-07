@@ -23,11 +23,11 @@
         <!-- 简单的本地定时任务调度 -->
         <dependency>
             <groupId>org.noear</groupId>
-            <artifactId>solon.scheduling.simple</artifactId>
+            <artifactId>solon-scheduling-simple</artifactId>
         </dependency>
         <dependency>
             <groupId>org.noear</groupId>
-            <artifactId>solon.logging.simple</artifactId>
+            <artifactId>solon-logging-simple</artifactId>
         </dependency>
         <!-- metrics 指标 开始 -->
         <dependency>
