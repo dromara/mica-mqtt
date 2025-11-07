@@ -2,6 +2,13 @@
 
 ## 发行版本
 
+### v2.5.7 - 2025-11-07
+
+- :sparkles: mica-mqtt-server 新增 `/api/v1/stats/sse` 接口，支持通过 SSE 实时获取服务器统计信息
+- :sparkles: example 升级到 solon 3.7.0 更改相关依赖命名规则
+- :arrow_up: 升级 mica-net 到 1.2.2 支持 snack4 json 序列化，内存优化和消息发送性能优化
+- :bug: mica-mqtt-server-solon-plugin 移除 MqttServerConfiguration bean MqttFunctionManager 的 static 修饰符
+
 ### v2.5.6 - 2025-10-27
 - :bug: 修复 MQTT 解码器中的缓冲区读取问题，修复解码异常重连后无法恢复的问题。（所有版本）
 - :arrow_up: 升级 mica-net 到 1.2.1，修改慢包读取 (gitee #ID3IAU)，影响范围（2.5.5）
