@@ -73,6 +73,10 @@ $ curl -i --basic -u mica:mica "http://localhost:18083/api/v1/endpoints"
             "path": "/api/v1/stats"
         },
         {
+            "method": "GET",
+            "path": "/api/v1/stats/sse"
+        },
+        {
             "method": "POST",
             "path": "/api/v1/mqtt/publish/batch"
         },

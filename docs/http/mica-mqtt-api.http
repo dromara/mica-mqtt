@@ -3,6 +3,25 @@ GET http://{{host}}/api/v1/endpoints
 Content-Type: application/json
 Authorization: Basic {{username}} {{password}}
 
+### mqtt clients
+GET http://{{host}}/api/v1/clients
+Content-Type: application/json
+Authorization: Basic {{username}} {{password}}
+
+### mqtt client info
+GET http://{{host}}/api/v1/clients/info?clientId=123
+Content-Type: application/json
+Authorization: Basic {{username}} {{password}}
+
+### mqtt stats
+GET http://{{host}}/api/v1/stats
+Content-Type: application/json
+Authorization: Basic {{username}} {{password}}
+
+### mqtt stats sse
+GET http://{{host}}/api/v1/stats/sse
+Authorization: Basic {{username}} {{password}}
+
 ### mqtt publish
 POST http://{{host}}/api/v1/mqtt/publish
 Content-Type: application/json
