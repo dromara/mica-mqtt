@@ -618,6 +618,11 @@ public final class MqttClientCreator {
 		return this;
 	}
 
+	/**
+	 * 构建一个新的 MqttClientCreator
+	 *
+	 * @return 新的 MqttClientCreator
+	 */
 	public MqttClientCreator newCreator() {
 		return new MqttClientCreator()
 			.name(this.name)
@@ -634,10 +639,7 @@ public final class MqttClientCreator {
 			.reInterval(this.reInterval)
 			.retryCount(this.retryCount)
 			.reSubscribeBatchSize(this.reSubscribeBatchSize)
-			.clientId(this.clientId)
 			.version(this.version)
-			.username(this.username)
-			.password(this.password)
 			.cleanStart(this.cleanStart)
 			.sessionExpiryIntervalSecs(this.sessionExpiryIntervalSecs)
 			.willMessage(this.willMessage)
