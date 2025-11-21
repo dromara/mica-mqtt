@@ -118,7 +118,9 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 	 * @return IMqttClientSession
 	 */
 	protected IMqttClientSession getMqttClientSession(String beanName) {
-		return applicationContext.getBean(beanName, MqttClientTemplate.class).getClientCreator().getClientSession();
+		// 添加对占位符的支持：gitee #ID7PF6 https://gitee.com/dromara/mica-mqtt/issues/ID7PF6
+		String resolvedBeanName = applicationContext.getEnvironment().resolvePlaceholders(beanName);
+		return applicationContext.getBean(resolvedBeanName, MqttClientTemplate.class).getClientCreator().getClientSession();
 	}
 
 	/**
