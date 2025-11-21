@@ -126,7 +126,10 @@ public class MqttClientPluginImpl implements Plugin {
 	}
 
 	private MqttClientTemplate getMqttClientTemplate(MqttClientSubscribe anno) {
-		return context.getBean(anno.clientTemplateBean());
+		String beanName = anno.clientTemplateBean();
+		// 添加对占位符的支持：gitee #ID7PF6 https://gitee.com/dromara/mica-mqtt/issues/ID7PF6
+		String resolvedBeanName = Optional.ofNullable(Solon.cfg().getByTmpl(beanName)).orElse(beanName);
+		return context.getBean(resolvedBeanName);
 	}
 
 	/**
