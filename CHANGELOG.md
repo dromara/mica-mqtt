@@ -2,6 +2,11 @@
 
 ## 发行版本
 
+### v2.5.8 - 2025-11-29
+
+- feat(mqtt): MQTT 客户端订阅中的 beanName 支持占位符解析，感谢 `@tan90` 反馈（gitee #ID7PF6）
+- :arrow_up: 升级到 mica-net 1.2.3，优化 sse，修复 jackson3 方法错误。
+
 ### v2.5.7 - 2025-11-07
 
 - :sparkles: mica-mqtt-server 新增 `/api/v1/stats/sse` 接口，支持通过 SSE 实时获取服务器统计信息
