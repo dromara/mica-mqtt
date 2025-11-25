@@ -55,8 +55,8 @@ public class MqttHttpRequestHandler implements HttpRequestHandler {
 		if (handler == null) {
 			return resp404(request, requestLine);
 		}
-		if (logger.isInfoEnabled()) {
-			logger.info("mqtt http api {} path:{}", requestLine.method, requestLine.getPathAndQuery());
+		if (logger.isDebugEnabled()) {
+			logger.debug("mqtt http api {} path:{}", requestLine.method, requestLine.getPathAndQuery());
 		}
 		try {
 			return handler.apply(request);
@@ -67,8 +67,8 @@ public class MqttHttpRequestHandler implements HttpRequestHandler {
 
 	@Override
 	public HttpResponse resp404(HttpRequest request, RequestLine requestLine) {
-		if (logger.isErrorEnabled()) {
-			logger.error("mqtt http {} path:{} 404", requestLine.getMethod().name(), requestLine.getPathAndQuery());
+		if (logger.isWarnEnabled()) {
+			logger.warn("mqtt http {} path:{} 404", requestLine.getMethod().name(), requestLine.getPathAndQuery());
 		}
 		return Result.fail(request, ResultCode.E404);
 	}
