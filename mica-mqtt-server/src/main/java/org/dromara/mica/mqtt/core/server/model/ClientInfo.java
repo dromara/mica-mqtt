@@ -134,7 +134,7 @@ public class ClientInfo implements Serializable {
 		clientInfo.setProtoName(mqttVersion.protocolName());
 		clientInfo.setProtoVer(mqttVersion.protocolLevel());
 		clientInfo.setProtoFullName(mqttVersion.fullName());
-		clientInfo.setSsl(context.sslFacadeContext != null);
+		clientInfo.setSsl(context.isSsl());
 		clientInfo.setWebSocket(context.containsKey("TIO_W_S_C"));
 		// 时间信息
 		clientInfo.setConnectedAt(context.stat.timeFirstConnected);
