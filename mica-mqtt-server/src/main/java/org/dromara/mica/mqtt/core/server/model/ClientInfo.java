@@ -62,6 +62,14 @@ public class ClientInfo implements Serializable {
 	 */
 	private String protoFullName;
 	/**
+	 * 是否 WebSocket
+	 */
+	private boolean webSocket;
+	/**
+	 * 是否开启 SSL
+	 */
+	private boolean ssl;
+	/**
 	 * ip
 	 */
 	private String ipAddress;
@@ -126,6 +134,8 @@ public class ClientInfo implements Serializable {
 		clientInfo.setProtoName(mqttVersion.protocolName());
 		clientInfo.setProtoVer(mqttVersion.protocolLevel());
 		clientInfo.setProtoFullName(mqttVersion.fullName());
+		clientInfo.setSsl(context.sslFacadeContext != null);
+		clientInfo.setWebSocket(context.containsKey("TIO_W_S_C"));
 		// 时间信息
 		clientInfo.setConnectedAt(context.stat.timeFirstConnected);
 		clientInfo.setCreatedAt(context.stat.timeCreated);
@@ -211,6 +221,22 @@ public class ClientInfo implements Serializable {
 		this.protoFullName = protoFullName;
 	}
 
+	public boolean isWebSocket() {
+		return webSocket;
+	}
+
+	public void setWebSocket(boolean webSocket) {
+		this.webSocket = webSocket;
+	}
+
+	public boolean isSsl() {
+		return ssl;
+	}
+
+	public void setSsl(boolean ssl) {
+		this.ssl = ssl;
+	}
+
 	public String getIpAddress() {
 		return ipAddress;
 	}
@@ -276,6 +302,9 @@ public class ClientInfo implements Serializable {
 			", connected=" + connected +
 			", protoName='" + protoName + '\'' +
 			", protoVer=" + protoVer +
+			", protoFullName='" + protoFullName + '\'' +
+			", webSocket=" + webSocket +
+			", ssl=" + ssl +
 			", ipAddress='" + ipAddress + '\'' +
 			", port=" + port +
 			", connectedAt=" + connectedAt +
