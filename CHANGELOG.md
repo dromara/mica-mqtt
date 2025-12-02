@@ -2,7 +2,7 @@
 
 ## 发行版本
 
-### v2.5.8 - 2025-11-29
+### v2.5.9 - 2025-11-29
 
 - :sparkles: mica-mqtt-client solon 和 spring 插件 MQTT 客户端订阅中的 beanName 支持占位符解析，感谢 `@tan90` 反馈（gitee #ID7PF6）
 - :sparkles: mica-mqtt-server ClientInfo 添加 SSL 和 WebSocket 标识。
