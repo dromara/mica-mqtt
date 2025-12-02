@@ -10,9 +10,23 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    outputs:
+      should_continue: ${{ steps.check.outputs.is_snapshot }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+      - name: Extract Maven version
+        id: check
+        run: |
+          # 提取 <revision> 标签中的内容（版本在根项目的 pom.xml 中）
+          VERSION=$(sed -n 's/<revision>\(.*\)<\/revision>/\1/p' pom.xml | tr -d ' ')
+          echo "Extracted version: $VERSION"
+          # 检查是否为 SNAPSHOT
+          if [[ "$VERSION" == *"SNAPSHOT"* ]]; then
+            echo "is_snapshot=true" >> $GITHUB_OUTPUT
+            echo "SNAPSHOT version [$VERSION]"
+          fi
+      - uses: actions/setup-java@v5
+        if: ${{ steps.check.outputs.is_snapshot }}
         with:
           distribution: 'zulu'
           java-version: 8
@@ -24,6 +38,7 @@ jobs:
           gpg-passphrase: MAVEN_GPG_PASSWORD
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
       - name: Publish to the Maven Central Repository
+        if: ${{ steps.check.outputs.is_snapshot }}
         run: chmod +x ./deploy.sh && ./deploy.sh snapshot
         env:
           MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
