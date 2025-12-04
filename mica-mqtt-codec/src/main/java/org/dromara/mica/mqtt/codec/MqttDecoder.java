@@ -64,6 +64,92 @@ public final class MqttDecoder {
 	}
 
 	/**
+	 * 解码 MQTT 消息
+	 *
+	 * @param ctx            ChannelContext
+	 * @param buffer         ByteBuffer
+	 * @param readableLength 可读长度
+	 * @return MqttMessage
+	 */
+	public Packet doDecode(ChannelContext ctx, ByteBuffer buffer, int readableLength) {
+		// 1. 解析消息头
+		MqttFixedHeader mqttFixedHeader = getOrDecodeMqttFixedHeader(ctx, buffer, readableLength);
+		if (mqttFixedHeader == null) {
+			return null;
+		}
+		// 2. 判断消息长度
+		int messageLength = mqttFixedHeader.getMessageLength();
+		if (readableLength < messageLength) {
+			return null;
+		}
+		// 清除缓存
+		ctx.remove(MQTT_FIXED_HEADER_KEY);
+		// 3. 判断是否 ping 消息，ping 只有消息类型
+		MqttMessageType messageType = mqttFixedHeader.messageType();
+		if (MqttMessageType.PINGREQ == messageType) {
+			return MqttMessage.PINGREQ;
+		} else if (MqttMessageType.PINGRESP == messageType) {
+			return MqttMessage.PINGRESP;
+		}
+		return decodeMqttMessage(ctx, buffer, messageType, mqttFixedHeader);
+	}
+
+	private MqttMessage decodeMqttMessage(ChannelContext ctx, ByteBuffer buffer, MqttMessageType messageType,
+										  MqttFixedHeader mqttFixedHeader) {
+		// 1. 消息体长度
+		int bytesRemainingInVariablePart = mqttFixedHeader.remainingLength();
+		// 2. 解析头信息
+		Object variableHeader;
+		try {
+			Result<?> decodedVariableHeader = decodeVariableHeader(ctx, buffer, messageType, mqttFixedHeader, bytesRemainingInVariablePart);
+			variableHeader = decodedVariableHeader.value;
+			bytesRemainingInVariablePart -= decodedVariableHeader.numberOfBytesConsumed;
+		} catch (Exception cause) {
+			throw new DecoderException(cause);
+		}
+		// 3. 解析消息体
+		final Object payload = decodePayload(buffer, maxClientIdLength, messageType, bytesRemainingInVariablePart, variableHeader);
+		return MqttMessageFactory.newMessage(mqttFixedHeader, variableHeader, payload);
+	}
+
+	/**
+	 * Decodes the variable header (if any)
+	 *
+	 * @param buffer          the buffer to decode from
+	 * @param mqttFixedHeader MqttFixedHeader of the same message
+	 * @return the variable header
+	 */
+	private Result<?> decodeVariableHeader(ChannelContext ctx, ByteBuffer buffer,
+										   MqttMessageType messageType,
+										   MqttFixedHeader mqttFixedHeader,
+										   int bytesRemainingInVariablePart) {
+		switch (messageType) {
+			case CONNECT:
+				return decodeConnectionVariableHeader(ctx, buffer);
+			case CONNACK:
+				return decodeConnAckVariableHeader(ctx, buffer);
+			case UNSUBSCRIBE:
+			case SUBSCRIBE:
+			case SUBACK:
+			case UNSUBACK:
+				return decodeMessageIdAndPropertiesVariableHeader(ctx, buffer, mqttFixedHeader);
+			case PUBACK:
+			case PUBREC:
+			case PUBCOMP:
+			case PUBREL:
+				return decodePubReplyMessage(buffer, mqttFixedHeader, bytesRemainingInVariablePart);
+			case PUBLISH:
+				return decodePublishVariableHeader(ctx, buffer, mqttFixedHeader);
+			case DISCONNECT:
+			case AUTH:
+				return decodeReasonCodeAndPropertiesVariableHeader(buffer, bytesRemainingInVariablePart);
+			default:
+				//shouldn't reach here
+				throw new DecoderException("Unknown message type: " + messageType);
+		}
+	}
+
+	/**
 	 * Decodes the fixed header. It's one byte for the flags and then variable bytes for the remaining length.
 	 *
 	 * @param buffer the buffer to decode from
@@ -522,28 +608,6 @@ public final class MqttDecoder {
 		return new Result<>(decodedProperties, numberOfBytesConsumed);
 	}
 
-	public Packet doDecode(ChannelContext ctx, ByteBuffer buffer, int readableLength) {
-		// 1. 解析消息头
-		MqttFixedHeader mqttFixedHeader = getOrDecodeMqttFixedHeader(ctx, buffer, readableLength);
-		if (mqttFixedHeader == null) {
-			return null;
-		}
-		// 2. 判断消息长度
-		int messageLength = mqttFixedHeader.getMessageLength();
-		if (readableLength < messageLength) {
-			return null;
-		}
-		// 清除缓存
-		ctx.remove(MQTT_FIXED_HEADER_KEY);
-		// 3. 判断是否 ping 消息，ping 只有消息类型
-		MqttMessageType messageType = mqttFixedHeader.messageType();
-		if (MqttMessageType.PINGREQ == messageType) {
-			return MqttMessage.PINGREQ;
-		} else if (MqttMessageType.PINGRESP == messageType) {
-			return MqttMessage.PINGRESP;
-		}
-		return decodeMqttMessage(ctx, buffer, messageType, mqttFixedHeader);
-	}
 
 	private Result<MqttPubReplyMessageVariableHeader> decodePubReplyMessage(
 		ByteBuffer buffer, MqttFixedHeader mqttFixedHeader, int bytesRemainingInVariablePart) {
@@ -630,61 +694,6 @@ public final class MqttDecoder {
 			return null;
 		}
 		return mqttFixedHeader;
-	}
-
-	private MqttMessage decodeMqttMessage(ChannelContext ctx, ByteBuffer buffer, MqttMessageType messageType,
-										  MqttFixedHeader mqttFixedHeader) {
-		// 1. 消息体长度
-		int bytesRemainingInVariablePart = mqttFixedHeader.remainingLength();
-		// 2. 解析头信息
-		Object variableHeader;
-		try {
-			Result<?> decodedVariableHeader = decodeVariableHeader(ctx, buffer, messageType, mqttFixedHeader, bytesRemainingInVariablePart);
-			variableHeader = decodedVariableHeader.value;
-			bytesRemainingInVariablePart -= decodedVariableHeader.numberOfBytesConsumed;
-		} catch (Exception cause) {
-			throw new DecoderException(cause);
-		}
-		// 3. 解析消息体
-		final Object payload = decodePayload(buffer, maxClientIdLength, messageType, bytesRemainingInVariablePart, variableHeader);
-		return MqttMessageFactory.newMessage(mqttFixedHeader, variableHeader, payload);
-	}
-
-	/**
-	 * Decodes the variable header (if any)
-	 *
-	 * @param buffer          the buffer to decode from
-	 * @param mqttFixedHeader MqttFixedHeader of the same message
-	 * @return the variable header
-	 */
-	private Result<?> decodeVariableHeader(ChannelContext ctx, ByteBuffer buffer,
-										   MqttMessageType messageType,
-										   MqttFixedHeader mqttFixedHeader,
-										   int bytesRemainingInVariablePart) {
-		switch (messageType) {
-			case CONNECT:
-				return decodeConnectionVariableHeader(ctx, buffer);
-			case CONNACK:
-				return decodeConnAckVariableHeader(ctx, buffer);
-			case UNSUBSCRIBE:
-			case SUBSCRIBE:
-			case SUBACK:
-			case UNSUBACK:
-				return decodeMessageIdAndPropertiesVariableHeader(ctx, buffer, mqttFixedHeader);
-			case PUBACK:
-			case PUBREC:
-			case PUBCOMP:
-			case PUBREL:
-				return decodePubReplyMessage(buffer, mqttFixedHeader, bytesRemainingInVariablePart);
-			case PUBLISH:
-				return decodePublishVariableHeader(ctx, buffer, mqttFixedHeader);
-			case DISCONNECT:
-			case AUTH:
-				return decodeReasonCodeAndPropertiesVariableHeader(buffer, bytesRemainingInVariablePart);
-			default:
-				//shouldn't reach here
-				throw new DecoderException("Unknown message type: " + messageType);
-		}
 	}
 
 	private Result<MqttPublishVariableHeader> decodePublishVariableHeader(
