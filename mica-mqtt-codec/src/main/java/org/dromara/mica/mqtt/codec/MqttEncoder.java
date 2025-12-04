@@ -73,24 +73,28 @@ public final class MqttEncoder {
 		payloadBufferSize += 2 + clientIdentifierBytes.length;
 
 		// Will topic and message
-		String willTopic = payload.willTopic();
-		byte[] willTopicBytes = willTopic != null ? encodeStringUtf8(willTopic) : ByteBufferUtil.EMPTY_BYTES;
-		byte[] willMessage = payload.willMessageInBytes();
-		byte[] willMessageBytes = willMessage != null ? willMessage : ByteBufferUtil.EMPTY_BYTES;
+		byte[] willTopicBytes = ByteBufferUtil.EMPTY_BYTES;
+		byte[] willMessageBytes = ByteBufferUtil.EMPTY_BYTES;
 		if (variableHeader.isWillFlag()) {
+			String willTopic = payload.willTopic();
+			willTopicBytes = willTopic != null ? encodeStringUtf8(willTopic) : ByteBufferUtil.EMPTY_BYTES;
+			byte[] willMessage = payload.willMessageInBytes();
+			willMessageBytes = willMessage != null ? willMessage : ByteBufferUtil.EMPTY_BYTES;
 			payloadBufferSize += 2 + willTopicBytes.length;
 			payloadBufferSize += 2 + willMessageBytes.length;
 		}
 
-		String userName = payload.username();
-		byte[] userNameBytes = userName != null ? encodeStringUtf8(userName) : ByteBufferUtil.EMPTY_BYTES;
+		byte[] userNameBytes = ByteBufferUtil.EMPTY_BYTES;
 		if (variableHeader.hasUsername()) {
+			String userName = payload.username();
+			userNameBytes = userName != null ? encodeStringUtf8(userName) : ByteBufferUtil.EMPTY_BYTES;
 			payloadBufferSize += 2 + userNameBytes.length;
 		}
 
-		byte[] password = payload.passwordInBytes();
-		byte[] passwordBytes = password != null ? password : ByteBufferUtil.EMPTY_BYTES;
+		byte[] passwordBytes = ByteBufferUtil.EMPTY_BYTES;
 		if (variableHeader.hasPassword()) {
+			byte[] password = payload.passwordInBytes();
+			passwordBytes = password != null ? password : ByteBufferUtil.EMPTY_BYTES;
 			payloadBufferSize += 2 + passwordBytes.length;
 		}
 
