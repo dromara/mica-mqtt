@@ -159,8 +159,9 @@ public final class MqttDecoder {
 		short b1 = ByteBufferUtil.readUnsignedByte(buffer);
 		MqttMessageType messageType = MqttMessageType.valueOf(b1 >> 4);
 		boolean dupFlag = (b1 & 0x08) == 0x08;
-		int qosLevel = (b1 & 0x06) >> 1;
-		boolean retain = (b1 & 0x01) != 0;
+		int qosLevelBits = (b1 & 0x06) >> 1;
+		boolean retainFlag = (b1 & 0x01) != 0;
+
 		int remainingLength = 0;
 		int multiplier = 1;
 		short digit;
@@ -174,13 +175,43 @@ public final class MqttDecoder {
 			multiplier *= 128;
 			loops++;
 		} while ((digit & 128) != 0 && loops < 4);
-		// MQTT protocol limits Remaining Length to 4 bytes
 		if (loops == 4 && (digit & 128) != 0) {
 			throw new DecoderException("remaining length exceeds 4 digits (" + messageType + ')');
 		}
 		int headLength = 1 + loops;
-		MqttFixedHeader decodedFixedHeader = new MqttFixedHeader(messageType, dupFlag, MqttQoS.valueOf(qosLevel), retain, headLength, remainingLength);
-		return MqttCodecUtil.validateFixedHeader(ctx, MqttCodecUtil.resetUnusedFields(decodedFixedHeader));
+
+		// 直接在解析阶段规范化未使用的标志，避免后续二次对象创建
+		MqttQoS qos = MqttQoS.valueOf(qosLevelBits);
+		boolean retain = retainFlag;
+		boolean dup = dupFlag;
+		switch (messageType) {
+			case CONNECT:
+			case CONNACK:
+			case PUBACK:
+			case PUBREC:
+			case PUBCOMP:
+			case SUBACK:
+			case UNSUBACK:
+			case PINGREQ:
+			case PINGRESP:
+			case DISCONNECT:
+				dup = false;
+				qos = MqttQoS.QOS0;
+				retain = false;
+				break;
+			case PUBREL:
+			case SUBSCRIBE:
+			case UNSUBSCRIBE:
+				// 这些类型 retain 必须为 false
+				retain = false;
+				break;
+			default:
+				// 保持原标志位
+				break;
+		}
+
+		MqttFixedHeader fixedHeader = new MqttFixedHeader(messageType, dup, qos, retain, headLength, remainingLength);
+		return MqttCodecUtil.validateFixedHeader(ctx, fixedHeader);
 	}
 
 	private static Result<MqttMessageIdAndPropertiesVariableHeader> decodeMessageIdAndPropertiesVariableHeader(
@@ -535,6 +566,11 @@ public final class MqttDecoder {
 		final long propertiesLength = decodeVariableByteInteger(buffer);
 		int totalPropertiesLength = unpackA(propertiesLength);
 		int numberOfBytesConsumed = unpackB(propertiesLength);
+
+		// 没有属性时，直接返回空属性
+		if (totalPropertiesLength == 0) {
+			return new Result<>(MqttProperties.NO_PROPERTIES, numberOfBytesConsumed);
+		}
 
 		MqttProperties decodedProperties = new MqttProperties();
 		while (numberOfBytesConsumed < totalPropertiesLength) {

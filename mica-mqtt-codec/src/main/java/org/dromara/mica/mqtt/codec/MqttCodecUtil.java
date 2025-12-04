@@ -53,7 +53,7 @@ public final class MqttCodecUtil {
 		return version;
 	}
 
-	protected static void setMqttVersion(ChannelContext ctx, MqttVersion version) {
+	static void setMqttVersion(ChannelContext ctx, MqttVersion version) {
 		ctx.set(MQTT_VERSION_KEY, version);
 	}
 
@@ -77,7 +77,7 @@ public final class MqttCodecUtil {
 		return false;
 	}
 
-	protected static boolean isValidClientId(MqttVersion mqttVersion, int maxClientIdLength, String clientId) {
+	static boolean isValidClientId(MqttVersion mqttVersion, int maxClientIdLength, String clientId) {
 		if (clientId == null) {
 			return false;
 		}
@@ -94,7 +94,7 @@ public final class MqttCodecUtil {
 		}
 	}
 
-	protected static MqttFixedHeader validateFixedHeader(ChannelContext ctx, MqttFixedHeader mqttFixedHeader) {
+	static MqttFixedHeader validateFixedHeader(ChannelContext ctx, MqttFixedHeader mqttFixedHeader) {
 		switch (mqttFixedHeader.messageType()) {
 			case PUBREL:
 			case SUBSCRIBE:
@@ -106,46 +106,6 @@ public final class MqttCodecUtil {
 			case AUTH:
 				if (MqttVersion.MQTT_5 != MqttCodecUtil.getMqttVersion(ctx)) {
 					throw new DecoderException("AUTH message requires at least MQTT 5");
-				}
-				return mqttFixedHeader;
-			default:
-				return mqttFixedHeader;
-		}
-	}
-
-	protected static MqttFixedHeader resetUnusedFields(MqttFixedHeader mqttFixedHeader) {
-		switch (mqttFixedHeader.messageType()) {
-			case CONNECT:
-			case CONNACK:
-			case PUBACK:
-			case PUBREC:
-			case PUBCOMP:
-			case SUBACK:
-			case UNSUBACK:
-			case PINGREQ:
-			case PINGRESP:
-			case DISCONNECT:
-				if (mqttFixedHeader.isDup() ||
-					MqttQoS.QOS0 != mqttFixedHeader.qosLevel() ||
-					mqttFixedHeader.isRetain()) {
-					return new MqttFixedHeader(
-						mqttFixedHeader.messageType(),
-						false,
-						MqttQoS.QOS0,
-						false,
-						mqttFixedHeader.remainingLength());
-				}
-				return mqttFixedHeader;
-			case PUBREL:
-			case SUBSCRIBE:
-			case UNSUBSCRIBE:
-				if (mqttFixedHeader.isRetain()) {
-					return new MqttFixedHeader(
-						mqttFixedHeader.messageType(),
-						mqttFixedHeader.isDup(),
-						mqttFixedHeader.qosLevel(),
-						false,
-						mqttFixedHeader.remainingLength());
 				}
 				return mqttFixedHeader;
 			default:
