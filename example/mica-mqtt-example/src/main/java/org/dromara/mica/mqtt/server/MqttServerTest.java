@@ -47,7 +47,7 @@ public class MqttServerTest {
 			// 客户端连接状态监听
 			.connectStatusListener(new MqttConnectStatusListener())
 			// 自定义消息拦截器
-			.addInterceptor(new MqttMessageInterceptor())
+//			.addInterceptor(new MqttMessageInterceptor())
 			// 开启 websocket
 			.enableMqttWs()
 			// 开启 mqtt http 接口

@@ -158,10 +158,9 @@ public final class MqttDecoder {
 	private static MqttFixedHeader decodeFixedHeader(ChannelContext ctx, ByteBuffer buffer) {
 		short b1 = ByteBufferUtil.readUnsignedByte(buffer);
 		MqttMessageType messageType = MqttMessageType.valueOf(b1 >> 4);
-		boolean dupFlag = (b1 & 0x08) == 0x08;
-		int qosLevelBits = (b1 & 0x06) >> 1;
-		boolean retainFlag = (b1 & 0x01) != 0;
-
+		boolean dup = (b1 & 0x08) == 0x08;
+		MqttQoS qos = MqttQoS.valueOf((b1 & 0x06) >> 1);
+		boolean retain = (b1 & 0x01) != 0;
 		int remainingLength = 0;
 		int multiplier = 1;
 		short digit;
@@ -175,15 +174,18 @@ public final class MqttDecoder {
 			multiplier *= 128;
 			loops++;
 		} while ((digit & 128) != 0 && loops < 4);
+		// MQTT protocol limits Remaining Length to 4 bytes
 		if (loops == 4 && (digit & 128) != 0) {
 			throw new DecoderException("remaining length exceeds 4 digits (" + messageType + ')');
 		}
 		int headLength = 1 + loops;
+		return resetAndValidateFixedHeader(ctx, messageType, dup, qos, retain, headLength, remainingLength);
+	}
 
-		// 直接在解析阶段规范化未使用的标志，避免后续二次对象创建
-		MqttQoS qos = MqttQoS.valueOf(qosLevelBits);
-		boolean retain = retainFlag;
-		boolean dup = dupFlag;
+	private static MqttFixedHeader resetAndValidateFixedHeader(ChannelContext ctx, MqttMessageType messageType,
+															   boolean dup, MqttQoS qos, boolean retain,
+															   int headLength, int remainingLength) {
+		// === 内联 resetUnusedFields 逻辑 ===
 		switch (messageType) {
 			case CONNECT:
 			case CONNACK:
@@ -195,23 +197,42 @@ public final class MqttDecoder {
 			case PINGREQ:
 			case PINGRESP:
 			case DISCONNECT:
-				dup = false;
-				qos = MqttQoS.QOS0;
-				retain = false;
+				if (dup || qos != MqttQoS.QOS0 || retain) {
+					dup = false;
+					qos = MqttQoS.QOS0;
+					retain = false;
+				}
 				break;
 			case PUBREL:
 			case SUBSCRIBE:
 			case UNSUBSCRIBE:
-				// 这些类型 retain 必须为 false
-				retain = false;
+				if (retain) {
+					retain = false;
+				}
 				break;
 			default:
-				// 保持原标志位
+				// 其他类型不做额外处理
 				break;
 		}
-
-		MqttFixedHeader fixedHeader = new MqttFixedHeader(messageType, dup, qos, retain, headLength, remainingLength);
-		return MqttCodecUtil.validateFixedHeader(ctx, fixedHeader);
+		// === 内联 validateFixedHeader 逻辑 ===
+		switch (messageType) {
+			case PUBREL:
+			case SUBSCRIBE:
+			case UNSUBSCRIBE:
+				if (qos != MqttQoS.QOS1) {
+					throw new DecoderException(messageType.name() + " message must have QoS 1");
+				}
+				break;
+			case AUTH:
+				if (MqttVersion.MQTT_5 != MqttCodecUtil.getMqttVersion(ctx)) {
+					throw new DecoderException("AUTH message requires at least MQTT 5");
+				}
+				break;
+			default:
+				break;
+		}
+		// 消息头
+		return new MqttFixedHeader(messageType, dup, qos, retain, headLength, remainingLength);
 	}
 
 	private static Result<MqttMessageIdAndPropertiesVariableHeader> decodeMessageIdAndPropertiesVariableHeader(

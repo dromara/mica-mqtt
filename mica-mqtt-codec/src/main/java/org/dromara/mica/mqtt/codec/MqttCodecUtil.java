@@ -16,9 +16,7 @@
 
 package org.dromara.mica.mqtt.codec;
 
-import org.dromara.mica.mqtt.codec.exception.DecoderException;
 import org.dromara.mica.mqtt.codec.exception.MqttUnacceptableProtocolVersionException;
-import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tio.core.ChannelContext;
@@ -77,6 +75,14 @@ public final class MqttCodecUtil {
 		return false;
 	}
 
+	/**
+	 * 验证 clientId
+	 *
+	 * @param mqttVersion       mqtt 版本
+	 * @param maxClientIdLength 最大长度
+	 * @param clientId          clientId
+	 * @return 是否有效
+	 */
 	static boolean isValidClientId(MqttVersion mqttVersion, int maxClientIdLength, String clientId) {
 		if (clientId == null) {
 			return false;
@@ -94,22 +100,4 @@ public final class MqttCodecUtil {
 		}
 	}
 
-	static MqttFixedHeader validateFixedHeader(ChannelContext ctx, MqttFixedHeader mqttFixedHeader) {
-		switch (mqttFixedHeader.messageType()) {
-			case PUBREL:
-			case SUBSCRIBE:
-			case UNSUBSCRIBE:
-				if (MqttQoS.QOS1 != mqttFixedHeader.qosLevel()) {
-					throw new DecoderException(mqttFixedHeader.messageType().name() + " message must have QoS 1");
-				}
-				return mqttFixedHeader;
-			case AUTH:
-				if (MqttVersion.MQTT_5 != MqttCodecUtil.getMqttVersion(ctx)) {
-					throw new DecoderException("AUTH message requires at least MQTT 5");
-				}
-				return mqttFixedHeader;
-			default:
-				return mqttFixedHeader;
-		}
-	}
 }
