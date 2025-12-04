@@ -28,7 +28,6 @@ import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.lang.NonNull;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
 
@@ -46,7 +45,7 @@ public class MqttServerFunctionDetector implements BeanPostProcessor {
 	private final ApplicationContext applicationContext;
 
 	@Override
-	public Object postProcessAfterInitialization(@NonNull Object bean, String beanName) throws BeansException {
+	public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
 		Class<?> userClass = ClassUtils.getUserClass(bean);
 		// 1. 查找类上的 MqttServerFunction 注解
 		if (bean instanceof IMqttFunctionMessageListener) {

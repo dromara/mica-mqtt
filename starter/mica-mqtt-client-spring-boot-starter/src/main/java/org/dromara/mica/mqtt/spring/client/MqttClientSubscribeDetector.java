@@ -29,7 +29,6 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.env.Environment;
-import org.springframework.lang.NonNull;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
 
@@ -48,7 +47,7 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 	private final ApplicationContext applicationContext;
 
 	@Override
-	public Object postProcessAfterInitialization(@NonNull Object bean, String beanName) throws BeansException {
+	public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
 		Class<?> userClass = ClassUtils.getUserClass(bean);
 		if (bean instanceof IMqttClientMessageListener) {
 			// 1. 查找类上的 MqttClientSubscribe 注解
