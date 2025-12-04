@@ -66,7 +66,7 @@ public final class MqttEncoder {
 
 		// Client id
 		String clientIdentifier = payload.clientIdentifier();
-		if (!MqttCodecUtil.isValidClientId(mqttVersion, MqttConstant.DEFAULT_MAX_CLIENT_ID_LENGTH, clientIdentifier)) {
+		if (MqttCodecUtil.isInvalidClientId(mqttVersion, MqttConstant.DEFAULT_MAX_CLIENT_ID_LENGTH, clientIdentifier)) {
 			throw new MqttIdentifierRejectedException("invalid clientIdentifier: " + clientIdentifier);
 		}
 		byte[] clientIdentifierBytes = encodeStringUtf8(clientIdentifier);

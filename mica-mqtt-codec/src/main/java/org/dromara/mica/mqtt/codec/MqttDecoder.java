@@ -402,7 +402,7 @@ public final class MqttDecoder {
 		final String decodedClientIdValue = decodedClientId.value;
 		final MqttVersion mqttVersion = MqttVersion.fromProtocolNameAndLevel(mqttConnectVariableHeader.name(),
 			(byte) mqttConnectVariableHeader.version());
-		if (!MqttCodecUtil.isValidClientId(mqttVersion, maxClientIdLength, decodedClientIdValue)) {
+		if (MqttCodecUtil.isInvalidClientId(mqttVersion, maxClientIdLength, decodedClientIdValue)) {
 			throw new MqttIdentifierRejectedException("invalid clientIdentifier: " + decodedClientIdValue);
 		}
 		int numberOfBytesConsumed = decodedClientId.numberOfBytesConsumed;
