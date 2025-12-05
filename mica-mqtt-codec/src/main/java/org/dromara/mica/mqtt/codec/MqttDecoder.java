@@ -489,10 +489,9 @@ public final class MqttDecoder {
 	private static byte[] decodePublishPayload(ByteBuffer buffer, int bytesRemainingInVariablePart) {
 		if (bytesRemainingInVariablePart == 0) {
 			return ByteBufferUtil.EMPTY_BYTES;
+		} else {
+			return ByteBufferUtil.readBytes(buffer, bytesRemainingInVariablePart);
 		}
-		byte[] payload = new byte[bytesRemainingInVariablePart];
-		buffer.get(payload, 0, bytesRemainingInVariablePart);
-		return payload;
 	}
 
 	private static void validateNoBytesRemain(int bytesRemainingInVariablePart,
