@@ -170,9 +170,11 @@ public final class MqttEncoder {
 	private static ByteBuffer encodeConnAckMessage(ChannelContext ctx, MqttConnAckMessage message) {
 		final MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		byte[] propertiesBytes = encodePropertiesIfNeeded(mqttVersion, message.variableHeader().properties());
-		ByteBuffer buf = ByteBuffer.allocate(4 + propertiesBytes.length);
+		int variablePartSize = 2 + propertiesBytes.length;
+		int fixedHeaderBufferSize = 1 + getVariableLengthInt(variablePartSize);
+		ByteBuffer buf = ByteBuffer.allocate(fixedHeaderBufferSize + variablePartSize);
 		buf.put(getFixedHeaderByte1(message.fixedHeader()));
-		writeVariableLengthInt(buf, 2 + propertiesBytes.length);
+		writeVariableLengthInt(buf, variablePartSize);
 		buf.put((byte) (message.variableHeader().isSessionPresent() ? 0x01 : 0x00));
 		buf.put(message.variableHeader().connectReturnCode().value());
 		buf.put(propertiesBytes);
@@ -294,7 +296,7 @@ public final class MqttEncoder {
 		return buf;
 	}
 
-	private static ByteBuffer encodeUnsubAckMessage(ChannelContext ctx, MqttUnSubAckMessage message) {
+	private static ByteBuffer encodeUnSubAckMessage(ChannelContext ctx, MqttUnSubAckMessage message) {
 		if (message.variableHeader() instanceof MqttMessageIdAndPropertiesVariableHeader) {
 			MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 			byte[] propertiesBytes = encodePropertiesIfNeeded(mqttVersion, message.idAndPropertiesVariableHeader().properties());
@@ -312,7 +314,7 @@ public final class MqttEncoder {
 
 			if (payload != null) {
 				for (Short reasonCode : payload.unsubscribeReasonCodes()) {
-					buf.putShort(reasonCode);
+					buf.put(reasonCode.byteValue());
 				}
 			}
 			return buf;
@@ -601,7 +603,7 @@ public final class MqttEncoder {
 				return encodeSubAckMessage(ctx, (MqttSubAckMessage) message);
 			case UNSUBACK:
 				if (message instanceof MqttUnSubAckMessage) {
-					return encodeUnsubAckMessage(ctx, (MqttUnSubAckMessage) message);
+					return encodeUnSubAckMessage(ctx, (MqttUnSubAckMessage) message);
 				}
 				return encodeMessageWithOnlySingleByteFixedHeaderAndMessageId(message);
 			case PUBACK:
