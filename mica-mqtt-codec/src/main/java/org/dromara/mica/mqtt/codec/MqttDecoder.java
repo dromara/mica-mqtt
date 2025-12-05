@@ -487,6 +487,9 @@ public final class MqttDecoder {
 	}
 
 	private static byte[] decodePublishPayload(ByteBuffer buffer, int bytesRemainingInVariablePart) {
+		if (bytesRemainingInVariablePart == 0) {
+			return ByteBufferUtil.EMPTY_BYTES;
+		}
 		byte[] payload = new byte[bytesRemainingInVariablePart];
 		buffer.get(payload, 0, bytesRemainingInVariablePart);
 		return payload;
@@ -584,20 +587,22 @@ public final class MqttDecoder {
 	}
 
 	private static Result<MqttProperties> decodeProperties(ByteBuffer buffer) {
-		final long propertiesLength = decodeVariableByteInteger(buffer);
-		int totalPropertiesLength = unpackA(propertiesLength);
-		int numberOfBytesConsumed = unpackB(propertiesLength);
+		final long propertiesLengthVBI = decodeVariableByteInteger(buffer);
+		int totalPropertiesLength = unpackA(propertiesLengthVBI);
+		int lengthFieldBytes = unpackB(propertiesLengthVBI);
 
 		// 没有属性时，直接返回空属性
 		if (totalPropertiesLength == 0) {
-			return new Result<>(MqttProperties.NO_PROPERTIES, numberOfBytesConsumed);
+			return new Result<>(MqttProperties.NO_PROPERTIES, lengthFieldBytes);
 		}
 
 		MqttProperties decodedProperties = new MqttProperties();
-		while (numberOfBytesConsumed < totalPropertiesLength) {
-			long propertyId = decodeVariableByteInteger(buffer);
-			final int propertyIdValue = unpackA(propertyId);
-			numberOfBytesConsumed += unpackB(propertyId);
+		int consumedWithinProperties = 0;
+
+		while (consumedWithinProperties < totalPropertiesLength) {
+			long propertyIdVBI = decodeVariableByteInteger(buffer);
+			final int propertyIdValue = unpackA(propertyIdVBI);
+			consumedWithinProperties += unpackB(propertyIdVBI);
 			MqttPropertyType propertyType = MqttPropertyType.valueOf(propertyIdValue);
 			switch (propertyType) {
 				case PAYLOAD_FORMAT_INDICATOR:
@@ -607,62 +612,69 @@ public final class MqttDecoder {
 				case RETAIN_AVAILABLE:
 				case WILDCARD_SUBSCRIPTION_AVAILABLE:
 				case SUBSCRIPTION_IDENTIFIER_AVAILABLE:
-				case SHARED_SUBSCRIPTION_AVAILABLE:
+				case SHARED_SUBSCRIPTION_AVAILABLE: {
 					final int b1 = ByteBufferUtil.readUnsignedByte(buffer);
-					numberOfBytesConsumed++;
+					consumedWithinProperties += 1;
 					decodedProperties.add(new IntegerProperty(propertyIdValue, b1));
 					break;
+				}
 				case SERVER_KEEP_ALIVE:
 				case RECEIVE_MAXIMUM:
 				case TOPIC_ALIAS_MAXIMUM:
-				case TOPIC_ALIAS:
+				case TOPIC_ALIAS: {
 					final int int2BytesResult = decodeMsbLsb(buffer);
-					numberOfBytesConsumed += 2;
+					consumedWithinProperties += 2;
 					decodedProperties.add(new IntegerProperty(propertyIdValue, int2BytesResult));
 					break;
+				}
 				case MESSAGE_EXPIRY_INTERVAL:
 				case SESSION_EXPIRY_INTERVAL:
 				case WILL_DELAY_INTERVAL:
-				case MAXIMUM_PACKET_SIZE:
+				case MAXIMUM_PACKET_SIZE: {
 					final int maxPacketSize = buffer.getInt();
-					numberOfBytesConsumed += 4;
+					consumedWithinProperties += 4;
 					decodedProperties.add(new IntegerProperty(propertyIdValue, maxPacketSize));
 					break;
-				case SUBSCRIPTION_IDENTIFIER:
+				}
+				case SUBSCRIPTION_IDENTIFIER: {
 					long vbIntegerResult = decodeVariableByteInteger(buffer);
-					numberOfBytesConsumed += unpackB(vbIntegerResult);
+					consumedWithinProperties += unpackB(vbIntegerResult);
 					decodedProperties.add(new IntegerProperty(propertyIdValue, unpackA(vbIntegerResult)));
 					break;
+				}
 				case CONTENT_TYPE:
 				case RESPONSE_TOPIC:
 				case ASSIGNED_CLIENT_IDENTIFIER:
 				case AUTHENTICATION_METHOD:
 				case RESPONSE_INFORMATION:
 				case SERVER_REFERENCE:
-				case REASON_STRING:
+				case REASON_STRING: {
 					final Result<String> stringResult = decodeString(buffer);
-					numberOfBytesConsumed += stringResult.numberOfBytesConsumed;
+					consumedWithinProperties += stringResult.numberOfBytesConsumed;
 					decodedProperties.add(new StringProperty(propertyIdValue, stringResult.value));
 					break;
-				case USER_PROPERTY:
+				}
+				case USER_PROPERTY: {
 					final Result<String> keyResult = decodeString(buffer);
 					final Result<String> valueResult = decodeString(buffer);
-					numberOfBytesConsumed += keyResult.numberOfBytesConsumed;
-					numberOfBytesConsumed += valueResult.numberOfBytesConsumed;
+					consumedWithinProperties += keyResult.numberOfBytesConsumed;
+					consumedWithinProperties += valueResult.numberOfBytesConsumed;
 					decodedProperties.add(new UserProperty(keyResult.value, valueResult.value));
 					break;
+				}
 				case CORRELATION_DATA:
-				case AUTHENTICATION_DATA:
+				case AUTHENTICATION_DATA: {
 					final byte[] binaryDataResult = decodeByteArray(buffer);
-					numberOfBytesConsumed += binaryDataResult.length + 2;
+					consumedWithinProperties += binaryDataResult.length + 2;
 					decodedProperties.add(new BinaryProperty(propertyIdValue, binaryDataResult));
 					break;
+				}
 				default:
 					//shouldn't reach here
 					throw new DecoderException("Unknown property type: " + propertyType);
 			}
 		}
-		return new Result<>(decodedProperties, numberOfBytesConsumed);
+		return new Result<>(decodedProperties, lengthFieldBytes + consumedWithinProperties);
 	}
 
 
