@@ -33,6 +33,7 @@ import org.tio.utils.hutool.FastByteBuffer;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -455,8 +456,12 @@ public final class MqttEncoder {
 	}
 
 	private static byte[] encodeProperties(MqttProperties mqttProperties) {
-		FastByteBuffer writeBuffer = new FastByteBuffer(256);
-		for (MqttProperty<?> property : mqttProperties.listAll()) {
+		Collection<? extends MqttProperty> properties = mqttProperties.listAll();
+		// 根据属性数量动态计算缓冲区初始容量，避免过度分配或不足分配
+		int propCount = properties.size();
+		int initialCapacity = Math.min(1024, Math.max(64, propCount * 12));
+		FastByteBuffer writeBuffer = new FastByteBuffer(initialCapacity);
+		for (MqttProperty<?> property : properties) {
 			int propertyId = property.propertyId();
 			MqttPropertyType propertyType = MqttPropertyType.valueOf(propertyId);
 			switch (propertyType) {
