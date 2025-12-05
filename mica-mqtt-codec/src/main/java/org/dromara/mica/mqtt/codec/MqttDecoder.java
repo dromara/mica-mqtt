@@ -527,9 +527,7 @@ public final class MqttDecoder {
 	 */
 	private static byte[] decodeByteArray(ByteBuffer buffer) {
 		int size = decodeMsbLsb(buffer);
-		byte[] bytes = new byte[size];
-		buffer.get(bytes);
-		return bytes;
+		return ByteBufferUtil.readBytes(buffer, size);
 	}
 
 	// packing utils to reduce the amount of garbage while decoding ints
