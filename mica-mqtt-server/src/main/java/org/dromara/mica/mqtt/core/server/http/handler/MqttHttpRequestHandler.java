@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 import org.tio.http.common.HttpRequest;
 import org.tio.http.common.HttpResponse;
 import org.tio.http.common.RequestLine;
-import org.tio.http.common.handler.HttpRequestFunction;
 import org.tio.http.common.handler.HttpRequestHandler;
 
 import java.util.List;
@@ -51,7 +50,7 @@ public class MqttHttpRequestHandler implements HttpRequestHandler {
 			return resp500(request, requestLine, e);
 		}
 		// 2. 路由处理
-		HttpRequestFunction handler = MqttHttpRoutes.getHandler(requestLine);
+		HttpRequestHandler handler = MqttHttpRoutes.getHandler(requestLine);
 		if (handler == null) {
 			return resp404(request, requestLine);
 		}
@@ -59,7 +58,7 @@ public class MqttHttpRequestHandler implements HttpRequestHandler {
 			logger.debug("mqtt http api {} path:{}", requestLine.method, requestLine.getPathAndQuery());
 		}
 		try {
-			return handler.apply(request);
+			return handler.handler(request);
 		} catch (Exception e) {
 			return resp500(request, requestLine, e);
 		}
