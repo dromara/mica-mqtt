@@ -27,6 +27,7 @@ import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -41,6 +42,10 @@ public final class MqttSubscribeBuilder {
 
 	public MqttSubscribeBuilder() {
 		subscriptions = new ArrayList<>(5);
+	}
+
+	public List<MqttTopicSubscription> getSubscriptions() {
+		return Collections.unmodifiableList(subscriptions);
 	}
 
 	public MqttSubscribeBuilder addSubscription(MqttTopicSubscription subscription) {

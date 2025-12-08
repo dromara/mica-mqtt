@@ -26,9 +26,8 @@ import org.dromara.mica.mqtt.codec.message.payload.MqttSubscribePayload;
  * @author netty
  */
 public final class MqttTopicSubscription {
-
-	private final MqttSubscriptionOption option;
 	private String topicFilter;
+	private final MqttSubscriptionOption option;
 
 	public MqttTopicSubscription(String topicFilter) {
 		this(topicFilter, MqttQoS.QOS0);
