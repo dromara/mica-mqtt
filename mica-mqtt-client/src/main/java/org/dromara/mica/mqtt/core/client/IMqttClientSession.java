@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.client;
 
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 
@@ -82,8 +83,19 @@ public interface IMqttClientSession {
 	 * @param messageListener IMqttClientMessageListener
 	 */
 	default void addSubscriptionList(String[] topicFilters, MqttQoS qos, IMqttClientMessageListener messageListener) {
+		addSubscriptionList(topicFilters, MqttSubscriptionOption.onlyFromQos(qos), messageListener);
+	}
+
+	/**
+	 * 添加启动时的临时订阅
+	 *
+	 * @param topicFilters    topicFilters
+	 * @param option          MqttSubscriptionOption
+	 * @param messageListener IMqttClientMessageListener
+	 */
+	default void addSubscriptionList(String[] topicFilters, MqttSubscriptionOption option, IMqttClientMessageListener messageListener) {
 		for (String topicFilter : topicFilters) {
-			addSubscription(new MqttClientSubscription(qos, topicFilter, messageListener));
+			addSubscription(new MqttClientSubscription(topicFilter, option, messageListener));
 		}
 	}
 

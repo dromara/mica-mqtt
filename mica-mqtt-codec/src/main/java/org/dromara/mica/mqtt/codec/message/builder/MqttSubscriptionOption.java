@@ -29,6 +29,7 @@ public final class MqttSubscriptionOption {
 	private final boolean noLocal;
 	private final boolean retainAsPublished;
 	private final RetainedHandlingPolicy retainHandling;
+
 	public MqttSubscriptionOption(MqttQoS qos,
 								  boolean noLocal,
 								  boolean retainAsPublished,

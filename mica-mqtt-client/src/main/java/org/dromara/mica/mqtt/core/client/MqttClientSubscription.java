@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.client;
 
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.core.common.TopicFilterType;
 
@@ -30,25 +31,29 @@ import java.util.Objects;
  */
 public final class MqttClientSubscription implements Serializable {
 	private final String topicFilter;
-	private final MqttQoS mqttQoS;
+	private final MqttSubscriptionOption option;
 	private final TopicFilterType type;
 	private final transient IMqttClientMessageListener listener;
 
-	public MqttClientSubscription(MqttQoS mqttQoS,
-								  String topicFilter,
+	public MqttClientSubscription(String topicFilter,
+								  MqttSubscriptionOption option,
 								  IMqttClientMessageListener listener) {
-		this.mqttQoS = Objects.requireNonNull(mqttQoS, "MQTT subscribe mqttQoS is null.");
 		this.topicFilter = Objects.requireNonNull(topicFilter, "MQTT subscribe topicFilter is null.");
+		this.option = Objects.requireNonNull(option, "MQTT subscribe option is null.");
 		this.type = TopicFilterType.getType(topicFilter);
 		this.listener = Objects.requireNonNull(listener, "MQTT subscribe listener is null.");
 	}
 
-	public MqttQoS getMqttQoS() {
-		return mqttQoS;
-	}
-
 	public String getTopicFilter() {
 		return topicFilter;
+	}
+
+	public MqttSubscriptionOption getOption() {
+		return option;
+	}
+
+	public MqttQoS getMqttQoS() {
+		return option.qos();
 	}
 
 	public IMqttClientMessageListener getListener() {
@@ -60,34 +65,34 @@ public final class MqttClientSubscription implements Serializable {
 	}
 
 	public MqttTopicSubscription toTopicSubscription() {
-		return new MqttTopicSubscription(topicFilter, mqttQoS);
+		return new MqttTopicSubscription(topicFilter, option);
 	}
 
 	@Override
-	public boolean equals(Object o) {
-		if (this == o) {
-			return true;
-		}
-		if (o == null || getClass() != o.getClass()) {
+	public boolean equals(Object object) {
+		if (object == null || getClass() != object.getClass()) {
 			return false;
 		}
-		MqttClientSubscription that = (MqttClientSubscription) o;
-		return Objects.equals(topicFilter, that.topicFilter) &&
-			mqttQoS == that.mqttQoS &&
-			Objects.equals(listener, that.listener);
+		MqttClientSubscription that = (MqttClientSubscription) object;
+		return topicFilter.equals(that.topicFilter) && Objects.equals(option, that.option) && type == that.type && Objects.equals(listener, that.listener);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(topicFilter, mqttQoS, listener);
+		int result = topicFilter.hashCode();
+		result = 31 * result + Objects.hashCode(option);
+		result = 31 * result + Objects.hashCode(type);
+		result = 31 * result + Objects.hashCode(listener);
+		return result;
 	}
 
 	@Override
 	public String toString() {
 		return "MqttClientSubscription{" +
 			"topicFilter='" + topicFilter + '\'' +
-			", mqttQoS=" + mqttQoS +
+			", option=" + option +
+			", type=" + type +
+			", listener=" + listener +
 			'}';
 	}
-
 }

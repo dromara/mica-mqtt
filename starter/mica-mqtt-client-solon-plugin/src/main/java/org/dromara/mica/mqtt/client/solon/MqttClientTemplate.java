@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.client.solon;
 
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
+import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.client.*;
@@ -427,8 +428,19 @@ public class MqttClientTemplate {
 	 * @param messageListener IMqttClientMessageListener
 	 */
 	public void addSubscriptionList(String[] topicFilters, MqttQoS qos, IMqttClientMessageListener messageListener) {
+		addSubscriptionList(topicFilters, MqttSubscriptionOption.onlyFromQos(qos), messageListener);
+	}
+
+	/**
+	 * 添加启动时的临时订阅
+	 *
+	 * @param topicFilters    topicFilters
+	 * @param option          MqttSubscriptionOption
+	 * @param messageListener IMqttClientMessageListener
+	 */
+	public void addSubscriptionList(String[] topicFilters, MqttSubscriptionOption option, IMqttClientMessageListener messageListener) {
 		for (String topicFilter : topicFilters) {
-			tempSubscriptionList.add(new MqttClientSubscription(qos, topicFilter, messageListener));
+			tempSubscriptionList.add(new MqttClientSubscription(topicFilter, option, messageListener));
 		}
 	}
 

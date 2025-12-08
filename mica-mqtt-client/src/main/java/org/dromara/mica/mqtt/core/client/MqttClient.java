@@ -22,6 +22,7 @@ import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
+import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
@@ -143,7 +144,20 @@ public final class MqttClient implements IMqttClient {
 	 * @return MqttClient
 	 */
 	public MqttClient subscribe(String topicFilter, MqttQoS mqttQoS, IMqttClientMessageListener listener, MqttProperties properties) {
-		return subscribe(Collections.singletonList(new MqttClientSubscription(mqttQoS, topicFilter, listener)), properties);
+		return subscribe(topicFilter, MqttSubscriptionOption.onlyFromQos(mqttQoS), listener, properties);
+	}
+
+	/**
+	 * 订阅
+	 *
+	 * @param topicFilter topicFilter
+	 * @param option      MqttSubscriptionOption
+	 * @param listener    MqttMessageListener
+	 * @param properties  MqttProperties
+	 * @return MqttClient
+	 */
+	public MqttClient subscribe(String topicFilter, MqttSubscriptionOption option, IMqttClientMessageListener listener, MqttProperties properties) {
+		return subscribe(Collections.singletonList(new MqttClientSubscription(topicFilter, option, listener)), properties);
 	}
 
 	/**
@@ -168,10 +182,23 @@ public final class MqttClient implements IMqttClient {
 	 * @return MqttClient
 	 */
 	public MqttClient subscribe(String[] topicFilters, MqttQoS mqttQoS, IMqttClientMessageListener listener, MqttProperties properties) {
+		return subscribe(topicFilters, MqttSubscriptionOption.onlyFromQos(mqttQoS), listener, properties);
+	}
+
+	/**
+	 * 订阅
+	 *
+	 * @param topicFilters topicFilter 数组
+	 * @param option       MqttSubscriptionOption
+	 * @param listener     MqttMessageListener
+	 * @param properties   MqttProperties
+	 * @return MqttClient
+	 */
+	public MqttClient subscribe(String[] topicFilters, MqttSubscriptionOption option, IMqttClientMessageListener listener, MqttProperties properties) {
 		Objects.requireNonNull(topicFilters, "MQTT subscribe topicFilters is null.");
 		List<MqttClientSubscription> subscriptionList = new ArrayList<>();
 		for (String topicFilter : topicFilters) {
-			subscriptionList.add(new MqttClientSubscription(mqttQoS, topicFilter, listener));
+			subscriptionList.add(new MqttClientSubscription(topicFilter, option, listener));
 		}
 		return subscribe(subscriptionList, properties);
 	}
