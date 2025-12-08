@@ -462,7 +462,7 @@ public final class MqttDecoder {
 			MqttSubscriptionOption.RetainedHandlingPolicy retainHandling =
 				MqttSubscriptionOption.RetainedHandlingPolicy.valueOf((optionByte & 0x30) >> 4);
 
-			final MqttSubscriptionOption subscriptionOption = new MqttSubscriptionOption(qos,
+			final MqttSubscriptionOption subscriptionOption = MqttSubscriptionOption.from(qos,
 				noLocal, retainAsPublished, retainHandling);
 
 			numberOfBytesConsumed++;

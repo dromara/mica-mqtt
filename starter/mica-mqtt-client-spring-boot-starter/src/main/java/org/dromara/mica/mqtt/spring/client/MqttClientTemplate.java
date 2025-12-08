@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.spring.client;
 
 import lombok.Getter;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
+import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.client.*;
@@ -95,20 +96,20 @@ public class MqttClientTemplate implements ApplicationContextAware, SmartInitial
 	 * @param listener    MqttMessageListener
 	 * @return MqttClient
 	 */
-	public MqttClient subscribe(MqttQoS mqttQoS, String topicFilter, IMqttClientMessageListener listener) {
-		return client.subscribe(mqttQoS, topicFilter, listener);
+	public MqttClient subscribe(String topicFilter, MqttQoS mqttQoS, IMqttClientMessageListener listener) {
+		return client.subscribe(topicFilter, mqttQoS, listener);
 	}
 
 	/**
 	 * 订阅
 	 *
-	 * @param mqttQoS     MqttQoS
 	 * @param topicFilter topicFilter
+	 * @param option      MqttSubscriptionOption
 	 * @param listener    MqttMessageListener
 	 * @return MqttClient
 	 */
-	public MqttClient subscribe(String topicFilter, MqttQoS mqttQoS, IMqttClientMessageListener listener) {
-		return client.subscribe(topicFilter, mqttQoS, listener);
+	public MqttClient subscribe(String topicFilter, MqttSubscriptionOption option, IMqttClientMessageListener listener) {
+		return client.subscribe(topicFilter, option, listener);
 	}
 
 	/**

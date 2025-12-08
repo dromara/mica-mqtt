@@ -83,7 +83,7 @@ public interface IMqttClientSession {
 	 * @param messageListener IMqttClientMessageListener
 	 */
 	default void addSubscriptionList(String[] topicFilters, MqttQoS qos, IMqttClientMessageListener messageListener) {
-		addSubscriptionList(topicFilters, MqttSubscriptionOption.onlyFromQos(qos), messageListener);
+		addSubscriptionList(topicFilters, MqttSubscriptionOption.from(qos), messageListener);
 	}
 
 	/**

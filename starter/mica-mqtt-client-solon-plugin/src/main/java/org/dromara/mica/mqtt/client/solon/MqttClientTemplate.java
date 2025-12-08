@@ -104,20 +104,20 @@ public class MqttClientTemplate {
 	 * @param listener    MqttMessageListener
 	 * @return MqttClient
 	 */
-	public MqttClient subscribe(MqttQoS mqttQoS, String topicFilter, IMqttClientMessageListener listener) {
-		return client.subscribe(mqttQoS, topicFilter, listener);
+	public MqttClient subscribe(String topicFilter, MqttQoS mqttQoS, IMqttClientMessageListener listener) {
+		return client.subscribe(topicFilter, mqttQoS, listener);
 	}
 
 	/**
 	 * 订阅
 	 *
-	 * @param mqttQoS     MqttQoS
 	 * @param topicFilter topicFilter
+	 * @param option      MqttSubscriptionOption
 	 * @param listener    MqttMessageListener
 	 * @return MqttClient
 	 */
-	public MqttClient subscribe(String topicFilter, MqttQoS mqttQoS, IMqttClientMessageListener listener) {
-		return client.subscribe(topicFilter, mqttQoS, listener);
+	public MqttClient subscribe(String topicFilter, MqttSubscriptionOption option, IMqttClientMessageListener listener) {
+		return client.subscribe(topicFilter, option, listener);
 	}
 
 	/**
@@ -428,7 +428,7 @@ public class MqttClientTemplate {
 	 * @param messageListener IMqttClientMessageListener
 	 */
 	public void addSubscriptionList(String[] topicFilters, MqttQoS qos, IMqttClientMessageListener messageListener) {
-		addSubscriptionList(topicFilters, MqttSubscriptionOption.onlyFromQos(qos), messageListener);
+		addSubscriptionList(topicFilters, MqttSubscriptionOption.from(qos), messageListener);
 	}
 
 	/**

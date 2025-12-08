@@ -24,13 +24,12 @@ import org.dromara.mica.mqtt.codec.MqttQoS;
  * @author netty
  */
 public final class MqttSubscriptionOption {
-
 	private final MqttQoS qos;
 	private final boolean noLocal;
 	private final boolean retainAsPublished;
 	private final RetainedHandlingPolicy retainHandling;
 
-	public MqttSubscriptionOption(MqttQoS qos,
+	private MqttSubscriptionOption(MqttQoS qos,
 								  boolean noLocal,
 								  boolean retainAsPublished,
 								  RetainedHandlingPolicy retainHandling) {
@@ -40,8 +39,23 @@ public final class MqttSubscriptionOption {
 		this.retainHandling = retainHandling;
 	}
 
-	public static MqttSubscriptionOption onlyFromQos(MqttQoS qos) {
-		return new MqttSubscriptionOption(qos, false, false, RetainedHandlingPolicy.SEND_AT_SUBSCRIBE);
+	public static MqttSubscriptionOption from(MqttQoS qos) {
+		return from(qos, false);
+	}
+
+	public static MqttSubscriptionOption from(MqttQoS qos, boolean noLocal) {
+		return from(qos, noLocal, false);
+	}
+
+	public static MqttSubscriptionOption from(MqttQoS qos, boolean noLocal, boolean retainAsPublished) {
+		return from(qos, noLocal, retainAsPublished, RetainedHandlingPolicy.SEND_AT_SUBSCRIBE);
+	}
+
+	public static MqttSubscriptionOption from(MqttQoS qos,
+											  boolean noLocal,
+											  boolean retainAsPublished,
+											  RetainedHandlingPolicy retainHandling) {
+		return new MqttSubscriptionOption(qos, noLocal, retainAsPublished, retainHandling);
 	}
 
 	public MqttQoS qos() {

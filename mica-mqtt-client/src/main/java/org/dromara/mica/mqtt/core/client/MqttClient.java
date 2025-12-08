@@ -113,25 +113,25 @@ public final class MqttClient implements IMqttClient {
 	/**
 	 * 订阅
 	 *
-	 * @param mqttQoS     MqttQoS
 	 * @param topicFilter topicFilter
+	 * @param mqttQoS     MqttQoS
 	 * @param listener    MqttMessageListener
 	 * @return MqttClient
 	 */
-	public MqttClient subscribe(MqttQoS mqttQoS, String topicFilter, IMqttClientMessageListener listener) {
+	public MqttClient subscribe(String topicFilter, MqttQoS mqttQoS, IMqttClientMessageListener listener) {
 		return subscribe(topicFilter, mqttQoS, listener, null);
 	}
 
 	/**
 	 * 订阅
 	 *
-	 * @param mqttQoS     MqttQoS
 	 * @param topicFilter topicFilter
+	 * @param option      MqttSubscriptionOption
 	 * @param listener    MqttMessageListener
 	 * @return MqttClient
 	 */
-	public MqttClient subscribe(String topicFilter, MqttQoS mqttQoS, IMqttClientMessageListener listener) {
-		return subscribe(topicFilter, mqttQoS, listener, null);
+	public MqttClient subscribe(String topicFilter, MqttSubscriptionOption option, IMqttClientMessageListener listener) {
+		return subscribe(topicFilter, option, listener, null);
 	}
 
 	/**
@@ -144,7 +144,7 @@ public final class MqttClient implements IMqttClient {
 	 * @return MqttClient
 	 */
 	public MqttClient subscribe(String topicFilter, MqttQoS mqttQoS, IMqttClientMessageListener listener, MqttProperties properties) {
-		return subscribe(topicFilter, MqttSubscriptionOption.onlyFromQos(mqttQoS), listener, properties);
+		return subscribe(topicFilter, MqttSubscriptionOption.from(mqttQoS), listener, properties);
 	}
 
 	/**
@@ -182,7 +182,7 @@ public final class MqttClient implements IMqttClient {
 	 * @return MqttClient
 	 */
 	public MqttClient subscribe(String[] topicFilters, MqttQoS mqttQoS, IMqttClientMessageListener listener, MqttProperties properties) {
-		return subscribe(topicFilters, MqttSubscriptionOption.onlyFromQos(mqttQoS), listener, properties);
+		return subscribe(topicFilters, MqttSubscriptionOption.from(mqttQoS), listener, properties);
 	}
 
 	/**
