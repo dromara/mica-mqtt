@@ -36,8 +36,8 @@ import java.util.function.Consumer;
  * @author netty, L.cm
  */
 public final class MqttSubscribeBuilder {
-	private final List<MqttTopicSubscription> subscriptions;
 	private int messageId;
+	private final List<MqttTopicSubscription> subscriptions;
 	private MqttProperties properties = MqttProperties.NO_PROPERTIES;
 
 	public MqttSubscribeBuilder() {
