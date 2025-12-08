@@ -49,7 +49,11 @@ public final class MqttSubscribeBuilder {
 	}
 
 	public MqttSubscribeBuilder addSubscription(String topic, MqttQoS qos) {
-		return addSubscription(new MqttTopicSubscription(topic, qos));
+		return addSubscription(topic, MqttSubscriptionOption.from(qos));
+	}
+
+	public MqttSubscribeBuilder addSubscription(String topic, MqttQoS qos, boolean noLocal) {
+		return addSubscription(topic, MqttSubscriptionOption.from(qos, noLocal));
 	}
 
 	public MqttSubscribeBuilder addSubscription(String topic, MqttSubscriptionOption option) {
