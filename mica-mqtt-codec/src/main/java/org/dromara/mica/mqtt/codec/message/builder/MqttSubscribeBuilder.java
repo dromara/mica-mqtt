@@ -48,7 +48,7 @@ public final class MqttSubscribeBuilder {
 		return this;
 	}
 
-	public MqttSubscribeBuilder addSubscription(MqttQoS qos, String topic) {
+	public MqttSubscribeBuilder addSubscription(String topic, MqttQoS qos) {
 		return addSubscription(new MqttTopicSubscription(topic, qos));
 	}
 
