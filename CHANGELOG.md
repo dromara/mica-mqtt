@@ -4,14 +4,10 @@
 
 ### v2.5.10 - 2025-12-28
 
-- 🔄 优化 MQTT 属性编码缓冲区初始容量动态计算，初始容量限制在64到1024字节之间，提升内存使用效率
-- 🔄 优化 will、username 和 password 字节处理逻辑，仅在对应标志为真时才计算对应负载大小，提升代码清晰度
-- 🔄 优化客户端ID验证逻辑，客户端ID验证函数由 isValidClientId 改为 isInvalidClientId 以增强语义清晰度
-- 🔄 优化固定报头解析，合并重构固定报头解析和校验逻辑，减少不必要的对象创建
-- 🔄 优化 MQTT 消息解码代码结构，移除多余的 Result 包装，简化返回值类型
-- 🔧 优化消息解码，改用 ByteBufferUtil.readBytes 简化代码
-- 🔧 优化 ConnAck 和 UnSubAck 编码逻辑，修复 UnSubAck 消息中的取消订阅原因码写入为单字节
+- ✨ mica-mqtt-client 支持使用 MqttSubscriptionOption 进行订阅配置 感谢 `@rocker-cheng` 反馈（gitee #IDB1DN）
+- 🔄 mica-mqtt-codec 优化 MQTT 消息解码代码结构，编解码逻辑，减少不必要的对象创建，提升内存使用效率
 - 🔧 移除不必要的 @org.springframework.lang.NonNull 注解，spring7 已移除
+- 🐛 修复 UnSubAck 消息中的取消订阅原因码应该为单字节
 - ⬆️ 升级到 mica-net 1.2.5
 
 ### v2.5.9 - 2025-11-29
