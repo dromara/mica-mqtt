@@ -24,11 +24,6 @@
         </dependency>
         <!-- 对接 micrometer 方便指标收集 begin -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-actuator-autoconfigure</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
             <scope>provided</scope>
