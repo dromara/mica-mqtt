@@ -1,8 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: PIG AI（mica-mqtt技术手册）！
-    url: https://home.pig4cloud.com:38443/bot/index.html#/0/1809133293843144705/chat
-    about: 有问题先问 PIG AI，响应更及时！！！
   - name: 遇到问题请先看《使用中常见问题汇总》！谢谢！！！
     url: https://gitee.com/596392912/mica-mqtt/issues/I45GO7
     about: 该文档可以解决你90%的疑惑
