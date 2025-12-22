@@ -141,7 +141,7 @@ class TopicUtilTest {
 	}
 
 	@Test
-	void testGetTopicVars() {
+	void testGetTopicVars1() {
 		// 测试匹配
 		String s1 = "$SYS/brokers/${node}/clients/${clientId}/disconnected";
 		String s2 = "$SYS/brokers/node1/clients/test1/disconnected";
@@ -154,6 +154,16 @@ class TopicUtilTest {
 		Map<String, String> vars1 = TopicUtil.getTopicVars(s3, s4);
 		// 不匹配会返回空
 		Assertions.assertTrue(vars1.isEmpty());
+	}
+
+	@Test
+	void testGetTopicVars2() {
+		// 测试匹配
+		String s1 = "lnsendout/youweian_mqtt/${deviceType}/${imei}/rtdata/#";
+		String s2 = "lnsendout/youweian_mqtt/deviceType/imei/rtdata/123123";
+		Map<String, String> vars = TopicUtil.getTopicVars(s1, s2);
+		Assertions.assertEquals("deviceType", vars.get("deviceType"));
+		Assertions.assertEquals("imei", vars.get("imei"));
 	}
 
 }
