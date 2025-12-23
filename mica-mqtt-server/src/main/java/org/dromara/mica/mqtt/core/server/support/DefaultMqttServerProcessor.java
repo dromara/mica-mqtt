@@ -51,7 +51,7 @@ import org.tio.core.Node;
 import org.tio.core.Tio;
 import org.tio.core.TioConfig;
 import org.tio.utils.hutool.StrUtil;
-import org.tio.utils.mica.Pair;
+import org.tio.utils.mica.IntPair;
 import org.tio.utils.timer.TimerTaskService;
 
 import java.util.ArrayList;
@@ -475,13 +475,13 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		byte[] payload = publishMessage.payload();
 		// 1. retain 消息逻辑
 		if (isRetain) {
-			Pair<String, Integer> retainPair = TopicUtil.retainTopicName(topicName);
-			int timeOut = retainPair.getRight();
+			IntPair<String> retainPair = TopicUtil.retainTopicName(topicName);
+			int timeOut = retainPair.getKey();
 			if (timeOut < 0) {
 				logger.error("MqttPublishMessage topic {} 不符合 $retain/${ttl}/topic 规则.", topicName);
 				return;
 			}
-			topicName = retainPair.getLeft();
+			topicName = retainPair.getValue();
 			// qos == 0 or payload is none,then clear previous retain message
 			if (MqttQoS.QOS0 == mqttQoS || payload == null || payload.length == 0) {
 				this.messageStore.clearRetainMessage(topicName);

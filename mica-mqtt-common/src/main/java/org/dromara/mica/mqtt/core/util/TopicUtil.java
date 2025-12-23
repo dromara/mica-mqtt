@@ -20,7 +20,7 @@ import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tio.utils.hutool.StrUtil;
-import org.tio.utils.mica.Pair;
+import org.tio.utils.mica.IntPair;
 import org.tio.utils.mica.StrTemplateParser;
 
 import java.lang.reflect.Field;
@@ -98,11 +98,11 @@ public final class TopicUtil {
 	 *
 	 * @param topicName topicName
 	 */
-	public static Pair<String, Integer> retainTopicName(String topicName) {
+	public static IntPair<String> retainTopicName(String topicName) {
 		if (topicName.startsWith("$retain/")) {
 			return getRetainTopicPair(topicName);
 		} else {
-			return new Pair<>(topicName, 0);
+			return new IntPair<>(0, topicName);
 		}
 	}
 
@@ -118,12 +118,12 @@ public final class TopicUtil {
 	 * @param topicName topicName
 	 * @return Pair
 	 */
-	private static Pair<String, Integer> getRetainTopicPair(String topicName) {
+	private static IntPair<String> getRetainTopicPair(String topicName) {
 		// $retain/ 的长度
 		int timeIndexBegin = 8;
 		int nextLayer = topicName.indexOf(MqttCodecUtil.TOPIC_LAYER, timeIndexBegin);
 		if (nextLayer == -1) {
-			return new Pair<>(topicName, -1);
+			return new IntPair<>(-1, topicName);
 		}
 		int time;
 		try {
@@ -133,9 +133,9 @@ public final class TopicUtil {
 		}
 		String retainTopic = topicName.substring(nextLayer + 1);
 		if (retainTopic.isEmpty()) {
-			return new Pair<>(topicName, -1);
+			return new IntPair<>(-1, topicName);
 		} else {
-			return new Pair<>(retainTopic, time);
+			return new IntPair<>(time, retainTopic);
 		}
 	}
 

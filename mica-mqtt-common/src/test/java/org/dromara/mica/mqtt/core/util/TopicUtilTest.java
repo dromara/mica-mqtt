@@ -18,7 +18,7 @@ package org.dromara.mica.mqtt.core.util;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.tio.utils.mica.Pair;
+import org.tio.utils.mica.IntPair;
 
 import java.util.Map;
 
@@ -130,21 +130,21 @@ class TopicUtilTest {
 
 	@Test
 	void testRetainTopicName() {
-		Pair<String, Integer> pair1 = TopicUtil.retainTopicName("$retain/15/x/y");
-		Assertions.assertEquals("x/y", pair1.getLeft());
-		Pair<String, Integer> pair2 = TopicUtil.retainTopicName("$retain/15//x/y");
-		Assertions.assertEquals("/x/y", pair2.getLeft());
-		Pair<String, Integer> pair3 = TopicUtil.retainTopicName("$retain/15/");
-		Assertions.assertEquals(-1, pair3.getRight());
-		Pair<String, Integer> pair4 = TopicUtil.retainTopicName("$retain/");
-		Assertions.assertEquals(-1, pair4.getRight());
+		IntPair<String> pair1 = TopicUtil.retainTopicName("$retain/15/x/y");
+		Assertions.assertEquals("x/y", pair1.getValue());
+		IntPair<String> pair2 = TopicUtil.retainTopicName("$retain/15//x/y");
+		Assertions.assertEquals("/x/y", pair2.getValue());
+		IntPair<String> pair3 = TopicUtil.retainTopicName("$retain/15/");
+		Assertions.assertEquals(-1, pair3.getKey());
+		IntPair<String> pair4 = TopicUtil.retainTopicName("$retain/");
+		Assertions.assertEquals(-1, pair4.getKey());
 	}
 
 	@Test
 	void testGetTopicVars1() {
 		// 测试匹配
-		String s1 = "$SYS/brokers/${node}/clients/${clientId}/disconnected";
-		String s2 = "$SYS/brokers/node1/clients/test1/disconnected";
+		String s1 = "$SYS/brokers/${node}/clients/${clientId}/disconnected/+";
+		String s2 = "$SYS/brokers/node1/clients/test1/disconnected/123123";
 		Map<String, String> vars = TopicUtil.getTopicVars(s1, s2);
 		Assertions.assertEquals("node1", vars.get("node"));
 		Assertions.assertEquals("test1", vars.get("clientId"));

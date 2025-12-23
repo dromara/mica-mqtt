@@ -37,7 +37,7 @@ import org.tio.core.stat.vo.StatVo;
 import org.tio.server.TioServerConfig;
 import org.tio.server.task.ServerHeartbeatTask;
 import org.tio.utils.hutool.StrUtil;
-import org.tio.utils.mica.Pair;
+import org.tio.utils.mica.IntPair;
 import org.tio.utils.page.Page;
 import org.tio.utils.page.PageUtils;
 import org.tio.utils.timer.TimerTask;
@@ -152,13 +152,13 @@ public final class MqttServer {
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
 		if (retain) {
-			Pair<String, Integer> retainPair = TopicUtil.retainTopicName(topic);
-			int timeOut = retainPair.getRight();
+			IntPair<String> retainPair = TopicUtil.retainTopicName(topic);
+			int timeOut = retainPair.getKey();
 			if (timeOut < 0) {
 				logger.error("MqttPublishMessage topic {} 不符合 $retain/${ttl}/topic 规则.", topic);
 				return false;
 			}
-			topic = retainPair.getLeft();
+			topic = retainPair.getValue();
 			this.saveRetainMessage(topic, timeOut, qos, payload);
 		}
 		// 获取 context
@@ -259,13 +259,13 @@ public final class MqttServer {
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
 		if (retain) {
-			Pair<String, Integer> retainPair = TopicUtil.retainTopicName(topic);
-			int timeOut = retainPair.getRight();
+			IntPair<String> retainPair = TopicUtil.retainTopicName(topic);
+			int timeOut = retainPair.getKey();
 			if (timeOut < 0) {
 				logger.error("MqttPublishMessage topic {} 不符合 $retain/${ttl}/topic 规则.", topic);
 				return false;
 			}
-			topic = retainPair.getLeft();
+			topic = retainPair.getValue();
 			this.saveRetainMessage(topic, timeOut, qos, payload);
 		}
 		// 查找订阅该 topic 的客户端

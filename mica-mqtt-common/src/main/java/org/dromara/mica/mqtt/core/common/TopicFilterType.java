@@ -32,13 +32,8 @@ public enum TopicFilterType {
 	 */
 	NONE {
 		@Override
-		public boolean match(String topicFilter, String topicName) {
-			return TopicUtil.match(topicFilter, topicName);
-		}
-
-		@Override
-		public Map<String, String> getTopicVars(String topicTemplate, String topicName) {
-			return TopicUtil.getTopicVars(topicTemplate, topicName);
+		public int getPrefixLength(String topicFilter) {
+			return 0;
 		}
 	},
 
@@ -47,17 +42,9 @@ public enum TopicFilterType {
 	 */
 	QUEUE {
 		@Override
-		public boolean match(String topicFilter, String topicName) {
+		public int getPrefixLength(String topicFilter) {
 			// $queue/ 共享订阅前缀去除
-			int prefixLen = TopicFilterType.SHARE_QUEUE_PREFIX.length();
-			return TopicUtil.match(topicFilter.substring(prefixLen), topicName);
-		}
-
-		@Override
-		public Map<String, String> getTopicVars(String topicTemplate, String topicName) {
-			// $queue/ 共享订阅前缀去除
-			int prefixLen = TopicFilterType.SHARE_QUEUE_PREFIX.length();
-			return TopicUtil.getTopicVars(topicTemplate.substring(prefixLen), topicName);
+			return TopicFilterType.SHARE_QUEUE_PREFIX.length();
 		}
 	},
 
@@ -66,17 +53,9 @@ public enum TopicFilterType {
 	 */
 	SHARE {
 		@Override
-		public boolean match(String topicFilter, String topicName) {
-			// 去除前缀 $share/<group-name>/ ,匹配 topicName / 前缀
-			int prefixLen = TopicFilterType.findShareTopicIndex(topicFilter);
-			return TopicUtil.match(topicFilter.substring(prefixLen), topicName);
-		}
-
-		@Override
-		public Map<String, String> getTopicVars(String topicTemplate, String topicName) {
-			// 去除前缀 $share/<group-name>/ ,匹配 topicName / 前缀
-			int prefixLen = TopicFilterType.findShareTopicIndex(topicTemplate);
-			return TopicUtil.getTopicVars(topicTemplate.substring(prefixLen), topicName);
+		public int getPrefixLength(String topicFilter) {
+			// 前缀 $share/<group-name>/ ,匹配 topicName / 前缀
+			return TopicFilterType.findShareTopicIndex(topicFilter);
 		}
 	};
 
@@ -87,13 +66,27 @@ public enum TopicFilterType {
 	public static final String SHARE_GROUP_PREFIX = "$share/";
 
 	/**
+	 * 获取 topicFilter 前缀长度
+	 *
+	 * @return topicFilter 前缀长度
+	 */
+	public abstract int getPrefixLength(String topicFilter);
+
+	/**
 	 * 判断 topicFilter 和 topicName 匹配情况
 	 *
 	 * @param topicFilter topicFilter
 	 * @param topicName   topicName
 	 * @return 是否匹配
 	 */
-	public abstract boolean match(String topicFilter, String topicName);
+	public boolean match(String topicFilter, String topicName) {
+		int prefixLength = getPrefixLength(topicFilter);
+		if (prefixLength > 0) {
+			return TopicUtil.match(topicFilter.substring(prefixLength), topicName);
+		} else {
+			return TopicUtil.match(topicFilter, topicName);
+		}
+	}
 
 	/**
 	 * 解析 topic 模板中的变量 例如 $SYS/brokers/${node}/clients/${clientid}/disconnected 中提取 node 和 clientid
@@ -102,7 +95,14 @@ public enum TopicFilterType {
 	 * @param topic         topic
 	 * @return 提取的变量
 	 */
-	public abstract Map<String, String> getTopicVars(String topicTemplate, String topic);
+	public Map<String, String> getTopicVars(String topicTemplate, String topic) {
+		int prefixLength = getPrefixLength(topicTemplate);
+		if (prefixLength > 0) {
+			return TopicUtil.getTopicVars(topicTemplate.substring(prefixLength), topic);
+		} else {
+			return TopicUtil.getTopicVars(topicTemplate, topic);
+		}
+	}
 
 	/**
 	 * 获取 topicFilter 类型
