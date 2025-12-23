@@ -109,15 +109,15 @@ public class TopicTemplate {
 	 */
 	public Map<String, String> getVariables(String topicName) {
 		String[] topicParts = TopicUtil.getTopicPart(topicName);
+		// 1. 长度必须相等
+		if (topicParts.length != topicTemplateParts.length) {
+			return Collections.emptyMap();
+		}
 		// 优化：如果变量数量已知，可以预设初始容量
 		int varCount = varIndexMap.size();
 		Map<String, String> result = varCount > 0
 			? new HashMap<>((int) (varCount / 0.75f) + 1)
 			: new HashMap<>();
-		// 1. 长度必须相等
-		if (topicParts.length != topicTemplateParts.length) {
-			return result;
-		}
 		// 2. 逐级匹配
 		for (int i = 0; i < topicTemplateParts.length; i++) {
 			String p = topicTemplateParts[i];
