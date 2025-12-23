@@ -17,17 +17,14 @@
 package org.dromara.mica.mqtt.core.util;
 
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
+import org.dromara.mica.mqtt.core.common.TopicTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.mica.IntPair;
-import org.tio.utils.mica.StrTemplateParser;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.StringTokenizer;
+import java.util.*;
 
 /**
  * Mqtt Topic 工具
@@ -352,19 +349,30 @@ public final class TopicUtil {
 	}
 
 	/**
-	 * 解析 topic 模板中的变量，不匹配时返回空 Map
-	 *
-	 * <p>
-	 * 例如 $SYS/brokers/${node}/clients/${clientid}/disconnected 中提取 node 和 clientid
-	 * </p>
+	 * 解析 topic 模板中的变量 例如 $SYS/brokers/${node}/clients/${clientid}/disconnected 中提取 node 和 clientid
 	 *
 	 * @param topicTemplate topicTemplate
 	 * @param topic         topic
-	 * @return 获取变量值
+	 * @return 提取的变量
 	 */
 	public static Map<String, String> getTopicVars(String topicTemplate, String topic) {
-		StrTemplateParser templateParser = new StrTemplateParser(topicTemplate);
-		return templateParser.getVariables(topic);
+		TopicTemplate template = new TopicTemplate(topicTemplate, getTopicFilter(topicTemplate));
+		return template.getVariables(topic);
+	}
+
+	/**
+	 * 将 topic 以 / 分割，如果以 / 开头和 / 结尾会多一级
+	 *
+	 * @param topic topic
+	 * @return topic 段
+	 */
+	public static String[] getTopicPart(String topic) {
+		StringTokenizer tokenizer = new StringTokenizer(topic, "/");
+		String[] parts = new String[tokenizer.countTokens()];
+		for (int i = 0; i < parts.length; i++) {
+			parts[i] = tokenizer.nextToken();
+		}
+		return parts;
 	}
 
 }

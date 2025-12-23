@@ -18,8 +18,6 @@ package org.dromara.mica.mqtt.core.common;
 
 import org.dromara.mica.mqtt.core.util.TopicUtil;
 
-import java.util.Map;
-
 /**
  * TopicFilter 类型
  *
@@ -85,22 +83,6 @@ public enum TopicFilterType {
 			return TopicUtil.match(topicFilter.substring(prefixLength), topicName);
 		} else {
 			return TopicUtil.match(topicFilter, topicName);
-		}
-	}
-
-	/**
-	 * 解析 topic 模板中的变量 例如 $SYS/brokers/${node}/clients/${clientid}/disconnected 中提取 node 和 clientid
-	 *
-	 * @param topicTemplate topicTemplate
-	 * @param topic         topic
-	 * @return 提取的变量
-	 */
-	public Map<String, String> getTopicVars(String topicTemplate, String topic) {
-		int prefixLength = getPrefixLength(topicTemplate);
-		if (prefixLength > 0) {
-			return TopicUtil.getTopicVars(topicTemplate.substring(prefixLength), topic);
-		} else {
-			return TopicUtil.getTopicVars(topicTemplate, topic);
 		}
 	}
 
