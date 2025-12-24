@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.util;
 
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
+import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.common.TopicTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -241,6 +242,16 @@ public final class TopicUtil {
 			}
 		}
 		return topicFilterBuilder.toString();
+	}
+
+	/**
+	 * 获取 topicFilter 类型
+	 *
+	 * @param topicFilter topicFilter
+	 * @return TopicFilterType
+	 */
+	public static TopicFilterType getTopicFilterType(String topicFilter) {
+		return TopicFilterType.getType(topicFilter);
 	}
 
 	/**
