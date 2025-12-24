@@ -2,7 +2,7 @@
 
 ## 发行版本
 
-### v2.5.11 - 2025-12-20
+### v2.5.11 - 2025-12-28
 
 - ✨ mica-mqtt-common 重构 TopicTemplate 优化匹配和变量提取逻辑，支持除了 `${var}` 变量还带 `+`、`#` 的情况。感谢 `@十年` 反馈。
 - ✨ mica-mqtt-common 优化 TopicUtil 保留消息相关逻辑并简化 TopicFilterType。
