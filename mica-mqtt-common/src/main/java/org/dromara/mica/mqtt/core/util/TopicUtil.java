@@ -21,6 +21,7 @@ import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.common.TopicTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tio.utils.hutool.ClassUtil;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.mica.IntPair;
 
@@ -291,7 +292,7 @@ public final class TopicUtil {
 		for (int start, end; (start = topicTemplate.indexOf("${", cursor)) != -1 && (end = topicTemplate.indexOf('}', start)) != -1; ) {
 			sb.append(topicTemplate, cursor, start);
 			String fieldName = topicTemplate.substring(start + 2, end);
-			Object value = getFieldValue(payload, fieldName);
+			Object value = ClassUtil.getFieldValue(payload, fieldName);
 			sb.append(value == null ? "" : value);
 			cursor = end + 1;
 		}
@@ -300,23 +301,6 @@ public final class TopicUtil {
 		} else {
 			sb.append(topicTemplate.substring(cursor));
 			return sb.toString();
-		}
-	}
-
-	/**
-	 * 获取字段值
-	 *
-	 * @param obj       obj
-	 * @param fieldName fieldName
-	 * @return fieldValue
-	 */
-	public static Object getFieldValue(Object obj, String fieldName) {
-		try {
-			Field field = obj.getClass().getDeclaredField(fieldName);
-			field.setAccessible(true);
-			return field.get(obj);
-		} catch (Exception e) {
-			throw new IllegalArgumentException("Failed to resolve field: " + fieldName + " from payload object", e);
 		}
 	}
 

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.tio.utils.mica.IntPair;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -126,6 +127,10 @@ class TopicUtilTest {
 		Assertions.assertEquals("$SYS/brokers/node1/clients/abc123/disconnected", m2);
 		String m3 = TopicUtil.resolveTopic("/iot/test/123", testBean);
 		Assertions.assertEquals("/iot/test/123", m3);
+		Map<String, String> mapData = new HashMap<>();
+		mapData.put("name", "张三");
+		String m4 = TopicUtil.resolveTopic("Hello, ${name}!", mapData);
+		Assertions.assertEquals("Hello, 张三!", m4);
 	}
 
 	@Test
