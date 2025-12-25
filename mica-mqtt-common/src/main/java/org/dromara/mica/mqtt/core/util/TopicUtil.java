@@ -279,7 +279,7 @@ public final class TopicUtil {
 	 * 解析 topic 中的变量，变量的格式为 ${x}，x 为 payload 中的字段名
 	 *
 	 * @param topicTemplate topic 模板
-	 * @param payload       payload
+	 * @param payload       payload，支持 java bean 和 Map 对象
 	 * @return 解析后的 topic
 	 */
 	public static String resolveTopic(String topicTemplate, Object payload) {
