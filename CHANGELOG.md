@@ -7,6 +7,8 @@
 - ✨ mica-mqtt-common 重构 TopicTemplate 优化匹配和变量提取逻辑，支持除了 `${var}` 变量还带 `+`、`#` 的情况。感谢 `@十年` 反馈。
 - ✨ mica-mqtt-common 优化 TopicUtil 保留消息相关逻辑并简化 TopicFilterType。
 - ✨ mica-mqtt-common 将 TopicUtil getFieldValue 方法替换为 ClassUtil 的实现，并且支持 Map。
+- ✨ mica-mqtt-codec 优化 MQTT 消息解码逻辑，减少中间变量和对象，提升性能。
+- ✨ mica-mqtt-codec 优化 MQTT 订阅和取消订阅消息 Topic 编码，避免重复编码，提升性能。
 
 ### v2.5.10 - 2025-12-20
 
