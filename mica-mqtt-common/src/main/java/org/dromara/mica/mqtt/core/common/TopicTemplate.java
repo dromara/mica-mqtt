@@ -32,8 +32,6 @@ import org.tio.utils.collection.IntObjectMap;
 public class TopicTemplate {
 	private final String[] topicTemplateParts;
 	private final IntObjectMap<String> varIndexMap;
-	// 优化：缓存去掉前缀后的 topicFilter，避免每次 match() 都创建新字符串
-	private final String topicFilterWithoutPrefix;
 	// 优化：预标记哪些位置是变量，避免每次 getVariables() 都调用 startsWith
 	private final boolean[] isVariablePart;
 	// 优化：预标记哪些位置是通配符，避免字符串比较
@@ -43,10 +41,6 @@ public class TopicTemplate {
 		int topicPrefixLength = TopicFilterType.getType(topicFilter).getPrefixLength(topicFilter);
 		this.topicTemplateParts = getTopicTemplateParts(topicPrefixLength, topicTemplate);
 		this.varIndexMap = getVarIndexMap(topicTemplateParts);
-		// 缓存去掉前缀后的 topicFilter
-		this.topicFilterWithoutPrefix = topicPrefixLength > 0
-			? topicFilter.substring(topicPrefixLength)
-			: topicFilter;
 		// 预标记变量和通配符位置
 		this.isVariablePart = new boolean[topicTemplateParts.length];
 		this.isWildcardPart = new boolean[topicTemplateParts.length];
@@ -57,7 +51,7 @@ public class TopicTemplate {
 		if (prefixLength > 0) {
 			topicTemplate = topicTemplate.substring(prefixLength);
 		}
-		return TopicUtil.getTopicPart(topicTemplate);
+		return TopicUtil.getTopicParts(topicTemplate);
 	}
 
 	private static IntObjectMap<String> getVarIndexMap(String[] topicTemplateParts) {
@@ -97,8 +91,35 @@ public class TopicTemplate {
 	 * @return 是否匹配
 	 */
 	public boolean match(String topicName) {
-		// 优化：使用缓存的字符串，避免每次调用 substring
-		return TopicUtil.match(topicFilterWithoutPrefix, topicName);
+		// 优化：直接使用 topicTemplateParts 数组匹配，避免字符串操作，性能更好
+		String[] topicParts = TopicUtil.getTopicParts(topicName);
+		// 1. 长度必须相等
+		if (topicParts.length != topicTemplateParts.length) {
+			return false;
+		}
+		// 2. 逐级匹配
+		for (int i = 0; i < topicTemplateParts.length; i++) {
+			String p = topicTemplateParts[i];
+			String t = topicParts[i];
+			// 优化：使用预标记的数组，避免重复调用 startsWith
+			if (isVariablePart[i]) {
+				// 变量可以匹配任何值，继续检查下一级
+			} else if (isWildcardPart[i]) {
+				// 通配符不能匹配空值
+				if (t.isEmpty()) {
+					return false;
+				}
+				// # 通配符只能在最后一位，且匹配所有后续层级
+				if (TopicUtil.TOPIC_WILDCARDS_MORE.equals(p)) {
+					return true;
+				}
+				// + 通配符匹配单个层级，继续检查下一级
+			} else if (!p.equals(t)) {
+				// 固定部分必须完全匹配
+				return false;
+		}
+		}
+		return true;
 	}
 
 	/**
@@ -108,7 +129,7 @@ public class TopicTemplate {
 	 * @return 变量
 	 */
 	public Map<String, String> getVariables(String topicName) {
-		String[] topicParts = TopicUtil.getTopicPart(topicName);
+		String[] topicParts = TopicUtil.getTopicParts(topicName);
 		// 1. 长度必须相等
 		if (topicParts.length != topicTemplateParts.length) {
 			return Collections.emptyMap();

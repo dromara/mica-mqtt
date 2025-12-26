@@ -25,8 +25,10 @@ import org.tio.utils.hutool.ClassUtil;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.mica.IntPair;
 
-import java.lang.reflect.Field;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.StringTokenizer;
 
 /**
  * Mqtt Topic 工具
@@ -353,21 +355,6 @@ public final class TopicUtil {
 	public static Map<String, String> getTopicVars(String topicTemplate, String topic) {
 		TopicTemplate template = new TopicTemplate(topicTemplate, getTopicFilter(topicTemplate));
 		return template.getVariables(topic);
-	}
-
-	/**
-	 * 将 topic 以 / 分割，如果以 / 开头和 / 结尾会多一级
-	 *
-	 * @param topic topic
-	 * @return topic 段
-	 */
-	public static String[] getTopicPart(String topic) {
-		StringTokenizer tokenizer = new StringTokenizer(topic, "/");
-		String[] parts = new String[tokenizer.countTokens()];
-		for (int i = 0; i < parts.length; i++) {
-			parts[i] = tokenizer.nextToken();
-		}
-		return parts;
 	}
 
 }
