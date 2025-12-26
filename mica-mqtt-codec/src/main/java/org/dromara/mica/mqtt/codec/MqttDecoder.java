@@ -47,6 +47,7 @@ import java.util.List;
  */
 public final class MqttDecoder {
 	private static final String MQTT_FIXED_HEADER_KEY = "MQTT_F_H_K";
+	private static final int PACKET_ID_BYTES = 2;
 	private final int maxBytesInMessage;
 	private final int maxClientIdLength;
 
@@ -134,7 +135,7 @@ public final class MqttDecoder {
 			case SUBSCRIBE:
 			case SUBACK:
 			case UNSUBACK:
-				return decodeMessageIdAndPropertiesVariableHeader(ctx, buffer, mqttFixedHeader, bytesConsumed);
+				return decodePacketIdAndPropertiesVariableHeader(ctx, buffer, mqttFixedHeader, bytesConsumed);
 			case PUBACK:
 			case PUBREC:
 			case PUBCOMP:
@@ -237,37 +238,37 @@ public final class MqttDecoder {
 		return new MqttFixedHeader(messageType, dup, qos, retain, headLength, remainingLength);
 	}
 
-	private static MqttMessageIdAndPropertiesVariableHeader decodeMessageIdAndPropertiesVariableHeader(
+	private static MqttMessageIdAndPropertiesVariableHeader decodePacketIdAndPropertiesVariableHeader(
 		ChannelContext ctx, ByteBuffer buffer, MqttFixedHeader mqttFixedHeader, IntValue bytesConsumed) {
 		final MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
-		final int packetId = decodeMessageId(buffer, mqttFixedHeader);
+		final int packetId = decodePacketId(buffer, mqttFixedHeader);
 		final MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader;
 		if (mqttVersion == MqttVersion.MQTT_5) {
 			IntValue tempBytesConsumed = new IntValue();
 			final MqttProperties properties = decodeProperties(buffer, tempBytesConsumed);
 			mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
-			bytesConsumed.value = 2 + tempBytesConsumed.value;
+			bytesConsumed.value = PACKET_ID_BYTES + tempBytesConsumed.value;
 		} else {
 			mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(packetId, MqttProperties.NO_PROPERTIES);
-			bytesConsumed.value = 2;
+			bytesConsumed.value = PACKET_ID_BYTES;
 		}
 		return mqttVariableHeader;
 	}
 
 	/**
-	 * decodeMessageId
+	 * decodePacketId
 	 *
 	 * @param buffer          ByteBuffer
 	 * @param mqttFixedHeader MqttFixedHeader
-	 * @return messageId with numberOfBytesConsumed is 2
+	 * @return packetId with numberOfBytesConsumed is 2
 	 */
-	private static int decodeMessageId(ByteBuffer buffer, MqttFixedHeader mqttFixedHeader) {
-		final int messageId = decodeMsbLsb(buffer);
-		// 注意：此处做 qos 降级处理，mqtt 规定 qos > 0，messageId 必须大于 0，固做降级处理
-		if (messageId == 0) {
+	private static int decodePacketId(ByteBuffer buffer, MqttFixedHeader mqttFixedHeader) {
+		final int packetId = decodeMsbLsb(buffer);
+		// 注意：此处做 qos 降级处理，mqtt 规定 qos > 0，packetId 必须大于 0，固做降级处理
+		if (packetId == 0) {
 			mqttFixedHeader.downgradeQos();
 		}
-		return messageId;
+		return packetId;
 	}
 
 	private static MqttSubAckPayload decodeSubAckPayload(ByteBuffer buffer, int bytesRemainingInVariablePart) {
@@ -685,10 +686,10 @@ public final class MqttDecoder {
 
 	private MqttPubReplyMessageVariableHeader decodePubReplyMessage(
 		ByteBuffer buffer, MqttFixedHeader mqttFixedHeader, int bytesRemainingInVariablePart, IntValue bytesConsumed) {
-		final int packetId = decodeMessageId(buffer, mqttFixedHeader);
+		final int packetId = decodePacketId(buffer, mqttFixedHeader);
 		final MqttPubReplyMessageVariableHeader mqttPubAckVariableHeader;
 		final int consumed;
-		final int packetIdNumberOfBytesConsumed = 2;
+		final int packetIdNumberOfBytesConsumed = PACKET_ID_BYTES;
 		if (bytesRemainingInVariablePart > 3) {
 			final byte reasonCode = buffer.get();
 			IntValue tempBytesConsumed = new IntValue();
@@ -765,7 +766,7 @@ public final class MqttDecoder {
 		}
 		// 存储固定头，避免重复解析
 		ctx.set(MQTT_FIXED_HEADER_KEY, mqttFixedHeader);
-		// 3. 长度不够，直接返回 null
+		// 4. 长度不够，直接返回 null
 		if (readableLength < messageLength) {
 			ctx.setPacketNeededLength(messageLength);
 			return null;
@@ -785,10 +786,10 @@ public final class MqttDecoder {
 		}
 		int numberOfBytesConsumed = tempBytesConsumed.value;
 
-		int messageId = -1;
+		int packetId = -1;
 		if (mqttFixedHeader.qosLevel().value() > 0) {
-			messageId = decodeMessageId(buffer, mqttFixedHeader);
-			numberOfBytesConsumed += 2;
+			packetId = decodePacketId(buffer, mqttFixedHeader);
+			numberOfBytesConsumed += PACKET_ID_BYTES;
 		}
 
 		final MqttProperties properties;
@@ -800,7 +801,7 @@ public final class MqttDecoder {
 		}
 
 		final MqttPublishVariableHeader mqttPublishVariableHeader =
-			new MqttPublishVariableHeader(decodedTopic, messageId, properties);
+			new MqttPublishVariableHeader(decodedTopic, packetId, properties);
 		bytesConsumed.value = numberOfBytesConsumed;
 		return mqttPublishVariableHeader;
 	}
