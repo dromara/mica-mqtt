@@ -98,16 +98,17 @@ public final class MqttDecoder {
 										  MqttFixedHeader mqttFixedHeader) {
 		// 1. 消息体长度
 		int bytesRemainingInVariablePart = mqttFixedHeader.remainingLength();
-		// 2. 解析头信息
+		// 2. 缓存消息长度
+		IntValue bytesConsumed = new IntValue();
+		// 3. 解析头信息
 		Object variableHeader;
 		try {
-			Result<?> decodedVariableHeader = decodeVariableHeader(ctx, buffer, messageType, mqttFixedHeader, bytesRemainingInVariablePart);
-			variableHeader = decodedVariableHeader.value;
-			bytesRemainingInVariablePart -= decodedVariableHeader.numberOfBytesConsumed;
+			variableHeader = decodeVariableHeader(ctx, buffer, messageType, mqttFixedHeader, bytesRemainingInVariablePart, bytesConsumed);
+			bytesRemainingInVariablePart -= bytesConsumed.value;
 		} catch (Exception cause) {
 			throw new DecoderException(cause);
 		}
-		// 3. 解析消息体
+		// 4. 解析消息体
 		final Object payload = decodePayload(buffer, maxClientIdLength, messageType, bytesRemainingInVariablePart, variableHeader);
 		return MqttMessageFactory.newMessage(mqttFixedHeader, variableHeader, payload);
 	}
@@ -119,30 +120,31 @@ public final class MqttDecoder {
 	 * @param mqttFixedHeader MqttFixedHeader of the same message
 	 * @return the variable header
 	 */
-	private Result<?> decodeVariableHeader(ChannelContext ctx, ByteBuffer buffer,
+	private Object decodeVariableHeader(ChannelContext ctx, ByteBuffer buffer,
 										   MqttMessageType messageType,
 										   MqttFixedHeader mqttFixedHeader,
-										   int bytesRemainingInVariablePart) {
+										   int bytesRemainingInVariablePart,
+										   IntValue bytesConsumed) {
 		switch (messageType) {
 			case CONNECT:
-				return decodeConnectionVariableHeader(ctx, buffer);
+				return decodeConnectionVariableHeader(ctx, buffer, bytesConsumed);
 			case CONNACK:
-				return decodeConnAckVariableHeader(ctx, buffer);
+				return decodeConnAckVariableHeader(ctx, buffer, bytesConsumed);
 			case UNSUBSCRIBE:
 			case SUBSCRIBE:
 			case SUBACK:
 			case UNSUBACK:
-				return decodeMessageIdAndPropertiesVariableHeader(ctx, buffer, mqttFixedHeader);
+				return decodeMessageIdAndPropertiesVariableHeader(ctx, buffer, mqttFixedHeader, bytesConsumed);
 			case PUBACK:
 			case PUBREC:
 			case PUBCOMP:
 			case PUBREL:
-				return decodePubReplyMessage(buffer, mqttFixedHeader, bytesRemainingInVariablePart);
+				return decodePubReplyMessage(buffer, mqttFixedHeader, bytesRemainingInVariablePart, bytesConsumed);
 			case PUBLISH:
-				return decodePublishVariableHeader(ctx, buffer, mqttFixedHeader);
+				return decodePublishVariableHeader(ctx, buffer, mqttFixedHeader, bytesConsumed);
 			case DISCONNECT:
 			case AUTH:
-				return decodeReasonCodeAndPropertiesVariableHeader(buffer, bytesRemainingInVariablePart);
+				return decodeReasonCodeAndPropertiesVariableHeader(buffer, bytesRemainingInVariablePart, bytesConsumed);
 			default:
 				//shouldn't reach here
 				throw new DecoderException("Unknown message type: " + messageType);
@@ -235,19 +237,21 @@ public final class MqttDecoder {
 		return new MqttFixedHeader(messageType, dup, qos, retain, headLength, remainingLength);
 	}
 
-	private static Result<MqttMessageIdAndPropertiesVariableHeader> decodeMessageIdAndPropertiesVariableHeader(
-		ChannelContext ctx, ByteBuffer buffer, MqttFixedHeader mqttFixedHeader) {
+	private static MqttMessageIdAndPropertiesVariableHeader decodeMessageIdAndPropertiesVariableHeader(
+		ChannelContext ctx, ByteBuffer buffer, MqttFixedHeader mqttFixedHeader, IntValue bytesConsumed) {
 		final MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		final int packetId = decodeMessageId(buffer, mqttFixedHeader);
 		final MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader;
 		if (mqttVersion == MqttVersion.MQTT_5) {
-			final Result<MqttProperties> properties = decodeProperties(buffer);
-			mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(packetId, properties.value);
-			return new Result<>(mqttVariableHeader, 2 + properties.numberOfBytesConsumed);
+			IntValue tempBytesConsumed = new IntValue();
+			final MqttProperties properties = decodeProperties(buffer, tempBytesConsumed);
+			mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
+			bytesConsumed.value = 2 + tempBytesConsumed.value;
 		} else {
 			mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(packetId, MqttProperties.NO_PROPERTIES);
-			return new Result<>(mqttVariableHeader, 2);
+			bytesConsumed.value = 2;
 		}
+		return mqttVariableHeader;
 	}
 
 	/**
@@ -282,15 +286,16 @@ public final class MqttDecoder {
 		return new MqttUnsubAckPayload(reasonCodes);
 	}
 
-	private static Result<MqttConnectVariableHeader> decodeConnectionVariableHeader(
-		ChannelContext ctx, ByteBuffer buffer) {
-		final Result<String> protoString = decodeString(buffer);
-		int numberOfBytesConsumed = protoString.numberOfBytesConsumed;
+	private static MqttConnectVariableHeader decodeConnectionVariableHeader(
+		ChannelContext ctx, ByteBuffer buffer, IntValue bytesConsumed) {
+		IntValue tempBytesConsumed = new IntValue();
+		final String protoString = decodeString(buffer, tempBytesConsumed);
+		int numberOfBytesConsumed = tempBytesConsumed.value;
 
 		final byte protocolLevel = buffer.get();
 		numberOfBytesConsumed += 1;
 
-		MqttVersion version = MqttVersion.fromProtocolNameAndLevel(protoString.value, protocolLevel);
+		MqttVersion version = MqttVersion.fromProtocolNameAndLevel(protoString, protocolLevel);
 		MqttCodecUtil.setMqttVersion(ctx, version);
 
 		final int b1 = ByteBufferUtil.readUnsignedByte(buffer);
@@ -317,9 +322,8 @@ public final class MqttDecoder {
 
 		final MqttProperties properties;
 		if (version == MqttVersion.MQTT_5) {
-			final Result<MqttProperties> propertiesResult = decodeProperties(buffer);
-			properties = propertiesResult.value;
-			numberOfBytesConsumed += propertiesResult.numberOfBytesConsumed;
+			properties = decodeProperties(buffer, tempBytesConsumed);
+			numberOfBytesConsumed += tempBytesConsumed.value;
 		} else {
 			properties = MqttProperties.NO_PROPERTIES;
 		}
@@ -335,11 +339,12 @@ public final class MqttDecoder {
 			cleanStart,
 			keepAlive,
 			properties);
-		return new Result<>(mqttConnectVariableHeader, numberOfBytesConsumed);
+		bytesConsumed.value = numberOfBytesConsumed;
+		return mqttConnectVariableHeader;
 	}
 
-	private static Result<MqttConnAckVariableHeader> decodeConnAckVariableHeader(
-		ChannelContext ctx, ByteBuffer buffer) {
+	private static MqttConnAckVariableHeader decodeConnAckVariableHeader(
+		ChannelContext ctx, ByteBuffer buffer, IntValue bytesConsumed) {
 		final MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		final boolean sessionPresent = (ByteBufferUtil.readUnsignedByte(buffer) & 0x01) == 0x01;
 		byte returnCode = buffer.get();
@@ -347,16 +352,17 @@ public final class MqttDecoder {
 
 		final MqttProperties properties;
 		if (mqttVersion == MqttVersion.MQTT_5) {
-			final Result<MqttProperties> propertiesResult = decodeProperties(buffer);
-			properties = propertiesResult.value;
-			numberOfBytesConsumed += propertiesResult.numberOfBytesConsumed;
+			IntValue tempBytesConsumed = new IntValue();
+			properties = decodeProperties(buffer, tempBytesConsumed);
+			numberOfBytesConsumed += tempBytesConsumed.value;
 		} else {
 			properties = MqttProperties.NO_PROPERTIES;
 		}
 
 		final MqttConnAckVariableHeader mqttConnAckVariableHeader =
 			new MqttConnAckVariableHeader(MqttConnectReasonCode.valueOf(returnCode), sessionPresent, properties);
-		return new Result<>(mqttConnAckVariableHeader, numberOfBytesConsumed);
+		bytesConsumed.value = numberOfBytesConsumed;
+		return mqttConnAckVariableHeader;
 	}
 
 	/**
@@ -394,38 +400,37 @@ public final class MqttDecoder {
 	private static MqttConnectPayload decodeConnectionPayload(ByteBuffer buffer, int maxClientIdLength,
 															  MqttConnectVariableHeader mqttConnectVariableHeader,
 															  int bytesRemainingInVariablePart) {
-		final Result<String> decodedClientId = decodeString(buffer);
-		final String decodedClientIdValue = decodedClientId.value;
+		IntValue tempBytesConsumed = new IntValue();
+		final String decodedClientIdValue = decodeString(buffer, tempBytesConsumed);
 		final MqttVersion mqttVersion = MqttVersion.fromProtocolNameAndLevel(mqttConnectVariableHeader.name(),
 			(byte) mqttConnectVariableHeader.version());
 		if (MqttCodecUtil.isInvalidClientId(mqttVersion, maxClientIdLength, decodedClientIdValue)) {
 			throw new MqttIdentifierRejectedException("invalid clientIdentifier: " + decodedClientIdValue);
 		}
-		int numberOfBytesConsumed = decodedClientId.numberOfBytesConsumed;
+		int numberOfBytesConsumed = tempBytesConsumed.value;
 
-		Result<String> decodedWillTopic = null;
+		String decodedWillTopic = null;
 		byte[] decodedWillMessage = null;
 		final MqttProperties willProperties;
 		if (mqttConnectVariableHeader.isWillFlag()) {
 			if (mqttVersion == MqttVersion.MQTT_5) {
-				final Result<MqttProperties> propertiesResult = decodeProperties(buffer);
-				willProperties = propertiesResult.value;
-				numberOfBytesConsumed += propertiesResult.numberOfBytesConsumed;
+				willProperties = decodeProperties(buffer, tempBytesConsumed);
+				numberOfBytesConsumed += tempBytesConsumed.value;
 			} else {
 				willProperties = MqttProperties.NO_PROPERTIES;
 			}
-			decodedWillTopic = decodeString(buffer, 0, 32767);
-			numberOfBytesConsumed += decodedWillTopic.numberOfBytesConsumed;
+			decodedWillTopic = decodeString(buffer, 0, 32767, tempBytesConsumed);
+			numberOfBytesConsumed += tempBytesConsumed.value;
 			decodedWillMessage = decodeByteArray(buffer);
 			numberOfBytesConsumed += decodedWillMessage.length + 2;
 		} else {
 			willProperties = MqttProperties.NO_PROPERTIES;
 		}
-		Result<String> decodedUserName = null;
+		String decodedUserName = null;
 		byte[] decodedPassword = null;
 		if (mqttConnectVariableHeader.hasUsername()) {
-			decodedUserName = decodeString(buffer);
-			numberOfBytesConsumed += decodedUserName.numberOfBytesConsumed;
+			decodedUserName = decodeString(buffer, tempBytesConsumed);
+			numberOfBytesConsumed += tempBytesConsumed.value;
 		}
 		if (mqttConnectVariableHeader.hasPassword()) {
 			decodedPassword = decodeByteArray(buffer);
@@ -435,20 +440,21 @@ public final class MqttDecoder {
 		// 校验消息中剩余的字节数是否为0
 		validateNoBytesRemain(bytesRemainingInVariablePart, numberOfBytesConsumed, MqttMessageType.CONNECT);
 		return new MqttConnectPayload(
-			decodedClientId.value,
+			decodedClientIdValue,
 			willProperties,
-			decodedWillTopic != null ? decodedWillTopic.value : null,
+			decodedWillTopic,
 			decodedWillMessage,
-			decodedUserName != null ? decodedUserName.value : null,
+			decodedUserName,
 			decodedPassword);
 	}
 
 	private static MqttSubscribePayload decodeSubscribePayload(ByteBuffer buffer, int bytesRemainingInVariablePart) {
 		final List<MqttTopicSubscription> subscribeTopics = new ArrayList<>();
 		int numberOfBytesConsumed = 0;
+		IntValue tempBytesConsumed = new IntValue();
 		while (numberOfBytesConsumed < bytesRemainingInVariablePart) {
-			final Result<String> decodedTopicName = decodeString(buffer);
-			numberOfBytesConsumed += decodedTopicName.numberOfBytesConsumed;
+			final String decodedTopicName = decodeString(buffer, tempBytesConsumed);
+			numberOfBytesConsumed += tempBytesConsumed.value;
 			//See 3.8.3.1 Subscription Options of MQTT 5.0 specification for optionByte details
 			final short optionByte = ByteBufferUtil.readUnsignedByte(buffer);
 
@@ -462,7 +468,7 @@ public final class MqttDecoder {
 				noLocal, retainAsPublished, retainHandling);
 
 			numberOfBytesConsumed++;
-			subscribeTopics.add(new MqttTopicSubscription(decodedTopicName.value, subscriptionOption));
+			subscribeTopics.add(new MqttTopicSubscription(decodedTopicName, subscriptionOption));
 		}
 		// 校验消息中剩余的字节数是否为0
 		validateNoBytesRemain(bytesRemainingInVariablePart, numberOfBytesConsumed, MqttMessageType.SUBSCRIBE);
@@ -472,10 +478,11 @@ public final class MqttDecoder {
 	private static MqttUnsubscribePayload decodeUnSubscribePayload(ByteBuffer buffer, int bytesRemainingInVariablePart) {
 		final List<String> unsubscribeTopics = new ArrayList<>();
 		int numberOfBytesConsumed = 0;
+		IntValue tempBytesConsumed = new IntValue();
 		while (numberOfBytesConsumed < bytesRemainingInVariablePart) {
-			final Result<String> decodedTopicName = decodeString(buffer);
-			numberOfBytesConsumed += decodedTopicName.numberOfBytesConsumed;
-			unsubscribeTopics.add(decodedTopicName.value);
+			final String decodedTopicName = decodeString(buffer, tempBytesConsumed);
+			numberOfBytesConsumed += tempBytesConsumed.value;
+			unsubscribeTopics.add(decodedTopicName);
 		}
 		// 校验消息中剩余的字节数是否为0
 		validateNoBytesRemain(bytesRemainingInVariablePart, numberOfBytesConsumed, MqttMessageType.UNSUBSCRIBE);
@@ -500,22 +507,24 @@ public final class MqttDecoder {
 		}
 	}
 
-	private static Result<String> decodeString(ByteBuffer buffer) {
-		return decodeString(buffer, 0, Integer.MAX_VALUE);
+	private static String decodeString(ByteBuffer buffer, IntValue bytesConsumed) {
+		return decodeString(buffer, 0, Integer.MAX_VALUE, bytesConsumed);
 	}
 
-	private static Result<String> decodeString(ByteBuffer buffer, int minBytes, int maxBytes) {
+	private static String decodeString(ByteBuffer buffer, int minBytes, int maxBytes, IntValue bytesConsumed) {
 		int size = decodeMsbLsb(buffer);
 		int numberOfBytesConsumed = 2;
 		if (size < minBytes || size > maxBytes) {
 			ByteBufferUtil.skipBytes(buffer, size);
 			numberOfBytesConsumed += size;
-			return new Result<>(null, numberOfBytesConsumed);
+			bytesConsumed.value = numberOfBytesConsumed;
+			return null;
 		}
 		String s = new String(buffer.array(), buffer.position(), size, StandardCharsets.UTF_8);
 		ByteBufferUtil.skipBytes(buffer, size);
 		numberOfBytesConsumed += size;
-		return new Result<>(s, numberOfBytesConsumed);
+		bytesConsumed.value = numberOfBytesConsumed;
+		return s;
 	}
 
 	/**
@@ -579,18 +588,20 @@ public final class MqttDecoder {
 		return packInts(remainingLength, loops);
 	}
 
-	private static Result<MqttProperties> decodeProperties(ByteBuffer buffer) {
+	private static MqttProperties decodeProperties(ByteBuffer buffer, IntValue bytesConsumed) {
 		final long propertiesLengthVBI = decodeVariableByteInteger(buffer);
 		int totalPropertiesLength = unpackA(propertiesLengthVBI);
 		int lengthFieldBytes = unpackB(propertiesLengthVBI);
 
 		// 没有属性时，直接返回空属性
 		if (totalPropertiesLength == 0) {
-			return new Result<>(MqttProperties.NO_PROPERTIES, lengthFieldBytes);
+			bytesConsumed.value = lengthFieldBytes;
+			return MqttProperties.NO_PROPERTIES;
 		}
 
 		MqttProperties decodedProperties = new MqttProperties();
 		int consumedWithinProperties = 0;
+		IntValue tempBytesConsumed = new IntValue();
 
 		while (consumedWithinProperties < totalPropertiesLength) {
 			long propertyIdVBI = decodeVariableByteInteger(buffer);
@@ -642,17 +653,17 @@ public final class MqttDecoder {
 				case RESPONSE_INFORMATION:
 				case SERVER_REFERENCE:
 				case REASON_STRING: {
-					final Result<String> stringResult = decodeString(buffer);
-					consumedWithinProperties += stringResult.numberOfBytesConsumed;
-					decodedProperties.add(new StringProperty(propertyIdValue, stringResult.value));
+					final String stringValue = decodeString(buffer, tempBytesConsumed);
+					consumedWithinProperties += tempBytesConsumed.value;
+					decodedProperties.add(new StringProperty(propertyIdValue, stringValue));
 					break;
 				}
 				case USER_PROPERTY: {
-					final Result<String> keyResult = decodeString(buffer);
-					final Result<String> valueResult = decodeString(buffer);
-					consumedWithinProperties += keyResult.numberOfBytesConsumed;
-					consumedWithinProperties += valueResult.numberOfBytesConsumed;
-					decodedProperties.add(new UserProperty(keyResult.value, valueResult.value));
+					final String keyValue = decodeString(buffer, tempBytesConsumed);
+					consumedWithinProperties += tempBytesConsumed.value;
+					final String valueValue = decodeString(buffer, tempBytesConsumed);
+					consumedWithinProperties += tempBytesConsumed.value;
+					decodedProperties.add(new UserProperty(keyValue, valueValue));
 					break;
 				}
 				case CORRELATION_DATA:
@@ -667,23 +678,25 @@ public final class MqttDecoder {
 					throw new DecoderException("Unknown property type: " + propertyType);
 			}
 		}
-		return new Result<>(decodedProperties, lengthFieldBytes + consumedWithinProperties);
+		bytesConsumed.value = lengthFieldBytes + consumedWithinProperties;
+		return decodedProperties;
 	}
 
 
-	private Result<MqttPubReplyMessageVariableHeader> decodePubReplyMessage(
-		ByteBuffer buffer, MqttFixedHeader mqttFixedHeader, int bytesRemainingInVariablePart) {
+	private MqttPubReplyMessageVariableHeader decodePubReplyMessage(
+		ByteBuffer buffer, MqttFixedHeader mqttFixedHeader, int bytesRemainingInVariablePart, IntValue bytesConsumed) {
 		final int packetId = decodeMessageId(buffer, mqttFixedHeader);
 		final MqttPubReplyMessageVariableHeader mqttPubAckVariableHeader;
 		final int consumed;
 		final int packetIdNumberOfBytesConsumed = 2;
 		if (bytesRemainingInVariablePart > 3) {
 			final byte reasonCode = buffer.get();
-			final Result<MqttProperties> properties = decodeProperties(buffer);
+			IntValue tempBytesConsumed = new IntValue();
+			final MqttProperties properties = decodeProperties(buffer, tempBytesConsumed);
 			mqttPubAckVariableHeader = new MqttPubReplyMessageVariableHeader(packetId,
 				reasonCode,
-				properties.value);
-			consumed = packetIdNumberOfBytesConsumed + 1 + properties.numberOfBytesConsumed;
+				properties);
+			consumed = packetIdNumberOfBytesConsumed + 1 + tempBytesConsumed.value;
 		} else if (bytesRemainingInVariablePart > 2) {
 			final byte reasonCode = buffer.get();
 			mqttPubAckVariableHeader = new MqttPubReplyMessageVariableHeader(packetId,
@@ -697,19 +710,20 @@ public final class MqttDecoder {
 			consumed = packetIdNumberOfBytesConsumed;
 		}
 
-		return new Result<>(mqttPubAckVariableHeader, consumed);
+		bytesConsumed.value = consumed;
+		return mqttPubAckVariableHeader;
 	}
 
-	private Result<MqttReasonCodeAndPropertiesVariableHeader> decodeReasonCodeAndPropertiesVariableHeader(
-		ByteBuffer buffer, int bytesRemainingInVariablePart) {
+	private MqttReasonCodeAndPropertiesVariableHeader decodeReasonCodeAndPropertiesVariableHeader(
+		ByteBuffer buffer, int bytesRemainingInVariablePart, IntValue bytesConsumed) {
 		final byte reasonCode;
 		final MqttProperties properties;
 		final int consumed;
 		if (bytesRemainingInVariablePart > 1) {
 			reasonCode = buffer.get();
-			final Result<MqttProperties> propertiesResult = decodeProperties(buffer);
-			properties = propertiesResult.value;
-			consumed = 1 + propertiesResult.numberOfBytesConsumed;
+			IntValue tempBytesConsumed = new IntValue();
+			properties = decodeProperties(buffer, tempBytesConsumed);
+			consumed = 1 + tempBytesConsumed.value;
 		} else if (bytesRemainingInVariablePart > 0) {
 			reasonCode = buffer.get();
 			properties = MqttProperties.NO_PROPERTIES;
@@ -721,7 +735,8 @@ public final class MqttDecoder {
 		}
 		final MqttReasonCodeAndPropertiesVariableHeader mqttReasonAndPropsVariableHeader =
 			new MqttReasonCodeAndPropertiesVariableHeader(reasonCode, properties);
-		return new Result<>(mqttReasonAndPropsVariableHeader, consumed);
+		bytesConsumed.value = consumed;
+		return mqttReasonAndPropsVariableHeader;
 	}
 
 	private MqttFixedHeader getOrDecodeMqttFixedHeader(ChannelContext ctx, ByteBuffer buffer, int readableLength) {
@@ -758,16 +773,17 @@ public final class MqttDecoder {
 		return mqttFixedHeader;
 	}
 
-	private Result<MqttPublishVariableHeader> decodePublishVariableHeader(
+	private MqttPublishVariableHeader decodePublishVariableHeader(
 		ChannelContext ctx, ByteBuffer buffer,
-		MqttFixedHeader mqttFixedHeader) {
+		MqttFixedHeader mqttFixedHeader, IntValue bytesConsumed) {
 		final MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
-		final Result<String> decodedTopic = decodeString(buffer);
+		IntValue tempBytesConsumed = new IntValue();
+		final String decodedTopic = decodeString(buffer, tempBytesConsumed);
 		// 校验发布的 topic name，不能包含通配符
-		if (MqttCodecUtil.isTopicFilter(decodedTopic.value)) {
-			throw new DecoderException("invalid publish topic name: " + decodedTopic.value + " (contains wildcards)");
+		if (MqttCodecUtil.isTopicFilter(decodedTopic)) {
+			throw new DecoderException("invalid publish topic name: " + decodedTopic + " (contains wildcards)");
 		}
-		int numberOfBytesConsumed = decodedTopic.numberOfBytesConsumed;
+		int numberOfBytesConsumed = tempBytesConsumed.value;
 
 		int messageId = -1;
 		if (mqttFixedHeader.qosLevel().value() > 0) {
@@ -777,26 +793,19 @@ public final class MqttDecoder {
 
 		final MqttProperties properties;
 		if (mqttVersion == MqttVersion.MQTT_5) {
-			final Result<MqttProperties> propertiesResult = decodeProperties(buffer);
-			properties = propertiesResult.value;
-			numberOfBytesConsumed += propertiesResult.numberOfBytesConsumed;
+			properties = decodeProperties(buffer, tempBytesConsumed);
+			numberOfBytesConsumed += tempBytesConsumed.value;
 		} else {
 			properties = MqttProperties.NO_PROPERTIES;
 		}
 
 		final MqttPublishVariableHeader mqttPublishVariableHeader =
-			new MqttPublishVariableHeader(decodedTopic.value, messageId, properties);
-		return new Result<>(mqttPublishVariableHeader, numberOfBytesConsumed);
+			new MqttPublishVariableHeader(decodedTopic, messageId, properties);
+		bytesConsumed.value = numberOfBytesConsumed;
+		return mqttPublishVariableHeader;
 	}
 
-	private static final class Result<T> {
-
-		private final T value;
-		private final int numberOfBytesConsumed;
-
-		Result(T value, int numberOfBytesConsumed) {
-			this.value = value;
-			this.numberOfBytesConsumed = numberOfBytesConsumed;
-		}
+	private static final class IntValue {
+		private int value;
 	}
 }
