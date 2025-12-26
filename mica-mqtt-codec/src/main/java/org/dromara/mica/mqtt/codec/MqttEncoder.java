@@ -194,11 +194,15 @@ public final class MqttEncoder {
 		MqttMessageIdVariableHeader variableHeader = message.variableHeader();
 		MqttSubscribePayload payload = message.payload();
 
-		for (MqttTopicSubscription topic : payload.topicSubscriptions()) {
-			String topicFilter = topic.topicFilter();
-			byte[] topicFilterBytes = encodeStringUtf8(topicFilter);
-			payloadBufferSize += 2 + topicFilterBytes.length;
-			payloadBufferSize += 1;
+		// 预编码所有 topic，避免重复编码，使用数组存储
+		List<MqttTopicSubscription> topicSubscriptions = payload.topicSubscriptions();
+		int topicCount = topicSubscriptions.size();
+		byte[][] topicBytesArray = new byte[topicCount][];
+		for (int i = 0; i < topicCount; i++) {
+			MqttTopicSubscription topic = topicSubscriptions.get(i);
+			byte[] topicFilterBytes = encodeStringUtf8(topic.topicFilter());
+			topicBytesArray[i] = topicFilterBytes;
+			payloadBufferSize += 2 + topicFilterBytes.length + 1;
 		}
 
 		int variablePartSize = variableHeaderBufferSize + payloadBufferSize;
@@ -214,10 +218,9 @@ public final class MqttEncoder {
 		buf.put(propertiesBytes);
 
 		// Payload
-		for (MqttTopicSubscription topic : payload.topicSubscriptions()) {
-			// topicName
-			String topicName = topic.topicFilter();
-			byte[] topicNameBytes = encodeStringUtf8(topicName);
+		for (int i = 0; i < topicCount; i++) {
+			MqttTopicSubscription topic = topicSubscriptions.get(i);
+			byte[] topicNameBytes = topicBytesArray[i];
 			buf.putShort((short) topicNameBytes.length);
 			buf.put(topicNameBytes, 0, topicNameBytes.length);
 			if (mqttVersion == MqttVersion.MQTT_3_1_1 || mqttVersion == MqttVersion.MQTT_3_1) {
@@ -239,7 +242,7 @@ public final class MqttEncoder {
 		return buf;
 	}
 
-	private static ByteBuffer encodeUnsubscribeMessage(ChannelContext ctx, MqttUnSubscribeMessage message) {
+	private static ByteBuffer encodeUnSubscribeMessage(ChannelContext ctx, MqttUnSubscribeMessage message) {
 		MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		byte[] propertiesBytes = encodePropertiesIfNeeded(mqttVersion,
 			message.idAndPropertiesVariableHeader().properties());
@@ -251,8 +254,14 @@ public final class MqttEncoder {
 		MqttMessageIdVariableHeader variableHeader = message.variableHeader();
 		MqttUnsubscribePayload payload = message.payload();
 
-		for (String topicName : payload.topics()) {
+		// 预编码所有 topic，避免重复编码，使用数组存储
+		List<String> topics = payload.topics();
+		int topicCount = topics.size();
+		byte[][] topicBytesArray = new byte[topicCount][];
+		for (int i = 0; i < topicCount; i++) {
+			String topicName = topics.get(i);
 			byte[] topicNameBytes = encodeStringUtf8(topicName);
+			topicBytesArray[i] = topicNameBytes;
 			payloadBufferSize += 2 + topicNameBytes.length;
 		}
 
@@ -269,9 +278,8 @@ public final class MqttEncoder {
 		buf.put(propertiesBytes);
 
 		// Payload
-		for (String topicName : payload.topics()) {
-			// topicName
-			byte[] topicNameBytes = encodeStringUtf8(topicName);
+		for (int i = 0; i < topicCount; i++) {
+			byte[] topicNameBytes = topicBytesArray[i];
 			buf.putShort((short) topicNameBytes.length);
 			buf.put(topicNameBytes, 0, topicNameBytes.length);
 		}
@@ -603,7 +611,7 @@ public final class MqttEncoder {
 			case SUBSCRIBE:
 				return encodeSubscribeMessage(ctx, (MqttSubscribeMessage) message);
 			case UNSUBSCRIBE:
-				return encodeUnsubscribeMessage(ctx, (MqttUnSubscribeMessage) message);
+				return encodeUnSubscribeMessage(ctx, (MqttUnSubscribeMessage) message);
 			case SUBACK:
 				return encodeSubAckMessage(ctx, (MqttSubAckMessage) message);
 			case UNSUBACK:
