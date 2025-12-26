@@ -40,11 +40,11 @@ public class TopicTemplate {
 	public TopicTemplate(String topicTemplate, String topicFilter) {
 		int topicPrefixLength = TopicFilterType.getType(topicFilter).getPrefixLength(topicFilter);
 		this.topicTemplateParts = getTopicTemplateParts(topicPrefixLength, topicTemplate);
-		this.varIndexMap = getVarIndexMap(topicTemplateParts);
-		// 预标记变量和通配符位置
+		// 优化：合并变量提取和类型标记为一次遍历，提升构造性能
+		this.varIndexMap = new IntObjectHashMap<>();
 		this.isVariablePart = new boolean[topicTemplateParts.length];
 		this.isWildcardPart = new boolean[topicTemplateParts.length];
-		markPartTypes();
+		markPartTypesAndExtractVars();
 	}
 
 	private static String[] getTopicTemplateParts(int prefixLength, String topicTemplate) {
@@ -54,34 +54,63 @@ public class TopicTemplate {
 		return TopicUtil.getTopicParts(topicTemplate);
 	}
 
-	private static IntObjectMap<String> getVarIndexMap(String[] topicTemplateParts) {
-		IntObjectMap<String> varIndexMap = new IntObjectHashMap<>();
-		// 预提取变量位置
-		for (int i = 0; i < topicTemplateParts.length; i++) {
-			String part = topicTemplateParts[i];
-			if (part.startsWith("${") && part.endsWith("}")) {
-				// 优化：避免重复 substring 操作，直接计算长度
-				int len = part.length();
-				if (len > 3) { // 至少 ${x} 的长度
-					varIndexMap.put(i, part.substring(2, len - 1));
-				}
-			}
-		}
-		return varIndexMap;
-	}
-
 	/**
-	 * 预标记变量和通配符位置，避免运行时重复判断
+	 * 合并变量提取和类型标记为一次遍历，提升构造性能
 	 */
-	private void markPartTypes() {
+	private void markPartTypesAndExtractVars() {
 		for (int i = 0; i < topicTemplateParts.length; i++) {
 			String part = topicTemplateParts[i];
 			if (part.startsWith("${") && part.endsWith("}")) {
 				isVariablePart[i] = true;
+				// 提取变量名
+				int len = part.length();
+				if (len > 3) { // 至少 ${x} 的长度
+					varIndexMap.put(i, part.substring(2, len - 1));
+				}
 			} else if (TopicUtil.TOPIC_WILDCARDS_ONE.equals(part) || TopicUtil.TOPIC_WILDCARDS_MORE.equals(part)) {
 				isWildcardPart[i] = true;
 			}
 		}
+	}
+
+	/**
+	 * 检查最后一位是否是 # 通配符
+	 */
+	private boolean hasHashWildcard() {
+		return topicTemplateParts.length > 0
+			&& TopicUtil.TOPIC_WILDCARDS_MORE.equals(topicTemplateParts[topicTemplateParts.length - 1]);
+	}
+
+	/**
+	 * 检查长度是否不匹配
+	 */
+	private boolean isLengthNotMatch(String[] topicParts, boolean hasHashWildcard) {
+		return hasHashWildcard
+			? topicParts.length < topicTemplateParts.length
+			: topicParts.length != topicTemplateParts.length;
+	}
+
+	/**
+	 * 逐级匹配 topic parts（不提取变量）
+	 */
+	private boolean matchParts(String[] topicParts, int matchLength) {
+		for (int i = 0; i < matchLength; i++) {
+			String p = topicTemplateParts[i];
+			String t = topicParts[i];
+			if (isVariablePart[i]) {
+				// 变量可以匹配任何值，继续检查下一级
+			} else if (isWildcardPart[i]) {
+				// 通配符不能匹配空值
+				if (t.isEmpty()) {
+					return false;
+				}
+				// + 通配符匹配单个层级，继续检查下一级
+			} else if (!p.equals(t)) {
+				// 固定部分必须完全匹配
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -91,35 +120,15 @@ public class TopicTemplate {
 	 * @return 是否匹配
 	 */
 	public boolean match(String topicName) {
-		// 优化：直接使用 topicTemplateParts 数组匹配，避免字符串操作，性能更好
 		String[] topicParts = TopicUtil.getTopicParts(topicName);
-		// 1. 长度必须相等
-		if (topicParts.length != topicTemplateParts.length) {
+		boolean hasHashWildcard = hasHashWildcard();
+		// 1. 长度检查
+		if (isLengthNotMatch(topicParts, hasHashWildcard)) {
 			return false;
 		}
-		// 2. 逐级匹配
-		for (int i = 0; i < topicTemplateParts.length; i++) {
-			String p = topicTemplateParts[i];
-			String t = topicParts[i];
-			// 优化：使用预标记的数组，避免重复调用 startsWith
-			if (isVariablePart[i]) {
-				// 变量可以匹配任何值，继续检查下一级
-			} else if (isWildcardPart[i]) {
-				// 通配符不能匹配空值
-				if (t.isEmpty()) {
-					return false;
-				}
-				// # 通配符只能在最后一位，且匹配所有后续层级
-				if (TopicUtil.TOPIC_WILDCARDS_MORE.equals(p)) {
-					return true;
-				}
-				// + 通配符匹配单个层级，继续检查下一级
-			} else if (!p.equals(t)) {
-				// 固定部分必须完全匹配
-				return false;
-		}
-		}
-		return true;
+		// 2. 逐级匹配（只匹配到 # 通配符之前）
+		int matchLength = hasHashWildcard ? topicTemplateParts.length - 1 : topicTemplateParts.length;
+		return matchParts(topicParts, matchLength);
 	}
 
 	/**
@@ -130,8 +139,9 @@ public class TopicTemplate {
 	 */
 	public Map<String, String> getVariables(String topicName) {
 		String[] topicParts = TopicUtil.getTopicParts(topicName);
-		// 1. 长度必须相等
-		if (topicParts.length != topicTemplateParts.length) {
+		boolean hasHashWildcard = hasHashWildcard();
+		// 1. 长度检查
+		if (isLengthNotMatch(topicParts, hasHashWildcard)) {
 			return Collections.emptyMap();
 		}
 		// 优化：如果变量数量已知，可以预设初始容量
@@ -139,22 +149,21 @@ public class TopicTemplate {
 		Map<String, String> result = varCount > 0
 			? new HashMap<>((int) (varCount / 0.75f) + 1)
 			: new HashMap<>();
-		// 2. 逐级匹配
-		for (int i = 0; i < topicTemplateParts.length; i++) {
+		// 2. 逐级匹配并提取变量（只匹配到 # 通配符之前）
+		int matchLength = hasHashWildcard ? topicTemplateParts.length - 1 : topicTemplateParts.length;
+		for (int i = 0; i < matchLength; i++) {
 			String p = topicTemplateParts[i];
 			String t = topicParts[i];
-			// 优化：使用预标记的数组，避免重复调用 startsWith
-			if (isVariablePart[i]) { // 变量
+			if (isVariablePart[i]) {
 				result.put(varIndexMap.get(i), t);
-			} else if (isWildcardPart[i]) { // 通配符
+			} else if (isWildcardPart[i]) {
 				if (t.isEmpty()) {
 					return Collections.emptyMap();
 				}
-			} else if (!p.equals(t)) { // 固定部分
+			} else if (!p.equals(t)) {
 				return Collections.emptyMap();
 			}
 		}
 		return result;
 	}
-
 }

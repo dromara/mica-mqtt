@@ -16,11 +16,11 @@
 
 package org.dromara.mica.mqtt.core.common;
 
+import java.util.Map;
+
 import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import java.util.Map;
 
 /**
  * TopicTemplate 测试
@@ -274,6 +274,442 @@ class TopicTemplateTest {
 			Map<String, String> vars = template.getVariables("test/device001/data");
 			Assertions.assertEquals("device001", vars.get("deviceId"));
 		}
+	}
+
+	@Test
+	void testWildcardHash() {
+		// # 通配符测试（多层级匹配）
+		String topicTemplate = "/test/${deviceId}/#";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/test/device001/data"));
+		Assertions.assertTrue(template.match("/test/device001/data/status"));
+		Assertions.assertTrue(template.match("/test/device001/data/status/temp"));
+		Assertions.assertFalse(template.match("/test/device001"));
+
+		Map<String, String> vars = template.getVariables("/test/device001/data/status");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testWildcardHashAtRoot() {
+		// # 通配符在根目录
+		String topicTemplate = "#";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/test/device001/data"));
+		Assertions.assertTrue(template.match("test/device001"));
+		Assertions.assertTrue(template.match("/"));
+	}
+
+	@Test
+	void testWildcardPlusMultiple() {
+		// 多个 + 通配符
+		String topicTemplate = "/test/+/+/status";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/test/device001/temp/status"));
+		Assertions.assertTrue(template.match("/test/device002/humidity/status"));
+		Assertions.assertFalse(template.match("/test/device001/status"));
+		Assertions.assertFalse(template.match("/test/device001/temp/status/extra"));
+	}
+
+	@Test
+	void testVariableAtStart() {
+		// 变量在开头
+		String topicTemplate = "/${deviceId}/data/status";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/device001/data/status"));
+		Assertions.assertTrue(template.match("/device002/data/status"));
+
+		Map<String, String> vars = template.getVariables("/device001/data/status");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testVariableAtEnd() {
+		// 变量在结尾
+		String topicTemplate = "/test/data/${deviceId}";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/test/data/device001"));
+		Assertions.assertTrue(template.match("/test/data/device002"));
+
+		Map<String, String> vars = template.getVariables("/test/data/device001");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testConsecutiveVariables() {
+		// 连续多个变量
+		String topicTemplate = "/${a}/${b}/${c}";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/value1/value2/value3"));
+
+		Map<String, String> vars = template.getVariables("/value1/value2/value3");
+		Assertions.assertEquals(3, vars.size());
+		Assertions.assertEquals("value1", vars.get("a"));
+		Assertions.assertEquals("value2", vars.get("b"));
+		Assertions.assertEquals("value3", vars.get("c"));
+	}
+
+	@Test
+	void testVariableWithWildcardPlus() {
+		// 变量和 + 通配符组合
+		String topicTemplate = "/test/${deviceId}/+/+/status";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/test/device001/temp/humidity/status"));
+		Assertions.assertFalse(template.match("/test/device001/temp/status"));
+
+		Map<String, String> vars = template.getVariables("/test/device001/temp/humidity/status");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testVariableWithWildcardHash() {
+		// 变量和 # 通配符组合
+		String topicTemplate = "/test/${deviceId}/#";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/test/device001/data"));
+		Assertions.assertTrue(template.match("/test/device001/data/status"));
+		Assertions.assertTrue(template.match("/test/device001/data/status/temp"));
+
+		Map<String, String> vars = template.getVariables("/test/device001/data/status");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testTopicEndsWithSlash() {
+		// topic 以 / 结尾
+		String topicTemplate = "/test/${deviceId}/";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/test/device001/"));
+		Assertions.assertFalse(template.match("/test/device001"));
+
+		Map<String, String> vars = template.getVariables("/test/device001/");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testEmptyTopicName() {
+		// 空 topic 名称
+		String topicTemplate = "/test/${deviceId}";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertFalse(template.match(""));
+		Assertions.assertFalse(template.match("/"));
+
+		Map<String, String> vars = template.getVariables("");
+		Assertions.assertTrue(vars.isEmpty());
+	}
+
+	@Test
+	void testSingleLevelTopic() {
+		// 单层级 topic
+		String topicTemplate = "/${deviceId}";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/device001"));
+		Assertions.assertFalse(template.match("/device001/data"));
+
+		Map<String, String> vars = template.getVariables("/device001");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testRootTopic() {
+		// 根 topic
+		String topicTemplate = "/";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/"));
+		Assertions.assertFalse(template.match("/test"));
+		Assertions.assertFalse(template.match(""));
+
+		Map<String, String> vars = template.getVariables("/");
+		Assertions.assertTrue(vars.isEmpty());
+	}
+
+	@Test
+	void testLengthMismatch() {
+		// 长度不匹配的各种情况
+		String topicTemplate = "/test/${deviceId}/data";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertFalse(template.match("/test/device001"));
+		Assertions.assertFalse(template.match("/test/device001/data/extra"));
+		Assertions.assertFalse(template.match("/test"));
+		Assertions.assertFalse(template.match("/test/device001/data/status/temp"));
+
+		Map<String, String> vars = template.getVariables("/test/device001");
+		Assertions.assertTrue(vars.isEmpty());
+	}
+
+	@Test
+	void testSpecialCharactersInVariable() {
+		// 变量值包含特殊字符
+		String topicTemplate = "/test/${deviceId}/data";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/test/device-001/data"));
+		Assertions.assertTrue(template.match("/test/device_001/data"));
+		Assertions.assertTrue(template.match("/test/device.001/data"));
+
+		Map<String, String> vars = template.getVariables("/test/device-001/data");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device-001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testQueueSharedSubscriptionComplex() {
+		// $queue/ 复杂场景
+		String topicTemplate = "$queue/sys/${productKey}/${deviceName}/thing/#";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("sys/product123/device456/thing/sub/register"));
+		Assertions.assertTrue(template.match("sys/product123/device456/thing/sub/register/status"));
+
+		Map<String, String> vars = template.getVariables("sys/product123/device456/thing/sub/register");
+		Assertions.assertEquals(2, vars.size());
+		Assertions.assertEquals("product123", vars.get("productKey"));
+		Assertions.assertEquals("device456", vars.get("deviceName"));
+	}
+
+	@Test
+	void testShareGroupSubscriptionLongPath() {
+		// $share/<group>/ 长路径
+		String topicTemplate = "$share/group1/a/b/c/${var1}/d/e/${var2}/f";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("a/b/c/value1/d/e/value2/f"));
+		Assertions.assertFalse(template.match("a/b/c/value1/d/e/value2"));
+
+		Map<String, String> vars = template.getVariables("a/b/c/value1/d/e/value2/f");
+		Assertions.assertEquals(2, vars.size());
+		Assertions.assertEquals("value1", vars.get("var1"));
+		Assertions.assertEquals("value2", vars.get("var2"));
+	}
+
+	@Test
+	void testShareGroupSubscriptionWithSlashLongPath() {
+		// $share/<group>/ 长路径，以 / 开头
+		String topicTemplate = "$share/group1//a/b/c/${var1}/d/e/${var2}/f";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/a/b/c/value1/d/e/value2/f"));
+		Assertions.assertFalse(template.match("a/b/c/value1/d/e/value2/f"));
+
+		Map<String, String> vars = template.getVariables("/a/b/c/value1/d/e/value2/f");
+		Assertions.assertEquals(2, vars.size());
+		Assertions.assertEquals("value1", vars.get("var1"));
+		Assertions.assertEquals("value2", vars.get("var2"));
+	}
+
+	@Test
+	void testWildcardPlusEmptyValue() {
+		// + 通配符不能匹配空值
+		String topicTemplate = "/test/+/data";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		// 注意：getTopicParts 会将空字符串作为单独的部分
+		// 所以 "/test//data" 会被分割为 ["/", "test", "", "data"]
+		Assertions.assertFalse(template.match("/test//data"));
+	}
+
+	@Test
+	void testVariableEmptyValue() {
+		// 变量可以匹配空值（如果 topic 结构允许）
+		String topicTemplate = "/test/${deviceId}/data";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		// 变量不能匹配空字符串，因为 getTopicParts 不会产生空字符串
+		// 但可以匹配单个字符
+		Assertions.assertTrue(template.match("/test/a/data"));
+	}
+
+	@Test
+	void testMultipleWildcards() {
+		// 多个通配符组合
+		String topicTemplate = "/+/+/+/status";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/a/b/c/status"));
+		Assertions.assertTrue(template.match("/test/device/data/status"));
+		Assertions.assertFalse(template.match("/a/b/status"));
+		Assertions.assertFalse(template.match("/a/b/c/d/status"));
+	}
+
+	@Test
+	void testVariableInMiddle() {
+		// 变量在中间位置
+		String topicTemplate = "/a/${var}/c/d";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/a/b/c/d"));
+		Assertions.assertFalse(template.match("/a/b/c"));
+
+		Map<String, String> vars = template.getVariables("/a/b/c/d");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("b", vars.get("var"));
+	}
+
+	@Test
+	void testQueueSharedSubscriptionSingleLevel() {
+		// $queue/ 单层级
+		String topicTemplate = "$queue/${deviceId}";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("device001"));
+		Assertions.assertFalse(template.match("/device001"));
+
+		Map<String, String> vars = template.getVariables("device001");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testShareGroupSubscriptionSingleLevel() {
+		// $share/<group>/ 单层级
+		String topicTemplate = "$share/group1/${deviceId}";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("device001"));
+		Assertions.assertFalse(template.match("/device001"));
+
+		Map<String, String> vars = template.getVariables("device001");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testShareGroupSubscriptionSingleLevelWithSlash() {
+		// $share/<group>/ 单层级，以 / 开头
+		String topicTemplate = "$share/group1//${deviceId}";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/device001"));
+		Assertions.assertFalse(template.match("device001"));
+
+		Map<String, String> vars = template.getVariables("/device001");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testComplexNestedVariables() {
+		// 复杂的嵌套变量场景
+		String topicTemplate = "/${level1}/${level2}/${level3}/data";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/a/b/c/data"));
+		Assertions.assertTrue(template.match("/test/device/status/data"));
+
+		Map<String, String> vars = template.getVariables("/a/b/c/data");
+		Assertions.assertEquals(3, vars.size());
+		Assertions.assertEquals("a", vars.get("level1"));
+		Assertions.assertEquals("b", vars.get("level2"));
+		Assertions.assertEquals("c", vars.get("level3"));
+	}
+
+	@Test
+	void testVariableWithWildcardMixed() {
+		// 变量和通配符混合的复杂场景
+		String topicTemplate = "/${deviceId}/+/${type}/#";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/device001/temp/status/data"));
+		Assertions.assertTrue(template.match("/device001/temp/status/data/extra"));
+
+		Map<String, String> vars = template.getVariables("/device001/temp/status/data");
+		Assertions.assertEquals(2, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+		Assertions.assertEquals("status", vars.get("type"));
+	}
+
+	@Test
+	void testQueueSharedSubscriptionWithHash() {
+		// $queue/ 带 # 通配符
+		String topicTemplate = "$queue/test/${deviceId}/#";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("test/device001/data"));
+		Assertions.assertTrue(template.match("test/device001/data/status"));
+		Assertions.assertFalse(template.match("/test/device001/data"));
+
+		Map<String, String> vars = template.getVariables("test/device001/data/status");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testShareGroupSubscriptionWithHash() {
+		// $share/<group>/ 带 # 通配符
+		String topicTemplate = "$share/group1/test/${deviceId}/#";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("test/device001/data"));
+		Assertions.assertTrue(template.match("test/device001/data/status"));
+		Assertions.assertFalse(template.match("/test/device001/data"));
+
+		Map<String, String> vars = template.getVariables("test/device001/data/status");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testShareGroupSubscriptionWithHashAndSlash() {
+		// $share/<group>/ 带 # 通配符，以 / 开头
+		String topicTemplate = "$share/group1//test/${deviceId}/#";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/test/device001/data"));
+		Assertions.assertTrue(template.match("/test/device001/data/status"));
+		Assertions.assertFalse(template.match("test/device001/data"));
+
+		Map<String, String> vars = template.getVariables("/test/device001/data/status");
+		Assertions.assertEquals(1, vars.size());
+		Assertions.assertEquals("device001", vars.get("deviceId"));
 	}
 
 }
