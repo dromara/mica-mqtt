@@ -277,7 +277,7 @@ class TopicTemplateTest {
 	}
 
 	@Test
-	void testWildcardHash() {
+	void testWildcardHash1() {
 		// # 通配符测试（多层级匹配）
 		String topicTemplate = "/test/${deviceId}/#";
 		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
@@ -291,6 +291,26 @@ class TopicTemplateTest {
 		Map<String, String> vars = template.getVariables("/test/device001/data/status");
 		Assertions.assertEquals(1, vars.size());
 		Assertions.assertEquals("device001", vars.get("deviceId"));
+	}
+
+	@Test
+	void testWildcardHash2() {
+		// + 通配符测试（多层级匹配）
+		String topicTemplate = "/test/${deviceId}/+";
+		String topicFilter = TopicUtil.getTopicFilter(topicTemplate);
+		TopicTemplate template = new TopicTemplate(topicTemplate, topicFilter);
+
+		Assertions.assertTrue(template.match("/test/device001/data"));
+		Assertions.assertFalse(template.match("/test/device001/data/status"));
+		Assertions.assertFalse(template.match("/test/device001/data/status/temp"));
+		Assertions.assertFalse(template.match("/test/device001"));
+
+		Map<String, String> vars1 = template.getVariables("/test/device001/data");
+		Assertions.assertEquals(1, vars1.size());
+		Assertions.assertEquals("device001", vars1.get("deviceId"));
+
+		Map<String, String> vars2 = template.getVariables("/test/device001/data/status");
+		Assertions.assertTrue(vars2.isEmpty());
 	}
 
 	@Test
