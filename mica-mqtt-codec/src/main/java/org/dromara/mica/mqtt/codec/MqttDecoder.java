@@ -239,19 +239,15 @@ public final class MqttDecoder {
 		ChannelContext ctx, ByteBuffer buffer, MqttFixedHeader mqttFixedHeader) {
 		final MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		final int packetId = decodeMessageId(buffer, mqttFixedHeader);
-
 		final MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader;
-		final int mqtt5Consumed;
-
 		if (mqttVersion == MqttVersion.MQTT_5) {
 			final Result<MqttProperties> properties = decodeProperties(buffer);
 			mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(packetId, properties.value);
-			mqtt5Consumed = properties.numberOfBytesConsumed;
+			return new Result<>(mqttVariableHeader, 2 + properties.numberOfBytesConsumed);
 		} else {
 			mqttVariableHeader = new MqttMessageIdAndPropertiesVariableHeader(packetId, MqttProperties.NO_PROPERTIES);
-			mqtt5Consumed = 0;
+			return new Result<>(mqttVariableHeader, 2);
 		}
-		return new Result<>(mqttVariableHeader, 2 + mqtt5Consumed);
 	}
 
 	/**
