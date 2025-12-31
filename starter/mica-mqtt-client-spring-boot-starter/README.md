@@ -41,8 +41,10 @@ mqtt:
     heartbeat-timeout-strategy: PING # 心跳超时策略，支持发送 PING 和 CLOSE 断开连接，默认：最大努力发送 PING。（2.4.3 开始支持）
     clean-start: true           # session 保留 2.5.x 使用 clean-start，老版本用 clean-session，默认：true
     session-expiry-interval-secs: 0 # 开启保留 session 时，session 的有效期，默认：0（2.4.2 开始支持）
-    
-    biz-thread-pool-size: 2     # mqtt 工作线程数，默认：2，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数（2.4.2 开始支持）
+    group-executor-size: 8      # AIO AsynchronousChannelGroup 的线程池，默认：2。（2.5.12 开始支持）
+    tio-executor-size: 8        # tio 编解码等线程数，默认：3，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数（2.5.12 开始支持）
+    mqtt-executor-size: 8       # mqtt 业务线程数，默认：2或CPU核心数，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数（取较大值）（2.5.12 开始支持）
+    biz-thread-pool-size: 2     # 同 mqtt-executor-size（2.4.2 开始支持，2.5.12 已经弃用）
     ssl:
       enabled: false            # 是否开启 ssl 认证，2.1.0 开始支持双向认证
       keystore-path:            # 可选参数：ssl 双向认证 keystore 目录，支持 classpath:/ 路径。
