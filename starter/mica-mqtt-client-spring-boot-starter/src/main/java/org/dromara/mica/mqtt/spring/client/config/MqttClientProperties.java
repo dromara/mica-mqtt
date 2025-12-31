@@ -164,7 +164,7 @@ public class MqttClientProperties {
 	 */
 	private Integer groupExecutorSize;
 	/**
-	 * mqtt 工作线程数，默认：2或CPU核心数，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数
+	 * mqtt 工作线程数，默认：2或CPU核心数（取较大值），如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数
 	 */
 	private Integer mqttExecutorSize;
 	/**

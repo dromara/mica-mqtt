@@ -11,9 +11,25 @@
       "description": "绑定网卡，网卡名称，和 bindIp 取其一"
     },
     {
+      "name": "mqtt.client.group-executor-size",
+      "type": "java.lang.Integer",
+      "description": "AIO AsynchronousChannelGroup 的线程池，默认：2，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数"
+    },
+    {
+      "name": "mqtt.client.mqtt-executor-size",
+      "type": "java.lang.Integer",
+      "description": "mqtt 工作线程数，默认：2或CPU核心数（取较大值），如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数"
+    },
+    {
+      "name": "mqtt.client.tio-executor-size",
+      "type": "java.lang.Integer",
+      "description": "tio 编解码等线程数，默认：3，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数"
+    },
+    {
       "name": "mqtt.client.biz-thread-pool-size",
       "type": "java.lang.Integer",
-      "description": "mqtt 工作线程数，默认：2，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数"
+      "description": "mqtt 工作线程数，默认：2，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数",
+      "deprecated": true
     },
     {
       "name": "mqtt.client.clean-start",
