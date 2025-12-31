@@ -156,8 +156,21 @@ public class MqttClientProperties {
 	 */
 	private boolean debug = false;
 	/**
+	 * tio 编解码等线程数，默认：3，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数
+	 */
+	private Integer tioExecutorSize;
+	/**
+	 * AIO AsynchronousChannelGroup 的线程池，默认：2，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数
+	 */
+	private Integer groupExecutorSize;
+	/**
+	 * mqtt 工作线程数，默认：2或CPU核心数，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数
+	 */
+	private Integer mqttExecutorSize;
+	/**
 	 * mqtt 工作线程数，默认：2，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数
 	 */
+	@Deprecated
 	private Integer bizThreadPoolSize;
 	/**
 	 * 停止前是否发送 disconnect 消息，默认：true 不会触发遗嘱消息

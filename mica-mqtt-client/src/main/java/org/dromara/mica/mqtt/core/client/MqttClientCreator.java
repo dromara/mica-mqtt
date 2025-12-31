@@ -566,9 +566,23 @@ public final class MqttClientCreator {
 		return this;
 	}
 
+	public MqttClientCreator tioExecutorSize(int poolSize) {
+		if (poolSize <= 0) {
+			throw new IllegalArgumentException("tioExecutor poolSize must be greater than zero.");
+		}
+		return tioExecutor(ThreadUtils.getTioExecutor(poolSize));
+	}
+
 	public MqttClientCreator tioExecutor(SynThreadPoolExecutor tioExecutor) {
 		this.tioExecutor = tioExecutor;
 		return this;
+	}
+
+	public MqttClientCreator groupExecutorSize(int poolSize) {
+		if (poolSize <= 0) {
+			throw new IllegalArgumentException("groupExecutor poolSize must be greater than zero.");
+		}
+		return groupExecutor(ThreadUtils.getGroupExecutor(poolSize));
 	}
 
 	public MqttClientCreator groupExecutor(ExecutorService groupExecutor) {
@@ -576,16 +590,16 @@ public final class MqttClientCreator {
 		return this;
 	}
 
-	public MqttClientCreator mqttExecutor(ExecutorService mqttExecutor) {
-		this.mqttExecutor = mqttExecutor;
-		return this;
-	}
-
-	public MqttClientCreator bizThreadPoolSize(int poolSize) {
+	public MqttClientCreator mqttExecutorSize(int poolSize) {
 		if (poolSize <= 0) {
 			throw new IllegalArgumentException("poolSize must be greater than zero.");
 		}
 		return mqttExecutor(ThreadUtils.getBizExecutor(poolSize));
+	}
+
+	public MqttClientCreator mqttExecutor(ExecutorService mqttExecutor) {
+		this.mqttExecutor = mqttExecutor;
+		return this;
 	}
 
 	public MqttClientCreator taskService(TimerTaskService taskService) {

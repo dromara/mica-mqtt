@@ -98,10 +98,25 @@ public class MqttClientConfiguration {
 		if (timeout != null && timeout > 0) {
 			clientCreator.timeout(timeout);
 		}
+		// tio 编解码等线程数
+		Integer tioExecutorSize = properties.getTioExecutorSize();
+		if (tioExecutorSize != null && tioExecutorSize > 0) {
+			clientCreator.tioExecutorSize(tioExecutorSize);
+		}
+		// AIO AsynchronousChannelGroup 的线程池
+		Integer groupExecutorSize = properties.getGroupExecutorSize();
+		if (groupExecutorSize != null && groupExecutorSize > 0) {
+			clientCreator.groupExecutorSize(groupExecutorSize);
+		}
 		// mqtt 业务线程数
 		Integer bizThreadPoolSize = properties.getBizThreadPoolSize();
 		if (bizThreadPoolSize != null && bizThreadPoolSize > 0) {
-			clientCreator.bizThreadPoolSize(bizThreadPoolSize);
+			clientCreator.mqttExecutorSize(bizThreadPoolSize);
+		}
+		// mqtt 工作线程数
+		Integer mqttExecutorSize = properties.getMqttExecutorSize();
+		if (mqttExecutorSize != null && mqttExecutorSize > 0) {
+			clientCreator.mqttExecutorSize(mqttExecutorSize);
 		}
 		// 开启 ssl
 		MqttClientProperties.Ssl ssl = properties.getSsl();
