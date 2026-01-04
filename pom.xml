@@ -27,6 +27,7 @@
         <jfinal.version>5.2.7</jfinal.version>
         <tinylog.version>2.7.0</tinylog.version>
         <snakeyaml.version>2.5</snakeyaml.version>
+        <lombok.version>1.18.42</lombok.version>
     </properties>
 
     <modules>
@@ -148,6 +149,11 @@
                 <groupId>org.yaml</groupId>
                 <artifactId>snakeyaml</artifactId>
                 <version>${snakeyaml.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

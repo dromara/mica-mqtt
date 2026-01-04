@@ -680,7 +680,7 @@ public final class MqttClientCreator {
 		}
 		// groupExecutor
 		if (this.groupExecutor == null) {
-			this.groupExecutor = ThreadUtils.getGroupExecutor(2);
+			this.groupExecutor = ThreadUtils.getGroupExecutor(4);
 		}
 		// mqttExecutor
 		if (this.mqttExecutor == null) {
