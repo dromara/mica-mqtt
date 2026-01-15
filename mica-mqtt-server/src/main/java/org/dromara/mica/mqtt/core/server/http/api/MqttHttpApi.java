@@ -193,7 +193,7 @@ public class MqttHttpApi {
 		if (StrUtil.isNotBlank(payload)) {
 			message.setPayload(PayloadEncode.decode(payload, form.getEncoding()));
 		}
-		serverCreator.getMessageDispatcher().send(message);
+		serverCreator.getMessagePipeline().handle(message);
 	}
 
 	/**
@@ -369,7 +369,7 @@ public class MqttHttpApi {
 		Message message = new Message();
 		message.setClientId(clientId);
 		message.setMessageType(MessageType.DISCONNECT);
-		serverCreator.getMessageDispatcher().send(message);
+		serverCreator.getMessagePipeline().handle(message);
 		return Result.ok();
 	}
 
@@ -400,7 +400,7 @@ public class MqttHttpApi {
 		} else {
 			message.setMessageType(MessageType.UNSUBSCRIBE);
 		}
-		serverCreator.getMessageDispatcher().send(message);
+		serverCreator.getMessagePipeline().handle(message);
 	}
 
 	/**

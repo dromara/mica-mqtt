@@ -246,7 +246,7 @@ public class MqttMcp {
 		if (StrUtil.isNotBlank(payload)) {
 			message.setPayload(PayloadEncode.decode(payload, form.getEncoding()));
 		}
-		return serverCreator.getMessageDispatcher().send(message);
+		return serverCreator.getMessagePipeline().handle(message);
 	}
 
 	/**

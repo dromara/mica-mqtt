@@ -23,9 +23,6 @@ import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerPublishPermission;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
-import org.dromara.mica.mqtt.core.server.broker.DefaultMqttBrokerDispatcher;
-import org.dromara.mica.mqtt.core.server.dispatcher.AbstractMqttMessageDispatcher;
-import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
@@ -34,6 +31,15 @@ import org.dromara.mica.mqtt.core.server.listener.IMqttProtocolListener;
 import org.dromara.mica.mqtt.core.server.listener.MqttHttpApiListener;
 import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListener;
 import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListeners;
+import org.dromara.mica.mqtt.core.server.pipeline.DefaultMqttMessagePipeline;
+import org.dromara.mica.mqtt.core.server.pipeline.IMqttMessagePipeline;
+import org.dromara.mica.mqtt.core.server.pipeline.message.ConnectMessageHandler;
+import org.dromara.mica.mqtt.core.server.pipeline.message.DisconnectMessageHandler;
+import org.dromara.mica.mqtt.core.server.pipeline.message.DownStreamMessageHandler;
+import org.dromara.mica.mqtt.core.server.pipeline.message.HttpApiMessageHandler;
+import org.dromara.mica.mqtt.core.server.pipeline.message.SubscribeMessageHandler;
+import org.dromara.mica.mqtt.core.server.pipeline.message.UnsubscribeMessageHandler;
+import org.dromara.mica.mqtt.core.server.pipeline.message.UpStreamMessageHandler;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
@@ -113,7 +119,7 @@ public class MqttServerCreator {
 	/**
 	 * 消息处理器
 	 */
-	private IMqttMessageDispatcher messageDispatcher;
+	private IMqttMessagePipeline messagePipeline;
 	/**
 	 * 消息存储
 	 */
@@ -277,12 +283,12 @@ public class MqttServerCreator {
 		return this;
 	}
 
-	public IMqttMessageDispatcher getMessageDispatcher() {
-		return messageDispatcher;
+	public IMqttMessagePipeline getMessagePipeline() {
+		return messagePipeline;
 	}
 
-	public MqttServerCreator messageDispatcher(IMqttMessageDispatcher messageDispatcher) {
-		this.messageDispatcher = messageDispatcher;
+	public MqttServerCreator messagePipeline(IMqttMessagePipeline messagePipeline) {
+		this.messagePipeline = messagePipeline;
 		return this;
 	}
 
@@ -511,8 +517,9 @@ public class MqttServerCreator {
 		if (this.uniqueIdService == null) {
 			this.uniqueIdService = new DefaultMqttServerUniqueIdServiceImpl();
 		}
-		if (this.messageDispatcher == null) {
-			this.messageDispatcher = new DefaultMqttBrokerDispatcher();
+		if (this.messagePipeline == null) {
+			// 默认使用空实现的消息管线，在 MqttServer 构建后会初始化
+			this.messagePipeline = new DefaultMqttMessagePipeline();
 		}
 		if (this.sessionManager == null) {
 			this.sessionManager = new InMemoryMqttSessionManager();
@@ -575,10 +582,17 @@ public class MqttServerCreator {
 		// MqttServer
 		MqttProtocolListeners listeners = new MqttProtocolListeners(this, tioConfig, this.listeners);
 		MqttServer mqttServer = new MqttServer(this, tioConfig, listeners);
-		// 如果是默认的消息转发器，设置 mqttServer
-		if (this.messageDispatcher instanceof AbstractMqttMessageDispatcher) {
-			((AbstractMqttMessageDispatcher) this.messageDispatcher).config(mqttServer);
-		}
+
+		// 初始化消息管线，添加所有消息类型的处理器
+		DefaultMqttMessagePipeline pipeline = (DefaultMqttMessagePipeline) this.messagePipeline;
+		pipeline.addHandler(new ConnectMessageHandler(mqttServer));
+		pipeline.addHandler(new SubscribeMessageHandler(mqttServer));
+		pipeline.addHandler(new UnsubscribeMessageHandler(mqttServer));
+		pipeline.addHandler(new UpStreamMessageHandler(mqttServer));
+		pipeline.addHandler(new DownStreamMessageHandler(mqttServer));
+		pipeline.addHandler(new HttpApiMessageHandler(mqttServer));
+		pipeline.addHandler(new DisconnectMessageHandler(mqttServer));
+
 		return mqttServer;
 	}
 

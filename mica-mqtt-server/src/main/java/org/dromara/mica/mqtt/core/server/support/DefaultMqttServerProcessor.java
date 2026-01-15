@@ -16,11 +16,23 @@
 
 package org.dromara.mica.mqtt.core.server.support;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+
 import org.dromara.mica.mqtt.codec.MqttMessageFactory;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
-import org.dromara.mica.mqtt.codec.message.*;
+import org.dromara.mica.mqtt.codec.message.MqttConnAckMessage;
+import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
+import org.dromara.mica.mqtt.codec.message.MqttPubAckMessage;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.message.MqttSubAckMessage;
+import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.MqttUnSubAckMessage;
+import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
@@ -35,12 +47,18 @@ import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerPublishPermission;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
-import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
+
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
 import org.dromara.mica.mqtt.core.server.model.Message;
+import org.dromara.mica.mqtt.core.server.pipeline.DefaultMqttPublishPipeline;
+import org.dromara.mica.mqtt.core.server.pipeline.IMqttPublishPipeline;
+import org.dromara.mica.mqtt.core.server.pipeline.PublishContext;
+import org.dromara.mica.mqtt.core.server.pipeline.handler.MessageListenerHandler;
+import org.dromara.mica.mqtt.core.server.pipeline.handler.RetainMessageHandler;
+import org.dromara.mica.mqtt.core.server.pipeline.handler.SubscriptionForwardHandler;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
@@ -53,10 +71,6 @@ import org.tio.core.TioConfig;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.mica.IntPair;
 import org.tio.utils.timer.TimerTaskService;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
 
 /**
  * mqtt broker 处理器
@@ -77,30 +91,47 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	private final IMqttServerUniqueIdService uniqueIdService;
 	private final IMqttServerSubscribeValidator subscribeValidator;
 	private final IMqttServerPublishPermission publishPermission;
-	private final IMqttMessageDispatcher messageDispatcher;
 	private final IMqttConnectStatusListener connectStatusListener;
 	private final IMqttSessionListener sessionListener;
 	private final IMqttMessageListener messageListener;
 	private final TimerTaskService taskService;
 	private final ExecutorService executor;
+	private final IMqttPublishPipeline publishPipeline;
 
 	public DefaultMqttServerProcessor(MqttServerCreator serverCreator,
-									  TimerTaskService taskService,
-									  ExecutorService executor) {
-		this.serverCreator = serverCreator;
-		this.heartbeatTimeout = serverCreator.getHeartbeatTimeout() == null ? TioConfig.DEFAULT_HEARTBEAT_TIMEOUT : serverCreator.getHeartbeatTimeout();
-		this.messageStore = serverCreator.getMessageStore();
-		this.sessionManager = serverCreator.getSessionManager();
-		this.authHandler = serverCreator.getAuthHandler();
-		this.uniqueIdService = serverCreator.getUniqueIdService();
-		this.subscribeValidator = serverCreator.getSubscribeValidator();
-		this.publishPermission = serverCreator.getPublishPermission();
-		this.messageDispatcher = serverCreator.getMessageDispatcher();
-		this.connectStatusListener = serverCreator.getConnectStatusListener();
-		this.sessionListener = serverCreator.getSessionListener();
-		this.messageListener = serverCreator.getMessageListener();
-		this.taskService = taskService;
-		this.executor = executor;
+								  TimerTaskService taskService,
+								  ExecutorService executor) {
+	this.serverCreator = serverCreator;
+	this.heartbeatTimeout = serverCreator.getHeartbeatTimeout() == null ? TioConfig.DEFAULT_HEARTBEAT_TIMEOUT : serverCreator.getHeartbeatTimeout();
+	this.messageStore = serverCreator.getMessageStore();
+	this.sessionManager = serverCreator.getSessionManager();
+	this.authHandler = serverCreator.getAuthHandler();
+	this.uniqueIdService = serverCreator.getUniqueIdService();
+	this.subscribeValidator = serverCreator.getSubscribeValidator();
+	this.publishPermission = serverCreator.getPublishPermission();
+	this.connectStatusListener = serverCreator.getConnectStatusListener();
+	this.sessionListener = serverCreator.getSessionListener();
+	this.messageListener = serverCreator.getMessageListener();
+	this.taskService = taskService;
+	this.executor = executor;
+	// 初始化发布消息管线
+	this.publishPipeline = createPublishPipeline();
+}
+
+	/**
+	 * 创建发布消息管线
+	 *
+	 * @return IMqttPublishPipeline
+	 */
+	private IMqttPublishPipeline createPublishPipeline() {
+		DefaultMqttPublishPipeline pipeline = new DefaultMqttPublishPipeline();
+		// 1. 保留消息处理
+		pipeline.addHandler(new RetainMessageHandler(messageStore, serverCreator.getNodeName()));
+		// 2. 消息监听器
+		pipeline.addHandler(new MessageListenerHandler(messageListener, executor));
+		// 3. 订阅转发
+		pipeline.addHandler(new SubscriptionForwardHandler(serverCreator, executor));
+		return pipeline;
 	}
 
 	@Override
@@ -211,7 +242,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		message.setTimestamp(System.currentTimeMillis());
 		Node clientNode = context.getClientNode();
 		message.setPeerHost(clientNode.getPeerHost());
-		messageDispatcher.send(message);
+		serverCreator.getMessagePipeline().handle(message);
 	}
 
 	private void cleanSession(String clientId) {
@@ -378,8 +409,18 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 				List<Message> retainMessageList = messageStore.getRetainMessage(topic);
 				if (retainMessageList != null && !retainMessageList.isEmpty()) {
 					for (Message retainMessage : retainMessageList) {
-						messageDispatcher.sendRetainMessage(context, clientId, retainMessage);
-					}
+							// 直接处理保留消息
+							MqttQoS mqttQoS = MqttQoS.valueOf(retainMessage.getQos());
+							// 创建发布消息
+							MqttPublishMessage publishMessage = MqttPublishMessage.builder()
+								.topicName(retainMessage.getTopic())
+								.payload(retainMessage.getPayload())
+								.qos(mqttQoS)
+								.retained(true)
+								.build();
+							// 发送消息
+							Tio.send(context, publishMessage);
+						}
 				}
 			});
 		}
@@ -469,77 +510,60 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	 */
 	private void invokeListenerForPublish(ChannelContext context, String clientId, MqttQoS mqttQoS,
 										  String topicName, MqttPublishMessage publishMessage) {
+		// 使用管线处理发布消息
+		PublishContext publishContext = buildPublishContext(context, clientId, mqttQoS, topicName, publishMessage);
+		if (publishContext != null) {
+			publishPipeline.handle(publishContext);
+		}
+	}
+
+	/**
+	 * 构建发布上下文
+	 *
+	 * @param context        ChannelContext
+	 * @param clientId       clientId
+	 * @param mqttQoS        MqttQoS
+	 * @param topicName      topicName
+	 * @param publishMessage MqttPublishMessage
+	 * @return PublishContext
+	 */
+	private PublishContext buildPublishContext(ChannelContext context, String clientId, MqttQoS mqttQoS,
+												String topicName, MqttPublishMessage publishMessage) {
 		MqttFixedHeader fixedHeader = publishMessage.fixedHeader();
+		MqttPublishVariableHeader variableHeader = publishMessage.variableHeader();
 		Node clientNode = context.getClientNode();
 		boolean isRetain = fixedHeader.isRetain();
 		byte[] payload = publishMessage.payload();
-		// 1. retain 消息逻辑
+		String username = context.getUserId();
+		// 处理 retain topic
+		String actualTopic = topicName;
 		if (isRetain) {
 			IntPair<String> retainPair = TopicUtil.retainTopicName(topicName);
 			int timeOut = retainPair.getKey();
 			if (timeOut < 0) {
 				logger.error("MqttPublishMessage topic {} 不符合 $retain/${ttl}/topic 规则.", topicName);
-				return;
+				return null;
 			}
-			topicName = retainPair.getValue();
-			// qos == 0 or payload is none,then clear previous retain message
-			if (MqttQoS.QOS0 == mqttQoS || payload == null || payload.length == 0) {
-				this.messageStore.clearRetainMessage(topicName);
-			} else {
-				Message retainMessage = new Message();
-				retainMessage.setTopic(topicName);
-				retainMessage.setQos(mqttQoS.value());
-				retainMessage.setPayload(payload);
-				retainMessage.setFromClientId(clientId);
-				retainMessage.setMessageType(MessageType.DOWN_STREAM);
-				retainMessage.setRetain(true);
-				retainMessage.setDup(fixedHeader.isDup());
-				retainMessage.setTimestamp(System.currentTimeMillis());
-				// 客户端 ip:端口
-				retainMessage.setPeerHost(clientNode.getPeerHost());
-				retainMessage.setNode(serverCreator.getNodeName());
-				this.messageStore.addRetainMessage(topicName, timeOut, retainMessage);
-			}
+			actualTopic = retainPair.getValue();
 		}
-		// topic
-		final String topic = topicName;
-		// 2. 消息监听
-		if (messageListener != null) {
-			executor.submit(() -> {
-				try {
-					messageListener.onMessage(context, clientId, topic, mqttQoS, publishMessage);
-				} catch (Throwable e) {
-					logger.error(e.getMessage(), e);
-				}
-			});
-		}
-		// 2. message
-		MqttPublishVariableHeader variableHeader = publishMessage.variableHeader();
-		Message message = new Message();
-		message.setId(variableHeader.packetId());
-		// 注意：broker 消息转发是不需要设置 toClientId 而是应该按 topic 找到订阅的客户端进行发送
-		message.setFromClientId(clientId);
-		message.setTopic(topic);
-		message.setQos(mqttQoS.value());
-		if (payload != null) {
-			message.setPayload(payload);
-		}
-		message.setMessageType(MessageType.UP_STREAM);
-		// 已订阅状态下的监听，此时消息被视为“实时发布”而非“保留触发”，标志位不会被激活
-		message.setRetain(false);
-		message.setDup(fixedHeader.isDup());
-		message.setTimestamp(System.currentTimeMillis());
-		// 客户端 ip:端口
-		message.setPeerHost(clientNode.getPeerHost());
-		message.setNode(serverCreator.getNodeName());
-		// 4. 消息流转
-		executor.submit(() -> {
-			try {
-				messageDispatcher.send(message);
-			} catch (Throwable e) {
-				logger.error(e.getMessage(), e);
-			}
-		});
+		// 构建发布上下文
+		return PublishContext.builder()
+			.publishMessage(publishMessage)
+			.context(context)
+			.clientId(clientId)
+			.username(username)
+			.topic(actualTopic)
+			.qos(mqttQoS)
+			.dup(fixedHeader.isDup())
+			.retain(isRetain)
+			.payload(payload)
+			.messageId(variableHeader.packetId() != -1 ? variableHeader.packetId() : null)
+			.properties(variableHeader.properties())
+			.peerHost(clientNode.getPeerHost())
+			.nodeName(serverCreator.getNodeName())
+			.timestamp(System.currentTimeMillis())
+			.publishReceivedAt(System.currentTimeMillis())
+			.build();
 	}
 
 }

@@ -27,7 +27,7 @@ import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerPublishPermission;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
-import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
+
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
@@ -87,7 +87,7 @@ public class MqttServerPluginImpl implements Plugin {
 			IMqttServerUniqueIdService uniqueIdService = context.getBean(IMqttServerUniqueIdService.class);
 			IMqttServerSubscribeValidator subscribeValidator = context.getBean(IMqttServerSubscribeValidator.class);
 			IMqttServerPublishPermission publishPermission = context.getBean(IMqttServerPublishPermission.class);
-			IMqttMessageDispatcher messageDispatcher = context.getBean(IMqttMessageDispatcher.class);
+
 			IMqttMessageStore messageStore = context.getBean(IMqttMessageStore.class);
 			IMqttSessionManager sessionManager = context.getBean(IMqttSessionManager.class);
 			IMqttSessionListener sessionListener = context.getBean(IMqttSessionListener.class);
@@ -118,10 +118,7 @@ public class MqttServerPluginImpl implements Plugin {
 			if (Objects.nonNull(publishPermission)) {
 				serverCreator.publishPermission(publishPermission);
 			}
-			// 消息转发
-			if (Objects.nonNull(messageDispatcher)) {
-				serverCreator.messageDispatcher(messageDispatcher);
-			}
+
 			// 消息存储
 			if (Objects.nonNull(messageStore)) {
 				serverCreator.messageStore(messageStore);

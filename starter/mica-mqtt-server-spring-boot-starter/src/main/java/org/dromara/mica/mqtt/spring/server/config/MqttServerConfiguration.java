@@ -25,7 +25,7 @@ import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerPublishPermission;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
-import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
+
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
@@ -81,7 +81,7 @@ public class MqttServerConfiguration {
 											   ObjectProvider<IMqttServerUniqueIdService> uniqueIdServiceObjectProvider,
 											   ObjectProvider<IMqttServerSubscribeValidator> subscribeValidatorObjectProvider,
 											   ObjectProvider<IMqttServerPublishPermission> publishPermissionObjectProvider,
-											   ObjectProvider<IMqttMessageDispatcher> messageDispatcherObjectProvider,
+
 											   ObjectProvider<IMqttMessageStore> messageStoreObjectProvider,
 											   ObjectProvider<IMqttSessionManager> sessionManagerObjectProvider,
 											   ObjectProvider<IMqttSessionListener> sessionListenerObjectProvider,
@@ -164,8 +164,7 @@ public class MqttServerConfiguration {
 		subscribeValidatorObjectProvider.ifAvailable(serverCreator::subscribeValidator);
 		// 订阅权限校验
 		publishPermissionObjectProvider.ifAvailable(serverCreator::publishPermission);
-		// 消息转发
-		messageDispatcherObjectProvider.ifAvailable(serverCreator::messageDispatcher);
+
 		// 消息存储
 		messageStoreObjectProvider.ifAvailable(serverCreator::messageStore);
 		// session 管理

@@ -16,11 +16,12 @@
 
 package org.dromara.mica.mqtt.core.server.model;
 
-import org.dromara.mica.mqtt.core.server.enums.MessageType;
-
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Objects;
+
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+import org.dromara.mica.mqtt.core.server.enums.MessageType;
 
 /**
  * 消息模型，用于存储
@@ -89,6 +90,14 @@ public class Message implements Serializable {
 	 * PUBLISH 消息到达 Broker 的时间 (ms)
 	 */
 	private Long publishReceivedAt;
+	/**
+	 * MQTT5 属性（用于集群序列化时，会序列化为字节数组）
+	 */
+	private transient MqttProperties properties;
+	/**
+	 * MQTT5 属性序列化后的字节数组（用于集群传输）
+	 */
+	private byte[] propertiesBytes;
 
 	public String getNode() {
 		return node;
@@ -208,6 +217,22 @@ public class Message implements Serializable {
 
 	public void setPublishReceivedAt(Long publishReceivedAt) {
 		this.publishReceivedAt = publishReceivedAt;
+	}
+
+	public MqttProperties getProperties() {
+		return properties;
+	}
+
+	public void setProperties(MqttProperties properties) {
+		this.properties = properties;
+	}
+
+	public byte[] getPropertiesBytes() {
+		return propertiesBytes;
+	}
+
+	public void setPropertiesBytes(byte[] propertiesBytes) {
+		this.propertiesBytes = propertiesBytes;
 	}
 
 	@Override

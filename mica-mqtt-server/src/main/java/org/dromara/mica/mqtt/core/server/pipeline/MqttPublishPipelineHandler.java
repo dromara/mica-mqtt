@@ -14,21 +14,31 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.core.server.broker;
-
-import org.dromara.mica.mqtt.core.server.dispatcher.AbstractMqttMessageDispatcher;
-import org.dromara.mica.mqtt.core.server.model.Message;
+package org.dromara.mica.mqtt.core.server.pipeline;
 
 /**
- * 默认的消息转发器
+ * 发布消息管线处理器接口
+ * 用于扩展发布消息处理流程的各个阶段
  *
  * @author L.cm
  */
-public class DefaultMqttBrokerDispatcher extends AbstractMqttMessageDispatcher {
+public interface MqttPublishPipelineHandler {
 
-	@Override
-	public void sendAll(Message message) {
+	/**
+	 * 处理发布消息
+	 *
+	 * @param context 发布上下文
+	 * @return 是否继续处理后续处理器，true 继续，false 中断
+	 */
+	boolean handle(PublishContext context);
 
+	/**
+	 * 获取处理器顺序，数字越小越先执行
+	 *
+	 * @return 顺序值
+	 */
+	default int getOrder() {
+		return 0;
 	}
 
 }

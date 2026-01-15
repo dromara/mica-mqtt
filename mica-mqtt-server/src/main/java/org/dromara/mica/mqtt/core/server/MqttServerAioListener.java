@@ -17,9 +17,9 @@
 package org.dromara.mica.mqtt.core.server;
 
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
-import org.dromara.mica.mqtt.core.server.dispatcher.IMqttMessageDispatcher;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.model.Message;
+import org.dromara.mica.mqtt.core.server.pipeline.IMqttMessagePipeline;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.slf4j.Logger;
@@ -40,14 +40,14 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 	private static final Logger logger = LoggerFactory.getLogger(MqttServerAioListener.class);
 	private final IMqttMessageStore messageStore;
 	private final IMqttSessionManager sessionManager;
-	private final IMqttMessageDispatcher messageDispatcher;
+	private final IMqttMessagePipeline messagePipeline;
 	private final IMqttConnectStatusListener connectStatusListener;
 	private final MqttMessageInterceptors messageInterceptors;
 
 	public MqttServerAioListener(MqttServerCreator serverCreator) {
 		this.messageStore = serverCreator.getMessageStore();
 		this.sessionManager = serverCreator.getSessionManager();
-		this.messageDispatcher = serverCreator.getMessageDispatcher();
+		this.messagePipeline = serverCreator.getMessagePipeline();
 		this.connectStatusListener = serverCreator.getConnectStatusListener();
 		this.messageInterceptors = serverCreator.getMessageInterceptors();
 	}
@@ -104,7 +104,7 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 			if (willMessage == null) {
 				return;
 			}
-			boolean result = messageDispatcher.send(willMessage);
+			boolean result = messagePipeline.handle(willMessage);
 			logger.debug("Mqtt server clientId:{} send willMessage result:{}.", clientId, result);
 			// 4. 清理遗嘱消息
 			messageStore.clearWillMessage(clientId);

@@ -14,32 +14,20 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.core.server.dispatcher;
-
-import org.dromara.mica.mqtt.core.server.model.Message;
-import org.tio.core.ChannelContext;
+package org.dromara.mica.mqtt.core.server.pipeline;
 
 /**
- * mqtt 消息调度器
+ * MQTT 发布消息处理管线接口
  *
  * @author L.cm
  */
-public interface IMqttMessageDispatcher {
+public interface IMqttPublishPipeline {
 
 	/**
-	 * 发送消息
+	 * 处理发布消息
 	 *
-	 * @param message 消息
-	 * @return 是否成功
+	 * @param context 发布上下文
 	 */
-	boolean send(Message message);
+	void handle(PublishContext context);
 
-	/**
-	 * 订阅时下发保留消息，直接发布到订阅的连接
-	 *
-	 * @param context       ChannelContext
-	 * @param clientId      clientId
-	 * @param retainMessage retainMessage
-	 */
-	void sendRetainMessage(ChannelContext context, String clientId, Message retainMessage);
 }
