@@ -20,6 +20,7 @@ import org.dromara.mica.mqtt.codec.message.builder.MqttSubscribeBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttSubscribePayload;
+import org.dromara.mica.mqtt.codec.message.properties.MqttSubscribeProperties;
 
 /**
  * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#subscribe">
@@ -44,6 +45,10 @@ public final class MqttSubscribeMessage extends MqttMessage {
 	@Override
 	public MqttSubscribePayload payload() {
 		return (MqttSubscribePayload) super.payload();
+	}
+
+	public MqttSubscribeProperties getProperties() {
+		return new MqttSubscribeProperties(variableHeader().properties());
 	}
 
 	/**

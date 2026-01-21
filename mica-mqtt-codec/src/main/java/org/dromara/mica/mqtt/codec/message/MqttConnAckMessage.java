@@ -19,6 +19,7 @@ package org.dromara.mica.mqtt.codec.message;
 import org.dromara.mica.mqtt.codec.message.builder.MqttConnAckBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnAckVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
+import org.dromara.mica.mqtt.codec.message.properties.MqttConnAckProperties;
 
 /**
  * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#connack">MQTTV3.1/connack</a>
@@ -34,6 +35,10 @@ public final class MqttConnAckMessage extends MqttMessage {
 	@Override
 	public MqttConnAckVariableHeader variableHeader() {
 		return (MqttConnAckVariableHeader) super.variableHeader();
+	}
+
+	public MqttConnAckProperties getProperties() {
+		return new MqttConnAckProperties(variableHeader().properties());
 	}
 
 	/**

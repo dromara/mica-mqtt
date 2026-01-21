@@ -20,6 +20,7 @@ import org.dromara.mica.mqtt.codec.message.builder.MqttSubAckBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttSubAckPayload;
+import org.dromara.mica.mqtt.codec.message.properties.MqttSubAckProperties;
 
 /**
  * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#suback">MQTTV3.1/suback</a>
@@ -43,6 +44,10 @@ public final class MqttSubAckMessage extends MqttMessage {
 	@Override
 	public MqttSubAckPayload payload() {
 		return (MqttSubAckPayload) super.payload();
+	}
+
+	public MqttSubAckProperties getProperties() {
+		return new MqttSubAckProperties(variableHeader().properties());
 	}
 
 	/**

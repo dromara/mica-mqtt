@@ -20,6 +20,7 @@ import org.dromara.mica.mqtt.codec.message.builder.MqttConnectBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
+import org.dromara.mica.mqtt.codec.message.properties.MqttConnectProperties;
 
 /**
  * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#connect">MQTTV3.1/connect</a>
@@ -43,6 +44,10 @@ public final class MqttConnectMessage extends MqttMessage {
 	@Override
 	public MqttConnectPayload payload() {
 		return (MqttConnectPayload) super.payload();
+	}
+
+	public MqttConnectProperties getProperties() {
+		return new MqttConnectProperties(variableHeader().properties());
 	}
 
 	/**

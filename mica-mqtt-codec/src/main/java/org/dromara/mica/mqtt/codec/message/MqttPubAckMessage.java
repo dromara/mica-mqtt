@@ -19,6 +19,7 @@ package org.dromara.mica.mqtt.codec.message;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPubAckBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
+import org.dromara.mica.mqtt.codec.message.properties.MqttPubAckProperties;
 
 /**
  * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#puback">MQTTV3.1/puback</a>
@@ -34,6 +35,10 @@ public final class MqttPubAckMessage extends MqttMessage {
 	@Override
 	public MqttMessageIdVariableHeader variableHeader() {
 		return (MqttMessageIdVariableHeader) super.variableHeader();
+	}
+
+	public MqttPubAckProperties getProperties() {
+		return new MqttPubAckProperties(variableHeader().properties());
 	}
 
 	/**

@@ -20,6 +20,7 @@ import org.dromara.mica.mqtt.codec.message.builder.MqttUnSubAckBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubAckPayload;
+import org.dromara.mica.mqtt.codec.message.properties.MqttUnSubAckProperties;
 
 /**
  * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#unsuback">
@@ -48,6 +49,10 @@ public final class MqttUnSubAckMessage extends MqttMessage {
 	@Override
 	public MqttUnsubAckPayload payload() {
 		return (MqttUnsubAckPayload) super.payload();
+	}
+
+	public MqttUnSubAckProperties getProperties() {
+		return new MqttUnSubAckProperties(variableHeader().properties());
 	}
 
 	/**

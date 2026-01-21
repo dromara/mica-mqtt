@@ -20,6 +20,7 @@ import org.dromara.mica.mqtt.codec.message.builder.MqttUnSubscribeBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubscribePayload;
+import org.dromara.mica.mqtt.codec.message.properties.MqttUnSubscribeProperties;
 
 /**
  * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#unsubscribe">
@@ -44,6 +45,10 @@ public final class MqttUnSubscribeMessage extends MqttMessage {
 	@Override
 	public MqttUnsubscribePayload payload() {
 		return (MqttUnsubscribePayload) super.payload();
+	}
+
+	public MqttUnSubscribeProperties getProperties() {
+		return new MqttUnSubscribeProperties(variableHeader().properties());
 	}
 
 	/**
