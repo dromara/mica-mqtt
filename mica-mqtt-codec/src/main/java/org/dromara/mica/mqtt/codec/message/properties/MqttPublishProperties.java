@@ -19,8 +19,9 @@ package org.dromara.mica.mqtt.codec.message.properties;
 import org.dromara.mica.mqtt.codec.properties.*;
 
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * MQTT5 消息发布属性类，用于存储发布消息相关的属性信息
@@ -211,12 +212,25 @@ public class MqttPublishProperties {
 	 * @return 用户属性列表，如果未设置则返回空列表
 	 */
 	public List<UserProperty> getUserProperties() {
-		Collection<? extends MqttProperty> allProps = properties.listAll();
 		List<UserProperty> userProps = new ArrayList<>();
-		for (MqttProperty prop : allProps) {
+		for (MqttProperty prop : properties.listAll()) {
 			if (prop instanceof UserProperty) {
 				userProps.add((UserProperty) prop);
 			}
+		}
+		return userProps;
+	}
+
+	/**
+	 * 获取所有用户属性
+	 *
+	 * @return 用户属性列表，如果未设置则返回空列表
+	 */
+	public Map<String, String> getUserPropertiesMap() {
+		Map<String, String> userProps = new HashMap<>();
+		for (UserProperty userProp : getUserProperties()) {
+			StringPair pair = userProp.value();
+			userProps.put(pair.key, pair.value);
 		}
 		return userProps;
 	}
