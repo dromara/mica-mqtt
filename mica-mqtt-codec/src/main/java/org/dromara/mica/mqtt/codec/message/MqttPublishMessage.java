@@ -19,6 +19,7 @@ package org.dromara.mica.mqtt.codec.message;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttPublishVariableHeader;
+import org.dromara.mica.mqtt.codec.message.properties.MqttPublishProperties;
 
 /**
  * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#publish">MQTTV3.1/publish</a>
@@ -45,6 +46,10 @@ public class MqttPublishMessage extends MqttMessage {
 
 	public byte[] getPayload() {
 		return (byte[]) super.payload();
+	}
+
+	public MqttPublishProperties getProperties() {
+		return new MqttPublishProperties(variableHeader().properties());
 	}
 
 	/**
