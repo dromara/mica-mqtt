@@ -21,7 +21,7 @@ import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.codes.MqttSubAckReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttSubAckMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttSubAckPayload;
 import org.dromara.mica.mqtt.codec.message.properties.MqttSubAckProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
@@ -92,8 +92,8 @@ public final class MqttSubAckBuilder {
 	public MqttSubAckMessage build() {
 		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.SUBACK, false, MqttQoS.QOS0, false, 0);
-		MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader =
-			new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
+		MqttMessageIdVariableHeader mqttSubAckVariableHeader =
+			MqttMessageIdVariableHeader.from(packetId, properties);
 		// transform to primitive types
 		short[] grantedQosArray = new short[this.reasonCodes.size()];
 		int i = 0;

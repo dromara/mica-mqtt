@@ -185,7 +185,7 @@ public final class MqttEncoder {
 	private static ByteBuffer encodeSubscribeMessage(ChannelContext ctx, MqttSubscribeMessage message) {
 		MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		byte[] propertiesBytes = encodePropertiesIfNeeded(mqttVersion,
-			message.idAndPropertiesVariableHeader().properties());
+			message.variableHeader().properties());
 
 		final int variableHeaderBufferSize = 2 + propertiesBytes.length;
 		int payloadBufferSize = 0;
@@ -245,7 +245,7 @@ public final class MqttEncoder {
 	private static ByteBuffer encodeUnSubscribeMessage(ChannelContext ctx, MqttUnSubscribeMessage message) {
 		MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		byte[] propertiesBytes = encodePropertiesIfNeeded(mqttVersion,
-			message.idAndPropertiesVariableHeader().properties());
+			message.variableHeader().properties());
 
 		final int variableHeaderBufferSize = 2 + propertiesBytes.length;
 		int payloadBufferSize = 0;
@@ -289,7 +289,7 @@ public final class MqttEncoder {
 	private static ByteBuffer encodeSubAckMessage(ChannelContext ctx, MqttSubAckMessage message) {
 		MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		byte[] propertiesBytes = encodePropertiesIfNeeded(mqttVersion,
-			message.idAndPropertiesVariableHeader().properties());
+			message.variableHeader().properties());
 		int variableHeaderBufferSize = 2 + propertiesBytes.length;
 		int payloadBufferSize = message.payload().grantedQoSLevels().size();
 		int variablePartSize = variableHeaderBufferSize + payloadBufferSize;
@@ -306,30 +306,27 @@ public final class MqttEncoder {
 	}
 
 	private static ByteBuffer encodeUnSubAckMessage(ChannelContext ctx, MqttUnSubAckMessage message) {
-		if (message.variableHeader() instanceof MqttMessageIdAndPropertiesVariableHeader) {
-			MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
-			byte[] propertiesBytes = encodePropertiesIfNeeded(mqttVersion, message.idAndPropertiesVariableHeader().properties());
+		MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
+		MqttMessageIdVariableHeader variableHeader = message.variableHeader();
+		byte[] propertiesBytes = encodePropertiesIfNeeded(mqttVersion, variableHeader.properties());
 
-			int variableHeaderBufferSize = 2 + propertiesBytes.length;
-			MqttUnsubAckPayload payload = message.payload();
-			int payloadBufferSize = payload == null ? 0 : payload.unsubscribeReasonCodes().size();
-			int variablePartSize = variableHeaderBufferSize + payloadBufferSize;
-			int fixedHeaderBufferSize = 1 + getVariableLengthInt(variablePartSize);
-			ByteBuffer buf = ByteBuffer.allocate(fixedHeaderBufferSize + variablePartSize);
-			buf.put(getFixedHeaderByte1(message.fixedHeader()));
-			writeVariableLengthInt(buf, variablePartSize);
-			buf.putShort((short) message.variableHeader().messageId());
-			buf.put(propertiesBytes);
+		int variableHeaderBufferSize = 2 + propertiesBytes.length;
+		MqttUnsubAckPayload payload = message.payload();
+		int payloadBufferSize = payload == null ? 0 : payload.unsubscribeReasonCodes().size();
+		int variablePartSize = variableHeaderBufferSize + payloadBufferSize;
+		int fixedHeaderBufferSize = 1 + getVariableLengthInt(variablePartSize);
+		ByteBuffer buf = ByteBuffer.allocate(fixedHeaderBufferSize + variablePartSize);
+		buf.put(getFixedHeaderByte1(message.fixedHeader()));
+		writeVariableLengthInt(buf, variablePartSize);
+		buf.putShort((short) variableHeader.messageId());
+		buf.put(propertiesBytes);
 
-			if (payload != null) {
-				for (Short reasonCode : payload.unsubscribeReasonCodes()) {
-					buf.put(reasonCode.byteValue());
-				}
+		if (payload != null) {
+			for (Short reasonCode : payload.unsubscribeReasonCodes()) {
+				buf.put(reasonCode.byteValue());
 			}
-			return buf;
-		} else {
-			return encodeMessageWithOnlySingleByteFixedHeaderAndMessageId(message);
 		}
+		return buf;
 	}
 
 	private static ByteBuffer encodePublishMessage(ChannelContext ctx, MqttPublishMessage message) {

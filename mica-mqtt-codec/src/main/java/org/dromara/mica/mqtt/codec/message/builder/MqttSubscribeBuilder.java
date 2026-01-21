@@ -20,7 +20,7 @@ import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttSubscribePayload;
 import org.dromara.mica.mqtt.codec.message.properties.MqttSubscribeProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
@@ -89,8 +89,8 @@ public final class MqttSubscribeBuilder {
 	public MqttSubscribeMessage build() {
 		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.SUBSCRIBE, false, MqttQoS.QOS1, false, 0);
-		MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader =
-			new MqttMessageIdAndPropertiesVariableHeader(messageId, properties);
+		MqttMessageIdVariableHeader mqttVariableHeader =
+			MqttMessageIdVariableHeader.from(messageId, properties);
 		MqttSubscribePayload mqttSubscribePayload = new MqttSubscribePayload(subscriptions);
 		return new MqttSubscribeMessage(mqttFixedHeader, mqttVariableHeader, mqttSubscribePayload);
 	}

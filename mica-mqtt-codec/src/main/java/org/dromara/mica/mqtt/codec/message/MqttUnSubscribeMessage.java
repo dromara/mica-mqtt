@@ -18,7 +18,6 @@ package org.dromara.mica.mqtt.codec.message;
 
 import org.dromara.mica.mqtt.codec.message.builder.MqttUnSubscribeBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubscribePayload;
 
@@ -32,25 +31,14 @@ public final class MqttUnSubscribeMessage extends MqttMessage {
 
 	public MqttUnSubscribeMessage(
 		MqttFixedHeader mqttFixedHeader,
-		MqttMessageIdAndPropertiesVariableHeader variableHeader,
-		MqttUnsubscribePayload payload) {
-		super(mqttFixedHeader, variableHeader, payload);
-	}
-
-	public MqttUnSubscribeMessage(
-		MqttFixedHeader mqttFixedHeader,
 		MqttMessageIdVariableHeader variableHeader,
 		MqttUnsubscribePayload payload) {
-		this(mqttFixedHeader, variableHeader.withDefaultEmptyProperties(), payload);
+		super(mqttFixedHeader, variableHeader, payload);
 	}
 
 	@Override
 	public MqttMessageIdVariableHeader variableHeader() {
 		return (MqttMessageIdVariableHeader) super.variableHeader();
-	}
-
-	public MqttMessageIdAndPropertiesVariableHeader idAndPropertiesVariableHeader() {
-		return (MqttMessageIdAndPropertiesVariableHeader) super.variableHeader();
 	}
 
 	@Override

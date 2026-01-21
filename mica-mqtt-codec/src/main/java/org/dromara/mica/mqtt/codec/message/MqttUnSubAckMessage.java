@@ -18,10 +18,8 @@ package org.dromara.mica.mqtt.codec.message;
 
 import org.dromara.mica.mqtt.codec.message.builder.MqttUnSubAckBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubAckPayload;
-import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 
 /**
  * See <a href="https://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html#unsuback">
@@ -32,15 +30,9 @@ import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 public final class MqttUnSubAckMessage extends MqttMessage {
 
 	public MqttUnSubAckMessage(MqttFixedHeader mqttFixedHeader,
-							   MqttMessageIdAndPropertiesVariableHeader variableHeader,
-							   MqttUnsubAckPayload payload) {
-		super(mqttFixedHeader, variableHeader, MqttUnsubAckPayload.withEmptyDefaults(payload));
-	}
-
-	public MqttUnSubAckMessage(MqttFixedHeader mqttFixedHeader,
 							   MqttMessageIdVariableHeader variableHeader,
 							   MqttUnsubAckPayload payload) {
-		this(mqttFixedHeader, fallbackVariableHeader(variableHeader), payload);
+		super(mqttFixedHeader, variableHeader, MqttUnsubAckPayload.withEmptyDefaults(payload));
 	}
 
 	public MqttUnSubAckMessage(MqttFixedHeader mqttFixedHeader,
@@ -48,21 +40,9 @@ public final class MqttUnSubAckMessage extends MqttMessage {
 		this(mqttFixedHeader, variableHeader, null);
 	}
 
-	private static MqttMessageIdAndPropertiesVariableHeader fallbackVariableHeader(
-		MqttMessageIdVariableHeader variableHeader) {
-		if (variableHeader instanceof MqttMessageIdAndPropertiesVariableHeader) {
-			return (MqttMessageIdAndPropertiesVariableHeader) variableHeader;
-		}
-		return new MqttMessageIdAndPropertiesVariableHeader(variableHeader.messageId(), MqttProperties.NO_PROPERTIES);
-	}
-
 	@Override
 	public MqttMessageIdVariableHeader variableHeader() {
 		return (MqttMessageIdVariableHeader) super.variableHeader();
-	}
-
-	public MqttMessageIdAndPropertiesVariableHeader idAndPropertiesVariableHeader() {
-		return (MqttMessageIdAndPropertiesVariableHeader) super.variableHeader();
 	}
 
 	@Override

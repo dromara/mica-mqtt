@@ -18,7 +18,6 @@ package org.dromara.mica.mqtt.codec.message;
 
 import org.dromara.mica.mqtt.codec.message.builder.MqttSubscribeBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttSubscribePayload;
 
@@ -32,25 +31,14 @@ public final class MqttSubscribeMessage extends MqttMessage {
 
 	public MqttSubscribeMessage(
 		MqttFixedHeader mqttFixedHeader,
-		MqttMessageIdAndPropertiesVariableHeader variableHeader,
-		MqttSubscribePayload payload) {
-		super(mqttFixedHeader, variableHeader, payload);
-	}
-
-	public MqttSubscribeMessage(
-		MqttFixedHeader mqttFixedHeader,
 		MqttMessageIdVariableHeader variableHeader,
 		MqttSubscribePayload payload) {
-		this(mqttFixedHeader, variableHeader.withDefaultEmptyProperties(), payload);
+		super(mqttFixedHeader, variableHeader, payload);
 	}
 
 	@Override
 	public MqttMessageIdVariableHeader variableHeader() {
 		return (MqttMessageIdVariableHeader) super.variableHeader();
-	}
-
-	public MqttMessageIdAndPropertiesVariableHeader idAndPropertiesVariableHeader() {
-		return (MqttMessageIdAndPropertiesVariableHeader) super.variableHeader();
 	}
 
 	@Override

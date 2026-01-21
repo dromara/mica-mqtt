@@ -20,7 +20,7 @@ import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubscribePayload;
 import org.dromara.mica.mqtt.codec.message.properties.MqttUnSubscribeProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
@@ -72,8 +72,8 @@ public final class MqttUnSubscribeBuilder {
 	public MqttUnSubscribeMessage build() {
 		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.UNSUBSCRIBE, false, MqttQoS.QOS1, false, 0);
-		MqttMessageIdAndPropertiesVariableHeader mqttVariableHeader =
-			new MqttMessageIdAndPropertiesVariableHeader(messageId, properties);
+		MqttMessageIdVariableHeader mqttVariableHeader =
+			MqttMessageIdVariableHeader.from(messageId, properties);
 		MqttUnsubscribePayload mqttSubscribePayload = new MqttUnsubscribePayload(topicFilters);
 		return new MqttUnSubscribeMessage(mqttFixedHeader, mqttVariableHeader, mqttSubscribePayload);
 	}

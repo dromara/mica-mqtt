@@ -238,7 +238,7 @@ public final class MqttDecoder {
 		return new MqttFixedHeader(messageType, dup, qos, retain, headLength, remainingLength);
 	}
 
-	private static MqttMessageIdAndPropertiesVariableHeader decodePacketIdAndPropertiesVariableHeader(
+	private static MqttMessageIdVariableHeader decodePacketIdAndPropertiesVariableHeader(
 		ChannelContext ctx, ByteBuffer buffer, MqttFixedHeader mqttFixedHeader, IntValue bytesConsumed) {
 		final MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		final int packetId = decodePacketId(buffer, mqttFixedHeader);
@@ -246,10 +246,10 @@ public final class MqttDecoder {
 			IntValue tempBytesConsumed = new IntValue();
 			final MqttProperties properties = decodeProperties(buffer, tempBytesConsumed);
 			bytesConsumed.value = PACKET_ID_BYTES + tempBytesConsumed.value;
-			return new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
+			return MqttMessageIdVariableHeader.from(packetId, properties);
 		} else {
 			bytesConsumed.value = PACKET_ID_BYTES;
-			return new MqttMessageIdAndPropertiesVariableHeader(packetId, MqttProperties.NO_PROPERTIES);
+			return MqttMessageIdVariableHeader.from(packetId);
 		}
 	}
 

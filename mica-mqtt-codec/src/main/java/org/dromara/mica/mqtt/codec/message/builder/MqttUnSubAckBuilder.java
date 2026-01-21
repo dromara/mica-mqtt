@@ -21,7 +21,7 @@ import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.codes.MqttUnSubAckReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttUnSubAckMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdAndPropertiesVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubAckPayload;
 import org.dromara.mica.mqtt.codec.message.properties.MqttUnSubAckProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
@@ -84,8 +84,8 @@ public final class MqttUnSubAckBuilder {
 	public MqttUnSubAckMessage build() {
 		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.UNSUBACK, false, MqttQoS.QOS0, false, 0);
-		MqttMessageIdAndPropertiesVariableHeader mqttSubAckVariableHeader =
-			new MqttMessageIdAndPropertiesVariableHeader(packetId, properties);
+		MqttMessageIdVariableHeader mqttSubAckVariableHeader =
+			MqttMessageIdVariableHeader.from(packetId, properties);
 
 		List<Short> reasonCodeValues = new ArrayList<>();
 		for (MqttUnSubAckReasonCode reasonCode : reasonCodes) {
