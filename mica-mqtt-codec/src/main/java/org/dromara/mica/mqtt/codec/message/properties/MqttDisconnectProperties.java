@@ -18,6 +18,11 @@ package org.dromara.mica.mqtt.codec.message.properties;
 
 import org.dromara.mica.mqtt.codec.properties.*;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * MQTT5 DISCONNECT 属性类，用于存储断开连接相关的属性信息
  *
@@ -39,6 +44,15 @@ public class MqttDisconnectProperties {
 	}
 
 	/**
+	 * 获取会话过期间隔
+	 *
+	 * @return 会话过期间隔，如果未设置则返回null
+	 */
+	public Integer getSessionExpiryInterval() {
+		return properties.getPropertyValue(MqttPropertyType.SESSION_EXPIRY_INTERVAL);
+	}
+
+	/**
 	 * 设置会话过期间隔
 	 *
 	 * @param interval 会话过期间隔
@@ -50,6 +64,15 @@ public class MqttDisconnectProperties {
 	}
 
 	/**
+	 * 获取服务器引用
+	 *
+	 * @return 服务器引用，如果未设置则返回null
+	 */
+	public String getServerReference() {
+		return properties.getPropertyValue(MqttPropertyType.SERVER_REFERENCE);
+	}
+
+	/**
 	 * 设置服务器引用
 	 *
 	 * @param serverReference 服务器引用
@@ -58,6 +81,15 @@ public class MqttDisconnectProperties {
 	public MqttDisconnectProperties setServerReference(String serverReference) {
 		properties.add(new StringProperty(MqttPropertyType.SERVER_REFERENCE, serverReference));
 		return this;
+	}
+
+	/**
+	 * 获取原因字符串
+	 *
+	 * @return 原因字符串，如果未设置则返回null
+	 */
+	public String getReasonString() {
+		return properties.getPropertyValue(MqttPropertyType.REASON_STRING);
 	}
 
 	/**
@@ -92,6 +124,35 @@ public class MqttDisconnectProperties {
 	public MqttDisconnectProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
 		return this;
+	}
+
+	/**
+	 * 获取所有用户属性
+	 *
+	 * @return 用户属性列表，如果未设置则返回空列表
+	 */
+	public List<UserProperty> getUserProperties() {
+		List<UserProperty> userProps = new ArrayList<>();
+		for (MqttProperty prop : properties.listAll()) {
+			if (prop instanceof UserProperty) {
+				userProps.add((UserProperty) prop);
+			}
+		}
+		return userProps;
+	}
+
+	/**
+	 * 获取所有用户属性
+	 *
+	 * @return 用户属性Map，如果未设置则返回空Map
+	 */
+	public Map<String, String> getUserPropertiesMap() {
+		Map<String, String> userProps = new HashMap<>();
+		for (UserProperty userProp : getUserProperties()) {
+			StringPair pair = userProp.value();
+			userProps.put(pair.key, pair.value);
+		}
+		return userProps;
 	}
 
 }

@@ -18,6 +18,11 @@ package org.dromara.mica.mqtt.codec.message.properties;
 
 import org.dromara.mica.mqtt.codec.properties.*;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * mqtt5 认证属性
  *
@@ -39,6 +44,15 @@ public class MqttAuthProperties {
 	}
 
 	/**
+	 * 获取认证方法
+	 *
+	 * @return 认证方法，如果未设置则返回null
+	 */
+	public String getAuthenticationMethod() {
+		return properties.getPropertyValue(MqttPropertyType.AUTHENTICATION_METHOD);
+	}
+
+	/**
 	 * 设置认证方法
 	 *
 	 * @param authenticationMethod 认证方法
@@ -50,6 +64,15 @@ public class MqttAuthProperties {
 	}
 
 	/**
+	 * 获取认证数据
+	 *
+	 * @return 认证数据，如果未设置则返回null
+	 */
+	public byte[] getAuthenticationData() {
+		return properties.getPropertyValue(MqttPropertyType.AUTHENTICATION_DATA);
+	}
+
+	/**
 	 * 设置认证数据
 	 *
 	 * @param authenticationData 认证数据
@@ -58,6 +81,15 @@ public class MqttAuthProperties {
 	public MqttAuthProperties setAuthenticationData(byte[] authenticationData) {
 		properties.add(new BinaryProperty(MqttPropertyType.AUTHENTICATION_DATA, authenticationData));
 		return this;
+	}
+
+	/**
+	 * 获取原因字符串
+	 *
+	 * @return 原因字符串，如果未设置则返回null
+	 */
+	public String getReasonString() {
+		return properties.getPropertyValue(MqttPropertyType.REASON_STRING);
 	}
 
 	/**
@@ -92,6 +124,35 @@ public class MqttAuthProperties {
 	public MqttAuthProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
 		return this;
+	}
+
+	/**
+	 * 获取所有用户属性
+	 *
+	 * @return 用户属性列表，如果未设置则返回空列表
+	 */
+	public List<UserProperty> getUserProperties() {
+		List<UserProperty> userProps = new ArrayList<>();
+		for (MqttProperty prop : properties.listAll()) {
+			if (prop instanceof UserProperty) {
+				userProps.add((UserProperty) prop);
+			}
+		}
+		return userProps;
+	}
+
+	/**
+	 * 获取所有用户属性
+	 *
+	 * @return 用户属性Map，如果未设置则返回空Map
+	 */
+	public Map<String, String> getUserPropertiesMap() {
+		Map<String, String> userProps = new HashMap<>();
+		for (UserProperty userProp : getUserProperties()) {
+			StringPair pair = userProp.value();
+			userProps.put(pair.key, pair.value);
+		}
+		return userProps;
 	}
 
 }

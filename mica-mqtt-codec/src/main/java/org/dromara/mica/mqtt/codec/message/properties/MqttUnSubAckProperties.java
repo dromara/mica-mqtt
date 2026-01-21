@@ -16,10 +16,12 @@
 
 package org.dromara.mica.mqtt.codec.message.properties;
 
-import org.dromara.mica.mqtt.codec.properties.MqttProperties;
-import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
-import org.dromara.mica.mqtt.codec.properties.StringProperty;
-import org.dromara.mica.mqtt.codec.properties.UserProperty;
+import org.dromara.mica.mqtt.codec.properties.*;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * mqtt5 取消订阅确认属性
@@ -39,6 +41,15 @@ public class MqttUnSubAckProperties {
 
 	public MqttProperties getProperties() {
 		return properties;
+	}
+
+	/**
+	 * 获取原因字符串
+	 *
+	 * @return 原因字符串，如果未设置则返回null
+	 */
+	public String getReasonString() {
+		return properties.getPropertyValue(MqttPropertyType.REASON_STRING);
 	}
 
 	/**
@@ -73,5 +84,34 @@ public class MqttUnSubAckProperties {
 	public MqttUnSubAckProperties addUserProperty(String key, String value) {
 		this.addUserProperty(new UserProperty(key, value));
 		return this;
+	}
+
+	/**
+	 * 获取所有用户属性
+	 *
+	 * @return 用户属性列表，如果未设置则返回空列表
+	 */
+	public List<UserProperty> getUserProperties() {
+		List<UserProperty> userProps = new ArrayList<>();
+		for (MqttProperty prop : properties.listAll()) {
+			if (prop instanceof UserProperty) {
+				userProps.add((UserProperty) prop);
+			}
+		}
+		return userProps;
+	}
+
+	/**
+	 * 获取所有用户属性
+	 *
+	 * @return 用户属性Map，如果未设置则返回空Map
+	 */
+	public Map<String, String> getUserPropertiesMap() {
+		Map<String, String> userProps = new HashMap<>();
+		for (UserProperty userProp : getUserProperties()) {
+			StringPair pair = userProp.value();
+			userProps.put(pair.key, pair.value);
+		}
+		return userProps;
 	}
 }
