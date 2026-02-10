@@ -11,6 +11,7 @@
       "matchPackagePatterns": [
         "^net.dreamlu:mica-bom$",
         "^net.dreamlu:mica-auto$",
+        "^org.moditect:moditect-maven-plugin$",
         "^org.springframework.boot:spring-boot-dependencies$",
         "^org.springframework.boot:spring-boot-maven-plugin$"
       ],
