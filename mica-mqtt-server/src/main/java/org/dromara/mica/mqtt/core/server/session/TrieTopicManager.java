@@ -50,21 +50,31 @@ public class TrieTopicManager {
 		 * 索引：qos=0/1/2, noLocal=0(false)/1(true)
 		 */
 		private static final SubscribeData[][] POOL = new SubscribeData[3][2];
+		/**
+		 * 解码缓存：直接通过 encoded 值索引获取实例，避免位运算
+		 * encoded 有效值：0,1,2,4,5,6 对应 6 种组合
+		 */
+		private static final SubscribeData[] DECODE_CACHE = new SubscribeData[8];
 
 		static {
 			for (int qos = 0; qos <= 2; qos++) {
 				for (int noLocal = 0; noLocal <= 1; noLocal++) {
-					POOL[qos][noLocal] = new SubscribeData((byte) qos, noLocal == 1);
+					SubscribeData data = new SubscribeData((byte) qos, noLocal == 1);
+					POOL[qos][noLocal] = data;
+					// 同时填充解码缓存，通过 encoded 值直接索引
+					DECODE_CACHE[data.encoded] = data;
 				}
 			}
 		}
 
 		final byte qos;
 		final boolean noLocal;
+		final byte encoded;
 
 		private SubscribeData(byte qos, boolean noLocal) {
 			this.qos = qos;
 			this.noLocal = noLocal;
+			this.encoded = (byte) ((qos & 0x03) | ((noLocal ? 1 : 0) << 2));
 		}
 
 		/**
@@ -84,28 +94,23 @@ public class TrieTopicManager {
 		}
 
 		/**
-		 * 从字节编码中解析（节省内存的另一种方式）
+		 * 从字节编码中解析（直接通过缓存数组获取，O(1) 性能）
 		 * 编码格式: bit 0-1: qos, bit 2: noLocal
 		 *
 		 * @param encoded 编码的字节值
 		 * @return SubscribeData 实例
 		 */
 		static SubscribeData decode(byte encoded) {
+			// 直接通过 encoded 值索引缓存数组，避免位运算
+			// encoded 有效值范围: 0-7，对应索引直接可用
+			SubscribeData data = DECODE_CACHE[encoded & 0x07];
+			if (data != null) {
+				return data;
+			}
+			// 降级处理：理论上不会到这里，除非 encoded 值非法
 			byte qos = (byte) (encoded & 0x03);
 			boolean noLocal = (encoded & 0x04) != 0;
 			return of(qos, noLocal);
-		}
-
-		/**
-		 * 编码为字节（用于紧凑存储）
-		 * 编码格式: bit 0-1: qos, bit 2: noLocal
-		 *
-		 * @param qos     QoS 级别
-		 * @param noLocal No Local 标志
-		 * @return 编码的字节值
-		 */
-		static byte encode(byte qos, boolean noLocal) {
-			return (byte) ((qos & 0x03) | ((noLocal ? 1 : 0) << 2));
 		}
 	}
 
@@ -269,16 +274,17 @@ public class TrieTopicManager {
 			if (isEnd) {
 				assert prev.subscriptions != null;
 				// 使用位运算编码 qos 和 noLocal，存储为单个 byte
-				byte encoded = SubscribeData.encode(mqttQoS, noLocal);
+				SubscribeData data = SubscribeData.of(mqttQoS, noLocal);
 				Byte existingEncoded = prev.subscriptions.get(clientId);
 				if (existingEncoded == null) {
-					prev.subscriptions.put(clientId, encoded);
+					prev.subscriptions.put(clientId, data.encoded);
 				} else {
 					// 如果已存在，取更大的 QoS，noLocal 取或运算
 					SubscribeData existing = SubscribeData.decode(existingEncoded);
 					byte maxQos = MAX_QOS.apply(existing.qos, mqttQoS);
 					boolean mergedNoLocal = existing.noLocal || noLocal;
-					prev.subscriptions.put(clientId, SubscribeData.encode(maxQos, mergedNoLocal));
+					SubscribeData merged = SubscribeData.of(maxQos, mergedNoLocal);
+					prev.subscriptions.put(clientId, merged.encoded);
 				}
 			}
 		}
