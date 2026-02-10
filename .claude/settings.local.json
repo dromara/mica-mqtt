@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mvn compile:*)"
+      "Bash(mvn compile:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
