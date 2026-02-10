@@ -57,8 +57,14 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 				return;
 			}
 			TioConfig tioConfig = context.getContext().getTioConfig();
+			String publisherClientId = context.getClientId();
 			try {
 				for (Subscribe subscribe : subscribeList) {
+					// MQTT 5.0 No Local: 如果订阅时设置了 No Local 标志，且订阅者就是消息发布者，则跳过
+					if (subscribe.isNoLocal() && subscribe.getClientId().equals(publisherClientId)) {
+						logger.debug("Mqtt Topic:{} skip forwarding to clientId:{} due to No Local flag", context.getTopic(), subscribe.getClientId());
+						continue;
+					}
 					// 获取客户端上下文
 					ChannelContext clientContext = Tio.getByBsId(tioConfig, subscribe.getClientId());
 					if (clientContext == null || clientContext.isClosed()) {

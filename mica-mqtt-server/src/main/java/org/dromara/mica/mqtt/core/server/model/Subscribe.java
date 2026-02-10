@@ -28,19 +28,30 @@ public class Subscribe implements Serializable {
 	private String topicFilter;
 	private String clientId;
 	private int mqttQoS;
+	private boolean noLocal;
 
 	public Subscribe() {
 	}
 
 	public Subscribe(String clientId, int mqttQoS) {
+		this(clientId, mqttQoS, false);
+	}
+
+	public Subscribe(String clientId, int mqttQoS, boolean noLocal) {
 		this.clientId = clientId;
 		this.mqttQoS = mqttQoS;
+		this.noLocal = noLocal;
 	}
 
 	public Subscribe(String topicFilter, String clientId, int mqttQoS) {
+		this(topicFilter, clientId, mqttQoS, false);
+	}
+
+	public Subscribe(String topicFilter, String clientId, int mqttQoS, boolean noLocal) {
 		this.topicFilter = topicFilter;
 		this.clientId = clientId;
 		this.mqttQoS = mqttQoS;
+		this.noLocal = noLocal;
 	}
 
 	public String getTopicFilter() {
@@ -67,6 +78,14 @@ public class Subscribe implements Serializable {
 		this.mqttQoS = mqttQoS;
 	}
 
+	public boolean isNoLocal() {
+		return noLocal;
+	}
+
+	public void setNoLocal(boolean noLocal) {
+		this.noLocal = noLocal;
+	}
+
 	@Override
 	public boolean equals(Object o) {
 		if (this == o) {
@@ -91,6 +110,7 @@ public class Subscribe implements Serializable {
 			"topicFilter='" + topicFilter + '\'' +
 			", clientId='" + clientId + '\'' +
 			", mqttQoS=" + mqttQoS +
+			", noLocal=" + noLocal +
 			'}';
 	}
 }

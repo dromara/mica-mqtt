@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(mvn compile:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(mvn clean test:*)",
+      "Bash(mvn clean compile:*)"
     ],
     "deny": [],
     "ask": []

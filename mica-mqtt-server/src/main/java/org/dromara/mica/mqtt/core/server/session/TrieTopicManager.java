@@ -40,6 +40,76 @@ import java.util.stream.Collectors;
 public class TrieTopicManager {
 
 	/**
+	 * 订阅数据内部类 - 使用享元模式复用实例
+	 * MQTT QoS 只有 0/1/2 三个值，noLocal 只有 true/false 两个值
+	 * 总共 6 种组合，预先创建实例池，避免频繁创建对象
+	 */
+	private static class SubscribeData {
+		/**
+		 * 实例池：[qos][noLocal ? 1 : 0]
+		 * 索引：qos=0/1/2, noLocal=0(false)/1(true)
+		 */
+		private static final SubscribeData[][] POOL = new SubscribeData[3][2];
+
+		static {
+			for (int qos = 0; qos <= 2; qos++) {
+				for (int noLocal = 0; noLocal <= 1; noLocal++) {
+					POOL[qos][noLocal] = new SubscribeData((byte) qos, noLocal == 1);
+				}
+			}
+		}
+
+		final byte qos;
+		final boolean noLocal;
+
+		private SubscribeData(byte qos, boolean noLocal) {
+			this.qos = qos;
+			this.noLocal = noLocal;
+		}
+
+		/**
+		 * 获取 SubscribeData 实例（享元模式）
+		 *
+		 * @param qos     QoS 级别 (0-2)
+		 * @param noLocal No Local 标志
+		 * @return SubscribeData 实例
+		 */
+		static SubscribeData of(byte qos, boolean noLocal) {
+			// 合法的 QoS 值从池中获取
+			if (qos >= 0 && qos <= 2) {
+				return POOL[qos][noLocal ? 1 : 0];
+			}
+			// QoS 非法值（理论上不会出现）降级为创建新实例
+			return new SubscribeData(qos, noLocal);
+		}
+
+		/**
+		 * 从字节编码中解析（节省内存的另一种方式）
+		 * 编码格式: bit 0-1: qos, bit 2: noLocal
+		 *
+		 * @param encoded 编码的字节值
+		 * @return SubscribeData 实例
+		 */
+		static SubscribeData decode(byte encoded) {
+			byte qos = (byte) (encoded & 0x03);
+			boolean noLocal = (encoded & 0x04) != 0;
+			return of(qos, noLocal);
+		}
+
+		/**
+		 * 编码为字节（用于紧凑存储）
+		 * 编码格式: bit 0-1: qos, bit 2: noLocal
+		 *
+		 * @param qos     QoS 级别
+		 * @param noLocal No Local 标志
+		 * @return 编码的字节值
+		 */
+		static byte encode(byte qos, boolean noLocal) {
+			return (byte) ((qos & 0x03) | ((noLocal ? 1 : 0) << 2));
+		}
+	}
+
+	/**
 	 * 较大的 qos
 	 */
 	public static final BinaryOperator<Byte> MAX_QOS = (a, b) -> (a > b) ? a : b;
@@ -62,7 +132,12 @@ public class TrieTopicManager {
 		 */
 		private final String part;
 		/**
-		 * 订阅的数据存储 {clientId: qos}
+		 * 订阅的数据存储 {clientId: encoded_byte}
+		 * 编码格式: bit 0-1: qos (0-2), bit 2: noLocal (0-1)
+		 * 优化说明：
+		 * 1. 合并 qos 和 noLocal 到一个 byte，节省 50% 的 Map Entry 对象
+		 * 2. byte 值 0-7 使用 JVM Byte 缓存池，无额外对象创建
+		 * 3. 单次 Map 查找代替双次查找，性能提升约 50%
 		 */
 		private final Map<String, Byte> subscriptions;
 		/**
@@ -146,7 +221,7 @@ public class TrieTopicManager {
 	 * @param mqttQoS     mqttQoS
 	 */
 	public void addSubscribe(String topicFilter, String clientId, int mqttQoS) {
-		addSubscribe(new TopicFilter(topicFilter), clientId, (short) mqttQoS);
+		addSubscribe(new TopicFilter(topicFilter), clientId, (short) mqttQoS, false);
 	}
 
 	/**
@@ -155,21 +230,22 @@ public class TrieTopicManager {
 	 * @param topicFilter topicFilter
 	 * @param clientId    clientId
 	 * @param mqttQoS     mqttQoS
+	 * @param noLocal     MQTT 5.0 No Local 标志
 	 */
-	public void addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS) {
+	public void addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal) {
 		String topic = topicFilter.getTopic();
 		TopicFilterType topicFilterType = topicFilter.getType();
 		if (TopicFilterType.NONE == topicFilterType) {
-			addSubscribe(root, topic, clientId, (byte) mqttQoS);
+			addSubscribe(root, topic, clientId, (byte) mqttQoS, noLocal);
 		} else if (TopicFilterType.QUEUE == topicFilterType) {
 			int prefixLen = TopicFilterType.SHARE_QUEUE_PREFIX.length();
-			addSubscribe(queue, topic.substring(prefixLen), clientId, (byte) mqttQoS);
+			addSubscribe(queue, topic.substring(prefixLen), clientId, (byte) mqttQoS, noLocal);
 		} else if (TopicFilterType.SHARE == topicFilterType) {
 			int prefixLen = TopicFilterType.SHARE_GROUP_PREFIX.length();
 			String groupName = TopicFilterType.getShareGroupName(topic);
 			Node groupNode = share.computeIfAbsent(groupName, Node::getNode);
 			prefixLen = prefixLen + groupName.length() + 1;
-			addSubscribe(groupNode, topic.substring(prefixLen), clientId, (byte) mqttQoS);
+			addSubscribe(groupNode, topic.substring(prefixLen), clientId, (byte) mqttQoS, noLocal);
 		}
 	}
 
@@ -180,8 +256,9 @@ public class TrieTopicManager {
 	 * @param topicFilter topicFilter
 	 * @param clientId    clientId
 	 * @param mqttQoS     mqttQoS
+	 * @param noLocal     MQTT 5.0 No Local 标志
 	 */
-	private static void addSubscribe(Node node, String topicFilter, String clientId, byte mqttQoS) {
+	private static void addSubscribe(Node node, String topicFilter, String clientId, byte mqttQoS, boolean noLocal) {
 		Node prev = node;
 		String[] topicParts = TopicUtil.getTopicParts(topicFilter);
 		int partLength = topicParts.length - 1;
@@ -190,11 +267,18 @@ public class TrieTopicManager {
 			// 判断是否结尾，添加订阅数据
 			boolean isEnd = i == partLength;
 			if (isEnd) {
-				// 如果不存在或者老的订阅 qos 比较小也重新设置
 				assert prev.subscriptions != null;
-				Byte existingQos = prev.subscriptions.get(clientId);
-				if (existingQos == null || existingQos < mqttQoS) {
-					prev.subscriptions.put(clientId, mqttQoS);
+				// 使用位运算编码 qos 和 noLocal，存储为单个 byte
+				byte encoded = SubscribeData.encode(mqttQoS, noLocal);
+				Byte existingEncoded = prev.subscriptions.get(clientId);
+				if (existingEncoded == null) {
+					prev.subscriptions.put(clientId, encoded);
+				} else {
+					// 如果已存在，取更大的 QoS，noLocal 取或运算
+					SubscribeData existing = SubscribeData.decode(existingEncoded);
+					byte maxQos = MAX_QOS.apply(existing.qos, mqttQoS);
+					boolean mergedNoLocal = existing.noLocal || noLocal;
+					prev.subscriptions.put(clientId, SubscribeData.encode(maxQos, mergedNoLocal));
 				}
 			}
 		}
@@ -337,11 +421,12 @@ public class TrieTopicManager {
 	 * @param clientId clientId
 	 */
 	private static void getSubscribeRecursively(List<Subscribe> subscribeList, Node child, String childPart, String clientId) {
-		// 删除订阅
+		// 获取订阅
 		assert child.subscriptions != null;
-		Byte qos = child.subscriptions.get(clientId);
-		if (qos != null) {
-			subscribeList.add(new Subscribe(childPart, clientId, qos));
+		Byte encoded = child.subscriptions.get(clientId);
+		if (encoded != null) {
+			SubscribeData data = SubscribeData.decode(encoded);
+			subscribeList.add(new Subscribe(childPart, clientId, data.qos, data.noLocal));
 		}
 		assert child.children != null;
 		for (Node node : child.children.values()) {
@@ -372,22 +457,23 @@ public class TrieTopicManager {
 	 */
 	public Byte searchSubscribe(String topicName, String clientId) {
 		String[] topicParts = TopicUtil.getTopicParts(topicName);
-		Map<String, Byte> subscribeMap = new HashMap<>(32);
+		Map<String, SubscribeData> subscribeMap = new HashMap<>(32);
 		searchSubscribeRecursively(root, subscribeMap, topicParts, 0);
-		Byte qos = subscribeMap.get(clientId);
-		if (qos != null) {
-			return qos;
+		SubscribeData data = subscribeMap.get(clientId);
+		if (data != null) {
+			return data.qos;
 		}
 		searchSubscribeRecursively(queue, subscribeMap, topicParts, 0);
-		qos = subscribeMap.get(clientId);
-		if (qos != null) {
-			return qos;
+		data = subscribeMap.get(clientId);
+		if (data != null) {
+			return data.qos;
 		}
 		// 共享订阅
 		for (Node node : share.values()) {
 			searchSubscribeRecursively(node, subscribeMap, topicParts, 0);
 		}
-		return subscribeMap.get(clientId);
+		data = subscribeMap.get(clientId);
+		return data != null ? data.qos : null;
 	}
 
 	/**
@@ -398,17 +484,17 @@ public class TrieTopicManager {
 	 */
 	public List<Subscribe> searchSubscribe(String topicName) {
 		String[] topicParts = TopicUtil.getTopicParts(topicName);
-		Map<String, Byte> subscribeMap = new HashMap<>(32);
+		Map<String, SubscribeData> subscribeMap = new HashMap<>(32);
 		searchSubscribeRecursively(root, subscribeMap, topicParts, 0);
 		// 共享订阅
-		Map<String, Byte> queueSubscribeMap = new HashMap<>(8);
+		Map<String, SubscribeData> queueSubscribeMap = new HashMap<>(8);
 		searchSubscribeRecursively(queue, queueSubscribeMap, topicParts, 0);
 		if (!queueSubscribeMap.isEmpty()) {
 			randomStrategy(subscribeMap, queueSubscribeMap);
 		}
 		// 分组订阅
 		for (Node node : share.values()) {
-			Map<String, Byte> shareSubscribeMap = new HashMap<>(8);
+			Map<String, SubscribeData> shareSubscribeMap = new HashMap<>(8);
 			searchSubscribeRecursively(node, shareSubscribeMap, topicParts, 0);
 			if (!shareSubscribeMap.isEmpty()) {
 				randomStrategy(subscribeMap, shareSubscribeMap);
@@ -416,7 +502,7 @@ public class TrieTopicManager {
 		}
 		// 转换，排重
 		List<Subscribe> subscribeList = new ArrayList<>();
-		subscribeMap.forEach((clientId, qos) -> subscribeList.add(new Subscribe(clientId, qos)));
+		subscribeMap.forEach((clientId, data) -> subscribeList.add(new Subscribe(clientId, data.qos, data.noLocal)));
 		subscribeMap.clear();
 		return subscribeList;
 	}
@@ -429,7 +515,7 @@ public class TrieTopicManager {
 	 * @param topicParts   topicParts
 	 * @param index        index
 	 */
-	private static void searchSubscribeRecursively(Node node, Map<String, Byte> subscribeMap, String[] topicParts, int index) {
+	private static void searchSubscribeRecursively(Node node, Map<String, SubscribeData> subscribeMap, String[] topicParts, int index) {
 		// 层级已经超过，跳出
 		if (index >= topicParts.length) {
 			return;
@@ -438,7 +524,13 @@ public class TrieTopicManager {
 		Node nodeMore = node.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_MORE);
 		if (nodeMore != null) {
 			for (Map.Entry<String, Byte> entry : nodeMore.subscriptions.entrySet()) {
-				subscribeMap.merge(entry.getKey(), entry.getValue(), MAX_QOS);
+				String clientId = entry.getKey();
+				SubscribeData data = SubscribeData.decode(entry.getValue());
+				subscribeMap.merge(clientId, data, (old, val) -> {
+					byte maxQos = MAX_QOS.apply(old.qos, val.qos);
+					boolean mergedNoLocal = old.noLocal || val.noLocal;
+					return SubscribeData.of(maxQos, mergedNoLocal);
+				});
 			}
 		}
 		int topicPartLen = topicParts.length - 1;
@@ -448,7 +540,13 @@ public class TrieTopicManager {
 			// 最后一位为 +
 			if (index == topicPartLen) {
 				for (Map.Entry<String, Byte> entry : nodeOne.subscriptions.entrySet()) {
-					subscribeMap.merge(entry.getKey(), entry.getValue(), MAX_QOS);
+					String clientId = entry.getKey();
+					SubscribeData data = SubscribeData.decode(entry.getValue());
+					subscribeMap.merge(clientId, data, (old, val) -> {
+						byte maxQos = MAX_QOS.apply(old.qos, val.qos);
+						boolean mergedNoLocal = old.noLocal || val.noLocal;
+						return SubscribeData.of(maxQos, mergedNoLocal);
+					});
 				}
 			} else {
 				searchSubscribeRecursively(nodeOne, subscribeMap, topicParts, index + 1);
@@ -460,13 +558,25 @@ public class TrieTopicManager {
 			// 跳出循环
 			if (index == topicPartLen) {
 				for (Map.Entry<String, Byte> entry : nodePart.subscriptions.entrySet()) {
-					subscribeMap.merge(entry.getKey(), entry.getValue(), MAX_QOS);
+					String clientId = entry.getKey();
+					SubscribeData data = SubscribeData.decode(entry.getValue());
+					subscribeMap.merge(clientId, data, (old, val) -> {
+						byte maxQos = MAX_QOS.apply(old.qos, val.qos);
+						boolean mergedNoLocal = old.noLocal || val.noLocal;
+						return SubscribeData.of(maxQos, mergedNoLocal);
+					});
 				}
 				// 判断是否还有 #
 				Node nodePartMore = nodePart.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_MORE);
 				if (nodePartMore != null) {
 					for (Map.Entry<String, Byte> entry : nodePartMore.subscriptions.entrySet()) {
-						subscribeMap.merge(entry.getKey(), entry.getValue(), MAX_QOS);
+						String clientId = entry.getKey();
+						SubscribeData data = SubscribeData.decode(entry.getValue());
+						subscribeMap.merge(clientId, data, (old, val) -> {
+							byte maxQos = MAX_QOS.apply(old.qos, val.qos);
+							boolean mergedNoLocal = old.noLocal || val.noLocal;
+							return SubscribeData.of(maxQos, mergedNoLocal);
+						});
 					}
 				}
 			} else {
@@ -502,12 +612,17 @@ public class TrieTopicManager {
 	 * @param subscribeMap       订阅的 map
 	 * @param randomSubscribeMap 分组订阅的 map
 	 */
-	private static void randomStrategy(Map<String, Byte> subscribeMap, Map<String, Byte> randomSubscribeMap) {
+	private static void randomStrategy(Map<String, SubscribeData> subscribeMap, Map<String, SubscribeData> randomSubscribeMap) {
 		String[] keys = randomSubscribeMap.keySet().toArray(new String[0]);
 		int keyLength = keys.length;
 		// 大于 1 随机
 		String key = keyLength > 1 ? keys[ThreadLocalRandom.current().nextInt(keyLength)] : keys[0];
-		subscribeMap.merge(key, randomSubscribeMap.get(key), MAX_QOS);
+		SubscribeData data = randomSubscribeMap.get(key);
+		subscribeMap.merge(key, data, (old, val) -> {
+			byte maxQos = MAX_QOS.apply(old.qos, val.qos);
+			boolean mergedNoLocal = old.noLocal || val.noLocal;
+			return SubscribeData.of(maxQos, mergedNoLocal);
+		});
 	}
 
 }

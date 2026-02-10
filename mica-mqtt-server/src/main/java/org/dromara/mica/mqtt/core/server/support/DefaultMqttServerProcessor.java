@@ -41,6 +41,7 @@ import org.dromara.mica.mqtt.codec.message.header.MqttPublishVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
+import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.MqttServerProcessor;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
@@ -384,6 +385,8 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			// 校验 topicFilter 是否合法
 			TopicUtil.validateTopicFilter(topicFilter);
 			MqttQoS mqttQoS = subscription.qualityOfService();
+			// 获取 MQTT 5.0 订阅选项中的 No Local 标志
+			boolean noLocal = subscription.option().isNoLocal();
 			// 校验是否可以订阅
 			if (enableSubscribeValidator && !subscribeValidator.verifyTopicFilter(context, clientId, topicFilter, mqttQoS)) {
 				grantedQosList.add(MqttQoS.FAILURE);
@@ -391,8 +394,8 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			} else {
 				grantedQosList.add(mqttQoS);
 				subscribedTopicList.add(topicFilter);
-				sessionManager.addSubscribe(topicFilter, clientId, mqttQoS.value());
-				logger.info("Subscribe - clientId:{} topicFilter:{} mqttQoS:{} packetId:{}", clientId, topicFilter, mqttQoS, packetId);
+				sessionManager.addSubscribe(new TopicFilter(topicFilter), clientId, mqttQoS.value(), noLocal);
+				logger.info("Subscribe - clientId:{} topicFilter:{} mqttQoS:{} noLocal:{} packetId:{}", clientId, topicFilter, mqttQoS, noLocal, packetId);
 				publishSubscribedEvent(context, clientId, topicFilter, mqttQoS);
 			}
 		}
