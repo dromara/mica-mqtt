@@ -68,8 +68,10 @@ public final class MqttPublishBuilder {
 		return this;
 	}
 
-	public MqttPublishBuilder messageId(int messageId) {
-		this.messageId = messageId;
+	public MqttPublishBuilder messageId(Integer messageId) {
+		if (messageId != null) {
+			this.messageId = messageId;
+		}
 		return this;
 	}
 
