@@ -2,7 +2,7 @@
 
 ## 发行版本
 
-### v2.5.12 - 2026-02-07
+### v2.5.12 - 2026-02-10
 - ✨ 在 Solon 和 Spring Boot 配置中新增多线程池大小配置，包括 group-executor-size、tio-executor-size、mqtt-executor-size、
   和废弃的 biz-thread-pool-size（统一使用 mqtt-executor-size）
 - ✨ 将 mica-mqtt-client 中 groupExecutor 的默认线程数由 2 增加至 4
