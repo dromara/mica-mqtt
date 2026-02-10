@@ -91,4 +91,9 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 	public int getOrder() {
 		return 300; // 订阅转发处理
 	}
+
+	@Override
+	public boolean isCritical() {
+		return true; // 订阅转发是核心功能，失败应中断流程
+	}
 }

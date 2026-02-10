@@ -86,4 +86,9 @@ public class RetainMessageHandler implements MqttPublishPipelineHandler {
 	public int getOrder() {
 		return 100; // 保留消息处理优先级较高
 	}
+
+	@Override
+	public boolean isCritical() {
+		return true; // 保留消息处理失败应中断流程，防止数据不一致
+	}
 }

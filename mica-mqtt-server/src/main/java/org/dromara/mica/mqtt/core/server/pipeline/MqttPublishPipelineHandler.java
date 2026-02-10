@@ -41,4 +41,14 @@ public interface MqttPublishPipelineHandler {
 		return 0;
 	}
 
+	/**
+	 * 是否为关键处理器
+	 * 关键处理器执行失败时会中断后续处理流程，防止数据不一致
+	 *
+	 * @return true 表示关键处理器（失败后中断流程），false 表示非关键处理器（失败后继续）
+	 */
+	default boolean isCritical() {
+		return false;
+	}
+
 }

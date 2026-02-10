@@ -66,7 +66,12 @@ public class DefaultMqttPublishPipeline implements IMqttPublishPipeline {
 				}
 			} catch (Throwable e) {
 				logger.error("Pipeline handler {} error", handler.getClass().getSimpleName(), e);
-				// 继续处理下一个处理器，不中断流程
+				// 如果是关键处理器，异常后中断流程，防止数据不一致
+				if (handler.isCritical()) {
+					logger.error("Critical pipeline handler {} failed, interrupting subsequent handlers", handler.getClass().getSimpleName());
+					break;
+				}
+				// 非关键处理器继续处理下一个处理器
 			}
 		}
 	}

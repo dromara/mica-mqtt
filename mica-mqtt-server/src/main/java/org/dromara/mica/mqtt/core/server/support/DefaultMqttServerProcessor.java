@@ -513,7 +513,14 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		// 使用管线处理发布消息
 		PublishContext publishContext = buildPublishContext(context, clientId, mqttQoS, topicName, publishMessage);
 		if (publishContext != null) {
-			publishPipeline.handle(publishContext);
+			// 异步处理，避免阻塞 I/O 线程
+			executor.execute(() -> {
+				try {
+					publishPipeline.handle(publishContext);
+				} catch (Throwable e) {
+					logger.error("Mqtt server clientId:{} topic:{} publish pipeline handle error.", clientId, topicName, e);
+				}
+			});
 		}
 	}
 

@@ -30,6 +30,7 @@ import org.tio.server.DefaultTioServerListener;
 import org.tio.utils.hutool.StrUtil;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
 
 /**
  * mqtt 服务监听
@@ -38,6 +39,7 @@ import java.io.IOException;
  */
 public class MqttServerAioListener extends DefaultTioServerListener {
 	private static final Logger logger = LoggerFactory.getLogger(MqttServerAioListener.class);
+	private final ExecutorService executor;
 	private final IMqttMessageStore messageStore;
 	private final IMqttSessionManager sessionManager;
 	private final IMqttMessagePipeline messagePipeline;
@@ -45,6 +47,7 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 	private final MqttMessageInterceptors messageInterceptors;
 
 	public MqttServerAioListener(MqttServerCreator serverCreator) {
+		this.executor = serverCreator.getMqttExecutor();
 		this.messageStore = serverCreator.getMessageStore();
 		this.sessionManager = serverCreator.getSessionManager();
 		this.messagePipeline = serverCreator.getMessagePipeline();
@@ -104,10 +107,17 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 			if (willMessage == null) {
 				return;
 			}
-			boolean result = messagePipeline.handle(willMessage);
-			logger.debug("Mqtt server clientId:{} send willMessage result:{}.", clientId, result);
-			// 4. 清理遗嘱消息
-			messageStore.clearWillMessage(clientId);
+			// 异步处理遗嘱消息，避免阻塞断连流程和级联影响
+			executor.execute(() -> {
+				try {
+					boolean result = messagePipeline.handle(willMessage);
+					logger.debug("Mqtt server clientId:{} send willMessage result:{}.", clientId, result);
+					// 清理遗嘱消息
+					messageStore.clearWillMessage(clientId);
+				} catch (Throwable e) {
+					logger.error("Mqtt server clientId:{} send willMessage async error.", clientId, e);
+				}
+			});
 		} catch (Throwable throwable) {
 			logger.error("Mqtt server clientId:{} send willMessage error.", clientId, throwable);
 		}
