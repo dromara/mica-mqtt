@@ -57,6 +57,7 @@ import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.json.JsonAdapter;
 import org.tio.utils.json.JsonUtil;
 import org.tio.utils.thread.ThreadUtils;
+import org.tio.utils.thread.pool.SynThreadPoolExecutor;
 import org.tio.utils.timer.DefaultTimerTaskService;
 import org.tio.utils.timer.TimerTaskService;
 
@@ -173,13 +174,21 @@ public class MqttServerCreator {
 	 */
 	private final MqttMessageInterceptors messageInterceptors = new MqttMessageInterceptors();
 	/**
-	 * taskService
+	 * tioExecutor
 	 */
-	private TimerTaskService taskService;
+	private SynThreadPoolExecutor tioExecutor;
+	/**
+	 * groupExecutor
+	 */
+	private ExecutorService groupExecutor;
 	/**
 	 * 业务消费线程
 	 */
 	private ExecutorService mqttExecutor;
+	/**
+	 * taskService
+	 */
+	private TimerTaskService taskService;
 	/**
 	 * json 处理器
 	 */
@@ -409,8 +418,21 @@ public class MqttServerCreator {
 		return this;
 	}
 
-	public MqttServerCreator taskService(TimerTaskService taskService) {
-		this.taskService = taskService;
+	public SynThreadPoolExecutor getTioExecutor() {
+		return tioExecutor;
+	}
+
+	public MqttServerCreator tioExecutor(SynThreadPoolExecutor tioExecutor) {
+		this.tioExecutor = tioExecutor;
+		return this;
+	}
+
+	public ExecutorService getGroupExecutor() {
+		return groupExecutor;
+	}
+
+	public MqttServerCreator groupExecutor(ExecutorService groupExecutor) {
+		this.groupExecutor = groupExecutor;
 		return this;
 	}
 
@@ -420,6 +442,15 @@ public class MqttServerCreator {
 
 	public MqttServerCreator mqttExecutor(ExecutorService mqttExecutor) {
 		this.mqttExecutor = mqttExecutor;
+		return this;
+	}
+
+	public TimerTaskService getTaskService() {
+		return taskService;
+	}
+
+	public MqttServerCreator taskService(TimerTaskService taskService) {
+		this.taskService = taskService;
 		return this;
 	}
 
@@ -530,13 +561,21 @@ public class MqttServerCreator {
 		if (this.connectStatusListener == null) {
 			this.connectStatusListener = new DefaultMqttConnectStatusListener();
 		}
-		// taskService
-		if (this.taskService == null) {
-			this.taskService = new DefaultTimerTaskService(200L, 60);
+		// tioExecutor
+		if (this.tioExecutor == null) {
+			this.tioExecutor = ThreadUtils.getTioExecutor();
+		}
+		// groupExecutor
+		if (this.groupExecutor == null) {
+			this.groupExecutor = ThreadUtils.getGroupExecutor();
 		}
 		// 业务线程池
 		if (this.mqttExecutor == null) {
 			this.mqttExecutor = ThreadUtils.getBizExecutor(ThreadUtils.MAX_POOL_SIZE_FOR_TIO);
+		}
+		// taskService
+		if (this.taskService == null) {
+			this.taskService = new DefaultTimerTaskService(200L, 60);
 		}
 		// 序列化
 		if (this.mqttSerializer == null) {
