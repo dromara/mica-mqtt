@@ -112,6 +112,11 @@ public class MqttServerConfiguration {
 		if (groupExecutorSize != null && groupExecutorSize > 0) {
 			serverCreator.groupExecutorSize(groupExecutorSize);
 		}
+		// mqtt 工作线程数
+		Integer mqttExecutorSize = properties.getMqttExecutorSize();
+		if (mqttExecutorSize != null && mqttExecutorSize > 0) {
+			serverCreator.mqttExecutorSize(mqttExecutorSize);
+		}
 		// mqtt 协议
 		MqttServerProperties.Listener mqttListener = properties.getMqttListener();
 		if (mqttListener.isEnable()) {

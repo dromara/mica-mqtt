@@ -454,6 +454,13 @@ public class MqttServerCreator {
 		return mqttExecutor;
 	}
 
+	public MqttServerCreator mqttExecutorSize(int poolSize) {
+		if (poolSize <= 0) {
+			throw new IllegalArgumentException("poolSize must be greater than zero.");
+		}
+		return mqttExecutor(ThreadUtils.getBizExecutor(poolSize));
+	}
+
 	public MqttServerCreator mqttExecutor(ExecutorService mqttExecutor) {
 		this.mqttExecutor = mqttExecutor;
 		return this;

@@ -30,6 +30,7 @@ public class MqttServerBench {
 		System.setProperty("tinylog.writer.level", "error");
 		// 启动 mqtt 服务
 		MqttServer.create()
+			.mqttExecutorSize(256)
 			.enableMqtt()
 			.statEnable(false)
 			.start();
