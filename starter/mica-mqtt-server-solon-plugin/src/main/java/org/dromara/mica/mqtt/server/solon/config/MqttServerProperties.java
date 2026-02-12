@@ -96,6 +96,14 @@ public class MqttServerProperties {
 	 * http api 监听器
 	 */
 	private HttpListener httpListener = new HttpListener();
+	/**
+	 * tio 编解码等线程数
+	 */
+	private Integer tioExecutorSize;
+	/**
+	 * AIO AsynchronousChannelGroup 的线程池
+	 */
+	private Integer groupExecutorSize;
 
 	@Getter
 	@Setter

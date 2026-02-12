@@ -102,6 +102,16 @@ public class MqttServerConfiguration {
 		if (properties.isDebug()) {
 			serverCreator.debug();
 		}
+		// tio 编解码等线程数
+		Integer tioExecutorSize = properties.getTioExecutorSize();
+		if (tioExecutorSize != null && tioExecutorSize > 0) {
+			serverCreator.tioExecutorSize(tioExecutorSize);
+		}
+		// AIO AsynchronousChannelGroup 的线程池
+		Integer groupExecutorSize = properties.getGroupExecutorSize();
+		if (groupExecutorSize != null && groupExecutorSize > 0) {
+			serverCreator.groupExecutorSize(groupExecutorSize);
+		}
 		// mqtt 协议
 		MqttServerProperties.Listener mqttListener = properties.getMqttListener();
 		if (mqttListener.isEnable()) {
