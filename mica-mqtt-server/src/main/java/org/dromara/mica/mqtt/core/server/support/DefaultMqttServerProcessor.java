@@ -128,10 +128,10 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		DefaultMqttPublishPipeline pipeline = new DefaultMqttPublishPipeline();
 		// 1. 保留消息处理
 		pipeline.addHandler(new RetainMessageHandler(messageStore, serverCreator.getNodeName()));
-		// 2. 消息监听器
-		pipeline.addHandler(new MessageListenerHandler(messageListener, executor));
-		// 3. 订阅转发
-		pipeline.addHandler(new SubscriptionForwardHandler(serverCreator, executor));
+		// 2. 消息监听器（同步执行，避免二次 submit）
+		pipeline.addHandler(new MessageListenerHandler(messageListener));
+		// 3. 订阅转发（同步执行，避免二次 submit）
+		pipeline.addHandler(new SubscriptionForwardHandler(serverCreator));
 		return pipeline;
 	}
 

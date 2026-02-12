@@ -16,8 +16,6 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline.handler;
 
-import java.util.concurrent.ExecutorService;
-
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.pipeline.MqttPublishPipelineHandler;
 import org.dromara.mica.mqtt.core.server.pipeline.PublishContext;
@@ -26,17 +24,17 @@ import org.slf4j.LoggerFactory;
 
 /**
  * 消息监听器处理器
+ * <p>
+ * 同步执行，避免二次 submit 到线程池，减少队列积压和内存占用
  *
  * @author L.cm
  */
 public class MessageListenerHandler implements MqttPublishPipelineHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MessageListenerHandler.class);
 	private final IMqttMessageListener messageListener;
-	private final ExecutorService executor;
 
-	public MessageListenerHandler(IMqttMessageListener messageListener, ExecutorService executor) {
+	public MessageListenerHandler(IMqttMessageListener messageListener) {
 		this.messageListener = messageListener;
-		this.executor = executor;
 	}
 
 	@Override
@@ -44,19 +42,17 @@ public class MessageListenerHandler implements MqttPublishPipelineHandler {
 		if (messageListener == null) {
 			return true;
 		}
-		executor.submit(() -> {
-			try {
-				messageListener.onMessage(
-					context.getContext(),
-					context.getClientId(),
-					context.getTopic(),
-					context.getQos(),
-					context.getPublishMessage()
-				);
-			} catch (Throwable e) {
-				logger.error("Message listener error", e);
-			}
-		});
+		try {
+			messageListener.onMessage(
+				context.getContext(),
+				context.getClientId(),
+				context.getTopic(),
+				context.getQos(),
+				context.getPublishMessage()
+			);
+		} catch (Throwable e) {
+			logger.error("Message listener error", e);
+		}
 		return true;
 	}
 

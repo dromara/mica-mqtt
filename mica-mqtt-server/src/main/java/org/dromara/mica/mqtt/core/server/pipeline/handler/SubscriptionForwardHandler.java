@@ -30,66 +30,61 @@ import org.tio.core.Tio;
 import org.tio.core.TioConfig;
 
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 
 /**
  * 订阅转发处理器 - 转发给订阅客户端
+ * <p>
+ * 同步执行，避免二次 submit 到线程池，减少队列积压和内存占用
  *
  * @author L.cm
  */
 public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 	private static final Logger logger = LoggerFactory.getLogger(SubscriptionForwardHandler.class);
 	private final IMqttSessionManager sessionManager;
-	private final ExecutorService executor;
 
-	public SubscriptionForwardHandler(MqttServerCreator serverCreator, ExecutorService executor) {
+	public SubscriptionForwardHandler(MqttServerCreator serverCreator) {
 		this.sessionManager = serverCreator.getSessionManager();
-		this.executor = executor;
 	}
 
 	@Override
 	public boolean handle(PublishContext context) {
-		// 异步转发
-		executor.submit(() -> {
-			// 搜索所有订阅者
-			List<Subscribe> subscribeList = sessionManager.searchSubscribe(context.getTopic());
-			if (subscribeList == null || subscribeList.isEmpty()) {
-				return;
-			}
-			TioConfig tioConfig = context.getContext().getTioConfig();
-			String publisherClientId = context.getClientId();
-			try {
-				for (Subscribe subscribe : subscribeList) {
-					// MQTT 5.0 No Local: 如果订阅时设置了 No Local 标志，且订阅者就是消息发布者，则跳过
-					if (subscribe.isNoLocal() && subscribe.getClientId().equals(publisherClientId)) {
-						logger.debug("Mqtt Topic:{} skip forwarding to clientId:{} due to No Local flag", context.getTopic(), subscribe.getClientId());
-						continue;
-					}
-					// 获取客户端上下文
-					ChannelContext clientContext = Tio.getByBsId(tioConfig, subscribe.getClientId());
-					if (clientContext == null || clientContext.isClosed()) {
-						logger.warn("Mqtt Topic:{} publish to clientId:{} ChannelContext is null may be disconnected.", context.getTopic(), subscribe.getClientId());
-						continue;
-					}
-					// 确定 QoS（取最小的）
-					int qosValue = Math.min(context.getQos().value(), subscribe.getMqttQoS());
-					MqttQoS mqttQoS = MqttQoS.valueOf(qosValue);
-					// 创建发布消息
-					MqttPublishMessage publishMessage = MqttPublishMessage.builder()
-						.topicName(context.getTopic())
-						.payload(context.getPayload())
-						.qos(mqttQoS)
-						.retained(false)
-						.messageId(context.getMessageId())
-						.properties(context.getProperties())
-						.build();
-					// 发送消息
-					Tio.send(clientContext, publishMessage);
+		List<Subscribe> subscribeList = sessionManager.searchSubscribe(context.getTopic());
+		if (subscribeList == null || subscribeList.isEmpty()) {
+			return true;
+		}
+		TioConfig tioConfig = context.getContext().getTioConfig();
+		String publisherClientId = context.getClientId();
+		try {
+			for (Subscribe subscribe : subscribeList) {
+				// MQTT 5.0 No Local: 如果订阅时设置了 No Local 标志，且订阅者就是消息发布者，则跳过
+				if (subscribe.isNoLocal() && subscribe.getClientId().equals(publisherClientId)) {
+					logger.debug("Mqtt Topic:{} skip forwarding to clientId:{} due to No Local flag", context.getTopic(), subscribe.getClientId());
+					continue;
 				}
-			} catch (Throwable e) {
-				logger.error("Subscription forward error", e);
+				// 获取客户端上下文
+				ChannelContext clientContext = Tio.getByBsId(tioConfig, subscribe.getClientId());
+				if (clientContext == null || clientContext.isClosed()) {
+					logger.warn("Mqtt Topic:{} publish to clientId:{} ChannelContext is null may be disconnected.", context.getTopic(), subscribe.getClientId());
+					continue;
+				}
+				// 确定 QoS（取最小的）
+				int qosValue = Math.min(context.getQos().value(), subscribe.getMqttQoS());
+				MqttQoS mqttQoS = MqttQoS.valueOf(qosValue);
+				// 创建发布消息
+				MqttPublishMessage publishMessage = MqttPublishMessage.builder()
+					.topicName(context.getTopic())
+					.payload(context.getPayload())
+					.qos(mqttQoS)
+					.retained(false)
+					.messageId(context.getMessageId())
+					.properties(context.getProperties())
+					.build();
+				// 发送消息
+				Tio.send(clientContext, publishMessage);
 			}
-		});
+		} catch (Throwable e) {
+			logger.error("Subscription forward error", e);
+		}
 		return true;
 	}
 
