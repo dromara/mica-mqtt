@@ -4,8 +4,8 @@
 
 ### v2.6.0-M1 - 2026-03-01
 
-- feat(mqtt-server): 支持 MQTT 5.0 订阅的 No Local 标志功能，gitee #IDB1DN 感谢 `@rocker` 反馈
-- feat(mqtt-server): 重构消息处理架构引入消息处理管线。
+- feat(mqtt-server): 支持 MQTT 5.0 订阅的 No Local 标志功能，gitee #IDB1DN 感谢 `@rocker` 反馈。
+- feat(mqtt-server): 重构消息处理架构引入消息处理管线，消息转发携带 mqtt 5.0 properties 属性。
 
 ### v2.5.12 - 2026-02-10
 - ✨ 在 Solon 和 Spring Boot 配置中新增多线程池大小配置，包括 group-executor-size、tio-executor-size、mqtt-executor-size、
