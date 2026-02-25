@@ -642,17 +642,14 @@ public class MqttServerCreator {
 		// MqttServer
 		MqttProtocolListeners listeners = new MqttProtocolListeners(this, tioConfig, this.listeners);
 		MqttServer mqttServer = new MqttServer(this, tioConfig, listeners);
-
 		// 初始化消息管线，添加所有消息类型的处理器
-		DefaultMqttMessagePipeline pipeline = (DefaultMqttMessagePipeline) this.messagePipeline;
-		pipeline.addHandler(new ConnectMessageHandler(mqttServer));
-		pipeline.addHandler(new SubscribeMessageHandler(mqttServer));
-		pipeline.addHandler(new UnsubscribeMessageHandler(mqttServer));
-		pipeline.addHandler(new UpStreamMessageHandler(mqttServer));
-		pipeline.addHandler(new DownStreamMessageHandler(mqttServer));
-		pipeline.addHandler(new HttpApiMessageHandler(mqttServer));
-		pipeline.addHandler(new DisconnectMessageHandler(mqttServer));
-
+		this.messagePipeline.addHandler(new ConnectMessageHandler(mqttServer));
+		this.messagePipeline.addHandler(new SubscribeMessageHandler(mqttServer));
+		this.messagePipeline.addHandler(new UnsubscribeMessageHandler(mqttServer));
+		this.messagePipeline.addHandler(new UpStreamMessageHandler(mqttServer));
+		this.messagePipeline.addHandler(new DownStreamMessageHandler(mqttServer));
+		this.messagePipeline.addHandler(new HttpApiMessageHandler(mqttServer));
+		this.messagePipeline.addHandler(new DisconnectMessageHandler(mqttServer));
 		return mqttServer;
 	}
 

@@ -16,16 +16,13 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * 默认 MQTT 消息处理管线实现
@@ -34,51 +31,21 @@ import org.slf4j.LoggerFactory;
  */
 public class DefaultMqttMessagePipeline implements IMqttMessagePipeline {
 	private static final Logger logger = LoggerFactory.getLogger(DefaultMqttMessagePipeline.class);
-
 	/**
-	 * 所有消息类型的处理器列表
+	 * 处理器列表
 	 */
-	private final List<MqttMessageHandler> allHandlers = new ArrayList<>();
-	
-	/**
-	 * 按消息类型分组的处理器映射
-	 */
-	private final Map<MessageType, List<MqttMessageHandler>> typeHandlersMap = new ConcurrentHashMap<>();
+	private final List<MqttMessageHandler> handlers = new ArrayList<>();
 
 	public DefaultMqttMessagePipeline() {
 	}
 
-	/**
-	 * 添加处理器到所有消息类型
-	 *
-	 * @param handler 处理器
-	 * @return this
-	 */
-	public DefaultMqttMessagePipeline addHandler(MqttMessageHandler handler) {
+	@Override
+	public void addHandler(MqttMessageHandler handler) {
 		if (handler != null) {
-			this.allHandlers.add(handler);
+			this.handlers.add(handler);
 			// 按顺序排序
-			this.allHandlers.sort(Comparator.comparingInt(MqttMessageHandler::getOrder));
+			this.handlers.sort(Comparator.comparingInt(MqttMessageHandler::getOrder));
 		}
-		return this;
-	}
-
-	/**
-	 * 添加处理器到特定消息类型
-	 *
-	 * @param messageType 消息类型
-	 * @param handler 处理器
-	 * @return this
-	 */
-	public DefaultMqttMessagePipeline addHandler(MessageType messageType, MqttMessageHandler handler) {
-		if (messageType != null && handler != null) {
-			this.typeHandlersMap.computeIfAbsent(messageType, k -> new ArrayList<>())
-				.add(handler);
-			// 按顺序排序
-			this.typeHandlersMap.get(messageType)
-				.sort(Comparator.comparingInt(MqttMessageHandler::getOrder));
-		}
-		return this;
 	}
 
 	@Override
@@ -86,17 +53,8 @@ public class DefaultMqttMessagePipeline implements IMqttMessagePipeline {
 		if (message == null) {
 			return false;
 		}
-		MessageType messageType = message.getMessageType();
-		
-		// 先处理所有消息类型的处理器
-		processHandlers(allHandlers, message);
-		
-		// 再处理特定消息类型的处理器
-		List<MqttMessageHandler> typeHandlers = typeHandlersMap.get(messageType);
-		if (typeHandlers != null) {
-			processHandlers(typeHandlers, message);
-		}
-		
+		// 处理所有消息类型的处理器
+		processHandlers(handlers, message);
 		return true;
 	}
 
@@ -111,12 +69,12 @@ public class DefaultMqttMessagePipeline implements IMqttMessagePipeline {
 			try {
 				boolean continueProcess = handler.handle(message);
 				if (!continueProcess) {
-					logger.debug("Pipeline handler {} interrupted the process for message type: {}", 
+					logger.debug("Pipeline handler {} interrupted the process for message type: {}",
 								 handler.getClass().getSimpleName(), message.getMessageType());
 					break;
 				}
 			} catch (Throwable e) {
-				logger.error("Pipeline handler {} error for message type: {}", 
+				logger.error("Pipeline handler {} error for message type: {}",
 							 handler.getClass().getSimpleName(), message.getMessageType(), e);
 				// 继续处理下一个处理器，不中断流程
 			}
