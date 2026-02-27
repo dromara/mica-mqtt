@@ -82,6 +82,10 @@ public class MqttClientProperties {
 	 */
 	private String bindNetworkInterface;
 	/**
+	 * 绑定端口，默认为 null，采用随机端口
+	 */
+	private Integer bindPort;
+	/**
 	 * 接收数据的 buffer size，默认：8KB
 	 */
 	private String readBufferSize = "8KB";
