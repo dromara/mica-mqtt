@@ -79,6 +79,10 @@ public final class MqttClientCreator {
 	 */
 	private String bindIp;
 	/**
+	 * 绑定端口，默认为 null，采用随机端口
+	 */
+	private Integer bindPort;
+	/**
 	 * 接收数据的 buffer size，默认：8k
 	 */
 	private int readBufferSize = MqttConstant.DEFAULT_MAX_READ_BUFFER_SIZE;
@@ -231,6 +235,10 @@ public final class MqttClientCreator {
 		return bindIp;
 	}
 
+	public Integer getBindPort() {
+		return bindPort;
+	}
+
 	public int getReadBufferSize() {
 		return readBufferSize;
 	}
@@ -377,6 +385,11 @@ public final class MqttClientCreator {
 
 	public MqttClientCreator bindIp(String bindIp) {
 		this.bindIp = bindIp;
+		return this;
+	}
+
+	public MqttClientCreator bindPort(Integer bindPort) {
+		this.bindPort = bindPort;
 		return this;
 	}
 

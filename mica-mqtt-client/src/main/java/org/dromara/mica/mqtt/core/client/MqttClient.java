@@ -480,9 +480,9 @@ public final class MqttClient implements IMqttClient {
 		Node node = new Node(config.getIp(), config.getPort());
 		try {
 			if (sync) {
-				this.tioClient.connect(node, config.getBindIp(), 0, config.getTimeout());
+				this.tioClient.connect(node, config.getBindIp(), config.getBindPort(), config.getTimeout());
 			} else {
-				this.tioClient.asyncConnect(node, config.getBindIp(), 0, config.getTimeout());
+				this.tioClient.asyncConnect(node, config.getBindIp(), config.getBindPort(), config.getTimeout());
 			}
 			return this;
 		} catch (Exception e) {
