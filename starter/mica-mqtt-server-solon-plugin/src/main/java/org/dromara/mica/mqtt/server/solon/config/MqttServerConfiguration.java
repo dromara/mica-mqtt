@@ -14,7 +14,10 @@ import org.dromara.mica.mqtt.server.solon.event.SolonEventMqttConnectStatusListe
 import org.noear.solon.annotation.Bean;
 import org.noear.solon.annotation.Condition;
 import org.noear.solon.annotation.Configuration;
+import org.noear.solon.annotation.Inject;
 import org.tio.core.Node;
+
+import java.util.List;
 
 /**
  * <b>(MqttServerConfiguration)</b>
@@ -51,7 +54,12 @@ public class MqttServerConfiguration {
 	}
 
 	@Bean
-	public MqttServerCreator mqttServerCreator(MqttServerProperties properties) {
+	public MqttServerCreator mqttServerCreator(MqttServerProperties properties,
+											   @Inject(required = false) List<MqttServerPropertiesCustomizer> customizers) {
+		if (customizers != null) {
+			customizers.forEach(customizer -> customizer.customize(properties));
+		}
+
 		MqttServerCreator serverCreator = MqttServer.create()
 			.name(properties.getName())
 			.heartbeatTimeout(properties.getHeartbeatTimeout())
