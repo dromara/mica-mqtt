@@ -25,7 +25,10 @@ import org.dromara.mica.mqtt.core.deserialize.MqttJsonDeserializer;
 import org.noear.solon.annotation.Bean;
 import org.noear.solon.annotation.Condition;
 import org.noear.solon.annotation.Configuration;
+import org.noear.solon.annotation.Inject;
 import org.tio.utils.hutool.StrUtil;
+
+import java.util.List;
 
 /**
  * mqtt client 配置
@@ -48,7 +51,12 @@ public class MqttClientConfiguration {
 	}
 
 	@Bean
-	public MqttClientCreator mqttClientCreator(MqttClientProperties properties) {
+	public MqttClientCreator mqttClientCreator(MqttClientProperties properties,
+											   @Inject(required = false) List<MqttClientPropertiesCustomizer> customizers) {
+		if (customizers != null) {
+			customizers.forEach(customizer -> customizer.customize(properties));
+		}
+
 		MqttClientCreator clientCreator = MqttClient.create()
 			.name(properties.getName())
 			.ip(properties.getIp())

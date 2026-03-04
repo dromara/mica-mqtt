@@ -77,6 +77,7 @@ public class MqttServerConfiguration {
 
 	@Bean
 	public MqttServerCreator mqttServerCreator(MqttServerProperties properties,
+											   ObjectProvider<MqttServerPropertiesCustomizer> propertiesCustomizers,
 											   ObjectProvider<IMqttServerAuthHandler> authHandlerObjectProvider,
 											   ObjectProvider<IMqttServerUniqueIdService> uniqueIdServiceObjectProvider,
 											   ObjectProvider<IMqttServerSubscribeValidator> subscribeValidatorObjectProvider,
@@ -89,6 +90,8 @@ public class MqttServerConfiguration {
 											   ObjectProvider<IMqttConnectStatusListener> connectStatusListenerObjectProvider,
 											   ObjectProvider<IMqttMessageInterceptor> messageInterceptorObjectProvider,
 											   ObjectProvider<MqttServerCustomizer> customizers) {
+		propertiesCustomizers.orderedStream().forEach(customizer -> customizer.customize(properties));
+
 		MqttServerCreator serverCreator = MqttServer.create()
 			.name(properties.getName())
 			.heartbeatTimeout(properties.getHeartbeatTimeout())

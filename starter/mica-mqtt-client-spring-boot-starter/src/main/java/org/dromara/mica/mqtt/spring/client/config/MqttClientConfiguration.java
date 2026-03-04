@@ -68,7 +68,11 @@ public class MqttClientConfiguration {
 	}
 
 	@Bean
-	public MqttClientCreator mqttClientCreator(MqttClientProperties properties, ObjectProvider<SSLEngineCustomizer> sslCustomizers) {
+	public MqttClientCreator mqttClientCreator(MqttClientProperties properties,
+											   ObjectProvider<MqttClientPropertiesCustomizer> customizers,
+											   ObjectProvider<SSLEngineCustomizer> sslCustomizers) {
+		customizers.orderedStream().forEach(customizer -> customizer.customize(properties));
+
 		MqttClientCreator clientCreator = MqttClient.create()
 			.name(properties.getName())
 			.ip(properties.getIp())
