@@ -18,6 +18,10 @@ package org.dromara.mica.mqtt.core.server.pipeline.handler;
 
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+import org.dromara.mica.mqtt.codec.properties.MqttProperty;
+import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.pipeline.MqttPublishPipelineHandler;
@@ -52,6 +56,58 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 		if (subscribeList == null || subscribeList.isEmpty()) {
 			return true;
 		}
+
+		MqttProperties properties = context.getProperties();
+		if (properties != null && !properties.isEmpty()) {
+			Long receivedAt = context.getPublishReceivedAt();
+			if (receivedAt == null) {
+				receivedAt = context.getTimestamp();
+			}
+			long elapsed = (System.currentTimeMillis() - receivedAt) / 1000;
+
+			Integer expiryInterval = properties.getPropertyValue(MqttPropertyType.MESSAGE_EXPIRY_INTERVAL);
+			if (expiryInterval != null) {
+				long remaining = expiryInterval - elapsed;
+				if (remaining <= 0) {
+					logger.debug("Mqtt Topic:{} message expired, skip forwarding", context.getTopic());
+					return true;
+				}
+			}
+
+			boolean hasModified = false;
+			for (MqttProperty property : properties.listAll()) {
+				int propertyId = property.propertyId();
+				if (propertyId == MqttPropertyType.TOPIC_ALIAS.value() ||
+					propertyId == MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value()) {
+					hasModified = true;
+				} else if (propertyId == MqttPropertyType.MESSAGE_EXPIRY_INTERVAL.value() && elapsed > 0) {
+					hasModified = true;
+				}
+			}
+
+			if (hasModified) {
+				MqttProperties newProperties = new MqttProperties();
+				for (MqttProperty property : properties.listAll()) {
+					int propertyId = property.propertyId();
+					// MQTT 5.0 规范: 服务端在转发时不能携带发布者的 Topic Alias 和 Subscription Identifier
+					if (propertyId == MqttPropertyType.TOPIC_ALIAS.value() ||
+						propertyId == MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value()) {
+						continue;
+					} else if (propertyId == MqttPropertyType.MESSAGE_EXPIRY_INTERVAL.value()) {
+						if (elapsed > 0 && expiryInterval != null) {
+							long remaining = expiryInterval - elapsed;
+							newProperties.add(new IntegerProperty(propertyId, Math.max(0, (int) remaining)));
+						} else {
+							newProperties.add(property);
+						}
+					} else {
+						newProperties.add(property);
+					}
+				}
+				properties = newProperties;
+			}
+		}
+
 		TioConfig tioConfig = context.getContext().getTioConfig();
 		String publisherClientId = context.getClientId();
 		try {
@@ -77,7 +133,7 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 					.qos(mqttQoS)
 					.retained(false)
 					.messageId(context.getMessageId())
-					.properties(context.getProperties())
+					.properties(properties)
 					.build();
 				// 发送消息
 				Tio.send(clientContext, publishMessage);
