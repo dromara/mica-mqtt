@@ -2,6 +2,11 @@
 
 ## 发行版本
 
+### v2.6.0 - 2026-03-01
+
+- feat(mqtt-server): 支持 MQTT 5.0 订阅的 No Local 标志功能，gitee #IDB1DN 感谢 `@rocker` 反馈。
+- feat(mqtt-server): 重构消息处理架构引入消息处理管线，MQTT 5.0 消息转发属性 properties 处理。
+
 ### v2.6.0-M1 - 2026-03-01
 
 - feat(mqtt-server): 支持 MQTT 5.0 订阅的 No Local 标志功能，gitee #IDB1DN 感谢 `@rocker` 反馈。
