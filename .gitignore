@@ -31,6 +31,10 @@ nbdist/
 ### vscode ###
 .vscode
 
+### opencode ###
+.opencode
+-p
+
 ### maven ###
 target/
 *.war

@@ -78,14 +78,14 @@ Client A (Node1)  ─publish─→  Node1  ─local deliver─→  Client B (Nod
 
 #### 场景 2：客户端 A 发布消息到远程订阅者
 ```
-Client A (Node1)  ─publish─→  Node1  ─cluster forward─→  Node2  ─deliver─→  Client C (Node2)
+Client A (Node1)  ─publish─→  Node1  ─cluster forward (单次)─→  Node2  ─local deliver─→  Client C, D, E (Node2)
 ```
-**处理步骤：**
-1. Node1 收到 Client A 的 PUBLISH 消息
-2. Node1 查询订阅表，发现 Client C 订阅了该 topic
-3. Node1 检查 Client C 所在节点（Node2）
-4. Node1 通过集群连接向 Node2 发送 `PublishForwardMessage`
-5. Node2 收到后，向 Client C 推送消息
+**处理步骤（避免网络风暴的 O(1) 路由）：**
+1. Node1 收到 Client A 的 PUBLISH 消息。
+2. Node1 查询全局路由表，发现 Node2 上有客户端订阅了该 topic。
+3. Node1 构造**一条**不携带特定目标 ClientId 的 `PublishForwardMessage`。
+4. Node1 通过集群连接向 Node2 发送该消息。
+5. Node2 收到后，在 **Node2 本地**查询订阅表，并将消息扇出（Fan-out）分发给 Client C, D, E。
 
 ---
 
@@ -134,7 +134,9 @@ public abstract class ClusterMessage implements Serializable {
 		PUBLISH_FORWARD,       // 消息转发
 		HEARTBEAT,             // 心跳
 		NODE_JOIN,             // 节点加入
-		NODE_LEAVE             // 节点离开
+		NODE_LEAVE,            // 节点离开
+		STATE_SYNC_REQUEST,    // 状态同步请求（新节点加入时请求全局路由表）
+		STATE_SYNC_RESPONSE    // 状态同步响应
 	}
 }
 ```
@@ -144,7 +146,7 @@ public abstract class ClusterMessage implements Serializable {
 **1. PublishForwardMessage（消息转发）**
 ```java
 public class PublishForwardMessage extends ClusterMessage {
-	private String targetClientId;  // 目标客户端ID
+	// 移除 targetClientId，依靠目标节点本地再路由以降低网络开销
 	private String topic;           // 主题
 	private byte[] payload;         // 消息体
 	private int qos;                // QoS 级别
@@ -192,6 +194,12 @@ public interface IMqttSessionManager {
 	void removeRemoteClient(String clientId);
 
 	/**
+	 * 节点宕机时级联清理该节点所有客户端及订阅
+	 * @param nodeId 节点ID
+	 */
+	void clearNodeClientsAndSubscriptions(String nodeId);
+
+	/**
 	 * 同步远程订阅信息
 	 * @param clientId 客户端ID
 	 * @param nodeId 所在节点
@@ -230,17 +238,16 @@ public class ClusterMessageDispatcher {
 			localSubs.forEach(sub -> publishLocal(sub, message));
 		}
 
-		// 4. 远程转发
-		nodeGroups.forEach((nodeId, subs) -> {
-			if (!nodeId.equals(localNodeId)) {
-				subs.forEach(sub -> forwardToNode(nodeId, sub, message));
+		// 4. 远程转发（O(1) 网络开销：每个节点只发一次）
+		nodeGroups.keySet().forEach(nodeId -> {
+			if (nodeId != null && !nodeId.equals(localNodeId)) {
+				forwardToNode(nodeId, message);
 			}
 		});
 	}
 
-	private void forwardToNode(String nodeId, Subscribe sub, MqttPublishMessage msg) {
+	private void forwardToNode(String nodeId, MqttPublishMessage msg) {
 		PublishForwardMessage clusterMsg = new PublishForwardMessage();
-		clusterMsg.setTargetClientId(sub.getClientId());
 		clusterMsg.setTopic(msg.variableHeader().topicName());
 		clusterMsg.setPayload(msg.payload());
 		clusterMsg.setQos(msg.fixedHeader().qosLevel().value());
@@ -649,14 +656,15 @@ mqtt.server.cluster.seed-members=192.168.1.10:9000,192.168.1.11:9000
 - **超大规模**：建议使用 Redis/Kafka 消息分发方案（见 2.4.x broker 模块）
 
 ### 7.3 数据一致性
-- **最终一致性**：集群采用异步复制，存在短暂数据不一致窗口
-- **会话粘性**：同一客户端重连应尽量路由到原节点（需负载均衡器支持）
-- **保留消息**：需持久化到共享存储（DB/Redis）
+- **节点初始状态同步**：新节点启动加入集群后，必须先发送 `STATE_SYNC_REQUEST` 向存活节点全量拉取当前订阅树和在线客户端状态，完成后再提供服务。
+- **最终一致性**：集群运行期间采用异步广播，存在短暂数据不一致窗口。
+- **会话接管（Session Takeover）**：如果 Client ID 发生跨节点重连，新节点必须广播踢除指令，旧节点需强制清理旧连接。
+- **保留消息（Retained）**：若追求无外部依赖，保留消息需在集群内广播并由各节点在内存中保存副本快照。
 
 ### 7.4 故障恢复
-- **脑裂问题**：当前方案不处理，建议通过网络隔离避免
-- **节点故障**：客户端需实现重连机制
-- **消息丢失**：QoS 1/2 消息需持久化会话存储
+- **节点故障级联清理**：当收到 `NODE_LEAVE` 事件时，存活节点必须原子性清理该宕机节点上的所有远程客户端及对应的订阅信息，避免产生路由黑洞。
+- **脑裂问题**：当前方案不处理，建议通过网络隔离避免。
+- **QoS 与消息可靠性**：内部集群转发基于可靠的 TCP 通信。QoS 1/2 的发布确认直接由接入节点回复，若目标节点投递失败则依赖目标节点的离线会话重传，避免跨节点的长链路 ACK 等待。
 
 ---
 
