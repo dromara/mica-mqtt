@@ -1,6 +1,30 @@
+/*
+ * Copyright (c) 2019-2029, Dreamlu 卢春梦 (596392912@qq.com & dreamlu.net).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dromara.mica.mqtt.broker.cluster;
 
-import org.dromara.mica.mqtt.broker.cluster.message.*;
+import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.ClientConnectMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.ClientDisconnectMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.GenericClusterMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.MessageType;
+import org.dromara.mica.mqtt.broker.cluster.message.PublishForwardMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.StateSyncResponseMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.SubscribeNotifyMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.UnsubscribeNotifyMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
@@ -12,8 +36,18 @@ import org.tio.server.cluster.core.ClusterConfig;
 import org.tio.server.cluster.core.ClusterImpl;
 import org.tio.server.cluster.message.ClusterDataMessage;
 
-import java.io.*;
-import java.util.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class MqttClusterManager {
     private static final Logger logger = LoggerFactory.getLogger(MqttClusterManager.class);
@@ -105,33 +139,50 @@ public class MqttClusterManager {
 
     private void handleClusterMessageInternal(ClusterMessage clusterMsg, ClusterDataMessage rawMessage) {
         ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
-        
-        if (clusterMsg.getType() == MessageType.PUBLISH_FORWARD) {
-            PublishForwardMessage pfm = (PublishForwardMessage) clusterMsg;
-            mqttServer.publishAll(pfm.getTopic(), pfm.getPayload(), MqttQoS.valueOf(pfm.getQos()), pfm.isRetain());
-        } else if (clusterMsg.getType() == MessageType.SUBSCRIBE_NOTIFY) {
-            SubscribeNotifyMessage snm = (SubscribeNotifyMessage) clusterMsg;
-            sessionManager.syncRemoteSubscriptions(snm.getClientId(), snm.getNodeId(), snm.getSubscriptions());
-        } else if (clusterMsg.getType() == MessageType.UNSUBSCRIBE_NOTIFY) {
-            UnsubscribeNotifyMessage unm = (UnsubscribeNotifyMessage) clusterMsg;
-            sessionManager.removeRemoteSubscriptions(unm.getClientId(), unm.getTopics());
-        } else if (clusterMsg.getType() == MessageType.CLIENT_CONNECT) {
-            ClientConnectMessage ccm = (ClientConnectMessage) clusterMsg;
-            sessionManager.registerRemoteClient(ccm.getClientId(), ccm.getSourceNode());
-        } else if (clusterMsg.getType() == MessageType.CLIENT_DISCONNECT) {
-            ClientDisconnectMessage cdm = (ClientDisconnectMessage) clusterMsg;
-            sessionManager.removeRemoteClient(cdm.getClientId());
-        } else if (clusterMsg.getType() == MessageType.STATE_SYNC_REQUEST) {
-            handleStateSyncRequest(clusterMsg.getSourceNode());
-        } else if (clusterMsg.getType() == MessageType.STATE_SYNC_RESPONSE) {
-            StateSyncResponseMessage ssm = (StateSyncResponseMessage) clusterMsg;
-            sessionManager.syncFullState(ssm.getClientNodeMap(), ssm.getSubscriptionMap());
-            logger.info("State sync completed, received {} client mappings", ssm.getClientNodeMap().size());
-        } else if (clusterMsg.getType() == MessageType.NODE_LEAVE) {
-            // 节点离开消息，需要清理该节点的所有订阅
-            String leavingNodeId = clusterMsg.getSourceNode();
-            sessionManager.clearNodeClientsAndSubscriptions(leavingNodeId);
-            logger.info("Node {} left cluster, cleaned up its clients and subscriptions", leavingNodeId);
+        switch (clusterMsg.getType()) {
+            case PUBLISH_FORWARD: {
+                PublishForwardMessage pfm = (PublishForwardMessage) clusterMsg;
+                mqttServer.publishAll(pfm.getTopic(), pfm.getPayload(), MqttQoS.valueOf(pfm.getQos()), pfm.isRetain());
+                break;
+            }
+            case SUBSCRIBE_NOTIFY: {
+                SubscribeNotifyMessage snm = (SubscribeNotifyMessage) clusterMsg;
+                sessionManager.syncRemoteSubscriptions(snm.getClientId(), snm.getNodeId(), snm.getSubscriptions());
+                break;
+            }
+            case UNSUBSCRIBE_NOTIFY: {
+                UnsubscribeNotifyMessage unm = (UnsubscribeNotifyMessage) clusterMsg;
+                sessionManager.removeRemoteSubscriptions(unm.getClientId(), unm.getTopics());
+                break;
+            }
+            case CLIENT_CONNECT: {
+                ClientConnectMessage ccm = (ClientConnectMessage) clusterMsg;
+                sessionManager.registerRemoteClient(ccm.getClientId(), ccm.getSourceNode());
+                break;
+            }
+            case CLIENT_DISCONNECT: {
+                ClientDisconnectMessage cdm = (ClientDisconnectMessage) clusterMsg;
+                sessionManager.removeRemoteClient(cdm.getClientId());
+                break;
+            }
+            case STATE_SYNC_REQUEST:
+                handleStateSyncRequest(clusterMsg.getSourceNode());
+                break;
+            case STATE_SYNC_RESPONSE: {
+                StateSyncResponseMessage ssm = (StateSyncResponseMessage) clusterMsg;
+                sessionManager.syncFullState(ssm.getClientNodeMap(), ssm.getSubscriptionMap());
+                logger.info("State sync completed, received {} client mappings", ssm.getClientNodeMap().size());
+                break;
+            }
+            case NODE_LEAVE: {
+                String leavingNodeId = clusterMsg.getSourceNode();
+                sessionManager.clearNodeClientsAndSubscriptions(leavingNodeId);
+                logger.info("Node {} left cluster, cleaned up its clients and subscriptions", leavingNodeId);
+                break;
+            }
+            default:
+                logger.warn("Unknown cluster message type: {}", clusterMsg.getType());
+                break;
         }
     }
 
@@ -180,7 +231,7 @@ public class MqttClusterManager {
             String[] parts = nodeId.split(":");
             if (parts.length == 2) {
                 Node node = new Node(parts[0], Integer.parseInt(parts[1]));
-                clusterMsg.setSourceNode(localNodeId);
+                fillMessageMeta(clusterMsg);
                 byte[] data = serialize(clusterMsg);
                 cluster.send(node, data);
             }
@@ -194,12 +245,17 @@ public class MqttClusterManager {
             return;
         }
         try {
-            clusterMsg.setSourceNode(localNodeId);
+            fillMessageMeta(clusterMsg);
             byte[] data = serialize(clusterMsg);
             cluster.broadcast(data);
         } catch (Exception e) {
             logger.error("Failed to broadcast message", e);
         }
+    }
+
+    private void fillMessageMeta(ClusterMessage clusterMsg) {
+        clusterMsg.setSourceNode(localNodeId);
+        clusterMsg.setTimestamp(System.currentTimeMillis());
     }
 
     public void stop() {

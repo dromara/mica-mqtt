@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2019-2029, Dreamlu 卢春梦 (596392912@qq.com & dreamlu.net).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.dromara.mica.mqtt.broker.cluster;
 
 import org.dromara.mica.mqtt.broker.cluster.message.SubscribeNotifyMessage;
@@ -11,10 +27,12 @@ import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * 集群 Session 管理器，装饰已有的 IMqttSessionManager
@@ -36,13 +54,13 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
     public void registerRemoteClient(String clientId, String nodeId) {
         clientNodeMap.put(clientId, nodeId);
-        logger.info("[Cluster] Registered remote client: {} -> node: {}", clientId, nodeId);
+        logger.debug("[Cluster] Registered remote client: {} -> node: {}", clientId, nodeId);
     }
 
     public void removeRemoteClient(String clientId) {
         String node = clientNodeMap.remove(clientId);
         delegate.remove(clientId);
-        logger.info("[Cluster] Removed remote client: {} from node: {}", clientId, node);
+        logger.debug("[Cluster] Removed remote client: {} from node: {}", clientId, node);
     }
 
     public void clearNodeClientsAndSubscriptions(String nodeId) {
@@ -59,7 +77,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
         registerRemoteClient(clientId, nodeId);
         for (Subscribe sub : subscriptions) {
             delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), clientId, sub.getMqttQoS(), sub.isNoLocal());
-            logger.info("[Cluster] Synced remote subscription: client={}, topic={}, node={}", 
+            logger.debug("[Cluster] Synced remote subscription: client={}, topic={}, node={}",
                 clientId, sub.getTopicFilter(), nodeId);
         }
     }
@@ -67,7 +85,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
     public void removeRemoteSubscriptions(String clientId, List<String> topics) {
         for (String topic : topics) {
             delegate.removeSubscribe(topic, clientId);
-            logger.info("[Cluster] Removed remote subscription: client={}, topic={}", clientId, topic);
+            logger.debug("[Cluster] Removed remote subscription: client={}, topic={}", clientId, topic);
         }
     }
 
@@ -80,9 +98,9 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
         notifyMessage.setType(MessageType.SUBSCRIBE_NOTIFY);
         notifyMessage.setClientId(clientId);
         notifyMessage.setNodeId(clusterManager.getLocalNodeId());
-        notifyMessage.setSubscriptions(java.util.Collections.singletonList(subscribe));
+        notifyMessage.setSubscriptions(Collections.singletonList(subscribe));
         
-        logger.info("[Cluster] Broadcasting subscription: client={}, topic={}, node={}", 
+        logger.debug("[Cluster] Broadcasting subscription: client={}, topic={}, node={}",
             clientId, topicFilter.getTopic(), clusterManager.getLocalNodeId());
         
         clusterManager.broadcast(notifyMessage);
@@ -95,7 +113,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
         notifyMessage.setType(MessageType.UNSUBSCRIBE_NOTIFY);
         notifyMessage.setClientId(clientId);
         notifyMessage.setNodeId(clusterManager.getLocalNodeId());
-        notifyMessage.setTopics(java.util.Collections.singletonList(topicFilter));
+        notifyMessage.setTopics(Collections.singletonList(topicFilter));
         clusterManager.broadcast(notifyMessage);
     }
 
@@ -106,15 +124,19 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
     @Override
     public List<Subscribe> searchSubscribe(String topic) {
-        // 仅返回本地订阅
         List<Subscribe> allSubscribers = delegate.searchSubscribe(topic);
         if (allSubscribers == null || allSubscribers.isEmpty()) {
             return allSubscribers;
         }
-        return allSubscribers.stream().filter(sub -> {
+        String localNodeId = clusterManager.getLocalNodeId();
+        List<Subscribe> localSubscribers = new ArrayList<>(allSubscribers.size());
+        for (Subscribe sub : allSubscribers) {
             String node = clientNodeMap.get(sub.getClientId());
-            return node == null || node.equals(clusterManager.getLocalNodeId());
-        }).collect(Collectors.toList());
+            if (node == null || node.equals(localNodeId)) {
+                localSubscribers.add(sub);
+            }
+        }
+        return localSubscribers;
     }
 
     /**
@@ -135,7 +157,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
      * 获取所有远程客户端映射（用于状态同步）
      */
     public Map<String, String> getRemoteClientNodeMap() {
-        return new java.util.HashMap<>(clientNodeMap);
+        return new HashMap<>(clientNodeMap);
     }
 
     /**
