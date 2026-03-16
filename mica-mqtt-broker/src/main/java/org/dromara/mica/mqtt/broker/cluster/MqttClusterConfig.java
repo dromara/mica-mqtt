@@ -81,4 +81,39 @@ public class MqttClusterConfig {
     public void setNodeTimeout(long nodeTimeout) {
         this.nodeTimeout = nodeTimeout;
     }
+
+    public MqttClusterConfig enabled(boolean enabled) {
+        this.enabled = enabled;
+        return this;
+    }
+
+    public MqttClusterConfig clusterHost(String clusterHost) {
+        this.clusterHost = clusterHost;
+        return this;
+    }
+
+    public MqttClusterConfig clusterPort(int clusterPort) {
+        this.clusterPort = clusterPort;
+        return this;
+    }
+
+    public MqttClusterConfig seedMembers(List<String> seedMembers) {
+        this.seedMembers = seedMembers;
+        return this;
+    }
+
+    public MqttClusterConfig clusterName(String clusterName) {
+        this.clusterName = clusterName;
+        return this;
+    }
+
+    public MqttClusterConfig heartbeatInterval(long heartbeatInterval) {
+        this.heartbeatInterval = heartbeatInterval;
+        return this;
+    }
+
+    public MqttClusterConfig nodeTimeout(long nodeTimeout) {
+        this.nodeTimeout = nodeTimeout;
+        return this;
+    }
 }

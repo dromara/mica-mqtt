@@ -36,11 +36,11 @@ public class ClusterTestNode3 {
         System.out.println("========================================");
 
         // 1. 集群配置
-        MqttClusterConfig clusterConfig = new MqttClusterConfig();
-        clusterConfig.setEnabled(true);
-        clusterConfig.setClusterHost("127.0.0.1");
-        clusterConfig.setClusterPort(9003);
-        clusterConfig.setSeedMembers(Arrays.asList("127.0.0.1:9001", "127.0.0.1:9002", "127.0.0.1:9003"));
+        MqttClusterConfig clusterConfig = new MqttClusterConfig()
+            .enabled(true)
+            .clusterHost("127.0.0.1")
+            .clusterPort(9003)
+            .seedMembers(Arrays.asList("127.0.0.1:9001", "127.0.0.1:9002", "127.0.0.1:9003"));
 
         // 2. 创建 MQTT Server
         MqttServerCreator creator = MqttServer.create()
@@ -49,9 +49,9 @@ public class ClusterTestNode3 {
             .enableMqtt(1885);
 
         // 3. 使用集群创建器构建并启动
-        MqttServer mqttServer = new MqttClusterBrokerCreator(creator)
+        MqttServer mqttServer = org.dromara.mica.mqtt.broker.MqttBroker.create(creator)
             .clusterConfig(clusterConfig)
-            .build();
+            .start();
 
         System.out.println("Node 3 started successfully!");
         System.out.println("MQTT Server listening on port 1885");

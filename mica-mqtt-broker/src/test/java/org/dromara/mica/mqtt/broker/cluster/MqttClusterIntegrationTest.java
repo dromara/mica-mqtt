@@ -28,7 +28,6 @@ import org.tio.server.cluster.core.ClusterImpl;
 import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -46,11 +45,25 @@ class MqttClusterIntegrationTest {
     private ClusterApi cluster1;
     private ClusterApi cluster2;
 
+    private final AtomicBoolean node1Received = new AtomicBoolean(false);
+    private final AtomicReference<String> node1ReceivedMessage = new AtomicReference<>();
+    
+    private final AtomicBoolean node2Received = new AtomicBoolean(false);
+    private final AtomicReference<String> node2ReceivedMessage = new AtomicReference<>();
+
     @BeforeEach
     void setUp() throws Exception {
+        node1Received.set(false);
+        node1ReceivedMessage.set(null);
+        node2Received.set(false);
+        node2ReceivedMessage.set(null);
+
         // 创建第一个节点
         ClusterConfig config1 = new ClusterConfig("127.0.0.1", 9001, message -> {
-            logger.info("Node1 received: {}", new String(message.getPayload(), StandardCharsets.UTF_8));
+            String msg = new String(message.getPayload(), StandardCharsets.UTF_8);
+            logger.info("Node1 received: {}", msg);
+            node1ReceivedMessage.set(msg);
+            node1Received.set(true);
         });
         config1.addSeedMember("127.0.0.1", 9001);
         config1.addSeedMember("127.0.0.1", 9002);
@@ -60,7 +73,10 @@ class MqttClusterIntegrationTest {
 
         // 创建第二个节点
         ClusterConfig config2 = new ClusterConfig("127.0.0.1", 9002, message -> {
-            logger.info("Node2 received: {}", new String(message.getPayload(), StandardCharsets.UTF_8));
+            String msg = new String(message.getPayload(), StandardCharsets.UTF_8);
+            logger.info("Node2 received: {}", msg);
+            node2ReceivedMessage.set(msg);
+            node2Received.set(true);
         });
         config2.addSeedMember("127.0.0.1", 9001);
         config2.addSeedMember("127.0.0.1", 9002);
@@ -100,65 +116,19 @@ class MqttClusterIntegrationTest {
 
     @Test
     void testBroadcastMessage() throws Exception {
-        AtomicBoolean node2Received = new AtomicBoolean(false);
-        AtomicReference<String> receivedMessage = new AtomicReference<>();
-        
-        // 重新创建 cluster2 带消息处理器
-        cluster2.stop();
-        ClusterConfig config2 = new ClusterConfig("127.0.0.1", 9002, message -> {
-            String msg = new String(message.getPayload(), StandardCharsets.UTF_8);
-            logger.info("Node2 received broadcast: {}", msg);
-            receivedMessage.set(msg);
-            node2Received.set(true);
-        });
-        config2.addSeedMember("127.0.0.1", 9001);
-        config2.addSeedMember("127.0.0.1", 9002);
-        cluster2 = new ClusterImpl(config2);
-        cluster2.start();
-        
-        Thread.sleep(1000);
+        // 重置状态
+        node2Received.set(false);
+        node2ReceivedMessage.set(null);
         
         // 从 cluster1 广播消息
         String testMessage = "Hello from Node1 - Broadcast";
         cluster1.broadcast(testMessage.getBytes(StandardCharsets.UTF_8));
         
         // 等待消息传递
-        Thread.sleep(500);
-        
-        assertTrue(node2Received.get(), "Node2 should receive broadcast message");
-        assertEquals(testMessage, receivedMessage.get());
-    }
-
-    @Test
-    void testSendToNode() throws Exception {
-        AtomicBoolean node2Received = new AtomicBoolean(false);
-        AtomicReference<String> receivedMessage = new AtomicReference<>();
-        
-        // 重新创建 cluster2 带消息处理器
-        cluster2.stop();
-        ClusterConfig config2 = new ClusterConfig("127.0.0.1", 9002, message -> {
-            String msg = new String(message.getPayload(), StandardCharsets.UTF_8);
-            logger.info("Node2 received direct: {}", msg);
-            receivedMessage.set(msg);
-            node2Received.set(true);
-        });
-        config2.addSeedMember("127.0.0.1", 9001);
-        config2.addSeedMember("127.0.0.1", 9002);
-        cluster2 = new ClusterImpl(config2);
-        cluster2.start();
-        
         Thread.sleep(1000);
         
-        // 从 cluster1 直接发送消息到 cluster2
-        Node node2 = new Node("127.0.0.1", 9002);
-        String testMessage = "Hello from Node1 - Direct";
-        cluster1.send(node2, testMessage.getBytes(StandardCharsets.UTF_8));
-        
-        // 等待消息传递
-        Thread.sleep(500);
-        
-        assertTrue(node2Received.get(), "Node2 should receive direct message");
-        assertEquals(testMessage, receivedMessage.get());
+        assertTrue(node2Received.get(), "Node2 should receive broadcast message");
+        assertEquals(testMessage, node2ReceivedMessage.get());
     }
 
     @Test

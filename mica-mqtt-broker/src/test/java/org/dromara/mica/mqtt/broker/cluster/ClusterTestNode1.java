@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.broker.cluster;
 
+import org.dromara.mica.mqtt.broker.MqttBroker;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 
@@ -36,11 +37,11 @@ public class ClusterTestNode1 {
         System.out.println("========================================");
 
         // 1. 集群配置
-        MqttClusterConfig clusterConfig = new MqttClusterConfig();
-        clusterConfig.setEnabled(true);
-        clusterConfig.setClusterHost("127.0.0.1");
-        clusterConfig.setClusterPort(9001);
-        clusterConfig.setSeedMembers(Arrays.asList("127.0.0.1:9001", "127.0.0.1:9002", "127.0.0.1:9003"));
+        MqttClusterConfig clusterConfig = new MqttClusterConfig()
+            .enabled(true)
+            .clusterHost("127.0.0.1")
+            .clusterPort(9001)
+            .seedMembers(Arrays.asList("127.0.0.1:9001", "127.0.0.1:9002", "127.0.0.1:9003"));
 
         // 2. 创建 MQTT Server
         MqttServerCreator creator = MqttServer.create()
@@ -49,14 +50,35 @@ public class ClusterTestNode1 {
             .enableMqtt(1883);
 
         // 3. 使用集群创建器构建并启动
-        MqttServer mqttServer = new MqttClusterBrokerCreator(creator)
-            .clusterConfig(clusterConfig)
-            .build();
+        MqttClusterBrokerCreator brokerCreator = MqttBroker.create(creator)
+            .clusterConfig(clusterConfig);
+        MqttServer mqttServer = brokerCreator.start();
+        MqttClusterManager clusterManager = brokerCreator.getClusterManager();
 
         System.out.println("Node 1 started successfully!");
         System.out.println("MQTT Server listening on port 1883");
 
-        // 4. 等待关闭
+        // 4. 定时下发测试消息（每隔5秒下发一次集群广播消息）
+        new Thread(() -> {
+            int count = 1;
+            while (true) {
+                try {
+                    Thread.sleep(5000);
+                    
+                    // 集群广播下发测试（所有订阅了 /test/cluster/topic 的设备都会收到）
+                    String broadcastMsg = "Broadcast message from Node 1, count: " + count;
+                    clusterManager.publish("/test/cluster/topic", broadcastMsg.getBytes(), 0, false);
+                    System.out.println("[Node 1] Published broadcast: " + broadcastMsg);
+
+                    count++;
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }).start();
+
+        // 5. 等待关闭
         Thread.sleep(Long.MAX_VALUE);
     }
 }

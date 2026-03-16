@@ -1,8 +1,7 @@
 package org.dromara.mica.mqtt.broker.cluster;
 
-import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessage;
-import org.dromara.mica.mqtt.broker.cluster.message.GenericClusterMessage;
-import org.dromara.mica.mqtt.broker.cluster.message.StateSyncResponseMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.*;
+import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.slf4j.Logger;
@@ -12,11 +11,9 @@ import org.tio.server.cluster.core.ClusterApi;
 import org.tio.server.cluster.core.ClusterConfig;
 import org.tio.server.cluster.core.ClusterImpl;
 import org.tio.server.cluster.message.ClusterDataMessage;
+
 import java.io.*;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class MqttClusterManager {
     private static final Logger logger = LoggerFactory.getLogger(MqttClusterManager.class);
@@ -78,7 +75,7 @@ public class MqttClusterManager {
             if (!nodeToString(seed).equals(localNodeId)) {
                 try {
                     GenericClusterMessage syncRequest = new GenericClusterMessage();
-                    syncRequest.setType(org.dromara.mica.mqtt.broker.cluster.message.MessageType.STATE_SYNC_REQUEST);
+                    syncRequest.setType(MessageType.STATE_SYNC_REQUEST);
                     syncRequest.setSourceNode(localNodeId);
                     cluster.send(seed, serialize(syncRequest));
                     logger.info("Sent state sync request to seed node: {}", seed);
@@ -109,33 +106,28 @@ public class MqttClusterManager {
     private void handleClusterMessageInternal(ClusterMessage clusterMsg, ClusterDataMessage rawMessage) {
         ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
         
-        if (clusterMsg.getType() == org.dromara.mica.mqtt.broker.cluster.message.MessageType.PUBLISH_FORWARD) {
-            org.dromara.mica.mqtt.broker.cluster.message.PublishForwardMessage pfm = 
-                (org.dromara.mica.mqtt.broker.cluster.message.PublishForwardMessage) clusterMsg;
-            mqttServer.publishAll(pfm.getTopic(), pfm.getPayload(), org.dromara.mica.mqtt.codec.MqttQoS.valueOf(pfm.getQos()), pfm.isRetain());
-        } else if (clusterMsg.getType() == org.dromara.mica.mqtt.broker.cluster.message.MessageType.SUBSCRIBE_NOTIFY) {
-            org.dromara.mica.mqtt.broker.cluster.message.SubscribeNotifyMessage snm = 
-                (org.dromara.mica.mqtt.broker.cluster.message.SubscribeNotifyMessage) clusterMsg;
+        if (clusterMsg.getType() == MessageType.PUBLISH_FORWARD) {
+            PublishForwardMessage pfm = (PublishForwardMessage) clusterMsg;
+            mqttServer.publishAll(pfm.getTopic(), pfm.getPayload(), MqttQoS.valueOf(pfm.getQos()), pfm.isRetain());
+        } else if (clusterMsg.getType() == MessageType.SUBSCRIBE_NOTIFY) {
+            SubscribeNotifyMessage snm = (SubscribeNotifyMessage) clusterMsg;
             sessionManager.syncRemoteSubscriptions(snm.getClientId(), snm.getNodeId(), snm.getSubscriptions());
-        } else if (clusterMsg.getType() == org.dromara.mica.mqtt.broker.cluster.message.MessageType.UNSUBSCRIBE_NOTIFY) {
-            org.dromara.mica.mqtt.broker.cluster.message.UnsubscribeNotifyMessage unm = 
-                (org.dromara.mica.mqtt.broker.cluster.message.UnsubscribeNotifyMessage) clusterMsg;
+        } else if (clusterMsg.getType() == MessageType.UNSUBSCRIBE_NOTIFY) {
+            UnsubscribeNotifyMessage unm = (UnsubscribeNotifyMessage) clusterMsg;
             sessionManager.removeRemoteSubscriptions(unm.getClientId(), unm.getTopics());
-        } else if (clusterMsg.getType() == org.dromara.mica.mqtt.broker.cluster.message.MessageType.CLIENT_CONNECT) {
-            org.dromara.mica.mqtt.broker.cluster.message.ClientConnectMessage ccm = 
-                (org.dromara.mica.mqtt.broker.cluster.message.ClientConnectMessage) clusterMsg;
+        } else if (clusterMsg.getType() == MessageType.CLIENT_CONNECT) {
+            ClientConnectMessage ccm = (ClientConnectMessage) clusterMsg;
             sessionManager.registerRemoteClient(ccm.getClientId(), ccm.getSourceNode());
-        } else if (clusterMsg.getType() == org.dromara.mica.mqtt.broker.cluster.message.MessageType.CLIENT_DISCONNECT) {
-            org.dromara.mica.mqtt.broker.cluster.message.ClientDisconnectMessage cdm = 
-                (org.dromara.mica.mqtt.broker.cluster.message.ClientDisconnectMessage) clusterMsg;
+        } else if (clusterMsg.getType() == MessageType.CLIENT_DISCONNECT) {
+            ClientDisconnectMessage cdm = (ClientDisconnectMessage) clusterMsg;
             sessionManager.removeRemoteClient(cdm.getClientId());
-        } else if (clusterMsg.getType() == org.dromara.mica.mqtt.broker.cluster.message.MessageType.STATE_SYNC_REQUEST) {
+        } else if (clusterMsg.getType() == MessageType.STATE_SYNC_REQUEST) {
             handleStateSyncRequest(clusterMsg.getSourceNode());
-        } else if (clusterMsg.getType() == org.dromara.mica.mqtt.broker.cluster.message.MessageType.STATE_SYNC_RESPONSE) {
+        } else if (clusterMsg.getType() == MessageType.STATE_SYNC_RESPONSE) {
             StateSyncResponseMessage ssm = (StateSyncResponseMessage) clusterMsg;
             sessionManager.syncFullState(ssm.getClientNodeMap(), ssm.getSubscriptionMap());
             logger.info("State sync completed, received {} client mappings", ssm.getClientNodeMap().size());
-        } else if (clusterMsg.getType() == org.dromara.mica.mqtt.broker.cluster.message.MessageType.NODE_LEAVE) {
+        } else if (clusterMsg.getType() == MessageType.NODE_LEAVE) {
             // 节点离开消息，需要清理该节点的所有订阅
             String leavingNodeId = clusterMsg.getSourceNode();
             sessionManager.clearNodeClientsAndSubscriptions(leavingNodeId);
@@ -150,7 +142,7 @@ public class MqttClusterManager {
         ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
         
         StateSyncResponseMessage response = new StateSyncResponseMessage();
-        response.setType(org.dromara.mica.mqtt.broker.cluster.message.MessageType.STATE_SYNC_RESPONSE);
+        response.setType(MessageType.STATE_SYNC_RESPONSE);
         response.setSourceNode(localNodeId);
         
         // 获取远程客户端映射
@@ -214,7 +206,7 @@ public class MqttClusterManager {
         if (cluster != null) {
             // 广播节点离开消息
             GenericClusterMessage leaveMsg = new GenericClusterMessage();
-            leaveMsg.setType(org.dromara.mica.mqtt.broker.cluster.message.MessageType.NODE_LEAVE);
+            leaveMsg.setType(MessageType.NODE_LEAVE);
             leaveMsg.setSourceNode(localNodeId);
             broadcast(leaveMsg);
             
@@ -229,9 +221,55 @@ public class MqttClusterManager {
         }
     }
 
+    /**
+     * 集群级别的下发消息：发布消息到集群中的所有匹配订阅者
+     *
+     * @param topic   主题
+     * @param payload 消息体
+     * @param qos     QoS
+     * @param retain  是否保留消息
+     */
+    public void publish(String topic, byte[] payload, int qos, boolean retain) {
+        if (mqttServer == null) {
+            return;
+        }
+        
+        // 1. 先在本地节点下发
+        mqttServer.publishAll(topic, payload, MqttQoS.valueOf(qos), retain);
+        
+        // 2. 查找是否有其他节点存在该 topic 的订阅者，按需转发以节省网络开销
+        if (config.isEnabled() && cluster != null) {
+            ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
+            List<Subscribe> allSubs = sessionManager.searchAllSubscribe(topic);
+            
+            if (allSubs != null && !allSubs.isEmpty()) {
+                Set<String> targetNodes = new HashSet<>();
+                for (Subscribe sub : allSubs) {
+                    String node = sessionManager.getClientNode(sub.getClientId());
+                    if (node != null && !node.equals(localNodeId)) {
+                        targetNodes.add(node);
+                    }
+                }
+                
+                if (!targetNodes.isEmpty()) {
+                    PublishForwardMessage clusterMsg = new PublishForwardMessage();
+                    clusterMsg.setType(MessageType.PUBLISH_FORWARD);
+                    clusterMsg.setTopic(topic);
+                    clusterMsg.setPayload(payload);
+                    clusterMsg.setQos(qos);
+                    clusterMsg.setRetain(retain);
+                    
+                    for (String node : targetNodes) {
+                        sendToNode(node, clusterMsg);
+                    }
+                }
+            }
+        }
+    }
+
     public Collection<Node> getRemoteMembers() {
         if (cluster == null) {
-            return java.util.Collections.emptyList();
+            return Collections.emptyList();
         }
         return cluster.getRemoteMembers();
     }

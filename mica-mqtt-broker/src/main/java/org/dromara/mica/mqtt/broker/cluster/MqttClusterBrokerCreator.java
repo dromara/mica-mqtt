@@ -16,11 +16,11 @@
 
 package org.dromara.mica.mqtt.broker.cluster;
 
+import org.dromara.mica.mqtt.broker.cluster.dispatcher.ClusterMessageDispatcher;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
-import org.dromara.mica.mqtt.broker.cluster.dispatcher.ClusterMessageDispatcher;
 
 /**
  * 集群模式的 Broker 创建器
@@ -40,7 +40,7 @@ public class MqttClusterBrokerCreator {
         return this;
     }
 
-    public MqttServer build() throws Exception {
+    public MqttServer build() {
         if (clusterConfig == null || !clusterConfig.isEnabled()) {
             return serverCreator.build();
         }
@@ -71,10 +71,25 @@ public class MqttClusterBrokerCreator {
         ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(mqttServer, clusterManager, clusterSessionManager);
         serverCreator.getMessagePipeline().addHandler(dispatcher);
 
-        // 6. 启动集群管理器（会自动启动 MQTT 服务）
-        clusterManager.start();
-
         return mqttServer;
+    }
+
+    public MqttServer start() {
+        MqttServer mqttServer = this.build();
+        try {
+            if (clusterManager != null) {
+                clusterManager.start();
+            } else {
+                mqttServer.start();
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to start MqttClusterBroker", e);
+        }
+        return mqttServer;
+    }
+
+    public MqttServerCreator getServerCreator() {
+        return serverCreator;
     }
 
     public MqttClusterManager getClusterManager() {
