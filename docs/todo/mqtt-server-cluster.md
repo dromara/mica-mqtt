@@ -267,10 +267,10 @@ public class ClusterMessageDispatcher {
 
 **任务清单：**
 - [x] 创建 `cluster` 包结构
-- [ ] 实现 `MqttClusterConfig` 配置类
-- [ ] 实现 `MqttClusterMessage` 基类及子类
-- [ ] 实现 `MqttClusterMessageHandler`（消息处理器）
-- [ ] 实现 `MqttClusterManager`（集群管理器）
+- [x] 实现 `MqttClusterConfig` 配置类
+- [x] 实现 `MqttClusterMessage` 基类及子类
+- [x] 实现 `MqttClusterMessageHandler`（集成在Manager内部）
+- [x] 实现 `MqttClusterManager`（集群管理器）
 
 **关键代码：**
 ```java
@@ -353,11 +353,11 @@ public class MqttServerCreator {
 #### 4.3 扩展 InMemoryMqttSessionManager
 
 **任务清单：**
-- [ ] 添加客户端节点映射表 `ConcurrentHashMap<String, String> clientNodeMap`
-- [ ] 实现 `getClientNode()` 方法
-- [ ] 实现 `registerRemoteClient()` 方法
-- [ ] 实现 `syncRemoteSubscriptions()` 方法
-- [ ] 修改 `searchSubscribe()` 方法，支持返回远程客户端订阅
+- [x] 添加客户端节点映射表 `ConcurrentHashMap<String, String> clientNodeMap`
+- [x] 实现 `getClientNode()` 方法
+- [x] 实现 `registerRemoteClient()` 方法
+- [x] 实现 `syncRemoteSubscriptions()` 方法
+- [x] 修改 `searchSubscribe()` 方法，支持返回远程客户端订阅
 
 **关键代码：**
 ```java
@@ -390,9 +390,9 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 #### 4.4 实现 ClusterMessageDispatcher
 
 **任务清单：**
-- [ ] 创建 `ClusterMessageDispatcher` 类
-- [ ] 实现 `dispatch()` 方法（本地+远程分发）
-- [ ] 集成到 `MqttServerProcessor.processPublish()` 中
+- [x] 创建 `ClusterMessageDispatcher` 类
+- [x] 实现 `dispatch()` 方法（本地+远程分发）
+- [x] 注册到 `MqttServerPipeline` 中拦截 `UP_STREAM`
 
 #### 4.5 修改消息发布流程
 
@@ -553,9 +553,8 @@ public class ClusterIntegrationTest {
 #### 4.10 编写文档
 
 **任务清单：**
-- [ ] 更新 `mica-mqtt-server/README.md`，添加集群配置章节
+- [ ] 更新 `mica-mqtt-broker/README.md`，添加集群配置章节
 - [ ] 创建 `docs/cluster-guide.md` 集群部署指南
-- [ ] 更新 `CLAUDE.md`，补充集群相关说明
 - [ ] 添加配置示例到 `example` 模块
 
 **文档内容要点：**
@@ -765,3 +764,33 @@ public class MessagePackSerializer {
 **创建日期：** 2026-02-12
 **作者：** mica-mqtt 团队
 **状态：** 待实施
+
+
+## 10. 完整 MQTT 集群功能检查清单（新梳理）
+
+以下是实现一个完整、工业级 MQTT 集群所需的全部功能及当前进度打勾状态：
+
+### 10.1 节点发现与集群基础管理
+- [x] 基于 TCP/Gossip 等机制的节点互联与发现（已通过 t-io cluster 实现）
+- [x] 新节点加入时的集群全量状态同步（`STATE_SYNC_REQUEST` / `STATE_SYNC_RESPONSE`）
+- [x] 节点离开（主动/宕机）时的状态清理（清理该节点上的远程订阅及客户端会话）
+- [ ] 脑裂（Split-Brain）检测与自动恢复机制
+
+### 10.2 客户端会话与状态同步
+- [x] 客户端连接/断开事件的集群广播（`CLIENT_CONNECT` / `CLIENT_DISCONNECT`）
+- [ ] **集群级会话接管（Client Takeover）**：同一 `ClientId` 跨节点重连时，必须踢除（Kick off）旧节点上的已有连接，防止幽灵连接和状态冲突。
+- [ ] **离线会话状态漫游**：`Clean Session = false` 的客户端在不同节点间漫游时，必须同步未过期的会话状态。
+- [ ] **飞行中消息同步（In-Flight Messages）**：QoS 1 和 QoS 2 中未确认的消息（Pending Publish / PubRel）跨节点接管和恢复。
+
+### 10.3 消息路由与订阅分发
+- [x] 订阅/取消订阅状态全网实时同步（`SUBSCRIBE_NOTIFY` / `UNSUBSCRIBE_NOTIFY`）
+- [x] 跨节点 Publish 消息按需路由转发（`PUBLISH_FORWARD`，利用订阅树 O(1) 广播给存在目标订阅的节点）
+- [x] 支持集群级别的共享订阅（Shared Subscriptions `$share`）及均衡分发调度。
+
+### 10.4 遗嘱与保留消息（Will & Retained Messages）
+- [ ] **保留消息的集群共享与存储**：当新客户端连入或新节点加入时，确保能够正确拉取全网最新（覆盖后的）Retained Message。
+- [ ] **遗嘱消息的集群同步与触发代发**：客户端所在节点宕机或断网且未正常发送 DISCONNECT 时，由集群中的其他存活节点代为发布遗嘱消息。
+
+### 10.5 可观测性与高级特性
+- [ ] 集群级别的统一指标监控 API（全局在线连接数、QPS 聚合等）。
+- [ ] 全局限流控制（Rate Limiting）协调机制。
