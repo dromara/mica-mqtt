@@ -27,6 +27,11 @@ public class SubscribeNotifyMessage extends ClusterMessage {
     private String nodeId;          // 节点ID
     private List<Subscribe> subscriptions; // 订阅主题列表
 
+    @Override
+    public ClusterMessageType getType() {
+        return ClusterMessageType.SUBSCRIBE_NOTIFY;
+    }
+
     public String getClientId() {
         return clientId;
     }

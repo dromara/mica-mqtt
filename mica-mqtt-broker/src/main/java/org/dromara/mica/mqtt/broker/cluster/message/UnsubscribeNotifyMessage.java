@@ -25,6 +25,11 @@ public class UnsubscribeNotifyMessage extends ClusterMessage {
     private String nodeId;
     private List<String> topics;
 
+    @Override
+    public ClusterMessageType getType() {
+        return ClusterMessageType.UNSUBSCRIBE_NOTIFY;
+    }
+
     public String getClientId() {
         return clientId;
     }

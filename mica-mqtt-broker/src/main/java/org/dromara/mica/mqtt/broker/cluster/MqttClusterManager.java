@@ -16,11 +16,12 @@
 
 package org.dromara.mica.mqtt.broker.cluster;
 
-import com.alibaba.com.caucho.hessian.io.Hessian2Input;
-import com.alibaba.com.caucho.hessian.io.Hessian2Output;
+import org.dromara.mica.mqtt.broker.cluster.codec.BinaryClusterMessageCodec;
+import org.dromara.mica.mqtt.broker.cluster.codec.ClusterMessageCodec;
 import org.dromara.mica.mqtt.broker.cluster.message.*;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.MqttServer;
+import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,9 +31,6 @@ import org.tio.server.cluster.core.ClusterConfig;
 import org.tio.server.cluster.core.ClusterImpl;
 import org.tio.server.cluster.message.ClusterDataMessage;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.*;
 
 public class MqttClusterManager {
@@ -42,6 +40,7 @@ public class MqttClusterManager {
 	private MqttServer mqttServer;
 	private final MqttClusterConfig config;
 	private final String localNodeId;
+	private final ClusterMessageCodec codec = new BinaryClusterMessageCodec();
 
 	public MqttClusterManager(MqttClusterConfig config, String localNodeId) {
 		this.config = config;
@@ -95,8 +94,7 @@ public class MqttClusterManager {
 		for (Node seed : seedMembers) {
 			if (!nodeToString(seed).equals(localNodeId)) {
 				try {
-					GenericClusterMessage syncRequest = new GenericClusterMessage();
-					syncRequest.setType(MessageType.STATE_SYNC_REQUEST);
+					GenericClusterMessage syncRequest = new GenericClusterMessage(ClusterMessageType.STATE_SYNC_REQUEST);
 					syncRequest.setSourceNode(localNodeId);
 					cluster.send(seed, serialize(syncRequest));
 					logger.info("Sent state sync request to seed node: {}", seed);
@@ -129,7 +127,7 @@ public class MqttClusterManager {
 		switch (clusterMsg.getType()) {
 			case PUBLISH_FORWARD: {
 				PublishForwardMessage pfm = (PublishForwardMessage) clusterMsg;
-				mqttServer.publishAll(pfm.getTopic(), pfm.getPayload(), MqttQoS.valueOf(pfm.getQos()), pfm.isRetain());
+				mqttServer.publishAll(pfm.getMessage().getTopic(), pfm.getMessage().getPayload(), MqttQoS.valueOf(pfm.getMessage().getQos()), pfm.getMessage().isRetain());
 				break;
 			}
 			case SUBSCRIBE_NOTIFY: {
@@ -180,7 +178,6 @@ public class MqttClusterManager {
 		ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
 
 		StateSyncResponseMessage response = new StateSyncResponseMessage();
-		response.setType(MessageType.STATE_SYNC_RESPONSE);
 		response.setSourceNode(localNodeId);
 
 		// 获取远程客户端映射
@@ -248,8 +245,7 @@ public class MqttClusterManager {
 	public void stop() {
 		if (cluster != null) {
 			// 广播节点离开消息
-			GenericClusterMessage leaveMsg = new GenericClusterMessage();
-			leaveMsg.setType(MessageType.NODE_LEAVE);
+			GenericClusterMessage leaveMsg = new GenericClusterMessage(ClusterMessageType.NODE_LEAVE);
 			leaveMsg.setSourceNode(localNodeId);
 			broadcast(leaveMsg);
 
@@ -296,11 +292,13 @@ public class MqttClusterManager {
 
 				if (!targetNodes.isEmpty()) {
 					PublishForwardMessage clusterMsg = new PublishForwardMessage();
-					clusterMsg.setType(MessageType.PUBLISH_FORWARD);
-					clusterMsg.setTopic(topic);
-					clusterMsg.setPayload(payload);
-					clusterMsg.setQos(qos);
-					clusterMsg.setRetain(retain);
+
+					Message message = new Message();
+					message.setTopic(topic);
+					message.setPayload(payload);
+					message.setQos(qos);
+					message.setRetain(retain);
+					clusterMsg.setMessage(message);
 
 					for (String node : targetNodes) {
 						sendToNode(node, clusterMsg);
@@ -321,18 +319,12 @@ public class MqttClusterManager {
 		return node.getPeerHost();
 	}
 
-	private byte[] serialize(ClusterMessage msg) throws IOException {
-		ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		Hessian2Output out = new Hessian2Output(bos);
-		out.writeObject(msg);
-		out.flush();
-		return bos.toByteArray();
+	private byte[] serialize(ClusterMessage msg) {
+		return codec.encode(msg);
 	}
 
-	private ClusterMessage deserialize(byte[] data) throws IOException {
-		ByteArrayInputStream bis = new ByteArrayInputStream(data);
-		Hessian2Input in = new Hessian2Input(bis);
-		return (ClusterMessage) in.readObject();
+	private ClusterMessage deserialize(byte[] data) {
+		return codec.decode(data);
 	}
 
 	public String getLocalNodeId() {

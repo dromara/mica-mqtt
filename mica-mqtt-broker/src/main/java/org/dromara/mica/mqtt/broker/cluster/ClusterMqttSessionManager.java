@@ -18,7 +18,6 @@ package org.dromara.mica.mqtt.broker.cluster;
 
 import org.dromara.mica.mqtt.broker.cluster.message.SubscribeNotifyMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.UnsubscribeNotifyMessage;
-import org.dromara.mica.mqtt.broker.cluster.message.MessageType;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
@@ -95,7 +94,6 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 		Subscribe subscribe = new Subscribe(topicFilter.getTopic(), clientId, mqttQoS, noLocal);
 		SubscribeNotifyMessage notifyMessage = new SubscribeNotifyMessage();
-		notifyMessage.setType(MessageType.SUBSCRIBE_NOTIFY);
 		notifyMessage.setClientId(clientId);
 		notifyMessage.setNodeId(clusterManager.getLocalNodeId());
 		notifyMessage.setSubscriptions(Collections.singletonList(subscribe));
@@ -110,7 +108,6 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void removeSubscribe(String topicFilter, String clientId) {
 		delegate.removeSubscribe(topicFilter, clientId);
 		UnsubscribeNotifyMessage notifyMessage = new UnsubscribeNotifyMessage();
-		notifyMessage.setType(MessageType.UNSUBSCRIBE_NOTIFY);
 		notifyMessage.setClientId(clientId);
 		notifyMessage.setNodeId(clusterManager.getLocalNodeId());
 		notifyMessage.setTopics(Collections.singletonList(topicFilter));

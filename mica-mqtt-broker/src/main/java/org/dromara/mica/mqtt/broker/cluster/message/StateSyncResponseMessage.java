@@ -32,6 +32,11 @@ public class StateSyncResponseMessage extends ClusterMessage {
     // clientId -> subscriptions
     private Map<String, List<Subscribe>> subscriptionMap = new HashMap<>();
 
+    @Override
+    public ClusterMessageType getType() {
+        return ClusterMessageType.STATE_SYNC_RESPONSE;
+    }
+
     public Map<String, String> getClientNodeMap() {
         return clientNodeMap;
     }

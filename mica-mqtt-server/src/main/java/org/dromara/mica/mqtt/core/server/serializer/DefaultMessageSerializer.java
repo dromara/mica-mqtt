@@ -27,7 +27,7 @@ import java.nio.charset.StandardCharsets;
  *
  * @author L.cm
  */
-public enum DefaultMessageSerializer implements org.dromara.mica.mqtt.core.server.serializer.IMessageSerializer {
+public enum DefaultMessageSerializer implements IMessageSerializer {
 
 	/**
 	 * 单利

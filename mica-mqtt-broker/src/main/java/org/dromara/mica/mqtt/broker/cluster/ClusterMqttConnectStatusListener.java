@@ -18,7 +18,6 @@ package org.dromara.mica.mqtt.broker.cluster;
 
 import org.dromara.mica.mqtt.broker.cluster.message.ClientConnectMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClientDisconnectMessage;
-import org.dromara.mica.mqtt.broker.cluster.message.MessageType;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.tio.core.ChannelContext;
 
@@ -39,7 +38,6 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
         }
 
         ClientConnectMessage msg = new ClientConnectMessage();
-        msg.setType(MessageType.CLIENT_CONNECT);
         msg.setClientId(clientId);
         clusterManager.broadcast(msg);
     }
@@ -51,7 +49,6 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
         }
 
         ClientDisconnectMessage msg = new ClientDisconnectMessage();
-        msg.setType(MessageType.CLIENT_DISCONNECT);
         msg.setClientId(clientId);
         clusterManager.broadcast(msg);
     }

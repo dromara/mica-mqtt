@@ -21,4 +21,18 @@ package org.dromara.mica.mqtt.broker.cluster.message;
  */
 public class GenericClusterMessage extends ClusterMessage {
     private static final long serialVersionUID = 1L;
+
+    private ClusterMessageType type;
+
+    public GenericClusterMessage() {
+    }
+
+    public GenericClusterMessage(ClusterMessageType type) {
+        this.type = type;
+    }
+
+    @Override
+    public ClusterMessageType getType() {
+        return type;
+    }
 }

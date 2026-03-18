@@ -14,17 +14,28 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.cluster.message;
+package org.dromara.mica.mqtt.broker.cluster.codec;
 
-public enum MessageType {
-    CLIENT_CONNECT,        // 客户端连接通知
-    CLIENT_DISCONNECT,     // 客户端断开通知
-    SUBSCRIBE_NOTIFY,      // 订阅通知
-    UNSUBSCRIBE_NOTIFY,    // 取消订阅通知
-    PUBLISH_FORWARD,       // 消息转发
-    HEARTBEAT,             // 心跳
-    NODE_JOIN,             // 节点加入
-    NODE_LEAVE,            // 节点离开
-    STATE_SYNC_REQUEST,    // 状态同步请求（新节点加入时请求全局路由表）
-    STATE_SYNC_RESPONSE    // 状态同步响应
+import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessage;
+
+/**
+ * 集群消息编解码接口
+ */
+public interface ClusterMessageCodec {
+
+    /**
+     * 编码集群消息
+     *
+     * @param msg 集群消息
+     * @return 编码后的字节数组
+     */
+    byte[] encode(ClusterMessage msg);
+
+    /**
+     * 解码集群消息
+     *
+     * @param data 字节数据
+     * @return 集群消息
+     */
+    ClusterMessage decode(byte[] data);
 }

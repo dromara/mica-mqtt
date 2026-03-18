@@ -16,22 +16,16 @@
 
 package org.dromara.mica.mqtt.broker.cluster;
 
+import org.dromara.mica.mqtt.broker.cluster.codec.BinaryClusterMessageCodec;
+import org.dromara.mica.mqtt.broker.cluster.codec.ClusterMessageCodec;
 import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessage;
-import org.dromara.mica.mqtt.broker.cluster.message.MessageType;
 import org.dromara.mica.mqtt.broker.cluster.message.PublishForwardMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.SubscribeNotifyMessage;
-import org.dromara.mica.mqtt.core.server.MqttServer;
-import org.dromara.mica.mqtt.core.server.MqttServerCreator;
+import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.junit.jupiter.api.Test;
-import org.tio.core.Node;
 
 import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -43,57 +37,48 @@ import static org.junit.jupiter.api.Assertions.*;
 class MqttClusterTest {
 
     @Test
-    void testClusterMessageSerialization() throws Exception {
-        // 测试消息序列化和反序列化
+    void testPublishForwardMessageSerialization() {
+        ClusterMessageCodec codec = new BinaryClusterMessageCodec();
+
         PublishForwardMessage msg = new PublishForwardMessage();
-        msg.setType(MessageType.PUBLISH_FORWARD);
         msg.setSourceNode("192.168.1.1:9000");
-        msg.setTopic("/test/topic");
-        msg.setPayload("Hello Cluster".getBytes());
-        msg.setQos(1);
-        msg.setRetain(false);
-        msg.setMessageId("msg-001");
         msg.setTimestamp(System.currentTimeMillis());
 
-        // 序列化
-        MqttClusterManager manager = new MqttClusterManager(new MqttClusterConfig(), "test-node");
-        java.lang.reflect.Method serializeMethod = MqttClusterManager.class.getDeclaredMethod("serialize", ClusterMessage.class);
-        serializeMethod.setAccessible(true);
-        byte[] data = (byte[]) serializeMethod.invoke(manager, msg);
+        Message message = new Message();
+        message.setMessageType(org.dromara.mica.mqtt.core.server.enums.MessageType.UP_STREAM);
+        message.setTopic("/test/topic");
+        message.setPayload("Hello Cluster".getBytes());
+        message.setQos(1);
+        message.setRetain(false);
+        message.setDup(false);
+        msg.setMessage(message);
 
+        byte[] data = codec.encode(msg);
         assertNotNull(data);
         assertTrue(data.length > 0);
 
-        // 反序列化
-        java.lang.reflect.Method deserializeMethod = MqttClusterManager.class.getDeclaredMethod("deserialize", byte[].class);
-        deserializeMethod.setAccessible(true);
-        ClusterMessage deserialized = (ClusterMessage) deserializeMethod.invoke(manager, data);
-
+        ClusterMessage deserialized = codec.decode(data);
         assertTrue(deserialized instanceof PublishForwardMessage);
         PublishForwardMessage pfm = (PublishForwardMessage) deserialized;
-        assertEquals("/test/topic", pfm.getTopic());
-        assertEquals(1, pfm.getQos());
-        assertEquals("Hello Cluster", new String(pfm.getPayload()));
+        assertEquals("/test/topic", pfm.getMessage().getTopic());
+        assertEquals(1, pfm.getMessage().getQos());
+        assertEquals("Hello Cluster", new String(pfm.getMessage().getPayload()));
     }
 
     @Test
-    void testSubscribeNotifyMessageSerialization() throws Exception {
+    void testSubscribeNotifyMessageSerialization() {
+        ClusterMessageCodec codec = new BinaryClusterMessageCodec();
+
         SubscribeNotifyMessage msg = new SubscribeNotifyMessage();
-        msg.setType(MessageType.SUBSCRIBE_NOTIFY);
         msg.setClientId("client-001");
         msg.setNodeId("192.168.1.1:9000");
         Subscribe subscribe = new Subscribe("/test/#", "client-001", 1, false);
         msg.setSubscriptions(Collections.singletonList(subscribe));
 
-        MqttClusterManager manager = new MqttClusterManager(new MqttClusterConfig(), "test-node");
-        java.lang.reflect.Method serializeMethod = MqttClusterManager.class.getDeclaredMethod("serialize", ClusterMessage.class);
-        serializeMethod.setAccessible(true);
-        byte[] data = (byte[]) serializeMethod.invoke(manager, msg);
+        byte[] data = codec.encode(msg);
+        assertNotNull(data);
 
-        java.lang.reflect.Method deserializeMethod = MqttClusterManager.class.getDeclaredMethod("deserialize", byte[].class);
-        deserializeMethod.setAccessible(true);
-        ClusterMessage deserialized = (ClusterMessage) deserializeMethod.invoke(manager, data);
-
+        ClusterMessage deserialized = codec.decode(data);
         assertTrue(deserialized instanceof SubscribeNotifyMessage);
         SubscribeNotifyMessage snm = (SubscribeNotifyMessage) deserialized;
         assertEquals("client-001", snm.getClientId());

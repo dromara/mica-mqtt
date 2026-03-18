@@ -16,29 +16,13 @@
 
 package org.dromara.mica.mqtt.broker.cluster.message;
 
-import java.io.Serializable;
-
-public abstract class ClusterMessage implements Serializable {
-    private static final long serialVersionUID = 1L;
-
-    private String sourceNode;
-    private long timestamp;
-
-    public abstract ClusterMessageType getType();
-
-    public String getSourceNode() {
-        return sourceNode;
-    }
-
-    public void setSourceNode(String sourceNode) {
-        this.sourceNode = sourceNode;
-    }
-
-    public long getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(long timestamp) {
-        this.timestamp = timestamp;
-    }
+public enum ClusterMessageType {
+    CLIENT_CONNECT,        // 客户端连接通知
+    CLIENT_DISCONNECT,    // 客户端断开通知
+    SUBSCRIBE_NOTIFY,     // 订阅通知
+    UNSUBSCRIBE_NOTIFY,   // 取消订阅通知
+    PUBLISH_FORWARD,     // 消息转发
+    NODE_LEAVE,          // 节点离开
+    STATE_SYNC_REQUEST,  // 状态同步请求
+    STATE_SYNC_RESPONSE, // 状态同步响应
 }

@@ -18,7 +18,6 @@ package org.dromara.mica.mqtt.broker.cluster.dispatcher;
 
 import org.dromara.mica.mqtt.broker.cluster.ClusterMqttSessionManager;
 import org.dromara.mica.mqtt.broker.cluster.MqttClusterManager;
-import org.dromara.mica.mqtt.broker.cluster.message.MessageType;
 import org.dromara.mica.mqtt.broker.cluster.message.PublishForwardMessage;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.model.Message;
@@ -50,10 +49,10 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 
         String topic = message.getTopic();
         String localNodeId = clusterManager.getLocalNodeId();
-        
+
         // 获取所有订阅者（包括远程）
         List<Subscribe> subscribers = clusterSessionManager.searchAllSubscribe(topic);
-        
+
         logger.debug("[Cluster] Received publish on topic: {}, subscribers count: {}", topic,
             subscribers == null ? 0 : subscribers.size());
 
@@ -68,7 +67,7 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
             String clientId = sub.getClientId();
             String node = clusterSessionManager.getClientNode(clientId);
             logger.debug("[Cluster] Client: {}, Node: {}", clientId, node);
-            
+
             if (node != null && !node.equals(localNodeId)) {
                 remoteNodes.add(node);
                 logger.debug("[Cluster] Will forward to node: {} for client: {}", node, clientId);
@@ -90,13 +89,9 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 
     private void forwardToNode(String nodeId, Message msg) {
         logger.debug("[Cluster] Forwarding to node: {}, topic: {}", nodeId, msg.getTopic());
-        
+
         PublishForwardMessage clusterMsg = new PublishForwardMessage();
-        clusterMsg.setType(MessageType.PUBLISH_FORWARD);
-        clusterMsg.setTopic(msg.getTopic());
-        clusterMsg.setPayload(msg.getPayload());
-        clusterMsg.setQos(msg.getQos());
-        clusterMsg.setRetain(msg.isRetain());
+        clusterMsg.setMessage(msg);
 
         clusterManager.sendToNode(nodeId, clusterMsg);
     }

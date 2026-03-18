@@ -21,6 +21,11 @@ public class ClientConnectMessage extends ClusterMessage {
 
     private String clientId;
 
+    @Override
+    public ClusterMessageType getType() {
+        return ClusterMessageType.CLIENT_CONNECT;
+    }
+
     public String getClientId() {
         return clientId;
     }

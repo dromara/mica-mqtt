@@ -16,43 +16,27 @@
 
 package org.dromara.mica.mqtt.broker.cluster.message;
 
+import org.dromara.mica.mqtt.core.server.model.Message;
+
+/**
+ * 集群消息转发，用于跨节点转发 PUBLISH 消息
+ * 直接使用 Message 模型，可复用现有的 MQTT 消息编解码
+ */
 public class PublishForwardMessage extends ClusterMessage {
     private static final long serialVersionUID = 1L;
 
-    private String topic;           // 主题
-    private byte[] payload;         // 消息体
-    private int qos;                // QoS 级别
-    private boolean retain;         // 是否保留
+    private Message message;
 
-    public String getTopic() {
-        return topic;
+    @Override
+    public ClusterMessageType getType() {
+        return ClusterMessageType.PUBLISH_FORWARD;
     }
 
-    public void setTopic(String topic) {
-        this.topic = topic;
+    public Message getMessage() {
+        return message;
     }
 
-    public byte[] getPayload() {
-        return payload;
-    }
-
-    public void setPayload(byte[] payload) {
-        this.payload = payload;
-    }
-
-    public int getQos() {
-        return qos;
-    }
-
-    public void setQos(int qos) {
-        this.qos = qos;
-    }
-
-    public boolean isRetain() {
-        return retain;
-    }
-
-    public void setRetain(boolean retain) {
-        this.retain = retain;
+    public void setMessage(Message message) {
+        this.message = message;
     }
 }

@@ -21,6 +21,11 @@ public class ClientDisconnectMessage extends ClusterMessage {
 
     private String clientId;
 
+    @Override
+    public ClusterMessageType getType() {
+        return ClusterMessageType.CLIENT_DISCONNECT;
+    }
+
     public String getClientId() {
         return clientId;
     }
