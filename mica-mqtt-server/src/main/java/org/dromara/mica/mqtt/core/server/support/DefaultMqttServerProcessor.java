@@ -100,24 +100,24 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	private final IMqttPublishPipeline publishPipeline;
 
 	public DefaultMqttServerProcessor(MqttServerCreator serverCreator,
-								  TimerTaskService taskService,
-								  ExecutorService executor) {
-	this.serverCreator = serverCreator;
-	this.heartbeatTimeout = serverCreator.getHeartbeatTimeout() == null ? TioConfig.DEFAULT_HEARTBEAT_TIMEOUT : serverCreator.getHeartbeatTimeout();
-	this.messageStore = serverCreator.getMessageStore();
-	this.sessionManager = serverCreator.getSessionManager();
-	this.authHandler = serverCreator.getAuthHandler();
-	this.uniqueIdService = serverCreator.getUniqueIdService();
-	this.subscribeValidator = serverCreator.getSubscribeValidator();
-	this.publishPermission = serverCreator.getPublishPermission();
-	this.connectStatusListener = serverCreator.getConnectStatusListener();
-	this.sessionListener = serverCreator.getSessionListener();
-	this.messageListener = serverCreator.getMessageListener();
-	this.taskService = taskService;
-	this.executor = executor;
-	// 初始化发布消息管线
-	this.publishPipeline = createPublishPipeline();
-}
+									  TimerTaskService taskService,
+									  ExecutorService executor) {
+		this.serverCreator = serverCreator;
+		this.heartbeatTimeout = serverCreator.getHeartbeatTimeout() == null ? TioConfig.DEFAULT_HEARTBEAT_TIMEOUT : serverCreator.getHeartbeatTimeout();
+		this.messageStore = serverCreator.getMessageStore();
+		this.sessionManager = serverCreator.getSessionManager();
+		this.authHandler = serverCreator.getAuthHandler();
+		this.uniqueIdService = serverCreator.getUniqueIdService();
+		this.subscribeValidator = serverCreator.getSubscribeValidator();
+		this.publishPermission = serverCreator.getPublishPermission();
+		this.connectStatusListener = serverCreator.getConnectStatusListener();
+		this.sessionListener = serverCreator.getSessionListener();
+		this.messageListener = serverCreator.getMessageListener();
+		this.taskService = taskService;
+		this.executor = executor;
+		// 初始化发布消息管线
+		this.publishPipeline = createPublishPipeline();
+	}
 
 	/**
 	 * 创建发布消息管线
@@ -412,18 +412,22 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 				List<Message> retainMessageList = messageStore.getRetainMessage(topic);
 				if (retainMessageList != null && !retainMessageList.isEmpty()) {
 					for (Message retainMessage : retainMessageList) {
-							// 直接处理保留消息
-							MqttQoS mqttQoS = MqttQoS.valueOf(retainMessage.getQos());
-							// 创建发布消息
-							MqttPublishMessage publishMessage = MqttPublishMessage.builder()
-								.topicName(retainMessage.getTopic())
-								.payload(retainMessage.getPayload())
-								.qos(mqttQoS)
-								.retained(true)
-								.build();
-							// 发送消息
-							Tio.send(context, publishMessage);
-						}
+						// 直接处理保留消息
+						MqttQoS mqttQoS = MqttQoS.valueOf(retainMessage.getQos());
+						// 创建发布消息
+						boolean isHighLevelQoS = MqttQoS.QOS1 == mqttQoS || MqttQoS.QOS2 == mqttQoS;
+						int messageId = isHighLevelQoS ? sessionManager.getPacketId(clientId) : -1;
+						MqttPublishMessage publishMessage = MqttPublishMessage.builder()
+							.topicName(retainMessage.getTopic())
+							.payload(retainMessage.getPayload())
+							.qos(mqttQoS)
+							.retained(true)
+							.messageId(messageId)
+							.properties(retainMessage.getProperties())
+							.build();
+						// 发送消息
+						Tio.send(context, publishMessage);
+					}
 				}
 			});
 		}
@@ -538,7 +542,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	 * @return PublishContext
 	 */
 	private PublishContext buildPublishContext(ChannelContext context, String clientId, MqttQoS mqttQoS,
-												String topicName, MqttPublishMessage publishMessage) {
+											   String topicName, MqttPublishMessage publishMessage) {
 		MqttFixedHeader fixedHeader = publishMessage.fixedHeader();
 		MqttPublishVariableHeader variableHeader = publishMessage.variableHeader();
 		Node clientNode = context.getClientNode();
