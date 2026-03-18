@@ -20,6 +20,7 @@ import org.dromara.mica.mqtt.broker.cluster.ClusterMqttSessionManager;
 import org.dromara.mica.mqtt.broker.cluster.MqttClusterManager;
 import org.dromara.mica.mqtt.broker.cluster.message.PublishForwardMessage;
 import org.dromara.mica.mqtt.core.server.MqttServer;
+import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.pipeline.message.BaseMessageHandler;
@@ -43,7 +44,7 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 
     @Override
     public boolean handle(Message message) {
-        if (org.dromara.mica.mqtt.core.server.enums.MessageType.UP_STREAM != message.getMessageType()) {
+        if (MessageType.UP_STREAM != message.getMessageType()) {
             return true;
         }
 

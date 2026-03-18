@@ -54,29 +54,33 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
 
     private int calculateBodyLength(ClusterMessage msg) {
         ClusterMessageType type = msg.getType();
+        int baseLength = calculateStringLength(msg.getSourceNode()) + 8; // sourceNode + timestamp(8 bytes)
         switch (type) {
             case CLIENT_CONNECT:
-                return calculateStringLength(((ClientConnectMessage) msg).getClientId());
+                return baseLength + calculateStringLength(((ClientConnectMessage) msg).getClientId());
             case CLIENT_DISCONNECT:
-                return calculateStringLength(((ClientDisconnectMessage) msg).getClientId());
+                return baseLength + calculateStringLength(((ClientDisconnectMessage) msg).getClientId());
             case SUBSCRIBE_NOTIFY:
-                return calculateSubscribeNotifyLength((SubscribeNotifyMessage) msg);
+                return baseLength + calculateSubscribeNotifyLength((SubscribeNotifyMessage) msg);
             case UNSUBSCRIBE_NOTIFY:
-                return calculateUnsubscribeNotifyLength((UnsubscribeNotifyMessage) msg);
+                return baseLength + calculateUnsubscribeNotifyLength((UnsubscribeNotifyMessage) msg);
             case PUBLISH_FORWARD:
                 Message m = ((PublishForwardMessage) msg).getMessage();
-                return SERIALIZER.serialize(m).length;
+                return baseLength + SERIALIZER.serialize(m).length;
             case NODE_LEAVE:
             case STATE_SYNC_REQUEST:
-                return 0;
+                return baseLength;
             case STATE_SYNC_RESPONSE:
-                return calculateStateSyncResponseLength((StateSyncResponseMessage) msg);
+                return baseLength + calculateStateSyncResponseLength((StateSyncResponseMessage) msg);
             default:
                 throw new IllegalArgumentException("Unknown message type: " + type);
         }
     }
 
     private void encodeBodyToBuffer(ClusterMessage msg, ByteBuffer buf) {
+        writeString(buf, msg.getSourceNode());
+        buf.putLong(msg.getTimestamp());
+        
         ClusterMessageType type = msg.getType();
         switch (type) {
             case CLIENT_CONNECT:
@@ -124,25 +128,45 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
     }
 
     private ClusterMessage decodeBody(ClusterMessageType type, ByteBuffer buf) {
+        String sourceNode = null;
+        long timestamp = 0;
+        if (buf.hasRemaining()) {
+            sourceNode = readString(buf);
+            if (buf.hasRemaining()) {
+                timestamp = buf.getLong();
+            }
+        }
+        
+        ClusterMessage msg;
         switch (type) {
             case CLIENT_CONNECT:
-                return decodeClientConnectMessage(buf);
+                msg = decodeClientConnectMessage(buf);
+                break;
             case CLIENT_DISCONNECT:
-                return decodeClientDisconnectMessage(buf);
+                msg = decodeClientDisconnectMessage(buf);
+                break;
             case SUBSCRIBE_NOTIFY:
-                return decodeSubscribeNotifyMessage(buf);
+                msg = decodeSubscribeNotifyMessage(buf);
+                break;
             case UNSUBSCRIBE_NOTIFY:
-                return decodeUnsubscribeNotifyMessage(buf);
+                msg = decodeUnsubscribeNotifyMessage(buf);
+                break;
             case PUBLISH_FORWARD:
-                return decodePublishForwardMessage(buf);
+                msg = decodePublishForwardMessage(buf);
+                break;
             case NODE_LEAVE:
             case STATE_SYNC_REQUEST:
-                return decodeGenericMessage(type);
+                msg = decodeGenericMessage(type);
+                break;
             case STATE_SYNC_RESPONSE:
-                return decodeStateSyncResponseMessage(buf);
+                msg = decodeStateSyncResponseMessage(buf);
+                break;
             default:
                 throw new IllegalArgumentException("Unknown message type: " + type);
         }
+        msg.setSourceNode(sourceNode);
+        msg.setTimestamp(timestamp);
+        return msg;
     }
 
     // ==================== 编码长度计算 ====================

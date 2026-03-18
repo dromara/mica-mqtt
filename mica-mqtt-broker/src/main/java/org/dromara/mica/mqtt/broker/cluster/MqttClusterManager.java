@@ -21,6 +21,7 @@ import org.dromara.mica.mqtt.broker.cluster.codec.ClusterMessageCodec;
 import org.dromara.mica.mqtt.broker.cluster.message.*;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.MqttServer;
+import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.slf4j.Logger;
@@ -294,6 +295,7 @@ public class MqttClusterManager {
 					PublishForwardMessage clusterMsg = new PublishForwardMessage();
 
 					Message message = new Message();
+					message.setMessageType(MessageType.UP_STREAM);
 					message.setTopic(topic);
 					message.setPayload(payload);
 					message.setQos(qos);
