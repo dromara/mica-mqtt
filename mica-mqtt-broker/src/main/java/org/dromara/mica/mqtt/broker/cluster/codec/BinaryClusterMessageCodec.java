@@ -20,8 +20,6 @@ import org.dromara.mica.mqtt.broker.cluster.message.*;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.serializer.DefaultMessageSerializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -34,20 +32,18 @@ import java.util.Map;
  * 二进制集群消息编解码器（完全手写，无第三方依赖）
  */
 public class BinaryClusterMessageCodec implements ClusterMessageCodec {
-    private static final Logger logger = LoggerFactory.getLogger(BinaryClusterMessageCodec.class);
-
     private static final byte MAGIC = 0x0C;
     private static final DefaultMessageSerializer SERIALIZER = DefaultMessageSerializer.INSTANCE;
 
     @Override
     public byte[] encode(ClusterMessage msg) {
         int bodyLength = calculateBodyLength(msg);
-        int varintLengthSize = varintSize(bodyLength);
+        int varIntLengthSize = varIntSize(bodyLength);
 
-        ByteBuffer buf = ByteBuffer.allocate(1 + 1 + varintLengthSize + bodyLength);
+        ByteBuffer buf = ByteBuffer.allocate(1 + 1 + varIntLengthSize + bodyLength);
         buf.put(MAGIC);
         buf.put((byte) msg.getType().ordinal());
-        writeVarint(buf, bodyLength);
+        writeVarInt(buf, bodyLength);
         encodeBodyToBuffer(msg, buf);
 
         byte[] result = new byte[buf.position()];
@@ -119,7 +115,7 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
         byte typeOrdinal = buf.get();
         ClusterMessageType type = ClusterMessageType.values()[typeOrdinal];
 
-        int length = readVarint(buf);
+        int length = readVarInt(buf);
 
         byte[] body = new byte[length];
         buf.get(body);
@@ -164,7 +160,7 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
         if (subs == null) {
             len += 1;
         } else {
-            len += varintSize(subs.size());
+            len += varIntSize(subs.size());
             for (Subscribe sub : subs) {
                 len += calculateStringLength(sub.getTopicFilter());
                 len += calculateStringLength(sub.getClientId());
@@ -182,7 +178,7 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
         if (topics == null) {
             len += 1;
         } else {
-            len += varintSize(topics.size());
+            len += varIntSize(topics.size());
             for (String topic : topics) {
                 len += calculateStringLength(topic);
             }
@@ -196,7 +192,7 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
         if (clientNodeMap == null) {
             len += 1;
         } else {
-            len += varintSize(clientNodeMap.size());
+            len += varIntSize(clientNodeMap.size());
             for (Map.Entry<String, String> entry : clientNodeMap.entrySet()) {
                 len += calculateStringLength(entry.getKey());
                 len += calculateStringLength(entry.getValue());
@@ -207,14 +203,14 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
         if (subMap == null) {
             len += 1;
         } else {
-            len += varintSize(subMap.size());
+            len += varIntSize(subMap.size());
             for (Map.Entry<String, List<Subscribe>> entry : subMap.entrySet()) {
                 len += calculateStringLength(entry.getKey());
                 List<Subscribe> subs = entry.getValue();
                 if (subs == null) {
                     len += 1;
                 } else {
-                    len += varintSize(subs.size());
+                    len += varIntSize(subs.size());
                     for (Subscribe sub : subs) {
                         len += calculateStringLength(sub.getTopicFilter());
                         len += calculateStringLength(sub.getClientId());
@@ -233,9 +229,9 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
         writeString(buf, msg.getNodeId());
         List<Subscribe> subs = msg.getSubscriptions();
         if (subs == null) {
-            writeVarint(buf, 0);
+            writeVarInt(buf, 0);
         } else {
-            writeVarint(buf, subs.size());
+            writeVarInt(buf, subs.size());
             for (Subscribe sub : subs) {
                 writeString(buf, sub.getTopicFilter());
                 writeString(buf, sub.getClientId());
@@ -250,9 +246,9 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
         writeString(buf, msg.getNodeId());
         List<String> topics = msg.getTopics();
         if (topics == null) {
-            writeVarint(buf, 0);
+            writeVarInt(buf, 0);
         } else {
-            writeVarint(buf, topics.size());
+            writeVarInt(buf, topics.size());
             for (String topic : topics) {
                 writeString(buf, topic);
             }
@@ -262,9 +258,9 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
     private void encodeStateSyncResponse(ByteBuffer buf, StateSyncResponseMessage msg) {
         Map<String, String> clientNodeMap = msg.getClientNodeMap();
         if (clientNodeMap == null) {
-            writeVarint(buf, 0);
+            writeVarInt(buf, 0);
         } else {
-            writeVarint(buf, clientNodeMap.size());
+            writeVarInt(buf, clientNodeMap.size());
             for (Map.Entry<String, String> entry : clientNodeMap.entrySet()) {
                 writeString(buf, entry.getKey());
                 writeString(buf, entry.getValue());
@@ -273,16 +269,16 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
 
         Map<String, List<Subscribe>> subMap = msg.getSubscriptionMap();
         if (subMap == null) {
-            writeVarint(buf, 0);
+            writeVarInt(buf, 0);
         } else {
-            writeVarint(buf, subMap.size());
+            writeVarInt(buf, subMap.size());
             for (Map.Entry<String, List<Subscribe>> entry : subMap.entrySet()) {
                 writeString(buf, entry.getKey());
                 List<Subscribe> subs = entry.getValue();
                 if (subs == null) {
-                    writeVarint(buf, 0);
+                    writeVarInt(buf, 0);
                 } else {
-                    writeVarint(buf, subs.size());
+                    writeVarInt(buf, subs.size());
                     for (Subscribe sub : subs) {
                         writeString(buf, sub.getTopicFilter());
                         writeString(buf, sub.getClientId());
@@ -345,7 +341,7 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
 
     // ==================== 基础方法 ====================
 
-    private void writeVarint(ByteBuffer buf, int value) {
+    private void writeVarInt(ByteBuffer buf, int value) {
         while (true) {
             int b = value & 0x7F;
             value >>>= 7;
@@ -367,7 +363,7 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
         buf.put(bytes);
     }
 
-    private int readVarint(ByteBuffer buf) {
+    private int readVarInt(ByteBuffer buf) {
         int result = 0;
         int shift = 0;
         while (true) {
@@ -392,7 +388,7 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
     }
 
     private List<String> readStringList(ByteBuffer buf) {
-        int size = readVarint(buf);
+        int size = readVarInt(buf);
         if (size == 0) {
             return null;
         }
@@ -404,7 +400,7 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
     }
 
     private List<Subscribe> readSubscribeList(ByteBuffer buf) {
-        int size = readVarint(buf);
+        int size = readVarInt(buf);
         if (size == 0) {
             return null;
         }
@@ -425,7 +421,7 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
     }
 
     private Map<String, String> readStringStringMap(ByteBuffer buf) {
-        int size = readVarint(buf);
+        int size = readVarInt(buf);
         if (size == 0) {
             return null;
         }
@@ -439,7 +435,7 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
     }
 
     private Map<String, List<Subscribe>> readSubscriptionMap(ByteBuffer buf) {
-        int size = readVarint(buf);
+        int size = readVarInt(buf);
         if (size == 0) {
             return null;
         }
@@ -452,7 +448,7 @@ public class BinaryClusterMessageCodec implements ClusterMessageCodec {
         return map;
     }
 
-    private int varintSize(int value) {
+    private int varIntSize(int value) {
         if (value < 0) {
             return 5;
         }
