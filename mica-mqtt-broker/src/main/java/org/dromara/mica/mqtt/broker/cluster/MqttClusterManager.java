@@ -248,13 +248,6 @@ public class MqttClusterManager {
 		}
 	}
 
-	public Collection<Node> getRemoteMembers() {
-		if (cluster == null) {
-			return Collections.emptyList();
-		}
-		return cluster.getRemoteMembers();
-	}
-
 	public String getLocalNodeId() {
 		return localNodeId;
 	}
