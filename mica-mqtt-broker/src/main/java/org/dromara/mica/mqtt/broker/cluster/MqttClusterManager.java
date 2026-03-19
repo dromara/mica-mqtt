@@ -28,6 +28,7 @@ import org.tio.core.Node;
 import org.tio.server.cluster.core.ClusterApi;
 import org.tio.server.cluster.core.ClusterConfig;
 import org.tio.server.cluster.core.ClusterImpl;
+import org.tio.server.cluster.codec.ClusterMessageEncoder;
 import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.*;

@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.broker.cluster.message;
 
+import org.tio.server.cluster.message.ClusterDataMessage;
+
 import java.util.List;
 import java.util.Map;
 
@@ -41,10 +43,10 @@ public class UnsubscribeNotifyMessage implements BrokerMessage {
     }
 
     @Override
-    public void fromClusterData(Map<String, String> headers, byte[] payload) {
-        this.clientId = headers.get(BrokerMessageConverter.HEADER_CLIENT_ID);
-        this.nodeId = headers.get(BrokerMessageConverter.HEADER_NODE_ID);
-        this.topics = BrokerMessageConverter.deserializeTopics(payload);
+    public void fromClusterData(ClusterDataMessage message) {
+        this.clientId = message.getHeader(BrokerMessageConverter.HEADER_CLIENT_ID);
+        this.nodeId = message.getHeader(BrokerMessageConverter.HEADER_NODE_ID);
+        this.topics = BrokerMessageConverter.deserializeTopics(message.getPayload());
     }
 
     public String getClientId() {

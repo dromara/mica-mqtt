@@ -18,41 +18,43 @@ package org.dromara.mica.mqtt.broker.cluster.message;
 
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.serializer.DefaultMessageSerializer;
+import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.Map;
 
 public class PublishForwardMessage implements BrokerMessage {
-    private Message message;
+	private Message message;
 
-    @Override
-    public BrokerMessageType getType() {
-        return BrokerMessageType.PUBLISH_FORWARD;
-    }
+	@Override
+	public BrokerMessageType getType() {
+		return BrokerMessageType.PUBLISH_FORWARD;
+	}
 
-    @Override
-    public void toClusterData(Map<String, String> headers) {
-    }
+	@Override
+	public void toClusterData(Map<String, String> headers) {
+	}
 
-    @Override
-    public byte[] toPayload() {
-        if (message == null) {
-            return new byte[0];
-        }
-        return DefaultMessageSerializer.INSTANCE.serialize(message);
-    }
+	@Override
+	public byte[] toPayload() {
+		if (message == null) {
+			return new byte[0];
+		}
+		return DefaultMessageSerializer.INSTANCE.serialize(message);
+	}
 
-    @Override
-    public void fromClusterData(Map<String, String> headers, byte[] payload) {
-        if (payload != null && payload.length > 0) {
-            this.message = DefaultMessageSerializer.INSTANCE.deserialize(payload);
-        }
-    }
+	@Override
+	public void fromClusterData(ClusterDataMessage message) {
+		byte[] payload = message.getPayload();
+		if (payload != null && payload.length > 0) {
+			this.message = DefaultMessageSerializer.INSTANCE.deserialize(payload);
+		}
+	}
 
-    public Message getMessage() {
-        return message;
-    }
+	public Message getMessage() {
+		return message;
+	}
 
-    public void setMessage(Message message) {
-        this.message = message;
-    }
+	public void setMessage(Message message) {
+		this.message = message;
+	}
 }

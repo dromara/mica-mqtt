@@ -17,12 +17,31 @@
 package org.dromara.mica.mqtt.broker.cluster.message;
 
 public enum BrokerMessageType {
-	CLIENT_CONNECT,        // 客户端连接通知
-	CLIENT_DISCONNECT,    // 客户端断开通知
-	SUBSCRIBE_NOTIFY,     // 订阅通知
-	UNSUBSCRIBE_NOTIFY,   // 取消订阅通知
-	PUBLISH_FORWARD,     // 消息转发
-	NODE_LEAVE,          // 节点离开
-	STATE_SYNC_REQUEST,  // 状态同步请求
-	STATE_SYNC_RESPONSE, // 状态同步响应
+	CLIENT_CONNECT(1),
+	CLIENT_DISCONNECT(2),
+	SUBSCRIBE_NOTIFY(3),
+	UNSUBSCRIBE_NOTIFY(4),
+	PUBLISH_FORWARD(5),
+	NODE_LEAVE(6),
+	STATE_SYNC_REQUEST(7),
+	STATE_SYNC_RESPONSE(8);
+
+	private final int code;
+
+	BrokerMessageType(int code) {
+		this.code = code;
+	}
+
+	public int getCode() {
+		return code;
+	}
+
+	public static BrokerMessageType fromCode(int code) {
+		for (BrokerMessageType type : values()) {
+			if (type.code == code) {
+				return type;
+			}
+		}
+		throw new IllegalArgumentException("Unknown message type code: " + code);
+	}
 }

@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.broker.cluster.message;
 
+import org.tio.server.cluster.message.ClusterDataMessage;
+
 import java.util.Map;
 
 public class NodeLeaveMessage implements BrokerMessage {
@@ -35,6 +37,6 @@ public class NodeLeaveMessage implements BrokerMessage {
     }
 
     @Override
-    public void fromClusterData(Map<String, String> headers, byte[] payload) {
+    public void fromClusterData(ClusterDataMessage message) {
     }
 }

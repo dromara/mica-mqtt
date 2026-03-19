@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.broker.cluster.message;
 
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
+import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.List;
 import java.util.Map;
@@ -40,10 +41,11 @@ public class StateSyncResponseMessage implements BrokerMessage {
     }
 
     @Override
-    public void fromClusterData(Map<String, String> headers, byte[] payload) {
-        BrokerMessageConverter.StateSyncData data = BrokerMessageConverter.deserializeStateSyncData(payload);
-        this.clientNodeMap = data.getClientNodeMap();
-        this.subscriptionMap = data.getSubscriptionMap();
+    public void fromClusterData(ClusterDataMessage message) {
+		byte[] payload = message.getPayload();
+		BrokerMessageConverter.StateSyncData syncData = BrokerMessageConverter.deserializeStateSyncData(payload);
+        this.clientNodeMap = syncData.getClientNodeMap();
+        this.subscriptionMap = syncData.getSubscriptionMap();
     }
 
     public Map<String, String> getClientNodeMap() {

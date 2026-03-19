@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.broker.cluster.message;
 
+import org.tio.server.cluster.message.ClusterDataMessage;
+
 import java.util.Map;
 
 public class ClientConnectMessage implements BrokerMessage {
@@ -37,8 +39,8 @@ public class ClientConnectMessage implements BrokerMessage {
     }
 
     @Override
-    public void fromClusterData(Map<String, String> headers, byte[] payload) {
-        this.clientId = headers.get(BrokerMessageConverter.HEADER_CLIENT_ID);
+    public void fromClusterData(ClusterDataMessage message) {
+        this.clientId = message.getHeader(BrokerMessageConverter.HEADER_CLIENT_ID);
     }
 
     public String getClientId() {

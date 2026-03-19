@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 
 public class BrokerMessageConverter {
-
     public static final String HEADER_TYPE = "type";
     public static final String HEADER_CLIENT_ID = "clientId";
     public static final String HEADER_NODE_ID = "nodeId";
@@ -35,24 +34,24 @@ public class BrokerMessageConverter {
 
     public static ClusterDataMessage toClusterData(BrokerMessage msg, String sourceNode) {
         Map<String, String> headers = new HashMap<>(4);
-        headers.put(HEADER_TYPE, msg.getType().name());
+        headers.put(HEADER_TYPE, String.valueOf(msg.getType().getCode()));
         headers.put(HEADER_SOURCE_NODE, sourceNode);
         msg.toClusterData(headers);
         byte[] payload = msg.toPayload();
-        return new ClusterDataMessage(System.currentTimeMillis(), headers, payload);
+        return new ClusterDataMessage(System.currentTimeMillis(), headers, payload.length > 0 ? payload : null);
     }
 
     @SuppressWarnings("unchecked")
     public static <T extends BrokerMessage> T fromClusterData(ClusterDataMessage data) {
-        String typeName = data.getHeaders().get(HEADER_TYPE);
-        BrokerMessageType type = BrokerMessageType.valueOf(typeName);
+        int typeCode = Integer.parseInt(data.getHeader(HEADER_TYPE));
+        BrokerMessageType type = BrokerMessageType.fromCode(typeCode);
         BrokerMessage msg = createMessage(type);
-        msg.fromClusterData(data.getHeaders(), data.getPayload());
+        msg.fromClusterData(data);
         return (T) msg;
     }
 
     public static String getSourceNode(ClusterDataMessage data) {
-        return data.getHeaders().get(HEADER_SOURCE_NODE);
+        return data.getHeader(HEADER_SOURCE_NODE);
     }
 
     private static BrokerMessage createMessage(BrokerMessageType type) {
