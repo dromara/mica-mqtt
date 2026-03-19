@@ -22,21 +22,21 @@ import java.util.Map;
 
 public class StateSyncRequestMessage implements BrokerMessage {
 
-    @Override
-    public BrokerMessageType getType() {
-        return BrokerMessageType.STATE_SYNC_REQUEST;
-    }
+	@Override
+	public BrokerMessageType getType() {
+		return BrokerMessageType.STATE_SYNC_REQUEST;
+	}
 
-    @Override
-    public void toClusterData(Map<String, String> headers) {
-    }
+	@Override
+	public void toClusterData(Map<String, String> headers) {
+	}
 
-    @Override
-    public byte[] toPayload() {
-        return new byte[0];
-    }
+	@Override
+	public byte[] toPayload() {
+		return new byte[0];
+	}
 
-    @Override
-    public void fromClusterData(ClusterDataMessage message) {
-    }
+	@Override
+	public void fromClusterData(ClusterDataMessage message) {
+	}
 }

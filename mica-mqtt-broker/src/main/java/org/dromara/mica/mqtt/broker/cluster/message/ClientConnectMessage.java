@@ -21,33 +21,33 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 import java.util.Map;
 
 public class ClientConnectMessage implements BrokerMessage {
-    private String clientId;
+	private String clientId;
 
-    @Override
-    public BrokerMessageType getType() {
-        return BrokerMessageType.CLIENT_CONNECT;
-    }
+	@Override
+	public BrokerMessageType getType() {
+		return BrokerMessageType.CLIENT_CONNECT;
+	}
 
-    @Override
-    public void toClusterData(Map<String, String> headers) {
-        headers.put(BrokerMessageConverter.HEADER_CLIENT_ID, clientId);
-    }
+	@Override
+	public void toClusterData(Map<String, String> headers) {
+		headers.put(BrokerMessageConverter.HEADER_CLIENT_ID, clientId);
+	}
 
-    @Override
-    public byte[] toPayload() {
-        return new byte[0];
-    }
+	@Override
+	public byte[] toPayload() {
+		return new byte[0];
+	}
 
-    @Override
-    public void fromClusterData(ClusterDataMessage message) {
-        this.clientId = message.getHeader(BrokerMessageConverter.HEADER_CLIENT_ID);
-    }
+	@Override
+	public void fromClusterData(ClusterDataMessage message) {
+		this.clientId = message.getHeader(BrokerMessageConverter.HEADER_CLIENT_ID);
+	}
 
-    public String getClientId() {
-        return clientId;
-    }
+	public String getClientId() {
+		return clientId;
+	}
 
-    public void setClientId(String clientId) {
-        this.clientId = clientId;
-    }
+	public void setClientId(String clientId) {
+		this.clientId = clientId;
+	}
 }

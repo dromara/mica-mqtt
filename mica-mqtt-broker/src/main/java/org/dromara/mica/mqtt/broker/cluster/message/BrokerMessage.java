@@ -25,11 +25,11 @@ import java.util.Map;
  */
 public interface BrokerMessage {
 
-    BrokerMessageType getType();
+	BrokerMessageType getType();
 
-    void toClusterData(Map<String, String> headers);
+	void toClusterData(Map<String, String> headers);
 
-    byte[] toPayload();
+	byte[] toPayload();
 
-    void fromClusterData(ClusterDataMessage message);
+	void fromClusterData(ClusterDataMessage message);
 }

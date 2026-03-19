@@ -26,77 +26,77 @@ import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
  * 集群模式的 Broker 创建器
  */
 public class MqttClusterBrokerCreator {
-    private final MqttServerCreator serverCreator;
-    private MqttClusterConfig clusterConfig;
-    private MqttClusterManager clusterManager;
-    private ClusterMqttSessionManager clusterSessionManager;
+	private final MqttServerCreator serverCreator;
+	private MqttClusterConfig clusterConfig;
+	private MqttClusterManager clusterManager;
+	private ClusterMqttSessionManager clusterSessionManager;
 
-    public MqttClusterBrokerCreator(MqttServerCreator serverCreator) {
-        this.serverCreator = serverCreator;
-    }
+	public MqttClusterBrokerCreator(MqttServerCreator serverCreator) {
+		this.serverCreator = serverCreator;
+	}
 
-    public MqttClusterBrokerCreator clusterConfig(MqttClusterConfig config) {
-        this.clusterConfig = config;
-        return this;
-    }
+	public MqttClusterBrokerCreator clusterConfig(MqttClusterConfig config) {
+		this.clusterConfig = config;
+		return this;
+	}
 
-    public MqttServer build() {
-        if (clusterConfig == null || !clusterConfig.isEnabled()) {
-            return serverCreator.build();
-        }
+	public MqttServer build() {
+		if (clusterConfig == null || !clusterConfig.isEnabled()) {
+			return serverCreator.build();
+		}
 
-        // 1. 初始化 Manager (需稍后传入 mqttServer)
-        clusterManager = new MqttClusterManager(clusterConfig, serverCreator.getNodeName());
+		// 1. 初始化 Manager (需稍后传入 mqttServer)
+		clusterManager = new MqttClusterManager(clusterConfig, serverCreator.getNodeName());
 
-        // 2. 确保 sessionManager 存在，如果为 null 则创建默认的
-        IMqttSessionManager delegateSessionManager = serverCreator.getSessionManager();
-        if (delegateSessionManager == null) {
-            delegateSessionManager = new InMemoryMqttSessionManager();
-        }
+		// 2. 确保 sessionManager 存在，如果为 null 则创建默认的
+		IMqttSessionManager delegateSessionManager = serverCreator.getSessionManager();
+		if (delegateSessionManager == null) {
+			delegateSessionManager = new InMemoryMqttSessionManager();
+		}
 
-        // 3. 包装 sessionManager
-        clusterSessionManager = new ClusterMqttSessionManager(delegateSessionManager, clusterManager);
-        serverCreator.sessionManager(clusterSessionManager);
+		// 3. 包装 sessionManager
+		clusterSessionManager = new ClusterMqttSessionManager(delegateSessionManager, clusterManager);
+		serverCreator.sessionManager(clusterSessionManager);
 
-        // 4. 构建 MqttServer (需修改 ConnectStatusListener)
-        ClusterMqttConnectStatusListener clusterConnectStatusListener = new ClusterMqttConnectStatusListener(
-            serverCreator.getConnectStatusListener(), clusterManager
-        );
-        serverCreator.connectStatusListener(clusterConnectStatusListener);
+		// 4. 构建 MqttServer (需修改 ConnectStatusListener)
+		ClusterMqttConnectStatusListener clusterConnectStatusListener = new ClusterMqttConnectStatusListener(
+			serverCreator.getConnectStatusListener(), clusterManager
+		);
+		serverCreator.connectStatusListener(clusterConnectStatusListener);
 
-        MqttServer mqttServer = serverCreator.build();
-        clusterManager.setMqttServer(mqttServer);
+		MqttServer mqttServer = serverCreator.build();
+		clusterManager.setMqttServer(mqttServer);
 
-        // 5. 添加消息拦截器/分发器
-        ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(mqttServer, clusterManager, clusterSessionManager);
-        serverCreator.getMessagePipeline().addHandler(dispatcher);
+		// 5. 添加消息拦截器/分发器
+		ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(mqttServer, clusterManager, clusterSessionManager);
+		serverCreator.getMessagePipeline().addHandler(dispatcher);
 
-        return mqttServer;
-    }
+		return mqttServer;
+	}
 
-    public MqttServer start() {
-        MqttServer mqttServer = this.build();
-        try {
-            if (clusterManager != null) {
-                clusterManager.start();
-            } else {
-                mqttServer.start();
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to start MqttClusterBroker", e);
-        }
-        return mqttServer;
-    }
+	public MqttServer start() {
+		MqttServer mqttServer = this.build();
+		try {
+			if (clusterManager != null) {
+				clusterManager.start();
+			} else {
+				mqttServer.start();
+			}
+		} catch (Exception e) {
+			throw new RuntimeException("Failed to start MqttClusterBroker", e);
+		}
+		return mqttServer;
+	}
 
-    public MqttServerCreator getServerCreator() {
-        return serverCreator;
-    }
+	public MqttServerCreator getServerCreator() {
+		return serverCreator;
+	}
 
-    public MqttClusterManager getClusterManager() {
-        return clusterManager;
-    }
+	public MqttClusterManager getClusterManager() {
+		return clusterManager;
+	}
 
-    public ClusterMqttSessionManager getClusterSessionManager() {
-        return clusterSessionManager;
-    }
+	public ClusterMqttSessionManager getClusterSessionManager() {
+		return clusterSessionManager;
+	}
 }

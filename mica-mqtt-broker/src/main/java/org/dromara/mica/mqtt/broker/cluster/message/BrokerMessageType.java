@@ -32,10 +32,6 @@ public enum BrokerMessageType {
 		this.code = code;
 	}
 
-	public int getCode() {
-		return code;
-	}
-
 	public static BrokerMessageType fromCode(int code) {
 		for (BrokerMessageType type : values()) {
 			if (type.code == code) {
@@ -43,5 +39,9 @@ public enum BrokerMessageType {
 			}
 		}
 		throw new IllegalArgumentException("Unknown message type code: " + code);
+	}
+
+	public int getCode() {
+		return code;
 	}
 }

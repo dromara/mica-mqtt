@@ -23,44 +23,44 @@ import java.util.List;
 import java.util.Map;
 
 public class StateSyncResponseMessage implements BrokerMessage {
-    private Map<String, String> clientNodeMap;
-    private Map<String, List<Subscribe>> subscriptionMap;
+	private Map<String, String> clientNodeMap;
+	private Map<String, List<Subscribe>> subscriptionMap;
 
-    @Override
-    public BrokerMessageType getType() {
-        return BrokerMessageType.STATE_SYNC_RESPONSE;
-    }
+	@Override
+	public BrokerMessageType getType() {
+		return BrokerMessageType.STATE_SYNC_RESPONSE;
+	}
 
-    @Override
-    public void toClusterData(Map<String, String> headers) {
-    }
+	@Override
+	public void toClusterData(Map<String, String> headers) {
+	}
 
-    @Override
-    public byte[] toPayload() {
-        return BrokerMessageConverter.serializeStateSyncData(clientNodeMap, subscriptionMap);
-    }
+	@Override
+	public byte[] toPayload() {
+		return BrokerMessageConverter.serializeStateSyncData(clientNodeMap, subscriptionMap);
+	}
 
-    @Override
-    public void fromClusterData(ClusterDataMessage message) {
+	@Override
+	public void fromClusterData(ClusterDataMessage message) {
 		byte[] payload = message.getPayload();
 		BrokerMessageConverter.StateSyncData syncData = BrokerMessageConverter.deserializeStateSyncData(payload);
-        this.clientNodeMap = syncData.getClientNodeMap();
-        this.subscriptionMap = syncData.getSubscriptionMap();
-    }
+		this.clientNodeMap = syncData.getClientNodeMap();
+		this.subscriptionMap = syncData.getSubscriptionMap();
+	}
 
-    public Map<String, String> getClientNodeMap() {
-        return clientNodeMap;
-    }
+	public Map<String, String> getClientNodeMap() {
+		return clientNodeMap;
+	}
 
-    public void setClientNodeMap(Map<String, String> clientNodeMap) {
-        this.clientNodeMap = clientNodeMap;
-    }
+	public void setClientNodeMap(Map<String, String> clientNodeMap) {
+		this.clientNodeMap = clientNodeMap;
+	}
 
-    public Map<String, List<Subscribe>> getSubscriptionMap() {
-        return subscriptionMap;
-    }
+	public Map<String, List<Subscribe>> getSubscriptionMap() {
+		return subscriptionMap;
+	}
 
-    public void setSubscriptionMap(Map<String, List<Subscribe>> subscriptionMap) {
-        this.subscriptionMap = subscriptionMap;
-    }
+	public void setSubscriptionMap(Map<String, List<Subscribe>> subscriptionMap) {
+		this.subscriptionMap = subscriptionMap;
+	}
 }

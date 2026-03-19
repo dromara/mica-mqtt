@@ -31,23 +31,23 @@ import org.dromara.mica.mqtt.core.server.MqttServerCreator;
  */
 public class MqttBroker {
 
-    /**
-     * Create a new MqttClusterBrokerCreator using an existing MqttServerCreator
-     *
-     * @param serverCreator the underlying MqttServerCreator
-     * @return MqttClusterBrokerCreator
-     */
-    public static MqttClusterBrokerCreator create(MqttServerCreator serverCreator) {
-        return new MqttClusterBrokerCreator(serverCreator);
-    }
+	/**
+	 * Create a new MqttClusterBrokerCreator using an existing MqttServerCreator
+	 *
+	 * @param serverCreator the underlying MqttServerCreator
+	 * @return MqttClusterBrokerCreator
+	 */
+	public static MqttClusterBrokerCreator create(MqttServerCreator serverCreator) {
+		return new MqttClusterBrokerCreator(serverCreator);
+	}
 
-    /**
-     * Create a new MqttClusterBrokerCreator using a new MqttServerCreator
-     *
-     * @return MqttClusterBrokerCreator
-     */
-    public static MqttClusterBrokerCreator create() {
-        return new MqttClusterBrokerCreator(MqttServer.create());
-    }
+	/**
+	 * Create a new MqttClusterBrokerCreator using a new MqttServerCreator
+	 *
+	 * @return MqttClusterBrokerCreator
+	 */
+	public static MqttClusterBrokerCreator create() {
+		return new MqttClusterBrokerCreator(MqttServer.create());
+	}
 
 }

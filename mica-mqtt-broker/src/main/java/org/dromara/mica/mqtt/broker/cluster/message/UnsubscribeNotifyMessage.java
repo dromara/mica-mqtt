@@ -22,54 +22,54 @@ import java.util.List;
 import java.util.Map;
 
 public class UnsubscribeNotifyMessage implements BrokerMessage {
-    private String clientId;
-    private String nodeId;
-    private List<String> topics;
+	private String clientId;
+	private String nodeId;
+	private List<String> topics;
 
-    @Override
-    public BrokerMessageType getType() {
-        return BrokerMessageType.UNSUBSCRIBE_NOTIFY;
-    }
+	@Override
+	public BrokerMessageType getType() {
+		return BrokerMessageType.UNSUBSCRIBE_NOTIFY;
+	}
 
-    @Override
-    public void toClusterData(Map<String, String> headers) {
-        headers.put(BrokerMessageConverter.HEADER_CLIENT_ID, clientId);
-        headers.put(BrokerMessageConverter.HEADER_NODE_ID, nodeId);
-    }
+	@Override
+	public void toClusterData(Map<String, String> headers) {
+		headers.put(BrokerMessageConverter.HEADER_CLIENT_ID, clientId);
+		headers.put(BrokerMessageConverter.HEADER_NODE_ID, nodeId);
+	}
 
-    @Override
-    public byte[] toPayload() {
-        return BrokerMessageConverter.serializeTopics(topics);
-    }
+	@Override
+	public byte[] toPayload() {
+		return BrokerMessageConverter.serializeTopics(topics);
+	}
 
-    @Override
-    public void fromClusterData(ClusterDataMessage message) {
-        this.clientId = message.getHeader(BrokerMessageConverter.HEADER_CLIENT_ID);
-        this.nodeId = message.getHeader(BrokerMessageConverter.HEADER_NODE_ID);
-        this.topics = BrokerMessageConverter.deserializeTopics(message.getPayload());
-    }
+	@Override
+	public void fromClusterData(ClusterDataMessage message) {
+		this.clientId = message.getHeader(BrokerMessageConverter.HEADER_CLIENT_ID);
+		this.nodeId = message.getHeader(BrokerMessageConverter.HEADER_NODE_ID);
+		this.topics = BrokerMessageConverter.deserializeTopics(message.getPayload());
+	}
 
-    public String getClientId() {
-        return clientId;
-    }
+	public String getClientId() {
+		return clientId;
+	}
 
-    public void setClientId(String clientId) {
-        this.clientId = clientId;
-    }
+	public void setClientId(String clientId) {
+		this.clientId = clientId;
+	}
 
-    public String getNodeId() {
-        return nodeId;
-    }
+	public String getNodeId() {
+		return nodeId;
+	}
 
-    public void setNodeId(String nodeId) {
-        this.nodeId = nodeId;
-    }
+	public void setNodeId(String nodeId) {
+		this.nodeId = nodeId;
+	}
 
-    public List<String> getTopics() {
-        return topics;
-    }
+	public List<String> getTopics() {
+		return topics;
+	}
 
-    public void setTopics(List<String> topics) {
-        this.topics = topics;
-    }
+	public void setTopics(List<String> topics) {
+		this.topics = topics;
+	}
 }
