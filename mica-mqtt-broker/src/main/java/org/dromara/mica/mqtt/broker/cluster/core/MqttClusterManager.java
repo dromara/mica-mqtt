@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.cluster;
+package org.dromara.mica.mqtt.broker.cluster.core;
 
 import org.dromara.mica.mqtt.broker.cluster.message.*;
 import org.dromara.mica.mqtt.codec.MqttQoS;
@@ -28,7 +28,6 @@ import org.tio.core.Node;
 import org.tio.server.cluster.core.ClusterApi;
 import org.tio.server.cluster.core.ClusterConfig;
 import org.tio.server.cluster.core.ClusterImpl;
-import org.tio.server.cluster.codec.ClusterMessageEncoder;
 import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.*;

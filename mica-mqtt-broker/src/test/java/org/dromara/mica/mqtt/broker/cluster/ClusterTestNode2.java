@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.broker.cluster;
 
+import org.dromara.mica.mqtt.broker.cluster.core.MqttClusterConfig;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 
@@ -49,7 +50,7 @@ public class ClusterTestNode2 {
             .enableMqtt(1884);
 
         // 3. 使用集群创建器构建并启动
-        MqttServer mqttServer = org.dromara.mica.mqtt.broker.MqttBroker.create(creator)
+        MqttServer mqttServer = MqttBroker.create(creator)
             .clusterConfig(clusterConfig)
             .start();
 

@@ -16,7 +16,9 @@
 
 package org.dromara.mica.mqtt.broker.cluster;
 
-import org.dromara.mica.mqtt.broker.MqttBroker;
+import org.dromara.mica.mqtt.broker.cluster.core.MqttClusterBrokerCreator;
+import org.dromara.mica.mqtt.broker.cluster.core.MqttClusterConfig;
+import org.dromara.mica.mqtt.broker.cluster.core.MqttClusterManager;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 
@@ -64,7 +66,7 @@ public class ClusterTestNode1 {
             while (true) {
                 try {
                     Thread.sleep(5000);
-                    
+
                     // 集群广播下发测试（所有订阅了 /test/cluster/topic 的设备都会收到）
                     String broadcastMsg = "Broadcast message from Node 1, count: " + count;
                     clusterManager.publish("/test/cluster/topic", broadcastMsg.getBytes(), 0, false);

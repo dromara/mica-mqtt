@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.cluster;
+package org.dromara.mica.mqtt.broker.cluster.core;
 
 import org.dromara.mica.mqtt.broker.cluster.message.SubscribeNotifyMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.UnsubscribeNotifyMessage;

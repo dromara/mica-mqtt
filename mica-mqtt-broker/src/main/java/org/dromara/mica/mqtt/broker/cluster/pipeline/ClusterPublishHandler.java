@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.broker.cluster.pipeline;
 
-import org.dromara.mica.mqtt.broker.cluster.ClusterMqttSessionManager;
-import org.dromara.mica.mqtt.broker.cluster.MqttClusterManager;
+import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttSessionManager;
+import org.dromara.mica.mqtt.broker.cluster.core.MqttClusterManager;
 import org.dromara.mica.mqtt.broker.cluster.message.PublishForwardMessage;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
