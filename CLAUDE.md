@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Shared subscriptions and queue subscriptions
 - Client/Server support for Spring Boot, Solon, and JFinal
 - GraalVM native compilation support
+- **Clustering via `mica-mqtt-broker` module** (t-io cluster for node-to-node communication)
 
 **Documentation:** https://mica-mqtt.dreamlu.net/guide/
 **Demo Server:** mqtt.dreamlu.net (username: mica, password: mica)
@@ -22,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Build & Test
 ```bash
-# Full build with tests
+# Full build with tests (includes example module via develop profile)
 mvn clean install
 
 # Build without tests
@@ -41,8 +42,11 @@ mvn -Dtest=TopicFilterTypeTest#methodName test
 mvn compile
 ```
 
-### Development Profile
-The `develop` profile is active by default and includes the `example` module. Use Aliyun mirror for faster Chinese downloads.
+### Module-Specific Build
+```bash
+# Build mica-mqtt-broker (cluster module, not in develop profile by default)
+mvn clean install -pl mica-mqtt-broker -am
+```
 
 ### Release Commands
 ```bash
@@ -59,10 +63,11 @@ mvn clean deploy -P release
 
 ```
 mica-mqtt/
-├── mica-mqtt-codec       # MQTT protocol encoding/decoding (independent, no business logic)
+├── mica-mqtt-codec       # MQTT protocol encoding/decoding (no business logic)
 ├── mica-mqtt-common      # Common utilities, topic filters, message models
 ├── mica-mqtt-client      # MQTT client implementation
 ├── mica-mqtt-server      # MQTT broker/server implementation
+├── mica-mqtt-broker      # Cluster broker (t-io based, node-to-node communication)
 └── starter/              # Framework integrations
     ├── mica-mqtt-client-spring-boot-starter
     ├── mica-mqtt-server-spring-boot-starter
@@ -73,7 +78,13 @@ mica-mqtt/
 ```
 
 **Dependency Flow:**
-`client/server` → `common` → `codec` → `mica-net-core` (t-io wrapper)
+- `client/server` → `common` → `codec` + `mica-net-core` (both direct dependencies)
+- `broker` → `server` + `mica-net-core`
+
+**Active Profile Modules** (`develop` profile, active by default):
+`common`, `client`, `server`, `starter`, `example`
+
+Note: `mica-mqtt-codec` and `mica-mqtt-broker` are built as transitive dependencies but not as top-level modules in the develop profile.
 
 ### Core Classes
 
@@ -90,12 +101,20 @@ mica-mqtt/
 - `MqttMessageStore`: Retained messages and will messages storage
 - `MqttServerAioHandler` / `MqttServerAioListener`: t-io integration layer
 
+**Broker/Cluster Side (mica-mqtt-broker):**
+- `MqttBroker`: Entry point for cluster brokers (`MqttBroker.create()`)
+- `MqttClusterManager`: Manages cluster node communication
+- `ClusterMqttSessionManager`: Session synchronization across nodes (decorator wrapping `IMqttSessionManager`)
+- `ClusterMessageDispatcher`: Routes messages across broker instances
+- `BrokerMessage`: Base class for cluster messages
+
 ### Design Patterns
 
 1. **Builder Pattern**: `MqttClient.create()`, `MqttServer.create()`, `MqttPublishMessage.builder()`
-2. **Listener Pattern**: Event-driven architecture for connections, messages, subscriptions
+2. **Listener Pattern**: Event-driven architecture for connections, messages, subscriptions (`MqttProtocolListener`, `IMqttMessageListener`)
 3. **Processor Pattern**: Message pipeline with interceptors (`IMqttMessageInterceptor`)
 4. **Strategy Pattern**: Pluggable auth (`IMqttServerAuthHandler`), serialization (`IMqttSerializer`), message dispatching (`IMqttMessageDispatcher`)
+5. **Decorator Pattern**: `ClusterMqttSessionManager` wraps `IMqttSessionManager` for session sync
 
 ### Thread Safety & Async I/O
 
@@ -147,7 +166,11 @@ Two modes for load balancing:
 
 ### Clustering & Message Dispatching
 
-Implement `IMqttMessageDispatcher` to route messages across broker instances (e.g., using Redis Pub/Sub, Kafka, RocketMQ). The `mica-mqtt-broker` module (2.4.x branch) demonstrates Redis Stream clustering.
+The `mica-mqtt-broker` module provides clustering via t-io cluster for node-to-node communication:
+- `MqttBroker.create()` as entry point with fluent API: `MqttClusterConfig.enabled(true).clusterPort(9001)`
+- Session state synchronized across nodes via `ClusterMqttSessionManager`
+- Cluster messages inherit from `BrokerMessage` base class
+- Implement `IMqttMessageDispatcher` to route messages across brokers (Redis Pub/Sub, Kafka, RocketMQ)
 
 ### HTTP API
 
@@ -161,13 +184,33 @@ See `docs/http-api.md` for endpoints.
 
 ## Important Notes
 
-### Code Style (see AGENTS.md for full details)
+### Code Style
 
 - **Java 8** compatible code only
-- **NO Lombok** in core modules (`mica-mqtt-client`, `mica-mqtt-server`, `mica-mqtt-common`, `mica-mqtt-codec`)
+- **NO Lombok** in core modules (`mica-mqtt-client`, `mica-mqtt-server`, `mica-mqtt-common`, `mica-mqtt-codec`, `mica-mqtt-broker`)
 - Use **TABS** for indentation (not spaces)
 - Always include Apache License 2.0 header in new files
 - Use SLF4J for logging: `private static final Logger logger = LoggerFactory.getLogger(ClassName.class);`
+
+### License Header (required for new files)
+
+```java
+/*
+ * Copyright (c) 2019-2029, Dreamlu 卢春梦 (596392912@qq.com & dreamlu.net).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+```
 
 ### Testing
 
@@ -194,7 +237,7 @@ For server deployments handling many connections, use JVM flag: `-Xss129k` to re
 
 - Uses `${revision}` property for version (defined in root pom.xml)
 - Flatten Maven plugin processes version for publishing
-- Current development version: `2.6.0-SNAPSHOT` on `dev` branch
+- Current version: `2.6.0`
 - Main branch for PRs: `master`
 
 ## Module-Specific READMEs
@@ -202,5 +245,6 @@ For server deployments handling many connections, use JVM flag: `-Xss129k` to re
 Each module has detailed usage documentation:
 - `mica-mqtt-client/README.md` - Client API examples
 - `mica-mqtt-server/README.md` - Server configuration examples
+- `mica-mqtt-broker/README.md` - Cluster broker configuration
 - `starter/*/README.md` - Framework-specific configuration
 - `example/` - Working examples for all integrations

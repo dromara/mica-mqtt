@@ -16,7 +16,8 @@
 
 package org.dromara.mica.mqtt.broker.cluster;
 
-import org.dromara.mica.mqtt.broker.cluster.dispatcher.ClusterMessageDispatcher;
+import org.dromara.mica.mqtt.broker.cluster.pipeline.ClusterMessageDispatcher;
+import org.dromara.mica.mqtt.broker.cluster.pipeline.ClusterPublishHandler;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
@@ -64,12 +65,17 @@ public class MqttClusterBrokerCreator {
 		);
 		serverCreator.connectStatusListener(clusterConnectStatusListener);
 
+		// 5. 添加发布消息管线处理器（用于集群消息转发）
+		ClusterPublishHandler publishHandler = new ClusterPublishHandler(clusterManager, clusterSessionManager);
+		serverCreator.addPublishPipelineHandler(publishHandler);
+
+		// 6. 构建 MqttServer
 		MqttServer mqttServer = serverCreator.build();
 		clusterManager.setMqttServer(mqttServer);
 
-		// 5. 添加消息拦截器/分发器
+		// 7. 添加消息拦截器/分发器
 		ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(mqttServer, clusterManager, clusterSessionManager);
-		serverCreator.getMessagePipeline().addHandler(dispatcher);
+		serverCreator.addMessagePipelineHandler(dispatcher);
 
 		return mqttServer;
 	}

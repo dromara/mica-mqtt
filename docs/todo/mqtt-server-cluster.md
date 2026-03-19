@@ -51,24 +51,26 @@
 
 ```
 mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
-└── cluster/                          # 集群包
-    ├── MqttClusterConfig.java       # 集群配置
-    ├── MqttClusterManager.java      # 集群管理器（主入口）
-    ├── MqttClusterBrokerCreator.java # Broker 创建器
-    ├── ClusterMqttSessionManager.java # 集群会话管理器（装饰器模式）
+└── cluster/                              # 集群包
+    ├── MqttClusterConfig.java           # 集群配置
+    ├── MqttClusterManager.java          # 集群管理器（主入口）
+    ├── MqttClusterBrokerCreator.java    # Broker 创建器
+    ├── ClusterMqttSessionManager.java    # 集群会话管理器（装饰器模式）
     ├── ClusterMqttConnectStatusListener.java # 连接状态监听
-    ├── message/                      # 集群消息类型
-    │   ├── ClusterMessage.java      # 集群消息基类
-    │   ├── MessageType.java         # 消息类型枚举
-    │   ├── ClientConnectMessage.java # 客户端连接通知
-    │   ├── ClientDisconnectMessage.java # 客户端断开通知
-    │   ├── SubscribeNotifyMessage.java # 订阅通知
+    ├── message/                          # 集群消息类型
+    │   ├── BrokerMessage.java           # 集群消息接口
+    │   ├── BrokerMessageType.java       # 消息类型枚举
+    │   ├── BrokerMessageConverter.java   # 消息转换器（序列化/反序列化）
+    │   ├── ClientConnectMessage.java     # 客户端连接通知
+    │   ├── ClientDisconnectMessage.java  # 客户端断开通知
+    │   ├── SubscribeNotifyMessage.java    # 订阅通知
     │   ├── UnsubscribeNotifyMessage.java # 取消订阅通知
-    │   ├── PublishForwardMessage.java  # 消息转发请求
+    │   ├── PublishForwardMessage.java    # 消息转发请求
+    │   ├── StateSyncRequestMessage.java  # 状态同步请求
     │   ├── StateSyncResponseMessage.java # 状态同步响应
-    │   └── GenericClusterMessage.java # 通用消息
+    │   └── NodeLeaveMessage.java         # 节点离开通知
     └── dispatcher/
-        └── ClusterMessageDispatcher.java # 集群消息分发器
+        └── ClusterMessageDispatcher.java  # 集群消息分发器
 ```
 
 ### 2.3 消息路由流程
@@ -121,26 +123,27 @@ public class MqttClusterConfig {
 
 ### 3.2 集群消息协议
 
-#### 消息格式
+#### 消息接口
 ```java
-public abstract class ClusterMessage implements Serializable {
-    private String messageId;      // 消息唯一ID
-    private String sourceNode;     // 源节点名称
-    private long timestamp;        // 时间戳
-    private MessageType type;      // 消息类型
+public interface BrokerMessage {
+    BrokerMessageType getType();
+    void toClusterData(Map<String, String> headers);
+    byte[] toPayload();
+    void fromClusterData(ClusterDataMessage message);
 }
+```
 
-public enum MessageType {
-    CLIENT_CONNECT,        // 客户端连接通知
-    CLIENT_DISCONNECT,     // 客户端断开通知
-    SUBSCRIBE_NOTIFY,      // 订阅通知
-    UNSUBSCRIBE_NOTIFY,    // 取消订阅通知
-    PUBLISH_FORWARD,       // 消息转发
-    HEARTBEAT,             // 心跳
-    NODE_JOIN,             // 节点加入
-    NODE_LEAVE,            // 节点离开
-    STATE_SYNC_REQUEST,    // 状态同步请求
-    STATE_SYNC_RESPONSE    // 状态同步响应
+#### 消息类型枚举
+```java
+public enum BrokerMessageType {
+    CLIENT_CONNECT(1),        // 客户端连接通知
+    CLIENT_DISCONNECT(2),      // 客户端断开通知
+    SUBSCRIBE_NOTIFY(3),      // 订阅通知
+    UNSUBSCRIBE_NOTIFY(4),     // 取消订阅通知
+    PUBLISH_FORWARD(5),        // 消息转发
+    NODE_LEAVE(6),             // 节点离开
+    STATE_SYNC_REQUEST(7),     // 状态同步请求
+    STATE_SYNC_RESPONSE(8);    // 状态同步响应
 }
 ```
 
@@ -148,19 +151,16 @@ public enum MessageType {
 
 **PublishForwardMessage（消息转发）**
 ```java
-public class PublishForwardMessage extends ClusterMessage {
-    private String topic;           // 主题
-    private byte[] payload;         // 消息体
-    private int qos;               // QoS 级别
-    private boolean retain;         // 是否保留
+public class PublishForwardMessage implements BrokerMessage {
+    private Message message;    // MQTT 消息体
 }
 ```
 
 **SubscribeNotifyMessage（订阅通知）**
 ```java
-public class SubscribeNotifyMessage extends ClusterMessage {
-    private String clientId;        // 客户端ID
-    private String nodeId;          // 节点ID
+public class SubscribeNotifyMessage implements BrokerMessage {
+    private String clientId;           // 客户端ID
+    private String nodeId;             // 节点ID
     private List<Subscribe> subscriptions; // 订阅列表
 }
 ```
@@ -181,7 +181,11 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
     public void removeRemoteClient(String clientId);
     public void clearNodeClientsAndSubscriptions(String nodeId);
     public void syncRemoteSubscriptions(String clientId, String nodeId, List<Subscribe> subscriptions);
+    public void removeRemoteSubscriptions(String clientId, List<String> topics);
     public List<Subscribe> searchAllSubscribe(String topic);  // 获取所有订阅（含远程）
+    public List<Subscribe> getClientSubscriptions(String clientId);
+    public Map<String, String> getRemoteClientNodeMap();
+    public void syncFullState(Map<String, String> clientNodeMap, Map<String, List<Subscribe>> subscriptionMap);
 }
 ```
 
@@ -199,36 +203,26 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 
 ### 3.5 序列化方案
 
-采用 **Hessian** 序列化（基于 dubbo hessian-lite）：
+采用 **自定义二进制序列化**（基于 `BrokerMessageConverter`）：
 
 ```java
-private byte[] serialize(ClusterMessage msg) {
-    ByteArrayOutputStream bos = new ByteArrayOutputStream();
-    Hessian2Output out = new Hessian2Output(bos);
-    out.writeObject(msg);
-    out.flush();
-    return bos.toByteArray();
-}
-
-private ClusterMessage deserialize(byte[] data) {
-    ByteArrayInputStream bis = new ByteArrayInputStream(data);
-    Hessian2Input in = new Hessian2Input(bis);
-    return (ClusterMessage) in.readObject();
-}
+// 使用 ByteBuffer 进行紧凑的二进制编码
+// 消息格式：type(int) + headers + payload
+// 传输载体：t-io ClusterDataMessage
 ```
 
 **优势：**
-- 性能比 Java 原生序列化快 3-5x
-- 体积小 30-50%
-- 自动支持多态
+- 性能比 Java 原生序列化快
+- 体积小（定长编码 + UTF-8 字符串）
 - 无反序列化安全漏洞
+- 与 t-io cluster 无缝集成
 
 ### 3.6 状态同步策略
 
-采用 **懒加载同步**策略：
-- 新节点加入时**不主动同步数据**
-- 当收到 PUBLISH 时，通过 `searchAllSubscribe` 按需查找远程订阅者并转发
-- 避免大数据量同步导致的 OOM 和网络包过大问题
+采用 **主动全量同步**策略：
+- 新节点加入时，通过 `STATE_SYNC_REQUEST` 向其他节点请求全量状态
+- 其他节点返回 `STATE_SYNC_RESPONSE`，包含完整的客户端映射和订阅信息
+- `ClusterMqttSessionManager.syncFullState()` 应用同步数据
 
 ---
 
@@ -328,25 +322,6 @@ mqtt:
 
 ---
 
-## 7. 后续优化方向
-
-### 7.1 功能增强
-- [ ] 集群监控 API（节点状态、流量统计）
-- [ ] 动态节点发现（ZooKeeper/Consul 集成）
-- [ ] 客户端会话持久化（支持节点故障转移）
-
-### 7.2 性能优化
-- [ ] 消息批量转发（减少网络开销）
-- [ ] 订阅表索引优化
-- [ ] 零拷贝消息转发
-
-### 7.3 运维工具
-- [ ] 集群管理 Web 控制台
-- [ ] 集群健康检查脚本
-- [ ] 监控指标导出（Prometheus）
-
----
-
-**文档版本：** v2.0
-**更新日期：** 2026-03-18
+**文档版本：** v2.1
+**更新日期：** 2026-03-19
 **状态：** 已实现

@@ -31,8 +31,11 @@ import org.dromara.mica.mqtt.core.server.listener.IMqttProtocolListener;
 import org.dromara.mica.mqtt.core.server.listener.MqttHttpApiListener;
 import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListener;
 import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListeners;
-import org.dromara.mica.mqtt.core.server.pipeline.DefaultMqttMessagePipeline;
-import org.dromara.mica.mqtt.core.server.pipeline.IMqttMessagePipeline;
+import org.dromara.mica.mqtt.core.server.pipeline.*;
+import org.dromara.mica.mqtt.core.server.pipeline.handler.MessageListenerHandler;
+import org.dromara.mica.mqtt.core.server.pipeline.handler.RetainMessageHandler;
+import org.dromara.mica.mqtt.core.server.pipeline.handler.SubscriptionForwardHandler;
+import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerProcessor;
 import org.dromara.mica.mqtt.core.server.pipeline.message.ConnectMessageHandler;
 import org.dromara.mica.mqtt.core.server.pipeline.message.DisconnectMessageHandler;
 import org.dromara.mica.mqtt.core.server.pipeline.message.DownStreamMessageHandler;
@@ -120,7 +123,11 @@ public class MqttServerCreator {
 	/**
 	 * 消息处理器
 	 */
-	private IMqttMessagePipeline messagePipeline;
+	private final IMqttMessagePipeline messagePipeline = new DefaultMqttMessagePipeline();;
+	/**
+	 * 发布消息管线处理器
+	 */
+	private final IMqttPublishPipeline publishPipeline = new DefaultMqttPublishPipeline();
 	/**
 	 * 消息存储
 	 */
@@ -296,8 +303,17 @@ public class MqttServerCreator {
 		return messagePipeline;
 	}
 
-	public MqttServerCreator messagePipeline(IMqttMessagePipeline messagePipeline) {
-		this.messagePipeline = messagePipeline;
+	public MqttServerCreator addMessagePipelineHandler(MqttMessageHandler handler) {
+		this.messagePipeline.addHandler(handler);
+		return this;
+	}
+
+	public IMqttPublishPipeline getPublishPipeline() {
+		return publishPipeline;
+	}
+
+	public MqttServerCreator addPublishPipelineHandler(MqttPublishPipelineHandler handler) {
+		this.publishPipeline.addHandler(handler);
 		return this;
 	}
 
@@ -569,10 +585,6 @@ public class MqttServerCreator {
 		if (this.uniqueIdService == null) {
 			this.uniqueIdService = new DefaultMqttServerUniqueIdServiceImpl();
 		}
-		if (this.messagePipeline == null) {
-			// 默认使用空实现的消息管线，在 MqttServer 构建后会初始化
-			this.messagePipeline = new DefaultMqttMessagePipeline();
-		}
 		if (this.sessionManager == null) {
 			this.sessionManager = new InMemoryMqttSessionManager();
 		}
@@ -650,6 +662,12 @@ public class MqttServerCreator {
 		this.messagePipeline.addHandler(new DownStreamMessageHandler(mqttServer));
 		this.messagePipeline.addHandler(new HttpApiMessageHandler(mqttServer));
 		this.messagePipeline.addHandler(new DisconnectMessageHandler(mqttServer));
+		// 1. 保留消息处理
+		this.publishPipeline.addHandler(new RetainMessageHandler(this.messageStore, this.nodeName));
+		// 2. 消息监听器（同步执行，避免二次 submit）
+		this.publishPipeline.addHandler(new MessageListenerHandler(this.messageListener));
+		// 3. 订阅转发（同步执行，避免二次 submit）
+		this.publishPipeline.addHandler(new SubscriptionForwardHandler(this));
 		return mqttServer;
 	}
 

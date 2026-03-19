@@ -50,6 +50,15 @@ public class MqttClusterManager {
 		this.mqttServer = mqttServer;
 	}
 
+	/**
+	 * 判断集群是否启用
+	 *
+	 * @return true if cluster is enabled
+	 */
+	public boolean isClusterEnabled() {
+		return config.isEnabled();
+	}
+
 	public void start() throws Exception {
 		if (mqttServer != null) {
 			mqttServer.start();
