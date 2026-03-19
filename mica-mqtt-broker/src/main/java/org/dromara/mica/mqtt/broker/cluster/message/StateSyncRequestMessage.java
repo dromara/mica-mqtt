@@ -16,29 +16,25 @@
 
 package org.dromara.mica.mqtt.broker.cluster.message;
 
-import java.io.Serializable;
+import java.util.Map;
 
-public abstract class ClusterMessage implements Serializable {
-    private static final long serialVersionUID = 1L;
+public class StateSyncRequestMessage implements BrokerMessage {
 
-    private String sourceNode;
-    private long timestamp;
-
-    public abstract ClusterMessageType getType();
-
-    public String getSourceNode() {
-        return sourceNode;
+    @Override
+    public BrokerMessageType getType() {
+        return BrokerMessageType.STATE_SYNC_REQUEST;
     }
 
-    public void setSourceNode(String sourceNode) {
-        this.sourceNode = sourceNode;
+    @Override
+    public void toClusterData(Map<String, String> headers) {
     }
 
-    public long getTimestamp() {
-        return timestamp;
+    @Override
+    public byte[] toPayload() {
+        return new byte[0];
     }
 
-    public void setTimestamp(long timestamp) {
-        this.timestamp = timestamp;
+    @Override
+    public void fromClusterData(Map<String, String> headers, byte[] payload) {
     }
 }

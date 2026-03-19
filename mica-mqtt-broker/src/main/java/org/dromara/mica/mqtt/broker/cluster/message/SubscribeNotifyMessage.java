@@ -19,17 +19,34 @@ package org.dromara.mica.mqtt.broker.cluster.message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 
 import java.util.List;
+import java.util.Map;
 
-public class SubscribeNotifyMessage extends ClusterMessage {
-    private static final long serialVersionUID = 1L;
-
-    private String clientId;        // 客户端ID
-    private String nodeId;          // 节点ID
-    private List<Subscribe> subscriptions; // 订阅主题列表
+public class SubscribeNotifyMessage implements BrokerMessage {
+    private String clientId;
+    private String nodeId;
+    private List<Subscribe> subscriptions;
 
     @Override
-    public ClusterMessageType getType() {
-        return ClusterMessageType.SUBSCRIBE_NOTIFY;
+    public BrokerMessageType getType() {
+        return BrokerMessageType.SUBSCRIBE_NOTIFY;
+    }
+
+    @Override
+    public void toClusterData(Map<String, String> headers) {
+        headers.put(BrokerMessageConverter.HEADER_CLIENT_ID, clientId);
+        headers.put(BrokerMessageConverter.HEADER_NODE_ID, nodeId);
+    }
+
+    @Override
+    public byte[] toPayload() {
+        return BrokerMessageConverter.serializeSubscriptions(subscriptions);
+    }
+
+    @Override
+    public void fromClusterData(Map<String, String> headers, byte[] payload) {
+        this.clientId = headers.get(BrokerMessageConverter.HEADER_CLIENT_ID);
+        this.nodeId = headers.get(BrokerMessageConverter.HEADER_NODE_ID);
+        this.subscriptions = BrokerMessageConverter.deserializeSubscriptions(payload);
     }
 
     public String getClientId() {

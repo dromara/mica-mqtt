@@ -17,17 +17,34 @@
 package org.dromara.mica.mqtt.broker.cluster.message;
 
 import java.util.List;
+import java.util.Map;
 
-public class UnsubscribeNotifyMessage extends ClusterMessage {
-    private static final long serialVersionUID = 1L;
-
+public class UnsubscribeNotifyMessage implements BrokerMessage {
     private String clientId;
     private String nodeId;
     private List<String> topics;
 
     @Override
-    public ClusterMessageType getType() {
-        return ClusterMessageType.UNSUBSCRIBE_NOTIFY;
+    public BrokerMessageType getType() {
+        return BrokerMessageType.UNSUBSCRIBE_NOTIFY;
+    }
+
+    @Override
+    public void toClusterData(Map<String, String> headers) {
+        headers.put(BrokerMessageConverter.HEADER_CLIENT_ID, clientId);
+        headers.put(BrokerMessageConverter.HEADER_NODE_ID, nodeId);
+    }
+
+    @Override
+    public byte[] toPayload() {
+        return BrokerMessageConverter.serializeTopics(topics);
+    }
+
+    @Override
+    public void fromClusterData(Map<String, String> headers, byte[] payload) {
+        this.clientId = headers.get(BrokerMessageConverter.HEADER_CLIENT_ID);
+        this.nodeId = headers.get(BrokerMessageConverter.HEADER_NODE_ID);
+        this.topics = BrokerMessageConverter.deserializeTopics(payload);
     }
 
     public String getClientId() {

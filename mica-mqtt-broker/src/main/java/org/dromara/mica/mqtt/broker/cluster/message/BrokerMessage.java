@@ -14,28 +14,20 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.cluster.codec;
+package org.dromara.mica.mqtt.broker.cluster.message;
 
-import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessage;
+import java.util.Map;
 
 /**
- * 集群消息编解码接口
+ * Broker 消息接口
  */
-public interface ClusterMessageCodec {
+public interface BrokerMessage {
 
-    /**
-     * 编码集群消息
-     *
-     * @param msg 集群消息
-     * @return 编码后的字节数组
-     */
-    byte[] encode(ClusterMessage msg);
+    BrokerMessageType getType();
 
-    /**
-     * 解码集群消息
-     *
-     * @param data 字节数据
-     * @return 集群消息
-     */
-    ClusterMessage decode(byte[] data);
+    void toClusterData(Map<String, String> headers);
+
+    byte[] toPayload();
+
+    void fromClusterData(Map<String, String> headers, byte[] payload);
 }

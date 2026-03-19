@@ -16,14 +16,29 @@
 
 package org.dromara.mica.mqtt.broker.cluster.message;
 
-public class ClientDisconnectMessage extends ClusterMessage {
-    private static final long serialVersionUID = 1L;
+import java.util.Map;
 
+public class ClientDisconnectMessage implements BrokerMessage {
     private String clientId;
 
     @Override
-    public ClusterMessageType getType() {
-        return ClusterMessageType.CLIENT_DISCONNECT;
+    public BrokerMessageType getType() {
+        return BrokerMessageType.CLIENT_DISCONNECT;
+    }
+
+    @Override
+    public void toClusterData(Map<String, String> headers) {
+        headers.put(BrokerMessageConverter.HEADER_CLIENT_ID, clientId);
+    }
+
+    @Override
+    public byte[] toPayload() {
+        return new byte[0];
+    }
+
+    @Override
+    public void fromClusterData(Map<String, String> headers, byte[] payload) {
+        this.clientId = headers.get(BrokerMessageConverter.HEADER_CLIENT_ID);
     }
 
     public String getClientId() {

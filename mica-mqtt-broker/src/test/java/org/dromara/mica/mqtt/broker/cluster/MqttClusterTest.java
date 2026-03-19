@@ -16,9 +16,8 @@
 
 package org.dromara.mica.mqtt.broker.cluster;
 
-import org.dromara.mica.mqtt.broker.cluster.codec.BinaryClusterMessageCodec;
-import org.dromara.mica.mqtt.broker.cluster.codec.ClusterMessageCodec;
-import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.BrokerMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.BrokerMessageConverter;
 import org.dromara.mica.mqtt.broker.cluster.message.PublishForwardMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.SubscribeNotifyMessage;
 import org.dromara.mica.mqtt.core.server.model.Message;
@@ -27,37 +26,27 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 集群功能测试
- *
- * @author mica-mqtt
  */
 class MqttClusterTest {
 
     @Test
     void testPublishForwardMessageSerialization() {
-        ClusterMessageCodec codec = new BinaryClusterMessageCodec();
-
         PublishForwardMessage msg = new PublishForwardMessage();
-        msg.setSourceNode("192.168.1.1:9000");
-        msg.setTimestamp(System.currentTimeMillis());
+        Message mqttMessage = new Message();
+        mqttMessage.setMessageType(org.dromara.mica.mqtt.core.server.enums.MessageType.UP_STREAM);
+        mqttMessage.setTopic("/test/topic");
+        mqttMessage.setPayload("Hello Cluster".getBytes());
+        mqttMessage.setQos(1);
+        mqttMessage.setRetain(false);
+        mqttMessage.setDup(false);
+        msg.setMessage(mqttMessage);
 
-        Message message = new Message();
-        message.setMessageType(org.dromara.mica.mqtt.core.server.enums.MessageType.UP_STREAM);
-        message.setTopic("/test/topic");
-        message.setPayload("Hello Cluster".getBytes());
-        message.setQos(1);
-        message.setRetain(false);
-        message.setDup(false);
-        msg.setMessage(message);
-
-        byte[] data = codec.encode(msg);
-        assertNotNull(data);
-        assertTrue(data.length > 0);
-
-        ClusterMessage deserialized = codec.decode(data);
+        BrokerMessage deserialized = BrokerMessageConverter.fromClusterData(BrokerMessageConverter.toClusterData(msg, "192.168.1.1:9000"));
         assertTrue(deserialized instanceof PublishForwardMessage);
         PublishForwardMessage pfm = (PublishForwardMessage) deserialized;
         assertEquals("/test/topic", pfm.getMessage().getTopic());
@@ -67,18 +56,13 @@ class MqttClusterTest {
 
     @Test
     void testSubscribeNotifyMessageSerialization() {
-        ClusterMessageCodec codec = new BinaryClusterMessageCodec();
-
         SubscribeNotifyMessage msg = new SubscribeNotifyMessage();
         msg.setClientId("client-001");
         msg.setNodeId("192.168.1.1:9000");
         Subscribe subscribe = new Subscribe("/test/#", "client-001", 1, false);
         msg.setSubscriptions(Collections.singletonList(subscribe));
 
-        byte[] data = codec.encode(msg);
-        assertNotNull(data);
-
-        ClusterMessage deserialized = codec.decode(data);
+        BrokerMessage deserialized = BrokerMessageConverter.fromClusterData(BrokerMessageConverter.toClusterData(msg, "192.168.1.1:9000"));
         assertTrue(deserialized instanceof SubscribeNotifyMessage);
         SubscribeNotifyMessage snm = (SubscribeNotifyMessage) deserialized;
         assertEquals("client-001", snm.getClientId());

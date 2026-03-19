@@ -17,24 +17,33 @@
 package org.dromara.mica.mqtt.broker.cluster.message;
 
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
-import java.util.HashMap;
+
 import java.util.List;
 import java.util.Map;
 
-/**
- * 状态同步响应消息，包含节点上的所有订阅信息
- */
-public class StateSyncResponseMessage extends ClusterMessage {
-    private static final long serialVersionUID = 1L;
-
-    // clientId -> nodeId
-    private Map<String, String> clientNodeMap = new HashMap<>();
-    // clientId -> subscriptions
-    private Map<String, List<Subscribe>> subscriptionMap = new HashMap<>();
+public class StateSyncResponseMessage implements BrokerMessage {
+    private Map<String, String> clientNodeMap;
+    private Map<String, List<Subscribe>> subscriptionMap;
 
     @Override
-    public ClusterMessageType getType() {
-        return ClusterMessageType.STATE_SYNC_RESPONSE;
+    public BrokerMessageType getType() {
+        return BrokerMessageType.STATE_SYNC_RESPONSE;
+    }
+
+    @Override
+    public void toClusterData(Map<String, String> headers) {
+    }
+
+    @Override
+    public byte[] toPayload() {
+        return BrokerMessageConverter.serializeStateSyncData(clientNodeMap, subscriptionMap);
+    }
+
+    @Override
+    public void fromClusterData(Map<String, String> headers, byte[] payload) {
+        BrokerMessageConverter.StateSyncData data = BrokerMessageConverter.deserializeStateSyncData(payload);
+        this.clientNodeMap = data.getClientNodeMap();
+        this.subscriptionMap = data.getSubscriptionMap();
     }
 
     public Map<String, String> getClientNodeMap() {

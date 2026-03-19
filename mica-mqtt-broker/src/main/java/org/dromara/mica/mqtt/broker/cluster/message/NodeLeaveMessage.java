@@ -16,13 +16,25 @@
 
 package org.dromara.mica.mqtt.broker.cluster.message;
 
-public enum ClusterMessageType {
-    CLIENT_CONNECT,        // 客户端连接通知
-    CLIENT_DISCONNECT,    // 客户端断开通知
-    SUBSCRIBE_NOTIFY,     // 订阅通知
-    UNSUBSCRIBE_NOTIFY,   // 取消订阅通知
-    PUBLISH_FORWARD,     // 消息转发
-    NODE_LEAVE,          // 节点离开
-    STATE_SYNC_REQUEST,  // 状态同步请求
-    STATE_SYNC_RESPONSE, // 状态同步响应
+import java.util.Map;
+
+public class NodeLeaveMessage implements BrokerMessage {
+
+    @Override
+    public BrokerMessageType getType() {
+        return BrokerMessageType.NODE_LEAVE;
+    }
+
+    @Override
+    public void toClusterData(Map<String, String> headers) {
+    }
+
+    @Override
+    public byte[] toPayload() {
+        return new byte[0];
+    }
+
+    @Override
+    public void fromClusterData(Map<String, String> headers, byte[] payload) {
+    }
 }

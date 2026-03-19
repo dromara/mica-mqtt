@@ -16,8 +16,6 @@
 
 package org.dromara.mica.mqtt.broker.cluster;
 
-import org.dromara.mica.mqtt.broker.cluster.codec.BinaryClusterMessageCodec;
-import org.dromara.mica.mqtt.broker.cluster.codec.ClusterMessageCodec;
 import org.dromara.mica.mqtt.broker.cluster.message.*;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.MqttServer;
@@ -27,6 +25,7 @@ import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tio.core.Node;
+import org.tio.server.cluster.codec.ClusterMessageEncoder;
 import org.tio.server.cluster.core.ClusterApi;
 import org.tio.server.cluster.core.ClusterConfig;
 import org.tio.server.cluster.core.ClusterImpl;
@@ -41,7 +40,6 @@ public class MqttClusterManager {
 	private MqttServer mqttServer;
 	private final MqttClusterConfig config;
 	private final String localNodeId;
-	private final ClusterMessageCodec codec = new BinaryClusterMessageCodec();
 
 	public MqttClusterManager(MqttClusterConfig config, String localNodeId) {
 		this.config = config;
@@ -53,7 +51,6 @@ public class MqttClusterManager {
 	}
 
 	public void start() throws Exception {
-		// 先启动 MQTT 服务
 		if (mqttServer != null) {
 			mqttServer.start();
 			logger.info("MQTT Server started");
@@ -69,7 +66,6 @@ public class MqttClusterManager {
 			this::handleClusterMessage
 		);
 
-		// 添加种子节点
 		for (String seed : config.getSeedMembers()) {
 			String[] parts = seed.split(":");
 			clusterConfig.addSeedMember(parts[0], Integer.parseInt(parts[1]));
@@ -79,32 +75,6 @@ public class MqttClusterManager {
 		cluster.start();
 
 		logger.info("Mqtt cluster manager started on {}:{} with nodeName {}", config.getClusterHost(), config.getClusterPort(), localNodeId);
-
-		// 懒加载同步：新节点加入时不主动同步状态
-		// 当收到 PUBLISH 时，会通过 searchAllSubscribe 按需查找远程订阅者
-		// if (cluster.isLateJoinMember()) {
-		//     requestStateSync();
-		// }
-	}
-
-	/**
-	 * 请求状态同步
-	 */
-	private void requestStateSync() {
-		Collection<Node> seedMembers = cluster.getSeedMembers();
-		for (Node seed : seedMembers) {
-			if (!nodeToString(seed).equals(localNodeId)) {
-				try {
-					GenericClusterMessage syncRequest = new GenericClusterMessage(ClusterMessageType.STATE_SYNC_REQUEST);
-					syncRequest.setSourceNode(localNodeId);
-					cluster.send(seed, serialize(syncRequest));
-					logger.info("Sent state sync request to seed node: {}", seed);
-					break; // 只需向一个节点请求
-				} catch (Exception e) {
-					logger.error("Failed to send state sync request to: {}", seed, e);
-				}
-			}
-		}
 	}
 
 	private void handleClusterMessage(ClusterDataMessage message) {
@@ -113,79 +83,69 @@ public class MqttClusterManager {
 			if (payload == null || payload.length == 0) {
 				return;
 			}
-			ClusterMessage clusterMsg = deserialize(payload);
-			if (clusterMsg != null) {
-				logger.debug("Received cluster message of type: {}", clusterMsg.getType());
-				handleClusterMessageInternal(clusterMsg, message);
+			BrokerMessage brokerMsg = BrokerMessageConverter.fromClusterData(message);
+			if (brokerMsg != null) {
+				logger.debug("Received cluster message of type: {}", brokerMsg.getType());
+				handleClusterMessageInternal(brokerMsg);
 			}
 		} catch (Exception e) {
 			logger.error("Error handling cluster message", e);
 		}
 	}
 
-	private void handleClusterMessageInternal(ClusterMessage clusterMsg, ClusterDataMessage rawMessage) {
+	private void handleClusterMessageInternal(BrokerMessage brokerMsg) {
 		ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
-		switch (clusterMsg.getType()) {
+		String sourceNode = BrokerMessageConverter.getSourceNode((ClusterDataMessage) brokerMsg);
+		switch (brokerMsg.getType()) {
 			case PUBLISH_FORWARD: {
-				PublishForwardMessage pfm = (PublishForwardMessage) clusterMsg;
+				PublishForwardMessage pfm = (PublishForwardMessage) brokerMsg;
 				mqttServer.publishAll(pfm.getMessage().getTopic(), pfm.getMessage().getPayload(), MqttQoS.valueOf(pfm.getMessage().getQos()), pfm.getMessage().isRetain());
 				break;
 			}
 			case SUBSCRIBE_NOTIFY: {
-				SubscribeNotifyMessage snm = (SubscribeNotifyMessage) clusterMsg;
+				SubscribeNotifyMessage snm = (SubscribeNotifyMessage) brokerMsg;
 				sessionManager.syncRemoteSubscriptions(snm.getClientId(), snm.getNodeId(), snm.getSubscriptions());
 				break;
 			}
 			case UNSUBSCRIBE_NOTIFY: {
-				UnsubscribeNotifyMessage unm = (UnsubscribeNotifyMessage) clusterMsg;
+				UnsubscribeNotifyMessage unm = (UnsubscribeNotifyMessage) brokerMsg;
 				sessionManager.removeRemoteSubscriptions(unm.getClientId(), unm.getTopics());
 				break;
 			}
 			case CLIENT_CONNECT: {
-				ClientConnectMessage ccm = (ClientConnectMessage) clusterMsg;
-				sessionManager.registerRemoteClient(ccm.getClientId(), ccm.getSourceNode());
+				ClientConnectMessage ccm = (ClientConnectMessage) brokerMsg;
+				sessionManager.registerRemoteClient(ccm.getClientId(), sourceNode);
 				break;
 			}
 			case CLIENT_DISCONNECT: {
-				ClientDisconnectMessage cdm = (ClientDisconnectMessage) clusterMsg;
+				ClientDisconnectMessage cdm = (ClientDisconnectMessage) brokerMsg;
 				sessionManager.removeRemoteClient(cdm.getClientId());
 				break;
 			}
 			case STATE_SYNC_REQUEST:
-				handleStateSyncRequest(clusterMsg.getSourceNode());
+				handleStateSyncRequest(sourceNode);
 				break;
 			case STATE_SYNC_RESPONSE: {
-				StateSyncResponseMessage ssm = (StateSyncResponseMessage) clusterMsg;
+				StateSyncResponseMessage ssm = (StateSyncResponseMessage) brokerMsg;
 				sessionManager.syncFullState(ssm.getClientNodeMap(), ssm.getSubscriptionMap());
 				logger.info("State sync completed, received {} client mappings", ssm.getClientNodeMap().size());
 				break;
 			}
 			case NODE_LEAVE: {
-				String leavingNodeId = clusterMsg.getSourceNode();
-				sessionManager.clearNodeClientsAndSubscriptions(leavingNodeId);
-				logger.info("Node {} left cluster, cleaned up its clients and subscriptions", leavingNodeId);
+				sessionManager.clearNodeClientsAndSubscriptions(sourceNode);
+				logger.info("Node {} left cluster, cleaned up its clients and subscriptions", sourceNode);
 				break;
 			}
 			default:
-				logger.warn("Unknown cluster message type: {}", clusterMsg.getType());
+				logger.warn("Unknown cluster message type: {}", brokerMsg.getType());
 				break;
 		}
 	}
 
-	/**
-	 * 处理状态同步请求
-	 */
 	private void handleStateSyncRequest(String requestNodeId) {
 		ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
 
-		StateSyncResponseMessage response = new StateSyncResponseMessage();
-		response.setSourceNode(localNodeId);
-
-		// 获取远程客户端映射
 		Map<String, String> clientNodeMap = sessionManager.getRemoteClientNodeMap();
-		response.setClientNodeMap(clientNodeMap);
-
-		// 获取所有订阅
 		Map<String, List<Subscribe>> subscriptionMap = new HashMap<>();
 		for (Map.Entry<String, String> entry : clientNodeMap.entrySet()) {
 			String clientId = entry.getKey();
@@ -194,21 +154,23 @@ public class MqttClusterManager {
 				subscriptionMap.put(clientId, subs);
 			}
 		}
+
+		StateSyncResponseMessage response = new StateSyncResponseMessage();
+		response.setClientNodeMap(clientNodeMap);
 		response.setSubscriptionMap(subscriptionMap);
 
-		// 发送响应
 		try {
-			byte[] data = serialize(response);
+			ClusterDataMessage data = BrokerMessageConverter.toClusterData(response, localNodeId);
 			String[] parts = requestNodeId.split(":");
 			Node node = new Node(parts[0], Integer.parseInt(parts[1]));
-			cluster.send(node, data);
+			cluster.send(node, ClusterMessageEncoder.INSTANCE.encode(data).array());
 			logger.info("Sent state sync response to node: {}", requestNodeId);
 		} catch (Exception e) {
 			logger.error("Failed to send state sync response to: {}", requestNodeId, e);
 		}
 	}
 
-	public void sendToNode(String nodeId, ClusterMessage clusterMsg) {
+	public void sendToNode(String nodeId, BrokerMessage brokerMsg) {
 		if (!config.isEnabled() || cluster == null) {
 			return;
 		}
@@ -216,68 +178,48 @@ public class MqttClusterManager {
 			String[] parts = nodeId.split(":");
 			if (parts.length == 2) {
 				Node node = new Node(parts[0], Integer.parseInt(parts[1]));
-				fillMessageMeta(clusterMsg);
-				byte[] data = serialize(clusterMsg);
-				cluster.send(node, data);
+				ClusterDataMessage data = BrokerMessageConverter.toClusterData(brokerMsg, localNodeId);
+				cluster.send(node, ClusterMessageEncoder.INSTANCE.encode(data).array());
 			}
 		} catch (Exception e) {
 			logger.error("Failed to send message to node: {}", nodeId, e);
 		}
 	}
 
-	public void broadcast(ClusterMessage clusterMsg) {
+	public void broadcast(BrokerMessage brokerMsg) {
 		if (!config.isEnabled() || cluster == null) {
 			return;
 		}
 		try {
-			fillMessageMeta(clusterMsg);
-			byte[] data = serialize(clusterMsg);
-			cluster.broadcast(data);
+			ClusterDataMessage data = BrokerMessageConverter.toClusterData(brokerMsg, localNodeId);
+			cluster.broadcast(ClusterMessageEncoder.INSTANCE.encode(data).array());
 		} catch (Exception e) {
 			logger.error("Failed to broadcast message", e);
 		}
 	}
 
-	private void fillMessageMeta(ClusterMessage clusterMsg) {
-		clusterMsg.setSourceNode(localNodeId);
-		clusterMsg.setTimestamp(System.currentTimeMillis());
-	}
-
 	public void stop() {
 		if (cluster != null) {
-			// 广播节点离开消息
-			GenericClusterMessage leaveMsg = new GenericClusterMessage(ClusterMessageType.NODE_LEAVE);
-			leaveMsg.setSourceNode(localNodeId);
+			NodeLeaveMessage leaveMsg = new NodeLeaveMessage();
 			broadcast(leaveMsg);
 
 			cluster.stop();
 			logger.info("Mqtt cluster manager stopped");
 		}
 
-		// 停止 MQTT 服务
 		if (mqttServer != null) {
 			mqttServer.stop();
 			logger.info("MQTT Server stopped");
 		}
 	}
 
-	/**
-	 * 集群级别的下发消息：发布消息到集群中的所有匹配订阅者
-	 *
-	 * @param topic   主题
-	 * @param payload 消息体
-	 * @param qos     QoS
-	 * @param retain  是否保留消息
-	 */
 	public void publish(String topic, byte[] payload, int qos, boolean retain) {
 		if (mqttServer == null) {
 			return;
 		}
 
-		// 1. 先在本地节点下发
 		mqttServer.publishAll(topic, payload, MqttQoS.valueOf(qos), retain);
 
-		// 2. 查找是否有其他节点存在该 topic 的订阅者，按需转发以节省网络开销
 		if (config.isEnabled() && cluster != null) {
 			ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
 			List<Subscribe> allSubs = sessionManager.searchAllSubscribe(topic);
@@ -293,7 +235,6 @@ public class MqttClusterManager {
 
 				if (!targetNodes.isEmpty()) {
 					PublishForwardMessage clusterMsg = new PublishForwardMessage();
-
 					Message message = new Message();
 					message.setMessageType(MessageType.UP_STREAM);
 					message.setTopic(topic);
@@ -315,18 +256,6 @@ public class MqttClusterManager {
 			return Collections.emptyList();
 		}
 		return cluster.getRemoteMembers();
-	}
-
-	private String nodeToString(Node node) {
-		return node.getPeerHost();
-	}
-
-	private byte[] serialize(ClusterMessage msg) {
-		return codec.encode(msg);
-	}
-
-	private ClusterMessage deserialize(byte[] data) {
-		return codec.decode(data);
 	}
 
 	public String getLocalNodeId() {

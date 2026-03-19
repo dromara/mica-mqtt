@@ -17,19 +17,35 @@
 package org.dromara.mica.mqtt.broker.cluster.message;
 
 import org.dromara.mica.mqtt.core.server.model.Message;
+import org.dromara.mica.mqtt.core.server.serializer.DefaultMessageSerializer;
 
-/**
- * 集群消息转发，用于跨节点转发 PUBLISH 消息
- * 直接使用 Message 模型，可复用现有的 MQTT 消息编解码
- */
-public class PublishForwardMessage extends ClusterMessage {
-    private static final long serialVersionUID = 1L;
+import java.util.Map;
 
+public class PublishForwardMessage implements BrokerMessage {
     private Message message;
 
     @Override
-    public ClusterMessageType getType() {
-        return ClusterMessageType.PUBLISH_FORWARD;
+    public BrokerMessageType getType() {
+        return BrokerMessageType.PUBLISH_FORWARD;
+    }
+
+    @Override
+    public void toClusterData(Map<String, String> headers) {
+    }
+
+    @Override
+    public byte[] toPayload() {
+        if (message == null) {
+            return new byte[0];
+        }
+        return DefaultMessageSerializer.INSTANCE.serialize(message);
+    }
+
+    @Override
+    public void fromClusterData(Map<String, String> headers, byte[] payload) {
+        if (payload != null && payload.length > 0) {
+            this.message = DefaultMessageSerializer.INSTANCE.deserialize(payload);
+        }
     }
 
     public Message getMessage() {
