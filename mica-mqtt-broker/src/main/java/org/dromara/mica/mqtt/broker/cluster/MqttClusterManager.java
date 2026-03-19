@@ -25,7 +25,6 @@ import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tio.core.Node;
-import org.tio.server.cluster.codec.ClusterMessageEncoder;
 import org.tio.server.cluster.core.ClusterApi;
 import org.tio.server.cluster.core.ClusterConfig;
 import org.tio.server.cluster.core.ClusterImpl;
@@ -86,16 +85,16 @@ public class MqttClusterManager {
 			BrokerMessage brokerMsg = BrokerMessageConverter.fromClusterData(message);
 			if (brokerMsg != null) {
 				logger.debug("Received cluster message of type: {}", brokerMsg.getType());
-				handleClusterMessageInternal(brokerMsg);
+				String sourceNode = BrokerMessageConverter.getSourceNode(message);
+				handleClusterMessageInternal(brokerMsg, sourceNode);
 			}
 		} catch (Exception e) {
 			logger.error("Error handling cluster message", e);
 		}
 	}
 
-	private void handleClusterMessageInternal(BrokerMessage brokerMsg) {
+	private void handleClusterMessageInternal(BrokerMessage brokerMsg, String sourceNode) {
 		ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
-		String sourceNode = BrokerMessageConverter.getSourceNode((ClusterDataMessage) brokerMsg);
 		switch (brokerMsg.getType()) {
 			case PUBLISH_FORWARD: {
 				PublishForwardMessage pfm = (PublishForwardMessage) brokerMsg;
@@ -163,7 +162,7 @@ public class MqttClusterManager {
 			ClusterDataMessage data = BrokerMessageConverter.toClusterData(response, localNodeId);
 			String[] parts = requestNodeId.split(":");
 			Node node = new Node(parts[0], Integer.parseInt(parts[1]));
-			cluster.send(node, ClusterMessageEncoder.INSTANCE.encode(data).array());
+			cluster.send(node, data);
 			logger.info("Sent state sync response to node: {}", requestNodeId);
 		} catch (Exception e) {
 			logger.error("Failed to send state sync response to: {}", requestNodeId, e);
@@ -178,8 +177,7 @@ public class MqttClusterManager {
 			String[] parts = nodeId.split(":");
 			if (parts.length == 2) {
 				Node node = new Node(parts[0], Integer.parseInt(parts[1]));
-				ClusterDataMessage data = BrokerMessageConverter.toClusterData(brokerMsg, localNodeId);
-				cluster.send(node, ClusterMessageEncoder.INSTANCE.encode(data).array());
+				cluster.send(node, BrokerMessageConverter.toClusterData(brokerMsg, localNodeId));
 			}
 		} catch (Exception e) {
 			logger.error("Failed to send message to node: {}", nodeId, e);
@@ -191,8 +189,7 @@ public class MqttClusterManager {
 			return;
 		}
 		try {
-			ClusterDataMessage data = BrokerMessageConverter.toClusterData(brokerMsg, localNodeId);
-			cluster.broadcast(ClusterMessageEncoder.INSTANCE.encode(data).array());
+			cluster.broadcast(BrokerMessageConverter.toClusterData(brokerMsg, localNodeId));
 		} catch (Exception e) {
 			logger.error("Failed to broadcast message", e);
 		}
