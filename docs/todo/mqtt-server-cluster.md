@@ -51,26 +51,29 @@
 
 ```
 mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
-└── cluster/                              # 集群包
-    ├── MqttClusterConfig.java           # 集群配置
-    ├── MqttClusterManager.java          # 集群管理器（主入口）
-    ├── MqttClusterBrokerCreator.java    # Broker 创建器
-    ├── ClusterMqttSessionManager.java    # 集群会话管理器（装饰器模式）
-    ├── ClusterMqttConnectStatusListener.java # 连接状态监听
-    ├── message/                          # 集群消息类型
-    │   ├── BrokerMessage.java           # 集群消息接口
-    │   ├── BrokerMessageType.java       # 消息类型枚举
-    │   ├── BrokerMessageConverter.java   # 消息转换器（序列化/反序列化）
-    │   ├── ClientConnectMessage.java     # 客户端连接通知
-    │   ├── ClientDisconnectMessage.java  # 客户端断开通知
-    │   ├── SubscribeNotifyMessage.java    # 订阅通知
-    │   ├── UnsubscribeNotifyMessage.java # 取消订阅通知
-    │   ├── PublishForwardMessage.java    # 消息转发请求
-    │   ├── StateSyncRequestMessage.java  # 状态同步请求
-    │   ├── StateSyncResponseMessage.java # 状态同步响应
-    │   └── NodeLeaveMessage.java         # 节点离开通知
-    └── dispatcher/
-        └── ClusterMessageDispatcher.java  # 集群消息分发器
+└── cluster/
+    ├── MqttBroker.java                    # Broker 入口
+    ├── core/                              # 核心组件
+    │   ├── MqttClusterConfig.java         # 集群配置
+    │   ├── MqttClusterManager.java         # 集群管理器
+    │   ├── MqttClusterBrokerCreator.java  # Broker 创建器
+    │   ├── ClusterMqttSessionManager.java # 集群会话管理器（装饰器模式）
+    │   └── ClusterMqttConnectStatusListener.java # 连接状态监听
+    ├── message/                           # 集群消息类型
+    │   ├── BrokerMessage.java             # 集群消息接口
+    │   ├── BrokerMessageType.java         # 消息类型枚举
+    │   ├── BrokerMessageConverter.java     # 消息转换器
+    │   ├── ClientConnectMessage.java       # 客户端连接通知
+    │   ├── ClientDisconnectMessage.java    # 客户端断开通知
+    │   ├── SubscribeNotifyMessage.java     # 订阅通知
+    │   ├── UnsubscribeNotifyMessage.java  # 取消订阅通知
+    │   ├── PublishForwardMessage.java      # 消息转发请求
+    │   ├── StateSyncRequestMessage.java    # 状态同步请求
+    │   ├── StateSyncResponseMessage.java   # 状态同步响应
+    │   └── NodeLeaveMessage.java           # 节点离开通知
+    └── pipeline/                          # 消息管道
+        ├── ClusterMessageDispatcher.java   # 集群消息分发器
+        └── ClusterPublishHandler.java      # 发布消息处理器
 ```
 
 ### 2.3 消息路由流程
