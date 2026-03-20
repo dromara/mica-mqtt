@@ -69,6 +69,7 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
     │   ├── MqttClusterManager.java         # 集群管理器
     │   ├── MqttClusterBrokerCreator.java  # Broker 创建器
     │   ├── ClusterMqttSessionManager.java # 集群会话管理器（装饰器模式）
+    │   ├── ClusterMqttMessageStore.java    # 集群消息存储（装饰器模式）
     │   └── ClusterMqttConnectStatusListener.java # 连接状态监听
     ├── message/                           # 集群消息类型
     │   ├── BrokerMessage.java             # 集群消息接口
@@ -79,6 +80,8 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
     │   ├── SubscribeNotifyMessage.java     # 订阅通知
     │   ├── UnsubscribeNotifyMessage.java  # 取消订阅通知
     │   ├── PublishForwardMessage.java      # 消息转发请求
+    │   ├── WillMessageNotifyMessage.java   # 遗嘱消息通知
+    │   ├── RetainMessageNotifyMessage.java  # 保留消息通知
     │   ├── StateSyncRequestMessage.java    # 状态同步请求
     │   ├── StateSyncResponseMessage.java   # 状态同步响应
     │   └── NodeLeaveMessage.java           # 节点离开通知
@@ -349,8 +352,8 @@ Node2: clientB 订阅 $share/g1/topic1
 - [ ] 共享订阅（Shared Subscriptions `$share`）- 单机实现正常，**集群环境下存在 bug：同 group 的订阅者可能出现在不同节点时，消息会被多次转发**
 
 ### 6.4 遗嘱与保留消息
-- [ ] 保留消息的集群共享与存储
-- [ ] 遗嘱消息的集群同步与触发代发
+- [x] 保留消息的集群共享与存储 - 通过 `ClusterMqttMessageStore` 装饰器实现，`addRetainMessage` 时自动广播到所有节点
+- [x] 遗嘱消息的集群同步与触发代发 - 通过 `ClusterMqttMessageStore` 装饰器实现，`addWillMessage` 时自动广播到所有节点
 
 ### 6.5 可观测性与高级特性
 - [ ] 集群级别的统一指标监控 API
@@ -358,6 +361,6 @@ Node2: clientB 订阅 $share/g1/topic1
 
 ---
 
-**文档版本：** v2.2
+**文档版本：** v2.4
 **更新日期：** 2026-03-20
 **状态：** 已实现（含已知问题）

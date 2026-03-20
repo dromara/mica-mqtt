@@ -31,9 +31,11 @@ public class BrokerMessageConverter {
 	public static final String HEADER_CLIENT_ID = "clientId";
 	public static final String HEADER_NODE_ID = "nodeId";
 	public static final String HEADER_SOURCE_NODE = "sourceNode";
+	public static final String HEADER_TOPIC = "topic";
+	public static final String HEADER_TIMEOUT = "timeout";
 
 	public static ClusterDataMessage toClusterData(BrokerMessage msg, String sourceNode) {
-		Map<String, String> headers = new HashMap<>(4);
+		Map<String, String> headers = new HashMap<>(8);
 		headers.put(HEADER_TYPE, String.valueOf(msg.getType().getCode()));
 		headers.put(HEADER_SOURCE_NODE, sourceNode);
 		msg.toClusterData(headers);
@@ -72,6 +74,10 @@ public class BrokerMessageConverter {
 				return new NodeLeaveMessage();
 			case STATE_SYNC_REQUEST:
 				return new StateSyncRequestMessage();
+			case WILL_MESSAGE:
+				return new WillMessageNotifyMessage();
+			case RETAIN_MESSAGE:
+				return new RetainMessageNotifyMessage();
 			default:
 				throw new IllegalArgumentException("Unknown message type: " + type);
 		}

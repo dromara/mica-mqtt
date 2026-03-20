@@ -59,7 +59,15 @@ public class MqttClusterBrokerCreator {
 		clusterSessionManager = new ClusterMqttSessionManager(delegateSessionManager, clusterManager);
 		serverCreator.sessionManager(clusterSessionManager);
 
-		// 4. 构建 MqttServer (需修改 ConnectStatusListener)
+		// 4. 包装 messageStore (用于遗嘱消息集群同步)
+		if (serverCreator.getMessageStore() != null) {
+			ClusterMqttMessageStore clusterMessageStore = new ClusterMqttMessageStore(
+				serverCreator.getMessageStore(), clusterManager
+			);
+			serverCreator.messageStore(clusterMessageStore);
+		}
+
+		// 5. 构建 MqttServer (需修改 ConnectStatusListener)
 		ClusterMqttConnectStatusListener clusterConnectStatusListener = new ClusterMqttConnectStatusListener(
 			serverCreator.getConnectStatusListener(), clusterManager
 		);

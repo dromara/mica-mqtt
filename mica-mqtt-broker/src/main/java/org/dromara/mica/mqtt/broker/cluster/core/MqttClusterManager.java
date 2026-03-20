@@ -22,6 +22,7 @@ import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
+import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tio.core.Node;
@@ -142,6 +143,29 @@ public class MqttClusterManager {
 			case NODE_LEAVE: {
 				sessionManager.clearNodeClientsAndSubscriptions(sourceNode);
 				logger.info("Node {} left cluster, cleaned up its clients and subscriptions", sourceNode);
+				break;
+			}
+			case WILL_MESSAGE: {
+				WillMessageNotifyMessage wmm = (WillMessageNotifyMessage) brokerMsg;
+				IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
+				if (messageStore != null && wmm.getWillMessage() != null) {
+					messageStore.addWillMessage(wmm.getClientId(), wmm.getWillMessage());
+					logger.debug("[Cluster] Received and stored will message for clientId: {} from node: {}", wmm.getClientId(), sourceNode);
+				}
+				break;
+			}
+			case RETAIN_MESSAGE: {
+				RetainMessageNotifyMessage rmm = (RetainMessageNotifyMessage) brokerMsg;
+				IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
+				if (messageStore != null) {
+					if (rmm.getRetainMessage() != null) {
+						messageStore.addRetainMessage(rmm.getTopic(), rmm.getTimeout(), rmm.getRetainMessage());
+						logger.debug("[Cluster] Received and stored retain message for topic: {} from node: {}", rmm.getTopic(), sourceNode);
+					} else {
+						messageStore.clearRetainMessage(rmm.getTopic());
+						logger.debug("[Cluster] Received retain clear for topic: {} from node: {}", rmm.getTopic(), sourceNode);
+					}
+				}
 				break;
 			}
 			default:
