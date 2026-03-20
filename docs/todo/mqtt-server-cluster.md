@@ -21,8 +21,8 @@
 - `mica.server.cluster.message.ClusterDataMessage` - mica-net 集群消息载体
 
 **自研部分：**
-- 集群消息类型定义（`BrokerMessage` 系列）
-- 消息编解码（`BrokerMessageConverter`）
+- 集群消息类型定义（`ClusterMessage` 系列）
+- 消息编解码（`ClusterMessageSerializer`）
 - 集群会话管理（`ClusterMqttSessionManager`）
 - 消息路由与转发（`ClusterMessageDispatcher`、`ClusterPublishHandler`）
 
@@ -72,9 +72,9 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
     │   ├── ClusterMqttMessageStore.java    # 集群消息存储（装饰器模式）
     │   └── ClusterMqttConnectStatusListener.java # 连接状态监听
     ├── message/                           # 集群消息类型
-    │   ├── BrokerMessage.java             # 集群消息接口
-    │   ├── BrokerMessageType.java         # 消息类型枚举
-    │   ├── BrokerMessageConverter.java     # 消息转换器
+    │   ├── ClusterMessage.java            # 集群消息接口
+    │   ├── ClusterMessageType.java        # 消息类型枚举
+    │   ├── ClusterMessageSerializer.java  # 消息序列化器
     │   ├── ClientConnectMessage.java       # 客户端连接通知
     │   ├── ClientDisconnectMessage.java    # 客户端断开通知
     │   ├── SubscribeNotifyMessage.java     # 订阅通知
@@ -142,8 +142,8 @@ public class MqttClusterConfig {
 
 #### 消息接口
 ```java
-public interface BrokerMessage {
-    BrokerMessageType getType();
+public interface ClusterMessage {
+    ClusterMessageType getType();
     void toClusterData(Map<String, String> headers);
     byte[] toPayload();
     void fromClusterData(ClusterDataMessage message);
@@ -152,7 +152,7 @@ public interface BrokerMessage {
 
 #### 消息类型枚举
 ```java
-public enum BrokerMessageType {
+public enum ClusterMessageType {
     CLIENT_CONNECT(1),        // 客户端连接通知
     CLIENT_DISCONNECT(2),      // 客户端断开通知
     SUBSCRIBE_NOTIFY(3),      // 订阅通知
@@ -168,14 +168,14 @@ public enum BrokerMessageType {
 
 **PublishForwardMessage（消息转发）**
 ```java
-public class PublishForwardMessage implements BrokerMessage {
+public class PublishForwardMessage implements ClusterMessage {
     private Message message;    // MQTT 消息体
 }
 ```
 
 **SubscribeNotifyMessage（订阅通知）**
 ```java
-public class SubscribeNotifyMessage implements BrokerMessage {
+public class SubscribeNotifyMessage implements ClusterMessage {
     private String clientId;           // 客户端ID
     private String nodeId;             // 节点ID
     private List<Subscribe> subscriptions; // 订阅列表
@@ -220,7 +220,7 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 
 ### 3.5 序列化方案
 
-采用 **自定义二进制序列化**（基于 `BrokerMessageConverter`）：
+采用 **自定义二进制序列化**（基于 `ClusterMessageSerializer`）：
 
 ```java
 // 使用 ByteBuffer 进行紧凑的二进制编码
