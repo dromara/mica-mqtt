@@ -28,7 +28,28 @@ import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
 
 /**
- * 集群模式的 Broker 创建器
+ * Builder for creating MQTT broker instances with cluster mode support.
+ * <p>
+ * This class provides a fluent API to configure and create an {@link MqttServer}
+ * that operates in cluster mode. When cluster mode is disabled via
+ * {@link MqttClusterConfig#enabled(boolean)}, it delegates to the standard
+ * {@link MqttServerCreator#build()}.
+ * </p>
+ * <p>
+ * In cluster mode, this builder:
+ * <ol>
+ *   <li>Creates a {@link MqttClusterManager} to manage inter-node communication</li>
+ *   <li>Wraps the session manager with {@link ClusterMqttSessionManager} for cross-node session tracking</li>
+ *   <li>Wraps the message store with {@link ClusterMqttMessageStore} for will/retain message sync</li>
+ *   <li>Decorates the connect status listener with {@link ClusterMqttConnectStatusListener}</li>
+ *   <li>Adds pipeline handlers for message forwarding and dispatching</li>
+ * </ol>
+ * </p>
+ *
+ * @author L.cm
+ * @see MqttServerCreator
+ * @see MqttClusterConfig
+ * @since 1.0.0
  */
 public class MqttClusterBrokerCreator {
 	private final MqttServerCreator serverCreator;
@@ -36,34 +57,46 @@ public class MqttClusterBrokerCreator {
 	private MqttClusterManager clusterManager;
 	private ClusterMqttSessionManager clusterSessionManager;
 
+	/**
+	 * Constructs a new cluster broker creator wrapping the specified server creator.
+	 *
+	 * @param serverCreator the underlying MQTT server creator
+	 */
 	public MqttClusterBrokerCreator(MqttServerCreator serverCreator) {
 		this.serverCreator = serverCreator;
 	}
 
+	/**
+	 * Sets the cluster configuration.
+	 *
+	 * @param config the cluster configuration
+	 * @return this builder for method chaining
+	 */
 	public MqttClusterBrokerCreator clusterConfig(MqttClusterConfig config) {
 		this.clusterConfig = config;
 		return this;
 	}
 
+	/**
+	 * Builds the MQTT server, applying cluster decorations if cluster mode is enabled.
+	 *
+	 * @return the configured {@link MqttServer} instance
+	 */
 	public MqttServer build() {
 		if (clusterConfig == null || !clusterConfig.isEnabled()) {
 			return serverCreator.build();
 		}
 
-		// 1. 初始化 Manager (需稍后传入 mqttServer)
 		clusterManager = new MqttClusterManager(clusterConfig, serverCreator.getNodeName());
 
-		// 2. 确保 sessionManager 存在，如果为 null 则创建默认的
 		IMqttSessionManager delegateSessionManager = serverCreator.getSessionManager();
 		if (delegateSessionManager == null) {
 			delegateSessionManager = new InMemoryMqttSessionManager();
 		}
 
-		// 3. 包装 sessionManager
 		clusterSessionManager = new ClusterMqttSessionManager(delegateSessionManager, clusterManager);
 		serverCreator.sessionManager(clusterSessionManager);
 
-		// 4. 包装 messageStore (用于遗嘱消息集群同步)
 		if (serverCreator.getMessageStore() != null) {
 			ClusterMqttMessageStore clusterMessageStore = new ClusterMqttMessageStore(
 				serverCreator.getMessageStore(), clusterManager
@@ -71,27 +104,29 @@ public class MqttClusterBrokerCreator {
 			serverCreator.messageStore(clusterMessageStore);
 		}
 
-		// 5. 构建 MqttServer (需修改 ConnectStatusListener)
 		ClusterMqttConnectStatusListener clusterConnectStatusListener = new ClusterMqttConnectStatusListener(
 			serverCreator.getConnectStatusListener(), clusterManager
 		);
 		serverCreator.connectStatusListener(clusterConnectStatusListener);
 
-		// 5. 添加发布消息管线处理器（用于集群消息转发）
 		ClusterPublishHandler publishHandler = new ClusterPublishHandler(clusterManager, clusterSessionManager);
 		serverCreator.addPublishPipelineHandler(publishHandler);
 
-		// 6. 构建 MqttServer
 		MqttServer mqttServer = serverCreator.build();
 		clusterManager.setMqttServer(mqttServer);
 
-		// 7. 添加消息拦截器/分发器
 		ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(mqttServer, clusterManager, clusterSessionManager);
 		serverCreator.addMessagePipelineHandler(dispatcher);
 
 		return mqttServer;
 	}
 
+	/**
+	 * Builds and starts the MQTT server.
+	 *
+	 * @return the started {@link MqttServer} instance
+	 * @throws RuntimeException if startup fails
+	 */
 	public MqttServer start() {
 		MqttServer mqttServer = this.build();
 		try {

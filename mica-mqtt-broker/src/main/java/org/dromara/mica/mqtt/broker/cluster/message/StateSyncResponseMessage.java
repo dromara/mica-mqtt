@@ -23,27 +23,32 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 状态同步响应消息
+ * Response containing full cluster state for synchronization.
  * <p>
- * 响应状态同步请求，携带完整的客户端节点映射和订阅信息。
- * 用于新节点加入时的全量状态同步。
+ * This message is sent in response to a {@link StateSyncRequestMessage} and contains
+ * the complete cluster state including client-to-node mappings and all subscription tables.
+ * Used during new node join to synchronize the full cluster state.
  * </p>
  *
  * @author L.cm
+ * @see ClusterMessage
+ * @see ClusterMessageType#STATE_SYNC_RESPONSE
+ * @see StateSyncRequestMessage
+ * @since 1.0.0
  */
-public class StateSyncResponseMessage implements BrokerMessage {
+public class StateSyncResponseMessage implements ClusterMessage {
 	/**
-	 * 客户端 ID -> 节点 ID 映射
+	 * Mapping of client identifiers to the node identifiers where they are connected.
 	 */
 	private Map<String, String> clientNodeMap;
 	/**
-	 * 客户端 ID -> 订阅列表 映射
+	 * Mapping of client identifiers to their subscription lists.
 	 */
 	private Map<String, List<Subscribe>> subscriptionMap;
 
 	@Override
-	public BrokerMessageType getType() {
-		return BrokerMessageType.STATE_SYNC_RESPONSE;
+	public ClusterMessageType getType() {
+		return ClusterMessageType.STATE_SYNC_RESPONSE;
 	}
 
 	@Override
@@ -52,13 +57,13 @@ public class StateSyncResponseMessage implements BrokerMessage {
 
 	@Override
 	public byte[] toPayload() {
-		return BrokerMessageConverter.serializeStateSyncData(clientNodeMap, subscriptionMap);
+		return ClusterMessageSerializer.serializeStateSyncData(clientNodeMap, subscriptionMap);
 	}
 
 	@Override
 	public void fromClusterData(ClusterDataMessage message) {
 		byte[] payload = message.getPayload();
-		BrokerMessageConverter.StateSyncData syncData = BrokerMessageConverter.deserializeStateSyncData(payload);
+		ClusterMessageSerializer.StateSyncData syncData = ClusterMessageSerializer.deserializeStateSyncData(payload);
 		this.clientNodeMap = syncData.getClientNodeMap();
 		this.subscriptionMap = syncData.getSubscriptionMap();
 	}

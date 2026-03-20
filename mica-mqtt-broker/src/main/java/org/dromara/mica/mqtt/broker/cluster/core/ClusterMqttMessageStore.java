@@ -26,13 +26,16 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 /**
- * 集群消息存储装饰器
+ * Decorator for {@link IMqttMessageStore} that synchronizes will and retained messages across cluster nodes.
  * <p>
- * 包装原有的 IMqttMessageStore，当遗嘱消息或保留消息操作发生时，
- * 自动向集群广播通知，确保所有节点的消息存储一致。
+ * This store wraps an existing {@link IMqttMessageStore} and extends it with
+ * cluster synchronization. When a will message is set or a retained message is
+ * published/cleared, it broadcasts the change to all other cluster nodes.
  * </p>
  *
  * @author L.cm
+ * @see IMqttMessageStore
+ * @since 1.0.0
  */
 public class ClusterMqttMessageStore implements IMqttMessageStore {
 	private static final Logger logger = LoggerFactory.getLogger(ClusterMqttMessageStore.class);

@@ -21,19 +21,23 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 import java.util.Map;
 
 /**
- * 节点离开通知消息
+ * Notice broadcast when a cluster node departs or becomes unreachable.
  * <p>
- * 当节点关闭或失联时，其他节点收到此消息后，
- * 自动清理该节点上的所有客户端会话和订阅信息。
+ * When a node shuts down gracefully or is detected as unavailable, this notice is broadcast
+ * to all remaining nodes so they can clean up all client sessions and subscriptions
+ * associated with the departing node.
  * </p>
  *
  * @author L.cm
+ * @see ClusterMessage
+ * @see ClusterMessageType#NODE_LEAVE
+ * @since 1.0.0
  */
-public class NodeLeaveMessage implements BrokerMessage {
+public class NodeLeaveMessage implements ClusterMessage {
 
 	@Override
-	public BrokerMessageType getType() {
-		return BrokerMessageType.NODE_LEAVE;
+	public ClusterMessageType getType() {
+		return ClusterMessageType.NODE_LEAVE;
 	}
 
 	@Override

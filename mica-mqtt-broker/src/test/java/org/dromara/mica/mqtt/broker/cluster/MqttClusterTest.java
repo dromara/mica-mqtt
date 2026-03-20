@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.broker.cluster;
 
-import org.dromara.mica.mqtt.broker.cluster.message.BrokerMessage;
-import org.dromara.mica.mqtt.broker.cluster.message.BrokerMessageConverter;
+import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessageSerializer;
 import org.dromara.mica.mqtt.broker.cluster.message.PublishForwardMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.SubscribeNotifyMessage;
 import org.dromara.mica.mqtt.core.server.model.Message;
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 集群功能测试
+ * Cluster functionality tests for message serialization and deserialization.
  */
 class MqttClusterTest {
 
@@ -46,7 +46,7 @@ class MqttClusterTest {
         mqttMessage.setDup(false);
         msg.setMessage(mqttMessage);
 
-        BrokerMessage deserialized = BrokerMessageConverter.fromClusterData(BrokerMessageConverter.toClusterData(msg, "192.168.1.1:9000"));
+        ClusterMessage deserialized = ClusterMessageSerializer.fromClusterData(ClusterMessageSerializer.toClusterData(msg, "192.168.1.1:9000"));
         assertTrue(deserialized instanceof PublishForwardMessage);
         PublishForwardMessage pfm = (PublishForwardMessage) deserialized;
         assertEquals("/test/topic", pfm.getMessage().getTopic());
@@ -62,7 +62,7 @@ class MqttClusterTest {
         Subscribe subscribe = new Subscribe("/test/#", "client-001", 1, false);
         msg.setSubscriptions(Collections.singletonList(subscribe));
 
-        BrokerMessage deserialized = BrokerMessageConverter.fromClusterData(BrokerMessageConverter.toClusterData(msg, "192.168.1.1:9000"));
+        ClusterMessage deserialized = ClusterMessageSerializer.fromClusterData(ClusterMessageSerializer.toClusterData(msg, "192.168.1.1:9000"));
         assertTrue(deserialized instanceof SubscribeNotifyMessage);
         SubscribeNotifyMessage snm = (SubscribeNotifyMessage) deserialized;
         assertEquals("client-001", snm.getClientId());

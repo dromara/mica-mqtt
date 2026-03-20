@@ -34,6 +34,21 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.*;
 
+/**
+ * Manager for MQTT broker cluster operations and inter-node communication.
+ * <p>
+ * This class is responsible for:
+ * <ul>
+ *   <li>Starting and stopping the t-io cluster foundation</li>
+ *   <li>Broadcasting and point-to-point cluster messages</li>
+ *   <li>Handling incoming cluster messages and dispatching to appropriate handlers</li>
+ *   <li>Coordinating session synchronization across cluster nodes</li>
+ * </ul>
+ * </p>
+ *
+ * @author L.cm
+ * @since 1.0.0
+ */
 public class MqttClusterManager {
 	private static final Logger logger = LoggerFactory.getLogger(MqttClusterManager.class);
 
@@ -42,24 +57,44 @@ public class MqttClusterManager {
 	private final MqttClusterConfig config;
 	private final String localNodeId;
 
+	/**
+	 * Constructs a new cluster manager with the specified configuration.
+	 *
+	 * @param config the cluster configuration
+	 * @param localNodeId the unique identifier for this local node in the cluster
+	 */
 	public MqttClusterManager(MqttClusterConfig config, String localNodeId) {
 		this.config = config;
 		this.localNodeId = localNodeId;
 	}
 
+	/**
+	 * Sets the MQTT server instance to be managed by this cluster manager.
+	 *
+	 * @param mqttServer the MQTT server instance
+	 */
 	public void setMqttServer(MqttServer mqttServer) {
 		this.mqttServer = mqttServer;
 	}
 
 	/**
-	 * 判断集群是否启用
+	 * Checks whether cluster mode is enabled in the configuration.
 	 *
-	 * @return true if cluster is enabled
+	 * @return true if clustering is enabled, false otherwise
 	 */
 	public boolean isClusterEnabled() {
 		return config.isEnabled();
 	}
 
+	/**
+	 * Starts the cluster manager and optionally the embedded MQTT server.
+	 * <p>
+	 * If cluster mode is disabled, only the MQTT server is started.
+	 * If cluster mode is enabled, both the t-io cluster and MQTT server are started.
+	 * </p>
+	 *
+	 * @throws Exception if any error occurs during startup
+	 */
 	public void start() throws Exception {
 		if (mqttServer != null) {
 			mqttServer.start();
@@ -93,42 +128,42 @@ public class MqttClusterManager {
 			if (payload == null || payload.length == 0) {
 				return;
 			}
-			BrokerMessage brokerMsg = BrokerMessageConverter.fromClusterData(message);
-			if (brokerMsg != null) {
-				logger.debug("Received cluster message of type: {}", brokerMsg.getType());
-				String sourceNode = BrokerMessageConverter.getSourceNode(message);
-				handleClusterMessageInternal(brokerMsg, sourceNode);
+			ClusterMessage clusterMsg = ClusterMessageSerializer.fromClusterData(message);
+			if (clusterMsg != null) {
+				logger.debug("Received cluster message of type: {}", clusterMsg.getType());
+				String sourceNode = ClusterMessageSerializer.getSourceNode(message);
+				handleClusterMessageInternal(clusterMsg, sourceNode);
 			}
 		} catch (Exception e) {
 			logger.error("Error handling cluster message", e);
 		}
 	}
 
-	private void handleClusterMessageInternal(BrokerMessage brokerMsg, String sourceNode) {
+	private void handleClusterMessageInternal(ClusterMessage clusterMsg, String sourceNode) {
 		ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
-		switch (brokerMsg.getType()) {
+		switch (clusterMsg.getType()) {
 			case PUBLISH_FORWARD: {
-				PublishForwardMessage pfm = (PublishForwardMessage) brokerMsg;
+				PublishForwardMessage pfm = (PublishForwardMessage) clusterMsg;
 				mqttServer.publishAll(pfm.getMessage().getTopic(), pfm.getMessage().getPayload(), MqttQoS.valueOf(pfm.getMessage().getQos()), pfm.getMessage().isRetain());
 				break;
 			}
 			case SUBSCRIBE_NOTIFY: {
-				SubscribeNotifyMessage snm = (SubscribeNotifyMessage) brokerMsg;
+				SubscribeNotifyMessage snm = (SubscribeNotifyMessage) clusterMsg;
 				sessionManager.syncRemoteSubscriptions(snm.getClientId(), snm.getNodeId(), snm.getSubscriptions());
 				break;
 			}
 			case UNSUBSCRIBE_NOTIFY: {
-				UnsubscribeNotifyMessage unm = (UnsubscribeNotifyMessage) brokerMsg;
+				UnsubscribeNotifyMessage unm = (UnsubscribeNotifyMessage) clusterMsg;
 				sessionManager.removeRemoteSubscriptions(unm.getClientId(), unm.getTopics());
 				break;
 			}
 			case CLIENT_CONNECT: {
-				ClientConnectMessage ccm = (ClientConnectMessage) brokerMsg;
+				ClientConnectMessage ccm = (ClientConnectMessage) clusterMsg;
 				sessionManager.registerRemoteClient(ccm.getClientId(), sourceNode);
 				break;
 			}
 			case CLIENT_DISCONNECT: {
-				ClientDisconnectMessage cdm = (ClientDisconnectMessage) brokerMsg;
+				ClientDisconnectMessage cdm = (ClientDisconnectMessage) clusterMsg;
 				sessionManager.removeRemoteClient(cdm.getClientId());
 				break;
 			}
@@ -136,7 +171,7 @@ public class MqttClusterManager {
 				handleStateSyncRequest(sourceNode);
 				break;
 			case STATE_SYNC_RESPONSE: {
-				StateSyncResponseMessage ssm = (StateSyncResponseMessage) brokerMsg;
+				StateSyncResponseMessage ssm = (StateSyncResponseMessage) clusterMsg;
 				sessionManager.syncFullState(ssm.getClientNodeMap(), ssm.getSubscriptionMap());
 				logger.info("State sync completed, received {} client mappings", ssm.getClientNodeMap().size());
 				break;
@@ -147,7 +182,7 @@ public class MqttClusterManager {
 				break;
 			}
 			case WILL_MESSAGE: {
-				WillMessageNotifyMessage wmm = (WillMessageNotifyMessage) brokerMsg;
+				WillMessageNotifyMessage wmm = (WillMessageNotifyMessage) clusterMsg;
 				IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
 				if (messageStore != null && wmm.getWillMessage() != null) {
 					messageStore.addWillMessage(wmm.getClientId(), wmm.getWillMessage());
@@ -156,7 +191,7 @@ public class MqttClusterManager {
 				break;
 			}
 			case RETAIN_MESSAGE: {
-				RetainMessageNotifyMessage rmm = (RetainMessageNotifyMessage) brokerMsg;
+				RetainMessageNotifyMessage rmm = (RetainMessageNotifyMessage) clusterMsg;
 				IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
 				if (messageStore != null) {
 					if (rmm.getRetainMessage() != null) {
@@ -170,7 +205,7 @@ public class MqttClusterManager {
 				break;
 			}
 			default:
-				logger.warn("Unknown cluster message type: {}", brokerMsg.getType());
+				logger.warn("Unknown cluster message type: {}", clusterMsg.getType());
 				break;
 		}
 	}
@@ -193,7 +228,7 @@ public class MqttClusterManager {
 		response.setSubscriptionMap(subscriptionMap);
 
 		try {
-			ClusterDataMessage data = BrokerMessageConverter.toClusterData(response, localNodeId);
+			ClusterDataMessage data = ClusterMessageSerializer.toClusterData(response, localNodeId);
 			String[] parts = requestNodeId.split(":");
 			Node node = new Node(parts[0], Integer.parseInt(parts[1]));
 			cluster.send(node, data);
@@ -203,7 +238,7 @@ public class MqttClusterManager {
 		}
 	}
 
-	public void sendToNode(String nodeId, BrokerMessage brokerMsg) {
+	public void sendToNode(String nodeId, ClusterMessage clusterMsg) {
 		if (!config.isEnabled() || cluster == null) {
 			return;
 		}
@@ -211,19 +246,19 @@ public class MqttClusterManager {
 			String[] parts = nodeId.split(":");
 			if (parts.length == 2) {
 				Node node = new Node(parts[0], Integer.parseInt(parts[1]));
-				cluster.send(node, BrokerMessageConverter.toClusterData(brokerMsg, localNodeId));
+				cluster.send(node, ClusterMessageSerializer.toClusterData(clusterMsg, localNodeId));
 			}
 		} catch (Exception e) {
 			logger.error("Failed to send message to node: {}", nodeId, e);
 		}
 	}
 
-	public void broadcast(BrokerMessage brokerMsg) {
+	public void broadcast(ClusterMessage clusterMsg) {
 		if (!config.isEnabled() || cluster == null) {
 			return;
 		}
 		try {
-			cluster.broadcast(BrokerMessageConverter.toClusterData(brokerMsg, localNodeId));
+			cluster.broadcast(ClusterMessageSerializer.toClusterData(clusterMsg, localNodeId));
 		} catch (Exception e) {
 			logger.error("Failed to broadcast message", e);
 		}

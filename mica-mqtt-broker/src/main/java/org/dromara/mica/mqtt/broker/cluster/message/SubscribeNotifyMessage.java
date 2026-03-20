@@ -23,49 +23,52 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 订阅通知消息
+ * Notice broadcast when a client subscribes to one or more topics.
  * <p>
- * 当客户端订阅主题时，本节点向集群广播此消息，
- * 通知其他节点同步该订阅信息到远程。
+ * When a client subscribes to topics, this node broadcasts this notice to all other nodes
+ * so they can synchronize their subscription tables for cross-node message forwarding.
  * </p>
  *
  * @author L.cm
+ * @see ClusterMessage
+ * @see ClusterMessageType#SUBSCRIBE_NOTIFY
+ * @since 1.0.0
  */
-public class SubscribeNotifyMessage implements BrokerMessage {
+public class SubscribeNotifyMessage implements ClusterMessage {
 	/**
-	 * 客户端 ID
+	 * Unique identifier of the subscribing MQTT client.
 	 */
 	private String clientId;
 	/**
-	 * 节点 ID
+	 * Identifier of the node where the client is connected.
 	 */
 	private String nodeId;
 	/**
-	 * 订阅列表
+	 * List of topic subscriptions requested by the client.
 	 */
 	private List<Subscribe> subscriptions;
 
 	@Override
-	public BrokerMessageType getType() {
-		return BrokerMessageType.SUBSCRIBE_NOTIFY;
+	public ClusterMessageType getType() {
+		return ClusterMessageType.SUBSCRIBE_NOTIFY;
 	}
 
 	@Override
 	public void toClusterData(Map<String, String> headers) {
-		headers.put(BrokerMessageConverter.HEADER_CLIENT_ID, clientId);
-		headers.put(BrokerMessageConverter.HEADER_NODE_ID, nodeId);
+		headers.put(ClusterMessageSerializer.HEADER_CLIENT_ID, clientId);
+		headers.put(ClusterMessageSerializer.HEADER_NODE_ID, nodeId);
 	}
 
 	@Override
 	public byte[] toPayload() {
-		return BrokerMessageConverter.serializeSubscriptions(subscriptions);
+		return ClusterMessageSerializer.serializeSubscriptions(subscriptions);
 	}
 
 	@Override
 	public void fromClusterData(ClusterDataMessage message) {
-		this.clientId = message.getHeader(BrokerMessageConverter.HEADER_CLIENT_ID);
-		this.nodeId = message.getHeader(BrokerMessageConverter.HEADER_NODE_ID);
-		this.subscriptions = BrokerMessageConverter.deserializeSubscriptions(message.getPayload());
+		this.clientId = message.getHeader(ClusterMessageSerializer.HEADER_CLIENT_ID);
+		this.nodeId = message.getHeader(ClusterMessageSerializer.HEADER_NODE_ID);
+		this.subscriptions = ClusterMessageSerializer.deserializeSubscriptions(message.getPayload());
 	}
 
 	public String getClientId() {

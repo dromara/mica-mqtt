@@ -21,30 +21,34 @@ import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 
 /**
- * Mqtt Broker
+ * Entry point for creating MQTT broker instances with cluster mode support.
  * <p>
- * Entry point for creating MQTT broker instances, including cluster support.
+ * This class provides static factory methods to create a {@link MqttClusterBrokerCreator}
+ * which can then be used to configure and build an MQTT broker that operates in
+ * cluster mode, enabling horizontal scalability and high availability.
  * </p>
  *
  * @author L.cm
  * @author opencode
+ * @see MqttClusterBrokerCreator
+ * @since 1.0.0
  */
 public class MqttBroker {
 
 	/**
-	 * Create a new MqttClusterBrokerCreator using an existing MqttServerCreator
+	 * Creates a new {@link MqttClusterBrokerCreator} using an existing {@link MqttServerCreator}.
 	 *
-	 * @param serverCreator the underlying MqttServerCreator
-	 * @return MqttClusterBrokerCreator
+	 * @param serverCreator the underlying server creator to wrap
+	 * @return a new broker creator instance
 	 */
 	public static MqttClusterBrokerCreator create(MqttServerCreator serverCreator) {
 		return new MqttClusterBrokerCreator(serverCreator);
 	}
 
 	/**
-	 * Create a new MqttClusterBrokerCreator using a new MqttServerCreator
+	 * Creates a new {@link MqttClusterBrokerCreator} using a new default {@link MqttServerCreator}.
 	 *
-	 * @return MqttClusterBrokerCreator
+	 * @return a new broker creator instance
 	 */
 	public static MqttClusterBrokerCreator create() {
 		return new MqttClusterBrokerCreator(MqttServer.create());

@@ -27,42 +27,55 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 集群消息转换器
+ * Serializer for cluster messages handling conversion between domain models and t-io transport format.
  * <p>
- * 负责将 BrokerMessage 转换为 t-io ClusterDataMessage 进行网络传输，
- * 以及将 ClusterDataMessage 反序列化为对应的 BrokerMessage。
- * 使用自定义二进制序列化，性能高效、体积小。
+ * This class provides bidirectional serialization:
+ * <ul>
+ *   <li>{@link #toClusterData(ClusterMessage, String)} - serializes a {@link ClusterMessage} into a t-io {@link ClusterDataMessage}</li>
+ *   <li>{@link #fromClusterData(ClusterDataMessage)} - deserializes a {@link ClusterDataMessage} back into the appropriate {@link ClusterMessage} subclass</li>
+ * </ul>
+ * The serialization format uses efficient binary encoding with compact header management.
  * </p>
  *
  * @author L.cm
+ * @see ClusterMessage
+ * @see ClusterMessageType
+ * @since 1.0.0
  */
-public class BrokerMessageConverter {
+public class ClusterMessageSerializer {
 	/**
-	 * 消息类型 header key
+	 * Header key for message type code.
 	 */
 	public static final String HEADER_TYPE = "type";
 	/**
-	 * 客户端 ID header key
+	 * Header key for client identifier.
 	 */
 	public static final String HEADER_CLIENT_ID = "clientId";
 	/**
-	 * 节点 ID header key
+	 * Header key for node identifier.
 	 */
 	public static final String HEADER_NODE_ID = "nodeId";
 	/**
-	 * 源节点 header key
+	 * Header key for source node identifier.
 	 */
 	public static final String HEADER_SOURCE_NODE = "sourceNode";
 	/**
-	 * Topic header key
+	 * Header key for topic name.
 	 */
 	public static final String HEADER_TOPIC = "topic";
 	/**
-	 * 超时时间 header key
+	 * Header key for timeout value in milliseconds.
 	 */
 	public static final String HEADER_TIMEOUT = "timeout";
 
-	public static ClusterDataMessage toClusterData(BrokerMessage msg, String sourceNode) {
+	/**
+	 * Serializes a cluster message into a t-io cluster data message for network transmission.
+	 *
+	 * @param msg the cluster message to serialize
+	 * @param sourceNode the identifier of the source node initiating the send
+	 * @return the serialized {@link ClusterDataMessage} ready for transmission
+	 */
+	public static ClusterDataMessage toClusterData(ClusterMessage msg, String sourceNode) {
 		Map<String, String> headers = new HashMap<>(8);
 		headers.put(HEADER_TYPE, String.valueOf(msg.getType().getCode()));
 		headers.put(HEADER_SOURCE_NODE, sourceNode);
@@ -71,20 +84,34 @@ public class BrokerMessageConverter {
 		return new ClusterDataMessage(System.currentTimeMillis(), headers, payload.length > 0 ? payload : null);
 	}
 
+	/**
+	 * Deserializes a t-io cluster data message into the appropriate cluster message subtype.
+	 *
+	 * @param data the serialized {@link ClusterDataMessage} received from the network
+	 * @param <T> the expected cluster message subtype
+	 * @return the deserialized cluster message instance
+	 * @throws IllegalArgumentException if the message type is unknown
+	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends BrokerMessage> T fromClusterData(ClusterDataMessage data) {
+	public static <T extends ClusterMessage> T fromClusterData(ClusterDataMessage data) {
 		int typeCode = Integer.parseInt(data.getHeader(HEADER_TYPE));
-		BrokerMessageType type = BrokerMessageType.fromCode(typeCode);
-		BrokerMessage msg = createMessage(type);
+		ClusterMessageType type = ClusterMessageType.fromCode(typeCode);
+		ClusterMessage msg = createMessage(type);
 		msg.fromClusterData(data);
 		return (T) msg;
 	}
 
+	/**
+	 * Extracts the source node identifier from a cluster data message.
+	 *
+	 * @param data the cluster data message
+	 * @return the source node identifier
+	 */
 	public static String getSourceNode(ClusterDataMessage data) {
 		return data.getHeader(HEADER_SOURCE_NODE);
 	}
 
-	private static BrokerMessage createMessage(BrokerMessageType type) {
+	private static ClusterMessage createMessage(ClusterMessageType type) {
 		switch (type) {
 			case CLIENT_CONNECT:
 				return new ClientConnectMessage();
@@ -111,6 +138,12 @@ public class BrokerMessageConverter {
 		}
 	}
 
+	/**
+	 * Serializes a list of subscription records into binary format.
+	 *
+	 * @param subscriptions the list of subscriptions to serialize
+	 * @return the binary payload, or an empty array if the list is null or empty
+	 */
 	public static byte[] serializeSubscriptions(List<Subscribe> subscriptions) {
 		if (subscriptions == null || subscriptions.isEmpty()) {
 			return new byte[0];
@@ -129,6 +162,12 @@ public class BrokerMessageConverter {
 		return result;
 	}
 
+	/**
+	 * Deserializes a binary payload into a list of subscription records.
+	 *
+	 * @param data the binary payload
+	 * @return the list of subscriptions, or null if the payload is invalid
+	 */
 	public static List<Subscribe> deserializeSubscriptions(byte[] data) {
 		if (data == null || data.length == 0) {
 			return null;
@@ -150,6 +189,12 @@ public class BrokerMessageConverter {
 		return list;
 	}
 
+	/**
+	 * Serializes a list of topic strings into binary format.
+	 *
+	 * @param topics the list of topics to serialize
+	 * @return the binary payload, or an empty array if the list is null or empty
+	 */
 	public static byte[] serializeTopics(List<String> topics) {
 		if (topics == null || topics.isEmpty()) {
 			return new byte[0];
@@ -173,6 +218,12 @@ public class BrokerMessageConverter {
 		return result;
 	}
 
+	/**
+	 * Deserializes a binary payload into a list of topic strings.
+	 *
+	 * @param data the binary payload
+	 * @return the list of topics, or null if the payload is invalid
+	 */
 	public static List<String> deserializeTopics(byte[] data) {
 		if (data == null || data.length == 0) {
 			return null;
@@ -189,6 +240,13 @@ public class BrokerMessageConverter {
 		return list;
 	}
 
+	/**
+	 * Serializes state synchronization data containing client-to-node mappings and subscription tables.
+	 *
+	 * @param clientNodeMap mapping of client identifiers to node identifiers
+	 * @param subscriptionMap mapping of client identifiers to their subscription lists
+	 * @return the binary serialized payload
+	 */
 	public static byte[] serializeStateSyncData(Map<String, String> clientNodeMap, Map<String, List<Subscribe>> subscriptionMap) {
 		int len = calculateStateSyncDataLength(clientNodeMap, subscriptionMap);
 		ByteBuffer buf = ByteBuffer.allocate(len);
@@ -223,6 +281,12 @@ public class BrokerMessageConverter {
 		return result;
 	}
 
+	/**
+	 * Deserializes state synchronization data from binary format.
+	 *
+	 * @param data the binary payload
+	 * @return the deserialized {@link StateSyncData} containing client-node mappings and subscriptions
+	 */
 	public static StateSyncData deserializeStateSyncData(byte[] data) {
 		if (data == null || data.length == 0) {
 			return new StateSyncData();
@@ -313,6 +377,16 @@ public class BrokerMessageConverter {
 		return new String(bytes, StandardCharsets.UTF_8);
 	}
 
+	/**
+	 * Data carrier for state synchronization containing client-node mappings and subscription tables.
+	 * <p>
+	 * This class is returned by {@link #deserializeStateSyncData(byte[])} to provide structured
+	 * access to the deserialized state data during cluster node join synchronization.
+	 * </p>
+	 *
+	 * @author L.cm
+	 * @since 1.0.0
+	 */
 	public static class StateSyncData {
 		private Map<String, String> clientNodeMap;
 		private Map<String, List<Subscribe>> subscriptionMap;
@@ -325,6 +399,11 @@ public class BrokerMessageConverter {
 			this.subscriptionMap = subscriptionMap;
 		}
 
+		/**
+		 * Returns the mapping of client identifiers to their hosting node identifiers.
+		 *
+		 * @return the client-to-node mapping, may be null if not populated
+		 */
 		public Map<String, String> getClientNodeMap() {
 			return clientNodeMap;
 		}
@@ -333,6 +412,11 @@ public class BrokerMessageConverter {
 			this.clientNodeMap = clientNodeMap;
 		}
 
+		/**
+		 * Returns the mapping of client identifiers to their subscription lists.
+		 *
+		 * @return the client-to-subscriptions mapping, may be null if not populated
+		 */
 		public Map<String, List<Subscribe>> getSubscriptionMap() {
 			return subscriptionMap;
 		}

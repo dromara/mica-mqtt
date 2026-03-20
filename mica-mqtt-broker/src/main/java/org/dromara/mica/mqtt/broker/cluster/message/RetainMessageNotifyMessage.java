@@ -23,37 +23,40 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 import java.util.Map;
 
 /**
- * 保留消息通知消息
+ * Notice for retained message synchronization across cluster nodes.
  * <p>
- * 当保留消息发布或清除时，广播通知所有节点同步更新。
- * 用于集群环境下保留消息的一致性。
+ * When a retained message is published or cleared, this notice is broadcast to all nodes
+ * so they can maintain a consistent retained message store across the cluster.
  * </p>
  *
  * @author L.cm
+ * @see ClusterMessage
+ * @see ClusterMessageType#RETAIN_MESSAGE
+ * @since 1.0.0
  */
-public class RetainMessageNotifyMessage implements BrokerMessage {
+public class RetainMessageNotifyMessage implements ClusterMessage {
 	/**
-	 * 主题
+	 * The topic for which the retained message applies.
 	 */
 	private String topic;
 	/**
-	 * 保留超时时间（秒）
+	 * Timeout in seconds after which the retained message expires. Zero means no expiration.
 	 */
 	private int timeout;
 	/**
-	 * 保留消息
+	 * The retained message payload, or null if this notice represents a clear operation.
 	 */
 	private Message retainMessage;
 
 	@Override
-	public BrokerMessageType getType() {
-		return BrokerMessageType.RETAIN_MESSAGE;
+	public ClusterMessageType getType() {
+		return ClusterMessageType.RETAIN_MESSAGE;
 	}
 
 	@Override
 	public void toClusterData(Map<String, String> headers) {
-		headers.put(BrokerMessageConverter.HEADER_TOPIC, topic);
-		headers.put(BrokerMessageConverter.HEADER_TIMEOUT, String.valueOf(timeout));
+		headers.put(ClusterMessageSerializer.HEADER_TOPIC, topic);
+		headers.put(ClusterMessageSerializer.HEADER_TIMEOUT, String.valueOf(timeout));
 	}
 
 	@Override
@@ -66,8 +69,8 @@ public class RetainMessageNotifyMessage implements BrokerMessage {
 
 	@Override
 	public void fromClusterData(ClusterDataMessage message) {
-		this.topic = message.getHeader(BrokerMessageConverter.HEADER_TOPIC);
-		String timeoutStr = message.getHeader(BrokerMessageConverter.HEADER_TIMEOUT);
+		this.topic = message.getHeader(ClusterMessageSerializer.HEADER_TOPIC);
+		String timeoutStr = message.getHeader(ClusterMessageSerializer.HEADER_TIMEOUT);
 		this.timeout = timeoutStr != null ? Integer.parseInt(timeoutStr) : 0;
 		byte[] payload = message.getPayload();
 		if (payload != null && payload.length > 0) {

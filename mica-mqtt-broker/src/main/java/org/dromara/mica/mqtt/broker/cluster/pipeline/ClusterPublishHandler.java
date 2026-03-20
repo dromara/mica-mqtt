@@ -32,12 +32,15 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 集群消息分发器 - 处理发布消息的跨节点转发
+ * Pipeline handler for cross-node message forwarding during publish operations.
  * <p>
- * 实现 MqttPublishPipelineHandler 接口，在发布管线中拦截消息并转发给远程节点。
+ * This handler implements {@link MqttPublishPipelineHandler} and intercepts
+ * published messages in the pipeline. If subscribers exist on remote cluster
+ * nodes, it forwards the message to those nodes for local delivery.
  * </p>
  *
  * @author L.cm
+ * @since 1.0.0
  */
 public class ClusterPublishHandler implements MqttPublishPipelineHandler {
 	private static final Logger logger = LoggerFactory.getLogger(ClusterPublishHandler.class);

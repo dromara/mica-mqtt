@@ -21,19 +21,24 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 import java.util.Map;
 
 /**
- * 状态同步请求消息
+ * Request for full state synchronization from a newly joined cluster node.
  * <p>
- * 新节点加入集群时，向其他节点发送此消息请求全量状态数据，
- * 包括所有客户端所在节点映射和订阅信息。
+ * When a new node joins the cluster, it sends this request to all existing nodes
+ * to obtain the complete cluster state, including client-to-node mappings and
+ * all subscription tables.
  * </p>
  *
  * @author L.cm
+ * @see ClusterMessage
+ * @see ClusterMessageType#STATE_SYNC_REQUEST
+ * @see StateSyncResponseMessage
+ * @since 1.0.0
  */
-public class StateSyncRequestMessage implements BrokerMessage {
+public class StateSyncRequestMessage implements ClusterMessage {
 
 	@Override
-	public BrokerMessageType getType() {
-		return BrokerMessageType.STATE_SYNC_REQUEST;
+	public ClusterMessageType getType() {
+		return ClusterMessageType.STATE_SYNC_REQUEST;
 	}
 
 	@Override

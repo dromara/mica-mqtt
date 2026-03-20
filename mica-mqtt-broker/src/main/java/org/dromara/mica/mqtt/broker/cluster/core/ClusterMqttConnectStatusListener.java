@@ -22,13 +22,16 @@ import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.tio.core.ChannelContext;
 
 /**
- * 集群连接状态监听装饰器
+ * Decorator for {@link IMqttConnectStatusListener} that broadcasts client lifecycle events to the cluster.
  * <p>
- * 包装原有的 IMqttConnectStatusListener，当客户端连接或断开时，
- * 自动向集群广播通知，更新全局客户端位置映射。
+ * This listener wraps an existing {@link IMqttConnectStatusListener} and extends it with
+ * cluster awareness. When a client connects or disconnects, it broadcasts a notification
+ * to all other cluster nodes so they can update their client-to-node mappings.
  * </p>
  *
  * @author L.cm
+ * @see IMqttConnectStatusListener
+ * @since 1.0.0
  */
 public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListener {
 

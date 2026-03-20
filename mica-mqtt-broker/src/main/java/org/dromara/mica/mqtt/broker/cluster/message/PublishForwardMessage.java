@@ -23,23 +23,26 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 import java.util.Map;
 
 /**
- * 消息转发消息
+ * Request for cross-node message forwarding when subscribers exist on remote nodes.
  * <p>
- * 当发布者所在节点收到消息后，如果订阅者位于其他节点，
- * 则通过此消息将内容转发到订阅者所在节点。
+ * When a publisher's node receives a message and subscribers are located on different nodes,
+ * this message carries the payload to those remote nodes for local delivery.
  * </p>
  *
  * @author L.cm
+ * @see ClusterMessage
+ * @see ClusterMessageType#PUBLISH_FORWARD
+ * @since 1.0.0
  */
-public class PublishForwardMessage implements BrokerMessage {
+public class PublishForwardMessage implements ClusterMessage {
 	/**
-	 * MQTT 消息体
+	 * The MQTT message payload to be forwarded to remote subscribers.
 	 */
 	private Message message;
 
 	@Override
-	public BrokerMessageType getType() {
-		return BrokerMessageType.PUBLISH_FORWARD;
+	public ClusterMessageType getType() {
+		return ClusterMessageType.PUBLISH_FORWARD;
 	}
 
 	@Override

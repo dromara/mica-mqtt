@@ -20,26 +20,72 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Mqtt Cluster Configuration
+ * Configuration properties for MQTT broker cluster mode.
+ * <p>
+ * This class encapsulates all cluster-related settings including network configuration,
+ * node discovery via seed members, heartbeat intervals for failure detection, and
+ * cluster identity for node verification.
+ * </p>
+ *
+ * @author L.cm
+ * @since 1.0.0
  */
 public class MqttClusterConfig {
-	// 是否启用集群
+	/**
+	 * Whether cluster mode is enabled.
+	 * When {@code false}, the broker operates in standalone mode without cluster communication.
+	 */
 	private boolean enabled = false;
 
-	// 集群监听地址和端口（用于集群节点间通信）
+	/**
+	 * Network address on which this node listens for cluster inter-node communication.
+	 */
 	private String clusterHost = "127.0.0.1";
+
+	/**
+	 * Port number on which this node listens for cluster inter-node communication.
+	 */
 	private int clusterPort = 9000;
 
-	// 种子节点列表（格式：host:port）
+	/**
+	 * List of seed members used for initial cluster discovery.
+	 * <p>
+	 * Format: {@code host:port}. New nodes use this list to discover existing cluster members
+	 * and obtain the full cluster state during bootstrap.
+	 * </p>
+	 */
 	private List<String> seedMembers = new ArrayList<>();
 
-	// 集群名称（相同集群名称的节点才能互联）
+	/**
+	 * Logical name identifying this cluster.
+	 * <p>
+	 * Only nodes with the same cluster name can communicate with each other.
+	 * This provides isolation between different broker clusters.
+	 * </p>
+	 */
 	private String clusterName = "mica-mqtt-cluster";
 
-	// 集群心跳间隔（毫秒）
+	/**
+	 * Heartbeat interval in milliseconds between cluster nodes.
+	 * <p>
+	 * Nodes send periodic heartbeats to indicate liveness. If a node fails to receive
+	 * heartbeats from a peer within the {@link #nodeTimeout} window, the peer is
+	 * considered unreachable.
+	 * </p>
+	 *
+	 * @see #nodeTimeout
+	 */
 	private long heartbeatInterval = 5000;
 
-	// 节点失联超时（毫秒）
+	/**
+	 * Timeout in milliseconds after which an unresponsive node is considered unreachable.
+	 * <p>
+	 * This value should be significantly larger than {@link #heartbeatInterval} to
+	 * account for network latency and transient connectivity issues.
+	 * </p>
+	 *
+	 * @see #heartbeatInterval
+	 */
 	private long nodeTimeout = 15000;
 
 	public boolean isEnabled() {

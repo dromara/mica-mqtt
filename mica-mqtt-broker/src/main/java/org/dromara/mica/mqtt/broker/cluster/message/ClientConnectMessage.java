@@ -21,28 +21,32 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 import java.util.Map;
 
 /**
- * 客户端连接通知消息
+ * Notice broadcast when a client successfully establishes a connection to a broker node.
  * <p>
- * 当客户端成功连接时，本节点向集群广播此消息，
- * 通知其他节点更新该客户端所在节点的映射关系。
+ * Upon a client's successful connection, this node broadcasts this notice to all other nodes
+ * in the cluster so they can update their client-to-node location mappings for routing
+ * purposes.
  * </p>
  *
  * @author L.cm
+ * @see ClusterMessage
+ * @see ClusterMessageType#CLIENT_CONNECT
+ * @since 1.0.0
  */
-public class ClientConnectMessage implements BrokerMessage {
+public class ClientConnectMessage implements ClusterMessage {
 	/**
-	 * 客户端 ID
+	 * Unique identifier of the connected MQTT client.
 	 */
 	private String clientId;
 
 	@Override
-	public BrokerMessageType getType() {
-		return BrokerMessageType.CLIENT_CONNECT;
+	public ClusterMessageType getType() {
+		return ClusterMessageType.CLIENT_CONNECT;
 	}
 
 	@Override
 	public void toClusterData(Map<String, String> headers) {
-		headers.put(BrokerMessageConverter.HEADER_CLIENT_ID, clientId);
+		headers.put(ClusterMessageSerializer.HEADER_CLIENT_ID, clientId);
 	}
 
 	@Override
@@ -52,7 +56,7 @@ public class ClientConnectMessage implements BrokerMessage {
 
 	@Override
 	public void fromClusterData(ClusterDataMessage message) {
-		this.clientId = message.getHeader(BrokerMessageConverter.HEADER_CLIENT_ID);
+		this.clientId = message.getHeader(ClusterMessageSerializer.HEADER_CLIENT_ID);
 	}
 
 	public String getClientId() {

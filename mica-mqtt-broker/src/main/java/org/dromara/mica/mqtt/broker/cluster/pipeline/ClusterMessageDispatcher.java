@@ -32,23 +32,34 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 集群消息分发器
+ * Intercepts upstream MQTT messages and forwards them to subscribers on remote cluster nodes.
  * <p>
- * 拦截上行 MQTT 消息（UP_STREAM），当订阅者位于远程节点时，
- * 通过 t-io 集群将消息转发到目标节点。O(1) 网络开销：
- * 每个远程节点只转发一次，不重复发送。
+ * This handler is positioned in the message pipeline before the local
+ * {@code UpStreamMessageHandler} (order 90 vs 100). When a message is published on
+ * a topic that has subscribers on other cluster nodes, this dispatcher sends the
+ * message to those remote nodes via the t-io cluster framework.
  * </p>
  * <p>
- * 执行顺序：90，在 UpStreamMessageHandler (100) 之前执行。
+ * The forwarding algorithm ensures O(1) network overhead per remote node—each remote
+ * node receives the message exactly once, regardless of how many local subscribers exist.
  * </p>
  *
  * @author L.cm
+ * @see BaseMessageHandler
+ * @since 1.0.0
  */
 public class ClusterMessageDispatcher extends BaseMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(ClusterMessageDispatcher.class);
 	private final MqttClusterManager clusterManager;
 	private final ClusterMqttSessionManager clusterSessionManager;
 
+	/**
+	 * Constructs a new cluster message dispatcher.
+	 *
+	 * @param mqttServer the embedded MQTT server
+	 * @param clusterManager the cluster manager for sending forwarded messages
+	 * @param clusterSessionManager the cluster session manager for subscriber lookup
+	 */
 	public ClusterMessageDispatcher(MqttServer mqttServer, MqttClusterManager clusterManager, ClusterMqttSessionManager clusterSessionManager) {
 		super(mqttServer);
 		this.clusterManager = clusterManager;
@@ -64,7 +75,6 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 		String topic = message.getTopic();
 		String localNodeId = clusterManager.getLocalNodeId();
 
-		// 获取所有订阅者（包括远程）
 		List<Subscribe> subscribers = clusterSessionManager.searchAllSubscribe(topic);
 
 		logger.debug("[Cluster] Received publish on topic: {}, subscribers count: {}", topic,
@@ -75,7 +85,6 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 			return true;
 		}
 
-		// 找出需要转发的远程节点
 		Set<String> remoteNodes = new HashSet<>();
 		for (Subscribe sub : subscribers) {
 			String clientId = sub.getClientId();
@@ -88,7 +97,6 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 			}
 		}
 
-		// 向每个远程节点转发消息（O(1) 网络开销）
 		if (!remoteNodes.isEmpty()) {
 			logger.debug("[Cluster] Forwarding message on topic: {} to remote nodes: {}", topic, remoteNodes);
 			for (String nodeId : remoteNodes) {
@@ -98,7 +106,7 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 			logger.debug("[Cluster] No remote nodes need forwarding for topic: {}", topic);
 		}
 
-		return true; // 继续执行 UpStreamMessageHandler 进行本地分发
+		return true;
 	}
 
 	private void forwardToNode(String nodeId, Message msg) {
@@ -112,6 +120,6 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 
 	@Override
 	public int getOrder() {
-		return 90; // 在 UpStreamMessageHandler (100) 之前执行
+		return 90;
 	}
 }

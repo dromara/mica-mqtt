@@ -23,32 +23,36 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 import java.util.Map;
 
 /**
- * 遗嘱消息通知消息
+ * Notice for will message synchronization across cluster nodes.
  * <p>
- * 当客户端设置遗嘱消息时，广播通知其他节点备份。
- * 当节点收到客户端遗嘱消息触发通知时，从远程备份恢复。
+ * When a client sets or updates its will message, this notice is broadcast to all nodes
+ * so they can maintain a backup. If the client disconnects unexpectedly, the will message
+ * will be delivered from the backup stored on the node where the client was connected.
  * </p>
  *
  * @author L.cm
+ * @see ClusterMessage
+ * @see ClusterMessageType#WILL_MESSAGE
+ * @since 1.0.0
  */
-public class WillMessageNotifyMessage implements BrokerMessage {
+public class WillMessageNotifyMessage implements ClusterMessage {
 	/**
-	 * 客户端 ID
+	 * Unique identifier of the MQTT client that owns the will message.
 	 */
 	private String clientId;
 	/**
-	 * 遗嘱消息
+	 * The will message to be stored as a backup on remote nodes.
 	 */
 	private Message willMessage;
 
 	@Override
-	public BrokerMessageType getType() {
-		return BrokerMessageType.WILL_MESSAGE;
+	public ClusterMessageType getType() {
+		return ClusterMessageType.WILL_MESSAGE;
 	}
 
 	@Override
 	public void toClusterData(Map<String, String> headers) {
-		headers.put(BrokerMessageConverter.HEADER_CLIENT_ID, clientId);
+		headers.put(ClusterMessageSerializer.HEADER_CLIENT_ID, clientId);
 	}
 
 	@Override
@@ -61,7 +65,7 @@ public class WillMessageNotifyMessage implements BrokerMessage {
 
 	@Override
 	public void fromClusterData(ClusterDataMessage message) {
-		this.clientId = message.getHeader(BrokerMessageConverter.HEADER_CLIENT_ID);
+		this.clientId = message.getHeader(ClusterMessageSerializer.HEADER_CLIENT_ID);
 		byte[] payload = message.getPayload();
 		if (payload != null && payload.length > 0) {
 			this.willMessage = DefaultMessageSerializer.INSTANCE.deserialize(payload);

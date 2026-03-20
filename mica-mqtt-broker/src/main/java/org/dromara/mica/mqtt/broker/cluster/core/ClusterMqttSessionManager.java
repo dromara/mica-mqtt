@@ -34,7 +34,20 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 集群 Session 管理器，装饰已有的 IMqttSessionManager
+ * Cluster-aware session manager that decorates an underlying {@link IMqttSessionManager}.
+ * <p>
+ * This class extends the session management capabilities to support MQTT broker clustering by:
+ * <ul>
+ *   <li>Tracking which cluster node each client is connected to</li>
+ *   <li>Synchronizing subscription state across cluster nodes via broadcast messages</li>
+ *   <li>Providing unified local + remote subscription lookup for message routing</li>
+ *   <li>Coordinating session cleanup when nodes depart the cluster</li>
+ * </ul>
+ * </p>
+ *
+ * @author L.cm
+ * @see IMqttSessionManager
+ * @since 1.0.0
  */
 public class ClusterMqttSessionManager implements IMqttSessionManager {
 	private static final Logger logger = LoggerFactory.getLogger(ClusterMqttSessionManager.class);
@@ -42,26 +55,54 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	private final MqttClusterManager clusterManager;
 	private final ConcurrentHashMap<String, String> clientNodeMap = new ConcurrentHashMap<>();
 
+	/**
+	 * Constructs a cluster session manager wrapping the specified delegate.
+	 *
+	 * @param delegate the underlying session manager to which operations are delegated
+	 * @param clusterManager the cluster manager for broadcasting synchronization messages
+	 */
 	public ClusterMqttSessionManager(IMqttSessionManager delegate, MqttClusterManager clusterManager) {
 		this.delegate = delegate;
 		this.clusterManager = clusterManager;
 	}
 
+	/**
+	 * Returns the cluster node identifier where the specified client is connected.
+	 *
+	 * @param clientId the client identifier
+	 * @return the node identifier, or null if the client is not registered as a remote client
+	 */
 	public String getClientNode(String clientId) {
 		return clientNodeMap.get(clientId);
 	}
 
+	/**
+	 * Registers a remote client as being connected to a specific cluster node.
+	 *
+	 * @param clientId the client identifier
+	 * @param nodeId the identifier of the node where the client is connected
+	 */
 	public void registerRemoteClient(String clientId, String nodeId) {
 		clientNodeMap.put(clientId, nodeId);
 		logger.debug("[Cluster] Registered remote client: {} -> node: {}", clientId, nodeId);
 	}
 
+	/**
+	 * Removes a remote client registration and cleans up its session.
+	 *
+	 * @param clientId the client identifier
+	 */
 	public void removeRemoteClient(String clientId) {
 		String node = clientNodeMap.remove(clientId);
 		delegate.remove(clientId);
 		logger.debug("[Cluster] Removed remote client: {} from node: {}", clientId, node);
 	}
 
+	/**
+	 * Clears all clients and their subscriptions associated with a departing node.
+	 *
+	 * @param nodeId the identifier of the node that has left the cluster
+	 */
 	public void clearNodeClientsAndSubscriptions(String nodeId) {
 		clientNodeMap.entrySet().removeIf(entry -> {
 			if (entry.getValue().equals(nodeId)) {
@@ -72,6 +113,13 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		});
 	}
 
+	/**
+	 * Synchronizes remote subscriptions from a client connected to another node.
+	 *
+	 * @param clientId the client identifier
+	 * @param nodeId the identifier of the node where the client is connected
+	 * @param subscriptions the list of subscriptions to synchronize
+	 */
 	public void syncRemoteSubscriptions(String clientId, String nodeId, List<Subscribe> subscriptions) {
 		registerRemoteClient(clientId, nodeId);
 		for (Subscribe sub : subscriptions) {
@@ -81,6 +129,12 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		}
 	}
 
+	/**
+	 * Removes synchronized subscriptions for a remote client.
+	 *
+	 * @param clientId the client identifier
+	 * @param topics the list of topics to unsubscribe from
+	 */
 	public void removeRemoteSubscriptions(String clientId, List<String> topics) {
 		for (String topic : topics) {
 			delegate.removeSubscribe(topic, clientId);
@@ -137,28 +191,50 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	}
 
 	/**
-	 * 获取包括远程节点在内的所有订阅
+	 * Returns all subscriptions for a topic, including those from remote cluster nodes.
+	 * <p>
+	 * Unlike {@link #searchSubscribe(String)} which filters to local subscriptions only,
+	 * this method returns the complete set of subscribers across the entire cluster.
+	 * </p>
+	 *
+	 * @param topic the topic to search subscriptions for
+	 * @return the list of all subscribers, or null if no subscriptions exist
 	 */
 	public List<Subscribe> searchAllSubscribe(String topic) {
 		return delegate.searchSubscribe(topic);
 	}
 
 	/**
-	 * 获取客户端的订阅（从原始 sessionManager）
+	 * Returns the subscriptions for a specific client from the underlying session manager.
+	 *
+	 * @param clientId the client identifier
+	 * @return the list of subscriptions for the client, or null if none exist
 	 */
 	public List<Subscribe> getClientSubscriptions(String clientId) {
 		return delegate.getSubscriptions(clientId);
 	}
 
 	/**
-	 * 获取所有远程客户端映射（用于状态同步）
+	 * Returns the complete mapping of remote clients to their cluster nodes.
+	 * <p>
+	 * This map is used during state synchronization when a new node joins the cluster.
+	 * </p>
+	 *
+	 * @return a copy of the client-to-node mapping
 	 */
 	public Map<String, String> getRemoteClientNodeMap() {
 		return new HashMap<>(clientNodeMap);
 	}
 
 	/**
-	 * 全量同步状态（用于新节点加入）
+	 * Performs a full state synchronization from a joining node.
+	 * <p>
+	 * This populates the remote client registry and recreates all subscriptions
+	 * from the synchronized state data.
+	 * </p>
+	 *
+	 * @param clientNodeMap the client-to-node mapping to synchronize
+	 * @param subscriptionMap the client-to-subscriptions mapping to synchronize
 	 */
 	public void syncFullState(Map<String, String> clientNodeMap, Map<String, List<Subscribe>> subscriptionMap) {
 		this.clientNodeMap.putAll(clientNodeMap);
