@@ -13,7 +13,18 @@
 - 集群状态监控
 
 ### 1.2 技术方案
-基于 **mica-net core cluster** 提供的 TCP 集群能力，实现轻量级、低延迟的 Broker 集群方案。
+基于 **mica-net cluster** 提供的 TCP 集群能力（底层基于 t-io），上层集群协议和消息处理逻辑**完全自研**。
+
+**核心依赖：**
+- `mica.server.cluster.core.ClusterApi` - mica-net 集群 API
+- `mica.server.cluster.core.ClusterImpl` - mica-net 集群实现
+- `mica.server.cluster.message.ClusterDataMessage` - mica-net 集群消息载体
+
+**自研部分：**
+- 集群消息类型定义（`BrokerMessage` 系列）
+- 消息编解码（`BrokerMessageConverter`）
+- 集群会话管理（`ClusterMqttSessionManager`）
+- 消息路由与转发（`ClusterMessageDispatcher`、`ClusterPublishHandler`）
 
 **优势：**
 - 无需额外依赖（Redis、Kafka 等）
@@ -32,10 +43,10 @@
 
 ### 2.1 集群拓扑
 ```
-                    ┌─────────────┐
-                    │ Seed Node 1 │
-                    └──────┬──────┘
-                           │
+                     ┌─────────────┐
+                     │ Seed Node 1 │
+                     └──────┬──────┘
+                            │
            ┌────────────────┼────────────────┐
            │                │                │
      ┌─────▼──────┐  ┌─────▼──────┐  ┌─────▼──────┐
@@ -218,7 +229,7 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 - 性能比 Java 原生序列化快
 - 体积小（定长编码 + UTF-8 字符串）
 - 无反序列化安全漏洞
-- 与 t-io cluster 无缝集成
+- 与 mica-net cluster 无缝集成
 
 ### 3.6 状态同步策略
 
@@ -295,12 +306,34 @@ mqtt:
 - **节点故障级联清理**：当收到 `NODE_LEAVE` 事件时，存活节点会自动清理该宕机节点上的所有远程客户端及订阅信息
 - **脑裂问题**：当前方案不处理，建议通过网络隔离避免
 
+### 5.5 已知问题
+
+#### 共享订阅集群消息重复问题
+
+**问题描述**：当同一 `$share/<group>/` 订阅的客户端分布在不同节点时，消息会被转发多次。
+
+**场景复现**：
+```
+Node1: clientA 订阅 $share/g1/topic1
+Node2: clientB 订阅 $share/g1/topic1
+```
+
+当 clientA（在 Node1）发布消息到 `topic1`：
+1. Node1 本地 `publishAll()` → 找到 clientA → ✅ 发送
+2. Node1 调用 `searchAllSubscribe("topic1")` → 返回 `[clientA, clientB]`
+3. Node1 发现 clientB 在 Node2 → 向 Node2 发送 `PublishForwardMessage`
+4. Node2 收到 → `publishAll()` → 找到 clientB → ✅ 发送
+
+**结果**：clientA 和 clientB **都收到消息**，违反 `$share` 同一 group 只投一次的语义。
+
+**问题根因**：`MqttClusterManager.publish()` 中 `searchAllSubscribe()` 收集了所有节点订阅者，没有按 group 去重选择。
+
 ---
 
 ## 6. 功能检查清单
 
 ### 6.1 节点发现与集群基础管理
-- [x] 基于 TCP 的节点互联与发现（通过 t-io cluster 实现）
+- [x] 基于 TCP 的节点互联与发现（通过 mica-net cluster 实现）
 - [x] 节点离开时的状态清理（`NODE_LEAVE` 事件处理）
 - [ ] 脑裂（Split-Brain）检测与自动恢复机制
 
@@ -313,7 +346,7 @@ mqtt:
 ### 6.3 消息路由与订阅分发
 - [x] 订阅/取消订阅状态全网实时同步
 - [x] 跨节点 Publish 消息按需路由转发
-- [ ] 共享订阅（Shared Subscriptions `$share`）
+- [ ] 共享订阅（Shared Subscriptions `$share`）- 单机实现正常，**集群环境下存在 bug：同 group 的订阅者可能出现在不同节点时，消息会被多次转发**
 
 ### 6.4 遗嘱与保留消息
 - [ ] 保留消息的集群共享与存储
@@ -325,6 +358,6 @@ mqtt:
 
 ---
 
-**文档版本：** v2.1
-**更新日期：** 2026-03-19
-**状态：** 已实现
+**文档版本：** v2.2
+**更新日期：** 2026-03-20
+**状态：** 已实现（含已知问题）
