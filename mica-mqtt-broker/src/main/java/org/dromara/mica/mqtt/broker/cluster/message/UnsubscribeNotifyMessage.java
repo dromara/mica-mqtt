@@ -21,9 +21,27 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 取消订阅通知消息
+ * <p>
+ * 当客户端取消订阅时，本节点向集群广播此消息，
+ * 通知其他节点同步移除该订阅信息。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class UnsubscribeNotifyMessage implements BrokerMessage {
+	/**
+	 * 客户端 ID
+	 */
 	private String clientId;
+	/**
+	 * 节点 ID
+	 */
 	private String nodeId;
+	/**
+	 * 取消订阅的主题列表
+	 */
 	private List<String> topics;
 
 	@Override

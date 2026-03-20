@@ -20,7 +20,19 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.Map;
 
+/**
+ * 客户端连接通知消息
+ * <p>
+ * 当客户端成功连接时，本节点向集群广播此消息，
+ * 通知其他节点更新该客户端所在节点的映射关系。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class ClientConnectMessage implements BrokerMessage {
+	/**
+	 * 客户端 ID
+	 */
 	private String clientId;
 
 	@Override

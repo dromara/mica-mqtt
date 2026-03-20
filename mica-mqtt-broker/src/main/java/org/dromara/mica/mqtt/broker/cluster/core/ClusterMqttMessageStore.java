@@ -25,6 +25,15 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
+/**
+ * 集群消息存储装饰器
+ * <p>
+ * 包装原有的 IMqttMessageStore，当遗嘱消息或保留消息操作发生时，
+ * 自动向集群广播通知，确保所有节点的消息存储一致。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class ClusterMqttMessageStore implements IMqttMessageStore {
 	private static final Logger logger = LoggerFactory.getLogger(ClusterMqttMessageStore.class);
 

@@ -20,6 +20,15 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.Map;
 
+/**
+ * 状态同步请求消息
+ * <p>
+ * 新节点加入集群时，向其他节点发送此消息请求全量状态数据，
+ * 包括所有客户端所在节点映射和订阅信息。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class StateSyncRequestMessage implements BrokerMessage {
 
 	@Override

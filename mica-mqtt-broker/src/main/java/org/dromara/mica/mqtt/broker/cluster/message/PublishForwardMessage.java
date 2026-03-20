@@ -22,7 +22,19 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.Map;
 
+/**
+ * 消息转发消息
+ * <p>
+ * 当发布者所在节点收到消息后，如果订阅者位于其他节点，
+ * 则通过此消息将内容转发到订阅者所在节点。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class PublishForwardMessage implements BrokerMessage {
+	/**
+	 * MQTT 消息体
+	 */
 	private Message message;
 
 	@Override

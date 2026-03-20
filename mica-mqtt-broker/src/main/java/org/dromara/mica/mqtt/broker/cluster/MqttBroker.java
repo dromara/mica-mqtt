@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.broker.cluster;
 
-import org.dromara.mica.mqtt.broker.cluster.core.MqttClusterBrokerCreator;
+import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterBrokerCreator;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 

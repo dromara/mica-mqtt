@@ -22,8 +22,23 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 状态同步响应消息
+ * <p>
+ * 响应状态同步请求，携带完整的客户端节点映射和订阅信息。
+ * 用于新节点加入时的全量状态同步。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class StateSyncResponseMessage implements BrokerMessage {
+	/**
+	 * 客户端 ID -> 节点 ID 映射
+	 */
 	private Map<String, String> clientNodeMap;
+	/**
+	 * 客户端 ID -> 订阅列表 映射
+	 */
 	private Map<String, List<Subscribe>> subscriptionMap;
 
 	@Override

@@ -22,9 +22,27 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.Map;
 
+/**
+ * 保留消息通知消息
+ * <p>
+ * 当保留消息发布或清除时，广播通知所有节点同步更新。
+ * 用于集群环境下保留消息的一致性。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class RetainMessageNotifyMessage implements BrokerMessage {
+	/**
+	 * 主题
+	 */
 	private String topic;
+	/**
+	 * 保留超时时间（秒）
+	 */
 	private int timeout;
+	/**
+	 * 保留消息
+	 */
 	private Message retainMessage;
 
 	@Override

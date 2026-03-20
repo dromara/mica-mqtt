@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.cluster.core;
+package org.dromara.mica.mqtt.broker.cluster.config;
 
 import java.util.ArrayList;
 import java.util.List;

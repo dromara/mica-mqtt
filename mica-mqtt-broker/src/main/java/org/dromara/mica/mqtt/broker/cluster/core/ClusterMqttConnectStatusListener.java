@@ -21,6 +21,15 @@ import org.dromara.mica.mqtt.broker.cluster.message.ClientDisconnectMessage;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.tio.core.ChannelContext;
 
+/**
+ * 集群连接状态监听装饰器
+ * <p>
+ * 包装原有的 IMqttConnectStatusListener，当客户端连接或断开时，
+ * 自动向集群广播通知，更新全局客户端位置映射。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListener {
 
 	private final IMqttConnectStatusListener delegate;

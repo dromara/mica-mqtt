@@ -20,7 +20,19 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.Map;
 
+/**
+ * 客户端断开连接通知消息
+ * <p>
+ * 当客户端断开连接时，本节点向集群广播此消息，
+ * 通知其他节点清理该客户端的远程会话信息。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class ClientDisconnectMessage implements BrokerMessage {
+	/**
+	 * 客户端 ID
+	 */
 	private String clientId;
 
 	@Override

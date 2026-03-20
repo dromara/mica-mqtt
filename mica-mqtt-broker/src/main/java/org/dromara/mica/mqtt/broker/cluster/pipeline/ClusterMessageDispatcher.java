@@ -31,6 +31,19 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * 集群消息分发器
+ * <p>
+ * 拦截上行 MQTT 消息（UP_STREAM），当订阅者位于远程节点时，
+ * 通过 t-io 集群将消息转发到目标节点。O(1) 网络开销：
+ * 每个远程节点只转发一次，不重复发送。
+ * </p>
+ * <p>
+ * 执行顺序：90，在 UpStreamMessageHandler (100) 之前执行。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class ClusterMessageDispatcher extends BaseMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(ClusterMessageDispatcher.class);
 	private final MqttClusterManager clusterManager;

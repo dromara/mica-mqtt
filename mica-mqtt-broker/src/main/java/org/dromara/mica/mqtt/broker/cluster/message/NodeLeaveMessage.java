@@ -20,6 +20,15 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.Map;
 
+/**
+ * 节点离开通知消息
+ * <p>
+ * 当节点关闭或失联时，其他节点收到此消息后，
+ * 自动清理该节点上的所有客户端会话和订阅信息。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class NodeLeaveMessage implements BrokerMessage {
 
 	@Override

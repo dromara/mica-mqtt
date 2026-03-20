@@ -22,8 +22,23 @@ import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.Map;
 
+/**
+ * 遗嘱消息通知消息
+ * <p>
+ * 当客户端设置遗嘱消息时，广播通知其他节点备份。
+ * 当节点收到客户端遗嘱消息触发通知时，从远程备份恢复。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class WillMessageNotifyMessage implements BrokerMessage {
+	/**
+	 * 客户端 ID
+	 */
 	private String clientId;
+	/**
+	 * 遗嘱消息
+	 */
 	private Message willMessage;
 
 	@Override

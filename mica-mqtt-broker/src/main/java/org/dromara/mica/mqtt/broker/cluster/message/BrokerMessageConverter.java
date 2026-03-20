@@ -26,12 +26,40 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 集群消息转换器
+ * <p>
+ * 负责将 BrokerMessage 转换为 t-io ClusterDataMessage 进行网络传输，
+ * 以及将 ClusterDataMessage 反序列化为对应的 BrokerMessage。
+ * 使用自定义二进制序列化，性能高效、体积小。
+ * </p>
+ *
+ * @author L.cm
+ */
 public class BrokerMessageConverter {
+	/**
+	 * 消息类型 header key
+	 */
 	public static final String HEADER_TYPE = "type";
+	/**
+	 * 客户端 ID header key
+	 */
 	public static final String HEADER_CLIENT_ID = "clientId";
+	/**
+	 * 节点 ID header key
+	 */
 	public static final String HEADER_NODE_ID = "nodeId";
+	/**
+	 * 源节点 header key
+	 */
 	public static final String HEADER_SOURCE_NODE = "sourceNode";
+	/**
+	 * Topic header key
+	 */
 	public static final String HEADER_TOPIC = "topic";
+	/**
+	 * 超时时间 header key
+	 */
 	public static final String HEADER_TIMEOUT = "timeout";
 
 	public static ClusterDataMessage toClusterData(BrokerMessage msg, String sourceNode) {
