@@ -26,7 +26,7 @@ printf "profile [%s] \n" "$profile"
 
 ## 4. modules
 modules="mica-mqtt-codec,mica-mqtt-common,"
-modules="$modules mica-mqtt-client,mica-mqtt-server,"
+modules="$modules mica-mqtt-client,mica-mqtt-server,mica-mqtt-broker,"
 modules="$modules starter/mica-mqtt-client-spring-boot-starter,"
 modules="$modules starter/mica-mqtt-server-spring-boot-starter,"
 modules="$modules starter/mica-mqtt-client-solon-plugin,"
