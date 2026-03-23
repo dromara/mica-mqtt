@@ -27,9 +27,13 @@ import org.dromara.mica.mqtt.core.server.pipeline.message.BaseMessageHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttSessionManager.RemoteNode;
+
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Intercepts upstream MQTT messages and forwards them to subscribers on remote cluster nodes.
@@ -85,6 +89,9 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 			return true;
 		}
 
+		// Use getSharedGroupNodes to deduplicate shared subscriptions per group (round-robin)
+		Map<String, Set<RemoteNode>> groupNodesMap = clusterSessionManager.getSharedGroupNodes(topic);
+
 		Set<String> remoteNodes = new HashSet<>();
 		for (Subscribe sub : subscribers) {
 			String clientId = sub.getClientId();
@@ -92,8 +99,26 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 			logger.debug("[Cluster] Client: {}, Node: {}", clientId, node);
 
 			if (node != null && !node.equals(localNodeId)) {
-				remoteNodes.add(node);
-				logger.debug("[Cluster] Will forward to node: {} for client: {}", node, clientId);
+				// For non-shared subscriptions, forward to all remote nodes that have subscribers
+				// For shared subscriptions, getSharedGroupNodes already did round-robin selection
+				if (groupNodesMap.isEmpty()) {
+					// Non-shared: forward to every remote node with a subscriber
+					remoteNodes.add(node);
+					logger.debug("[Cluster] Will forward to node: {} for client: {}", node, clientId);
+				}
+			}
+		}
+
+		// For shared subscriptions, select one node per group via round-robin
+		for (Map.Entry<String, Set<RemoteNode>> entry : groupNodesMap.entrySet()) {
+			Set<RemoteNode> nodes = entry.getValue();
+			if (!nodes.isEmpty()) {
+				RemoteNode selected = selectNodeForGroup(nodes);
+				if (!selected.nodeId.equals(localNodeId)) {
+					remoteNodes.add(selected.nodeId);
+					logger.debug("[Cluster] Shared group '{}': selected node: {} (round-robin)",
+						entry.getKey(), selected.nodeId);
+				}
 			}
 		}
 
@@ -107,6 +132,13 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 		}
 
 		return true;
+	}
+
+	private RemoteNode selectNodeForGroup(Set<RemoteNode> nodes) {
+		String[] nodeIds = nodes.stream().map(n -> n.nodeId).toArray(String[]::new);
+		int index = ThreadLocalRandom.current().nextInt(nodeIds.length);
+		final String selectedNodeId = nodeIds[index];
+		return nodes.stream().filter(n -> n.nodeId.equals(selectedNodeId)).findFirst().orElse(nodes.iterator().next());
 	}
 
 	private void forwardToNode(String nodeId, Message msg) {

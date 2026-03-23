@@ -33,6 +33,7 @@ import org.tio.server.cluster.core.ClusterImpl;
 import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Manager for MQTT broker cluster operations and inter-node communication.
@@ -288,33 +289,56 @@ public class MqttClusterManager {
 
 		if (config.isEnabled() && cluster != null) {
 			ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
+
+			// Use getSharedGroupNodes for shared subscriptions: round-robin per group
+			Map<String, Set<ClusterMqttSessionManager.RemoteNode>> groupNodesMap = sessionManager.getSharedGroupNodes(topic);
+
 			List<Subscribe> allSubs = sessionManager.searchAllSubscribe(topic);
 
-			if (allSubs != null && !allSubs.isEmpty()) {
-				Set<String> targetNodes = new HashSet<>();
+			Set<String> targetNodes = new HashSet<>();
+			// Non-shared subscriptions: forward to all remote nodes with subscribers
+			if (allSubs != null && !allSubs.isEmpty() && groupNodesMap.isEmpty()) {
 				for (Subscribe sub : allSubs) {
 					String node = sessionManager.getClientNode(sub.getClientId());
 					if (node != null && !node.equals(localNodeId)) {
 						targetNodes.add(node);
 					}
 				}
+			}
 
-				if (!targetNodes.isEmpty()) {
-					PublishForwardMessage clusterMsg = new PublishForwardMessage();
-					Message message = new Message();
-					message.setMessageType(MessageType.UP_STREAM);
-					message.setTopic(topic);
-					message.setPayload(payload);
-					message.setQos(qos);
-					message.setRetain(retain);
-					clusterMsg.setMessage(message);
-
-					for (String node : targetNodes) {
-						sendToNode(node, clusterMsg);
+			// Shared subscriptions: select one node per group via round-robin
+			for (Map.Entry<String, Set<ClusterMqttSessionManager.RemoteNode>> entry : groupNodesMap.entrySet()) {
+				Set<ClusterMqttSessionManager.RemoteNode> nodes = entry.getValue();
+				if (!nodes.isEmpty()) {
+					ClusterMqttSessionManager.RemoteNode selected = selectNodeForGroup(nodes);
+					if (!selected.nodeId.equals(localNodeId)) {
+						targetNodes.add(selected.nodeId);
 					}
 				}
 			}
+
+			if (!targetNodes.isEmpty()) {
+				PublishForwardMessage clusterMsg = new PublishForwardMessage();
+				Message message = new Message();
+				message.setMessageType(MessageType.UP_STREAM);
+				message.setTopic(topic);
+				message.setPayload(payload);
+				message.setQos(qos);
+				message.setRetain(retain);
+				clusterMsg.setMessage(message);
+
+				for (String node : targetNodes) {
+					sendToNode(node, clusterMsg);
+				}
+			}
 		}
+	}
+
+	private ClusterMqttSessionManager.RemoteNode selectNodeForGroup(Set<ClusterMqttSessionManager.RemoteNode> nodes) {
+		String[] nodeIds = nodes.stream().map(n -> n.nodeId).toArray(String[]::new);
+		int index = ThreadLocalRandom.current().nextInt(nodeIds.length);
+		final String selectedNodeId = nodeIds[index];
+		return nodes.stream().filter(n -> n.nodeId.equals(selectedNodeId)).findFirst().orElse(nodes.iterator().next());
 	}
 
 	public String getLocalNodeId() {

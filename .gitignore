@@ -1,3 +1,6 @@
+
+
+
 ### gradle ###
 .gradle
 !gradle/wrapper/gradle-wrapper.jar
@@ -31,9 +34,11 @@ nbdist/
 ### vscode ###
 .vscode
 
-### opencode ###
+### AI Coding ###
+.claude
 .opencode
 -p
+skills-lock.json
 
 ### maven ###
 target/

@@ -311,25 +311,11 @@ mqtt:
 
 ### 5.5 已知问题
 
-#### 共享订阅集群消息重复问题
+#### 共享订阅集群消息重复问题（已修复）
 
 **问题描述**：当同一 `$share/<group>/` 订阅的客户端分布在不同节点时，消息会被转发多次。
 
-**场景复现**：
-```
-Node1: clientA 订阅 $share/g1/topic1
-Node2: clientB 订阅 $share/g1/topic1
-```
-
-当 clientA（在 Node1）发布消息到 `topic1`：
-1. Node1 本地 `publishAll()` → 找到 clientA → ✅ 发送
-2. Node1 调用 `searchAllSubscribe("topic1")` → 返回 `[clientA, clientB]`
-3. Node1 发现 clientB 在 Node2 → 向 Node2 发送 `PublishForwardMessage`
-4. Node2 收到 → `publishAll()` → 找到 clientB → ✅ 发送
-
-**结果**：clientA 和 clientB **都收到消息**，违反 `$share` 同一 group 只投一次的语义。
-
-**问题根因**：`MqttClusterManager.publish()` 中 `searchAllSubscribe()` 收集了所有节点订阅者，没有按 group 去重选择。
+**修复方案**：所有三个消息路径（`ClusterPublishHandler` Pipeline、HTTP API `MqttClusterManager.publish()`、`ClusterMessageDispatcher`）统一使用 `getSharedGroupNodes()` 按 group 做 round-robin 选节点，每个 group 只转发给选中的那个节点，保证同一 group 内只有 1 个订阅者收到消息。
 
 ---
 
@@ -349,7 +335,7 @@ Node2: clientB 订阅 $share/g1/topic1
 ### 6.3 消息路由与订阅分发
 - [x] 订阅/取消订阅状态全网实时同步
 - [x] 跨节点 Publish 消息按需路由转发
-- [ ] 共享订阅（Shared Subscriptions `$share`）- 单机实现正常，**集群环境下存在 bug：同 group 的订阅者可能出现在不同节点时，消息会被多次转发**
+- [x] 共享订阅（Shared Subscriptions `$share`）- 三个消息路径全部通过 `getSharedGroupNodes()` + round-robin 修复
 
 ### 6.4 遗嘱与保留消息
 - [x] 保留消息的集群共享与存储 - 通过 `ClusterMqttMessageStore` 装饰器实现，`addRetainMessage` 时自动广播到所有节点
@@ -361,6 +347,6 @@ Node2: clientB 订阅 $share/g1/topic1
 
 ---
 
-**文档版本：** v2.4
-**更新日期：** 2026-03-20
+**文档版本：** v2.6
+**更新日期：** 2026-03-23
 **状态：** 已实现（含已知问题）
