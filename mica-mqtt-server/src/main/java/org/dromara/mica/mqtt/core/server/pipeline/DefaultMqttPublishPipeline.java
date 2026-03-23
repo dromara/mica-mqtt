@@ -37,19 +37,13 @@ public class DefaultMqttPublishPipeline implements IMqttPublishPipeline {
 		this.handlers = new ArrayList<>();
 	}
 
-	/**
-	 * 添加处理器
-	 *
-	 * @param handler 处理器
-	 * @return this
-	 */
-	public DefaultMqttPublishPipeline addHandler(MqttPublishPipelineHandler handler) {
+	@Override
+	public void addHandler(MqttPublishPipelineHandler handler) {
 		if (handler != null) {
 			this.handlers.add(handler);
 			// 按顺序排序
 			this.handlers.sort(Comparator.comparingInt(MqttPublishPipelineHandler::getOrder));
 		}
-		return this;
 	}
 
 	@Override

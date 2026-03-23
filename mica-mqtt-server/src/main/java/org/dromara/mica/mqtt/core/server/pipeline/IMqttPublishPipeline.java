@@ -24,6 +24,13 @@ package org.dromara.mica.mqtt.core.server.pipeline;
 public interface IMqttPublishPipeline {
 
 	/**
+	 * 添加处理器
+	 *
+	 * @param handler 处理器
+	 */
+	void addHandler(MqttPublishPipelineHandler handler);
+
+	/**
 	 * 处理发布消息
 	 *
 	 * @param context 发布上下文

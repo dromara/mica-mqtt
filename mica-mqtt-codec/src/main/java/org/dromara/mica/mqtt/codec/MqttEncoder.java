@@ -460,7 +460,7 @@ public final class MqttEncoder {
 		return ByteBufferUtil.EMPTY_BYTES;
 	}
 
-	private static byte[] encodeProperties(MqttProperties mqttProperties) {
+	public static byte[] encodeProperties(MqttProperties mqttProperties) {
 		Collection<? extends MqttProperty> properties = mqttProperties.listAll();
 		// 根据属性数量动态计算缓冲区初始容量，避免过度分配或不足分配
 		int propCount = properties.size();

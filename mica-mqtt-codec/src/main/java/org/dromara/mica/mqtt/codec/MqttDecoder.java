@@ -580,6 +580,12 @@ public final class MqttDecoder {
 		return packInts(remainingLength, loops);
 	}
 
+	public static MqttProperties decodeProperties(byte[] propertiesBytes) {
+		ByteBuffer buffer = ByteBuffer.wrap(propertiesBytes);
+		MqttDecoder.IntValue bytesConsumed = new MqttDecoder.IntValue();
+		return decodeProperties(buffer, bytesConsumed);
+	}
+
 	private static MqttProperties decodeProperties(ByteBuffer buffer, IntValue bytesConsumed) {
 		final long propertiesLengthVBI = decodeVariableByteInteger(buffer);
 		int totalPropertiesLength = unpackA(propertiesLengthVBI);

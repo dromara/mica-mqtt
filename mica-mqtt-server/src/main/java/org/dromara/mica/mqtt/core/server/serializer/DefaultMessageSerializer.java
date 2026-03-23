@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.core.server.serializer;
 
+import org.dromara.mica.mqtt.codec.MqttDecoder;
+import org.dromara.mica.mqtt.codec.MqttEncoder;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 
@@ -27,7 +29,7 @@ import java.nio.charset.StandardCharsets;
  *
  * @author L.cm
  */
-public enum DefaultMessageSerializer implements org.dromara.mica.mqtt.core.server.serializer.IMessageSerializer {
+public enum DefaultMessageSerializer implements IMessageSerializer {
 
 	/**
 	 * 单利
@@ -284,116 +286,105 @@ public enum DefaultMessageSerializer implements org.dromara.mica.mqtt.core.serve
 	}
 
 	private static byte[] serializeUpStream(MessageType messageType, Message message) {
-		// 1 + 2 + 2 + 2 * 5 + 1 + 4 + 1 + 8 + 8
-		int protocolLength = 37;
+		// 1 + 2 + 2 + 2 * 5 + 1 + 4 + 4 + 1 + 8 + 8
+		int protocolLength = 41;
 		String fromClientId = message.getFromClientId();
-		// 消息来源 客户端 id
 		byte[] fromClientIdBytes = null;
 		if (fromClientId != null) {
 			fromClientIdBytes = fromClientId.getBytes(StandardCharsets.UTF_8);
 			protocolLength += fromClientIdBytes.length;
 		}
-		// 消息来源 用户名
 		String fromUsername = message.getFromUsername();
-		// 消息来源 客户端 id
 		byte[] fromUsernameBytes = null;
 		if (fromUsername != null) {
 			fromUsernameBytes = fromUsername.getBytes(StandardCharsets.UTF_8);
 			protocolLength += fromUsernameBytes.length;
 		}
-		// 消息目的 Client ID，主要是在遗嘱消息用
 		String clientId = message.getClientId();
 		byte[] clientIdBytes = null;
 		if (clientId != null) {
 			clientIdBytes = clientId.getBytes(StandardCharsets.UTF_8);
 			protocolLength += clientIdBytes.length;
 		}
-		// 消息目的用户名，主要是在遗嘱消息用
 		String username = message.getUsername();
 		byte[] usernameBytes = null;
 		if (username != null) {
 			usernameBytes = username.getBytes(StandardCharsets.UTF_8);
 			protocolLength += usernameBytes.length;
 		}
-		// topic
 		String topic = message.getTopic();
 		byte[] topicBytes = null;
 		if (topic != null) {
 			topicBytes = topic.getBytes(StandardCharsets.UTF_8);
 			protocolLength += topicBytes.length;
 		}
-		// 消息内容
 		byte[] payload = message.getPayload();
 		if (payload != null) {
 			protocolLength += payload.length;
 		}
-		// 客户端的 IPAddress
 		String peerHost = message.getPeerHost();
 		byte[] peerHostBytes = null;
 		if (peerHost != null) {
 			peerHostBytes = peerHost.getBytes(StandardCharsets.UTF_8);
 			protocolLength += peerHostBytes.length;
 		}
-		// 事件触发所在节点
 		String node = message.getNode();
 		byte[] nodeBytes = null;
 		if (node != null) {
 			nodeBytes = node.getBytes(StandardCharsets.UTF_8);
 			protocolLength += nodeBytes.length;
 		}
+		byte[] propertiesBytes = message.getPropertiesBytes();
+		if (propertiesBytes == null && message.getProperties() != null) {
+			propertiesBytes = MqttEncoder.encodeProperties(message.getProperties());
+		}
+		if (propertiesBytes != null) {
+			protocolLength += propertiesBytes.length;
+		}
 		ByteBuffer buffer = ByteBuffer.allocate(protocolLength);
-		// 消息类型
 		buffer.put((byte) messageType.getValue());
-		// 事件触发所在节点
 		if (nodeBytes != null) {
 			buffer.putShort((short) nodeBytes.length);
 			buffer.put(nodeBytes);
 		} else {
 			buffer.put(EMPTY_SHORT_BYTES);
 		}
-		// MQTT 消息 ID
 		Integer messageId = message.getId();
 		if (messageId != null) {
 			buffer.putShort(messageId.shortValue());
 		} else {
 			buffer.put(EMPTY_SHORT_BYTES);
 		}
-		// 消息来源 客户端 id
 		if (fromClientIdBytes != null) {
 			buffer.putShort((short) fromClientIdBytes.length);
 			buffer.put(fromClientIdBytes);
 		} else {
 			buffer.put(EMPTY_SHORT_BYTES);
 		}
-		// 消息来源 用户名
 		if (fromUsernameBytes != null) {
 			buffer.putShort((short) fromUsernameBytes.length);
 			buffer.put(fromUsernameBytes);
 		} else {
 			buffer.put(EMPTY_SHORT_BYTES);
 		}
-		// 消息目的 Client ID，主要是在遗嘱消息用
 		if (clientIdBytes != null) {
 			buffer.putShort((short) clientIdBytes.length);
 			buffer.put(clientIdBytes);
 		} else {
 			buffer.put(EMPTY_SHORT_BYTES);
 		}
-		// 消息来源 用户名
 		if (usernameBytes != null) {
 			buffer.putShort((short) usernameBytes.length);
 			buffer.put(usernameBytes);
 		} else {
 			buffer.put(EMPTY_SHORT_BYTES);
 		}
-		// topic
 		if (topicBytes != null) {
 			buffer.putShort((short) topicBytes.length);
 			buffer.put(topicBytes);
 		} else {
 			buffer.put(EMPTY_SHORT_BYTES);
 		}
-		// dup、qos、retain
 		int byte1 = 0;
 		if (message.isDup()) {
 			byte1 |= 0x08;
@@ -403,23 +394,25 @@ public enum DefaultMessageSerializer implements org.dromara.mica.mqtt.core.serve
 			byte1 |= 0x01;
 		}
 		buffer.put((byte) byte1);
-		// 消息内容
 		if (payload != null) {
 			buffer.putInt(payload.length);
 			buffer.put(payload);
 		} else {
 			buffer.put(EMPTY_INT_BYTES);
 		}
-		// 客户端的 IPAddress
+		if (propertiesBytes != null) {
+			buffer.putInt(propertiesBytes.length);
+			buffer.put(propertiesBytes);
+		} else {
+			buffer.put(EMPTY_INT_BYTES);
+		}
 		if (peerHostBytes != null) {
 			buffer.put((byte) peerHostBytes.length);
 			buffer.put(peerHostBytes);
 		} else {
 			buffer.put(EMPTY_BYTES);
 		}
-		// 存储时间
 		buffer.putLong(message.getTimestamp());
-		// PUBLISH 消息到达 Broker 的时间 (ms)
 		Long publishReceivedAt = message.getPublishReceivedAt();
 		if (publishReceivedAt != null) {
 			buffer.putLong(publishReceivedAt);
@@ -430,87 +423,81 @@ public enum DefaultMessageSerializer implements org.dromara.mica.mqtt.core.serve
 	}
 
 	private static byte[] serializeDownStream(MessageType messageType, Message message) {
-		// 1 + 2 + 2 + 2 * 3 + 1 + 4 + 1 + 8 + 8
-		int protocolLength = 33;
-		// 事件触发所在节点
+		// 1 + 2 + 2 + 2 * 3 + 1 + 4 + 4 + 1 + 8 + 8
+		int protocolLength = 37;
 		String node = message.getNode();
 		byte[] nodeBytes = null;
 		if (node != null) {
 			nodeBytes = node.getBytes(StandardCharsets.UTF_8);
 			protocolLength += nodeBytes.length;
 		}
-		// 消息目的 Client ID，主要是在遗嘱消息用
 		String clientId = message.getClientId();
 		byte[] clientIdBytes = null;
 		if (clientId != null) {
 			clientIdBytes = clientId.getBytes(StandardCharsets.UTF_8);
 			protocolLength += clientIdBytes.length;
 		}
-		// 消息目的用户名，主要是在遗嘱消息用
 		String username = message.getUsername();
 		byte[] usernameBytes = null;
 		if (username != null) {
 			usernameBytes = username.getBytes(StandardCharsets.UTF_8);
 			protocolLength += usernameBytes.length;
 		}
-		// topic
 		String topic = message.getTopic();
 		byte[] topicBytes = null;
 		if (topic != null) {
 			topicBytes = topic.getBytes(StandardCharsets.UTF_8);
 			protocolLength += topicBytes.length;
 		}
-		// 消息内容
 		byte[] payload = message.getPayload();
 		if (payload != null) {
 			protocolLength += payload.length;
 		}
-		// 客户端的 IPAddress
 		String peerHost = message.getPeerHost();
 		byte[] peerHostBytes = null;
 		if (peerHost != null) {
 			peerHostBytes = peerHost.getBytes(StandardCharsets.UTF_8);
 			protocolLength += peerHostBytes.length;
 		}
+		byte[] propertiesBytes = message.getPropertiesBytes();
+		if (propertiesBytes == null && message.getProperties() != null) {
+			propertiesBytes = MqttEncoder.encodeProperties(message.getProperties());
+		}
+		if (propertiesBytes != null) {
+			protocolLength += propertiesBytes.length;
+		}
 		ByteBuffer buffer = ByteBuffer.allocate(protocolLength);
-		// 消息类型
 		buffer.put((byte) messageType.getValue());
-		// 事件触发所在节点
 		if (nodeBytes != null) {
 			buffer.putShort((short) nodeBytes.length);
 			buffer.put(nodeBytes);
 		} else {
 			buffer.put(EMPTY_SHORT_BYTES);
 		}
-		// MQTT 消息 ID
 		Integer messageId = message.getId();
 		if (messageId != null) {
 			buffer.putShort(messageId.shortValue());
 		} else {
 			buffer.put(EMPTY_SHORT_BYTES);
 		}
-		// 消息目的 Client ID，主要是在遗嘱消息用
 		if (clientIdBytes != null) {
 			buffer.putShort((short) clientIdBytes.length);
 			buffer.put(clientIdBytes);
 		} else {
 			buffer.put(EMPTY_SHORT_BYTES);
 		}
-		// 消息来源 用户名
 		if (usernameBytes != null) {
 			buffer.putShort((short) usernameBytes.length);
 			buffer.put(usernameBytes);
 		} else {
 			buffer.put(EMPTY_SHORT_BYTES);
 		}
-		// topic
 		if (topicBytes != null) {
 			buffer.putShort((short) topicBytes.length);
 			buffer.put(topicBytes);
 		} else {
 			buffer.put(EMPTY_SHORT_BYTES);
 		}
-		// dup、qos、retain
 		int byte1 = 0;
 		if (message.isDup()) {
 			byte1 |= 0x08;
@@ -520,23 +507,25 @@ public enum DefaultMessageSerializer implements org.dromara.mica.mqtt.core.serve
 			byte1 |= 0x01;
 		}
 		buffer.put((byte) byte1);
-		// 消息内容
 		if (payload != null) {
 			buffer.putInt(payload.length);
 			buffer.put(payload);
 		} else {
 			buffer.put(EMPTY_INT_BYTES);
 		}
-		// 客户端的 IPAddress
+		if (propertiesBytes != null) {
+			buffer.putInt(propertiesBytes.length);
+			buffer.put(propertiesBytes);
+		} else {
+			buffer.put(EMPTY_INT_BYTES);
+		}
 		if (peerHostBytes != null) {
 			buffer.put((byte) peerHostBytes.length);
 			buffer.put(peerHostBytes);
 		} else {
 			buffer.put(EMPTY_BYTES);
 		}
-		// 存储时间
 		buffer.putLong(message.getTimestamp());
-		// PUBLISH 消息到达 Broker 的时间 (ms)
 		Long publishReceivedAt = message.getPublishReceivedAt();
 		if (publishReceivedAt != null) {
 			buffer.putLong(publishReceivedAt);
@@ -682,81 +671,74 @@ public enum DefaultMessageSerializer implements org.dromara.mica.mqtt.core.serve
 	}
 
 	private static Message deserializeUpStream(ByteBuffer buffer, Message message) {
-		// 事件触发所在节点
 		short nodeLength = buffer.getShort();
 		if (nodeLength > 0) {
 			byte[] nodeBytes = new byte[nodeLength];
 			buffer.get(nodeBytes);
 			message.setNode(new String(nodeBytes, StandardCharsets.UTF_8));
 		}
-		// MQTT 消息 ID
 		int messageId = getMessageId(buffer);
 		if (messageId > 0) {
 			message.setId(messageId);
 		}
-		// 消息来源 客户端 id
 		short fromClientIdLen = buffer.getShort();
 		if (fromClientIdLen > 0) {
 			byte[] fromClientIdBytes = new byte[fromClientIdLen];
 			buffer.get(fromClientIdBytes);
 			message.setFromClientId(new String(fromClientIdBytes, StandardCharsets.UTF_8));
 		}
-		// 消息来源 用户名
 		short fromUsernameLen = buffer.getShort();
 		if (fromUsernameLen > 0) {
 			byte[] fromUsernameBytes = new byte[fromUsernameLen];
 			buffer.get(fromUsernameBytes);
 			message.setFromUsername(new String(fromUsernameBytes, StandardCharsets.UTF_8));
 		}
-		// 消息目的 Client ID，主要是在遗嘱消息用
 		short clientIdLen = buffer.getShort();
 		if (clientIdLen > 0) {
 			byte[] clientIdBytes = new byte[clientIdLen];
 			buffer.get(clientIdBytes);
 			message.setClientId(new String(clientIdBytes, StandardCharsets.UTF_8));
 		}
-		// 消息目的用户名，主要是在遗嘱消息用
 		short usernameLen = buffer.getShort();
 		if (usernameLen > 0) {
 			byte[] usernameBytes = new byte[usernameLen];
 			buffer.get(usernameBytes);
 			message.setUsername(new String(usernameBytes, StandardCharsets.UTF_8));
 		}
-		// topic
 		short topicLength = buffer.getShort();
 		if (topicLength > 0) {
 			byte[] topicBytes = new byte[topicLength];
 			buffer.get(topicBytes);
 			message.setTopic(new String(topicBytes, StandardCharsets.UTF_8));
 		}
-		// 消息类型、dup、qos、retain
 		short byte1 = readUnsignedByte(buffer);
 		boolean isDup = (byte1 & 0x08) == 0x08;
 		message.setDup(isDup);
-		// qos
 		int qosLevel = (byte1 & 0x06) >> 1;
 		message.setQos(qosLevel);
-		// retain
 		boolean retain = (byte1 & 0x01) != 0;
 		message.setRetain(retain);
-		// 消息内容
 		int payloadLen = buffer.getInt();
 		if (payloadLen > 0) {
 			byte[] payloadBytes = new byte[payloadLen];
 			buffer.get(payloadBytes);
 			message.setPayload(payloadBytes);
 		}
-		// 客户端的 peerHost IPAddress
+		int propertiesBytesLen = buffer.getInt();
+		if (propertiesBytesLen > 0) {
+			byte[] propertiesBytes = new byte[propertiesBytesLen];
+			buffer.get(propertiesBytes);
+			message.setPropertiesBytes(propertiesBytes);
+			message.setProperties(MqttDecoder.decodeProperties(propertiesBytes));
+		}
 		byte peerHostLen = buffer.get();
 		if (peerHostLen > 0) {
 			byte[] peerHostBytes = new byte[peerHostLen];
 			buffer.get(peerHostBytes);
 			message.setPeerHost(new String(peerHostBytes, StandardCharsets.UTF_8));
 		}
-		// 存储时间
 		long timestamp = buffer.getLong();
 		message.setTimestamp(timestamp);
-		// PUBLISH 消息到达 Broker 的时间 (ms)
 		long publishReceivedAt = buffer.getLong();
 		if (publishReceivedAt > 0) {
 			message.setPublishReceivedAt(publishReceivedAt);
@@ -765,67 +747,62 @@ public enum DefaultMessageSerializer implements org.dromara.mica.mqtt.core.serve
 	}
 
 	private static Message deserializeDownStream(ByteBuffer buffer, Message message) {
-		// 事件触发所在节点
 		short nodeLength = buffer.getShort();
 		if (nodeLength > 0) {
 			byte[] nodeBytes = new byte[nodeLength];
 			buffer.get(nodeBytes);
 			message.setNode(new String(nodeBytes, StandardCharsets.UTF_8));
 		}
-		// MQTT 消息 ID
 		int messageId = getMessageId(buffer);
 		if (messageId > 0) {
 			message.setId(messageId);
 		}
-		// 消息目的 Client ID，主要是在遗嘱消息用
 		short clientIdLen = buffer.getShort();
 		if (clientIdLen > 0) {
 			byte[] clientIdBytes = new byte[clientIdLen];
 			buffer.get(clientIdBytes);
 			message.setClientId(new String(clientIdBytes, StandardCharsets.UTF_8));
 		}
-		// 消息目的用户名，主要是在遗嘱消息用
 		short usernameLen = buffer.getShort();
 		if (usernameLen > 0) {
 			byte[] usernameBytes = new byte[usernameLen];
 			buffer.get(usernameBytes);
 			message.setUsername(new String(usernameBytes, StandardCharsets.UTF_8));
 		}
-		// topic
 		short topicLength = buffer.getShort();
 		if (topicLength > 0) {
 			byte[] topicBytes = new byte[topicLength];
 			buffer.get(topicBytes);
 			message.setTopic(new String(topicBytes, StandardCharsets.UTF_8));
 		}
-		// 消息类型、dup、qos、retain
 		short byte1 = readUnsignedByte(buffer);
 		boolean isDup = (byte1 & 0x08) == 0x08;
 		message.setDup(isDup);
-		// qos
 		int qosLevel = (byte1 & 0x06) >> 1;
 		message.setQos(qosLevel);
-		// retain
 		boolean retain = (byte1 & 0x01) != 0;
 		message.setRetain(retain);
-		// 消息内容
 		int payloadLen = buffer.getInt();
 		if (payloadLen > 0) {
 			byte[] payloadBytes = new byte[payloadLen];
 			buffer.get(payloadBytes);
 			message.setPayload(payloadBytes);
 		}
-		// 客户端的 peerHost IPAddress
+		int propertiesBytesLen = buffer.getInt();
+		if (propertiesBytesLen > 0) {
+			byte[] propertiesBytes = new byte[propertiesBytesLen];
+			buffer.get(propertiesBytes);
+			message.setPropertiesBytes(propertiesBytes);
+			message.setProperties(MqttDecoder.decodeProperties(propertiesBytes));
+		}
 		byte peerHostLen = buffer.get();
 		if (peerHostLen > 0) {
 			byte[] peerHostBytes = new byte[peerHostLen];
 			buffer.get(peerHostBytes);
 			message.setPeerHost(new String(peerHostBytes, StandardCharsets.UTF_8));
 		}
-		// 存储时间
 		long timestamp = buffer.getLong();
 		message.setTimestamp(timestamp);
-		// PUBLISH 消息到达 Broker 的时间 (ms)
 		long publishReceivedAt = buffer.getLong();
 		if (publishReceivedAt > 0) {
 			message.setPublishReceivedAt(publishReceivedAt);

@@ -16,23 +16,11 @@
 
 package org.dromara.mica.mqtt.core.server.support;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-
 import org.dromara.mica.mqtt.codec.MqttMessageFactory;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
-import org.dromara.mica.mqtt.codec.message.MqttConnAckMessage;
-import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
-import org.dromara.mica.mqtt.codec.message.MqttMessage;
-import org.dromara.mica.mqtt.codec.message.MqttPubAckMessage;
-import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
-import org.dromara.mica.mqtt.codec.message.MqttSubAckMessage;
-import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
-import org.dromara.mica.mqtt.codec.message.MqttUnSubAckMessage;
-import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.*;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
@@ -48,18 +36,12 @@ import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerPublishPermission;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
-
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
-import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
 import org.dromara.mica.mqtt.core.server.model.Message;
-import org.dromara.mica.mqtt.core.server.pipeline.DefaultMqttPublishPipeline;
 import org.dromara.mica.mqtt.core.server.pipeline.IMqttPublishPipeline;
 import org.dromara.mica.mqtt.core.server.pipeline.PublishContext;
-import org.dromara.mica.mqtt.core.server.pipeline.handler.MessageListenerHandler;
-import org.dromara.mica.mqtt.core.server.pipeline.handler.RetainMessageHandler;
-import org.dromara.mica.mqtt.core.server.pipeline.handler.SubscriptionForwardHandler;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
@@ -72,6 +54,10 @@ import org.tio.core.TioConfig;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.mica.IntPair;
 import org.tio.utils.timer.TimerTaskService;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
 
 /**
  * mqtt broker 处理器
@@ -94,7 +80,6 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	private final IMqttServerPublishPermission publishPermission;
 	private final IMqttConnectStatusListener connectStatusListener;
 	private final IMqttSessionListener sessionListener;
-	private final IMqttMessageListener messageListener;
 	private final TimerTaskService taskService;
 	private final ExecutorService executor;
 	private final IMqttPublishPipeline publishPipeline;
@@ -112,27 +97,10 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		this.publishPermission = serverCreator.getPublishPermission();
 		this.connectStatusListener = serverCreator.getConnectStatusListener();
 		this.sessionListener = serverCreator.getSessionListener();
-		this.messageListener = serverCreator.getMessageListener();
 		this.taskService = taskService;
 		this.executor = executor;
 		// 初始化发布消息管线
-		this.publishPipeline = createPublishPipeline();
-	}
-
-	/**
-	 * 创建发布消息管线
-	 *
-	 * @return IMqttPublishPipeline
-	 */
-	private IMqttPublishPipeline createPublishPipeline() {
-		DefaultMqttPublishPipeline pipeline = new DefaultMqttPublishPipeline();
-		// 1. 保留消息处理
-		pipeline.addHandler(new RetainMessageHandler(messageStore, serverCreator.getNodeName()));
-		// 2. 消息监听器（同步执行，避免二次 submit）
-		pipeline.addHandler(new MessageListenerHandler(messageListener));
-		// 3. 订阅转发（同步执行，避免二次 submit）
-		pipeline.addHandler(new SubscriptionForwardHandler(serverCreator));
-		return pipeline;
+		this.publishPipeline = serverCreator.getPublishPipeline();
 	}
 
 	@Override

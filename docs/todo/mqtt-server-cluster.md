@@ -1,4 +1,6 @@
-# mica-mqtt-server 集群化实施方案
+# mica-mqtt-broker 集群实现文档
+
+> **注意**：本文档描述的是 mica-mqtt-broker 模块的实际实现，与早期的设计方案可能存在差异。
 
 ## 1. 方案概述
 
@@ -11,7 +13,18 @@
 - 集群状态监控
 
 ### 1.2 技术方案
-基于 **mica-net core cluster** 提供的 TCP 集群能力，实现轻量级、低延迟的 Broker 集群方案。
+基于 **mica-net cluster** 提供的 TCP 集群能力（底层基于 t-io），上层集群协议和消息处理逻辑**完全自研**。
+
+**核心依赖：**
+- `mica.server.cluster.core.ClusterApi` - mica-net 集群 API
+- `mica.server.cluster.core.ClusterImpl` - mica-net 集群实现
+- `mica.server.cluster.message.ClusterDataMessage` - mica-net 集群消息载体
+
+**自研部分：**
+- 集群消息类型定义（`ClusterMessage` 系列）
+- 消息编解码（`ClusterMessageSerializer`）
+- 集群会话管理（`ClusterMqttSessionManager`）
+- 消息路由与转发（`ClusterMessageDispatcher`、`ClusterPublishHandler`）
 
 **优势：**
 - 无需额外依赖（Redis、Kafka 等）
@@ -30,17 +43,15 @@
 
 ### 2.1 集群拓扑
 ```
-                    ┌─────────────┐
-                    │ Seed Node 1 │
-                    │  (Master)   │
-                    └──────┬──────┘
-                           │
-          ┌────────────────┼────────────────┐
-          │                │                │
-    ┌─────▼──────┐  ┌─────▼──────┐  ┌─────▼──────┐
-    │   Node 2   │  │   Node 3   │  │   Node 4   │
-    │  (Worker)  │  │  (Worker)  │  │  (Worker)  │
-    └────────────┘  └────────────┘  └────────────┘
+                     ┌─────────────┐
+                     │ Seed Node 1 │
+                     └──────┬──────┘
+                            │
+           ┌────────────────┼────────────────┐
+           │                │                │
+     ┌─────▼──────┐  ┌─────▼──────┐  ┌─────▼──────┐
+     │   Node 2   │  │   Node 3   │  │   Node 4   │
+     └────────────┘  └────────────┘  └────────────┘
 ```
 
 - **种子节点（Seed Members）**：预配置的集群成员列表，用于初始节点发现
@@ -50,22 +61,33 @@
 ### 2.2 核心组件
 
 ```
-mica-mqtt-server/
-└── src/main/java/org/dromara/mica/mqtt/core/server/
-    ├── cluster/                          # 新增集群包
-    │   ├── MqttClusterConfig.java       # 集群配置
-    │   ├── MqttClusterManager.java      # 集群管理器（主入口）
-    │   ├── MqttClusterMessageHandler.java # 集群消息处理器
-    │   ├── message/                      # 集群消息类型
-    │   │   ├── ClusterMessage.java      # 集群消息基类
-    │   │   ├── ClientConnectMessage.java # 客户端连接通知
-    │   │   ├── ClientDisconnectMessage.java
-    │   │   ├── SubscribeNotifyMessage.java # 订阅通知
-    │   │   ├── PublishForwardMessage.java  # 消息转发请求
-    │   │   └── HeartbeatMessage.java    # 集群心跳
-    │   └── dispatcher/
-    │       └── ClusterMessageDispatcher.java # 集群消息分发器
-    └── MqttServerCreator.java           # 修改：增加集群配置方法
+mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
+└── cluster/
+    ├── MqttBroker.java                    # Broker 入口
+    ├── core/                              # 核心组件
+    │   ├── MqttClusterConfig.java         # 集群配置
+    │   ├── MqttClusterManager.java         # 集群管理器
+    │   ├── MqttClusterBrokerCreator.java  # Broker 创建器
+    │   ├── ClusterMqttSessionManager.java # 集群会话管理器（装饰器模式）
+    │   ├── ClusterMqttMessageStore.java    # 集群消息存储（装饰器模式）
+    │   └── ClusterMqttConnectStatusListener.java # 连接状态监听
+    ├── message/                           # 集群消息类型
+    │   ├── ClusterMessage.java            # 集群消息接口
+    │   ├── ClusterMessageType.java        # 消息类型枚举
+    │   ├── ClusterMessageSerializer.java  # 消息序列化器
+    │   ├── ClientConnectMessage.java       # 客户端连接通知
+    │   ├── ClientDisconnectMessage.java    # 客户端断开通知
+    │   ├── SubscribeNotifyMessage.java     # 订阅通知
+    │   ├── UnsubscribeNotifyMessage.java  # 取消订阅通知
+    │   ├── PublishForwardMessage.java      # 消息转发请求
+    │   ├── WillMessageNotifyMessage.java   # 遗嘱消息通知
+    │   ├── RetainMessageNotifyMessage.java  # 保留消息通知
+    │   ├── StateSyncRequestMessage.java    # 状态同步请求
+    │   ├── StateSyncResponseMessage.java   # 状态同步响应
+    │   └── NodeLeaveMessage.java           # 节点离开通知
+    └── pipeline/                          # 消息管道
+        ├── ClusterMessageDispatcher.java   # 集群消息分发器
+        └── ClusterPublishHandler.java      # 发布消息处理器
 ```
 
 ### 2.3 消息路由流程
@@ -78,14 +100,14 @@ Client A (Node1)  ─publish─→  Node1  ─local deliver─→  Client B (Nod
 
 #### 场景 2：客户端 A 发布消息到远程订阅者
 ```
-Client A (Node1)  ─publish─→  Node1  ─cluster forward─→  Node2  ─deliver─→  Client C (Node2)
+Client A (Node1)  ─publish─→  Node1  ─cluster forward─→  Node2  ─local deliver─→  Client C (Node2)
 ```
 **处理步骤：**
 1. Node1 收到 Client A 的 PUBLISH 消息
-2. Node1 查询订阅表，发现 Client C 订阅了该 topic
-3. Node1 检查 Client C 所在节点（Node2）
-4. Node1 通过集群连接向 Node2 发送 `PublishForwardMessage`
-5. Node2 收到后，向 Client C 推送消息
+2. ClusterMessageDispatcher 拦截消息，查询全局订阅表
+3. 发现 Node2 上有客户端订阅了该 topic
+4. 向 Node2 发送 PublishForwardMessage
+5. Node2 收到后，在本地查询订阅表并分发给客户端
 
 ---
 
@@ -95,490 +117,156 @@ Client A (Node1)  ─publish─→  Node1  ─cluster forward─→  Node2  ─d
 
 ```java
 public class MqttClusterConfig {
-	// 是否启用集群
-	private boolean enabled = false;
+    // 是否启用集群
+    private boolean enabled = false;
 
-	// 集群监听地址和端口（用于集群节点间通信）
-	private String clusterHost = "127.0.0.1";
-	private int clusterPort = 9000;
+    // 集群监听地址和端口（用于集群节点间通信）
+    private String clusterHost = "127.0.0.1";
+    private int clusterPort = 9000;
 
-	// 种子节点列表（格式：host:port）
-	private List<String> seedMembers = new ArrayList<>();
+    // 种子节点列表（格式：host:port）
+    private List<String> seedMembers = new ArrayList<>();
 
-	// 集群名称（相同集群名称的节点才能互联）
-	private String clusterName = "mica-mqtt-cluster";
+    // 集群名称（相同集群名称的节点才能互联）
+    private String clusterName = "mica-mqtt-cluster";
 
-	// 集群心跳间隔（毫秒）
-	private long heartbeatInterval = 5000;
+    // 集群心跳间隔（毫秒）
+    private long heartbeatInterval = 5000;
 
-	// 节点失联超时（毫秒）
-	private long nodeTimeout = 15000;
+    // 节点失联超时（毫秒）
+    private long nodeTimeout = 15000;
 }
 ```
 
 ### 3.2 集群消息协议
 
-#### 消息格式
+#### 消息接口
 ```java
-public abstract class ClusterMessage implements Serializable {
-	private String messageId;      // 消息唯一ID
-	private String sourceNode;     // 源节点名称
-	private long timestamp;        // 时间戳
-	private MessageType type;      // 消息类型
+public interface ClusterMessage {
+    ClusterMessageType getType();
+    void toClusterData(Map<String, String> headers);
+    byte[] toPayload();
+    void fromClusterData(ClusterDataMessage message);
+}
+```
 
-	public enum MessageType {
-		CLIENT_CONNECT,        // 客户端连接通知
-		CLIENT_DISCONNECT,     // 客户端断开通知
-		SUBSCRIBE_NOTIFY,      // 订阅通知
-		UNSUBSCRIBE_NOTIFY,    // 取消订阅通知
-		PUBLISH_FORWARD,       // 消息转发
-		HEARTBEAT,             // 心跳
-		NODE_JOIN,             // 节点加入
-		NODE_LEAVE             // 节点离开
-	}
+#### 消息类型枚举
+```java
+public enum ClusterMessageType {
+    CLIENT_CONNECT(1),        // 客户端连接通知
+    CLIENT_DISCONNECT(2),      // 客户端断开通知
+    SUBSCRIBE_NOTIFY(3),      // 订阅通知
+    UNSUBSCRIBE_NOTIFY(4),     // 取消订阅通知
+    PUBLISH_FORWARD(5),        // 消息转发
+    NODE_LEAVE(6),             // 节点离开
+    STATE_SYNC_REQUEST(7),     // 状态同步请求
+    STATE_SYNC_RESPONSE(8);    // 状态同步响应
 }
 ```
 
 #### 关键消息类型
 
-**1. PublishForwardMessage（消息转发）**
+**PublishForwardMessage（消息转发）**
 ```java
-public class PublishForwardMessage extends ClusterMessage {
-	private String targetClientId;  // 目标客户端ID
-	private String topic;           // 主题
-	private byte[] payload;         // 消息体
-	private int qos;                // QoS 级别
-	private boolean retain;         // 是否保留
+public class PublishForwardMessage implements ClusterMessage {
+    private Message message;    // MQTT 消息体
 }
 ```
 
-**2. SubscribeNotifyMessage（订阅通知）**
+**SubscribeNotifyMessage（订阅通知）**
 ```java
-public class SubscribeNotifyMessage extends ClusterMessage {
-	private String clientId;        // 客户端ID
-	private String nodeId;          // 节点ID
-	private List<TopicFilter> topics; // 订阅主题列表
+public class SubscribeNotifyMessage implements ClusterMessage {
+    private String clientId;           // 客户端ID
+    private String nodeId;             // 节点ID
+    private List<Subscribe> subscriptions; // 订阅列表
 }
 ```
 
-### 3.3 Session 管理器改造
+### 3.3 Session 管理器（装饰器模式）
 
-现有 `IMqttSessionManager` 需要支持集群：
+`ClusterMqttSessionManager` 包装了原有的 `IMqttSessionManager`：
 
 ```java
-public interface IMqttSessionManager {
-	// 现有方法...
+public class ClusterMqttSessionManager implements IMqttSessionManager {
+    private final IMqttSessionManager delegate;
+    private final MqttClusterManager clusterManager;
+    private final ConcurrentHashMap<String, String> clientNodeMap;  // clientId -> nodeId
 
-	// === 新增集群相关方法 ===
-
-	/**
-	 * 获取客户端所在节点
-	 * @param clientId 客户端ID
-	 * @return 节点名称，null 表示客户端不在线
-	 */
-	String getClientNode(String clientId);
-
-	/**
-	 * 注册远程客户端（其他节点的客户端）
-	 * @param clientId 客户端ID
-	 * @param nodeId 节点ID
-	 */
-	void registerRemoteClient(String clientId, String nodeId);
-
-	/**
-	 * 移除远程客户端
-	 * @param clientId 客户端ID
-	 */
-	void removeRemoteClient(String clientId);
-
-	/**
-	 * 同步远程订阅信息
-	 * @param clientId 客户端ID
-	 * @param nodeId 所在节点
-	 * @param subscriptions 订阅列表
-	 */
-	void syncRemoteSubscriptions(String clientId, String nodeId, List<Subscribe> subscriptions);
+    // 核心方法
+    public String getClientNode(String clientId);
+    public void registerRemoteClient(String clientId, String nodeId);
+    public void removeRemoteClient(String clientId);
+    public void clearNodeClientsAndSubscriptions(String nodeId);
+    public void syncRemoteSubscriptions(String clientId, String nodeId, List<Subscribe> subscriptions);
+    public void removeRemoteSubscriptions(String clientId, List<String> topics);
+    public List<Subscribe> searchAllSubscribe(String topic);  // 获取所有订阅（含远程）
+    public List<Subscribe> getClientSubscriptions(String clientId);
+    public Map<String, String> getRemoteClientNodeMap();
+    public void syncFullState(Map<String, String> clientNodeMap, Map<String, List<Subscribe>> subscriptionMap);
 }
 ```
 
 ### 3.4 消息分发器（ClusterMessageDispatcher）
 
-实现跨节点消息路由：
-
 ```java
-public class ClusterMessageDispatcher {
-	private final MqttServer mqttServer;
-	private final MqttClusterManager clusterManager;
-	private final IMqttSessionManager sessionManager;
-
-	/**
-	 * 分发消息（支持本地和远程）
-	 */
-	public void dispatch(String topic, MqttPublishMessage message) {
-		// 1. 查找所有订阅该 topic 的客户端
-		List<Subscribe> subscribers = sessionManager.searchSubscribe(topic);
-
-		// 2. 按节点分组
-		Map<String, List<Subscribe>> nodeGroups = subscribers.stream()
-			.collect(Collectors.groupingBy(sub ->
-				sessionManager.getClientNode(sub.getClientId())));
-
-		// 3. 本地投递
-		String localNodeId = mqttServer.getServerCreator().getNodeName();
-		List<Subscribe> localSubs = nodeGroups.get(localNodeId);
-		if (localSubs != null) {
-			localSubs.forEach(sub -> publishLocal(sub, message));
-		}
-
-		// 4. 远程转发
-		nodeGroups.forEach((nodeId, subs) -> {
-			if (!nodeId.equals(localNodeId)) {
-				subs.forEach(sub -> forwardToNode(nodeId, sub, message));
-			}
-		});
-	}
-
-	private void forwardToNode(String nodeId, Subscribe sub, MqttPublishMessage msg) {
-		PublishForwardMessage clusterMsg = new PublishForwardMessage();
-		clusterMsg.setTargetClientId(sub.getClientId());
-		clusterMsg.setTopic(msg.variableHeader().topicName());
-		clusterMsg.setPayload(msg.payload());
-		clusterMsg.setQos(msg.fixedHeader().qosLevel().value());
-
-		clusterManager.sendToNode(nodeId, clusterMsg);
-	}
+public class ClusterMessageDispatcher extends BaseMessageHandler {
+    // 拦截 UP_STREAM 消息
+    // 1. 查找所有订阅者（含远程）
+    // 2. 按节点分组
+    // 3. 向远程节点转发（O(1) 网络开销：每个节点只发一次）
+    // 4. 返回 true 继续本地分发
 }
 ```
+
+### 3.5 序列化方案
+
+采用 **自定义二进制序列化**（基于 `ClusterMessageSerializer`）：
+
+```java
+// 使用 ByteBuffer 进行紧凑的二进制编码
+// 消息格式：type(int) + headers + payload
+// 传输载体：t-io ClusterDataMessage
+```
+
+**优势：**
+- 性能比 Java 原生序列化快
+- 体积小（定长编码 + UTF-8 字符串）
+- 无反序列化安全漏洞
+- 与 mica-net cluster 无缝集成
+
+### 3.6 状态同步策略
+
+采用 **主动全量同步**策略：
+- 新节点加入时，通过 `STATE_SYNC_REQUEST` 向其他节点请求全量状态
+- 其他节点返回 `STATE_SYNC_RESPONSE`，包含完整的客户端映射和订阅信息
+- `ClusterMqttSessionManager.syncFullState()` 应用同步数据
 
 ---
 
-## 4. 实施步骤
+## 4. 使用示例
 
-### Phase 1: 基础框架搭建（预计 2-3 天）
-
-#### 4.1 创建集群相关类
-
-**任务清单：**
-- [x] 创建 `cluster` 包结构
-- [ ] 实现 `MqttClusterConfig` 配置类
-- [ ] 实现 `MqttClusterMessage` 基类及子类
-- [ ] 实现 `MqttClusterMessageHandler`（消息处理器）
-- [ ] 实现 `MqttClusterManager`（集群管理器）
-
-**关键代码：**
-```java
-public class MqttClusterManager {
-	private ClusterApi cluster;
-	private MqttServer mqttServer;
-	private MqttClusterConfig config;
-
-	public void start() throws Exception {
-		if (!config.isEnabled()) {
-			return;
-		}
-
-		ClusterConfig clusterConfig = new ClusterConfig(
-			config.getClusterHost(),
-			config.getClusterPort(),
-			this::handleClusterMessage
-		);
-
-		// 添加种子节点
-		for (String seed : config.getSeedMembers()) {
-			String[] parts = seed.split(":");
-			clusterConfig.addSeedMember(parts[0], Integer.parseInt(parts[1]));
-		}
-
-		cluster = new ClusterImpl(clusterConfig);
-		cluster.start();
-
-		// 定时心跳
-		cluster.schedule(() -> {
-			broadcast(new HeartbeatMessage(getLocalNodeId()));
-		}, config.getHeartbeatInterval());
-	}
-
-	private void handleClusterMessage(Message message) {
-		// 反序列化集群消息并分发处理
-	}
-}
-```
-
-#### 4.2 集成到 MqttServerCreator
-
-**修改点：**
-```java
-public class MqttServerCreator {
-	// 新增字段
-	private MqttClusterConfig clusterConfig;
-	private MqttClusterManager clusterManager;
-
-	// 新增配置方法
-	public MqttServerCreator clusterConfig(MqttClusterConfig config) {
-		this.clusterConfig = config;
-		return this;
-	}
-
-	public MqttServerCreator enableCluster(String host, int port, String... seedMembers) {
-		MqttClusterConfig config = new MqttClusterConfig();
-		config.setEnabled(true);
-		config.setClusterHost(host);
-		config.setClusterPort(port);
-		config.setSeedMembers(Arrays.asList(seedMembers));
-		return clusterConfig(config);
-	}
-
-	public MqttServer build() {
-		// ... 现有代码 ...
-
-		// 初始化集群管理器
-		if (clusterConfig != null && clusterConfig.isEnabled()) {
-			this.clusterManager = new MqttClusterManager(mqttServer, clusterConfig);
-		}
-
-		return mqttServer;
-	}
-}
-```
-
-### Phase 2: Session 管理器改造（预计 2 天）
-
-#### 4.3 扩展 InMemoryMqttSessionManager
-
-**任务清单：**
-- [ ] 添加客户端节点映射表 `ConcurrentHashMap<String, String> clientNodeMap`
-- [ ] 实现 `getClientNode()` 方法
-- [ ] 实现 `registerRemoteClient()` 方法
-- [ ] 实现 `syncRemoteSubscriptions()` 方法
-- [ ] 修改 `searchSubscribe()` 方法，支持返回远程客户端订阅
-
-**关键代码：**
-```java
-public class InMemoryMqttSessionManager implements IMqttSessionManager {
-	// 客户端所在节点映射 (clientId -> nodeId)
-	private final ConcurrentHashMap<String, String> clientNodeMap = new ConcurrentHashMap<>();
-
-	@Override
-	public String getClientNode(String clientId) {
-		return clientNodeMap.get(clientId);
-	}
-
-	@Override
-	public void registerRemoteClient(String clientId, String nodeId) {
-		clientNodeMap.put(clientId, nodeId);
-	}
-
-	@Override
-	public void addSubscribe(String clientId, Subscribe subscribe) {
-		// 原有逻辑...
-
-		// 如果集群已启用，广播订阅信息
-		notifyClusterSubscribe(clientId, subscribe);
-	}
-}
-```
-
-### Phase 3: 消息路由改造（预计 3 天）
-
-#### 4.4 实现 ClusterMessageDispatcher
-
-**任务清单：**
-- [ ] 创建 `ClusterMessageDispatcher` 类
-- [ ] 实现 `dispatch()` 方法（本地+远程分发）
-- [ ] 集成到 `MqttServerProcessor.processPublish()` 中
-
-#### 4.5 修改消息发布流程
-
-**修改 `MqttServerProcessor` 或其实现类：**
-```java
-@Override
-public void processPublish(ChannelContext context, MqttPublishMessage message) {
-	String topic = message.variableHeader().topicName();
-
-	// ... 权限校验、消息拦截等 ...
-
-	// 使用集群消息分发器
-	ClusterMessageDispatcher dispatcher = mqttServer.getClusterDispatcher();
-	if (dispatcher != null) {
-		dispatcher.dispatch(topic, message);
-	} else {
-		// 原有本地分发逻辑
-		localDispatch(topic, message);
-	}
-}
-```
-
-### Phase 4: 集群事件同步（预计 2 天）
-
-#### 4.6 客户端连接/断开通知
-
-**监听客户端事件：**
-```java
-public class MqttServerAioListener implements TioServerListener {
-	@Override
-	public void onAfterConnected(ChannelContext context, boolean isConnected, boolean isReconnect) {
-		// 现有逻辑...
-
-		// 广播客户端连接事件
-		if (clusterManager != null) {
-			String clientId = context.getBsId();
-			clusterManager.broadcast(new ClientConnectMessage(clientId));
-		}
-	}
-
-	@Override
-	public void onAfterClose(ChannelContext context, Throwable throwable, String remark, boolean isRemove) {
-		// 现有逻辑...
-
-		// 广播客户端断开事件
-		if (clusterManager != null) {
-			String clientId = context.getBsId();
-			clusterManager.broadcast(new ClientDisconnectMessage(clientId));
-		}
-	}
-}
-```
-
-#### 4.7 订阅/取消订阅通知
-
-**在订阅处理器中添加：**
-```java
-public void processSubscribe(ChannelContext context, MqttSubscribeMessage message) {
-	// 现有订阅逻辑...
-
-	// 通知其他节点
-	if (clusterManager != null) {
-		SubscribeNotifyMessage clusterMsg = new SubscribeNotifyMessage();
-		clusterMsg.setClientId(clientId);
-		clusterMsg.setTopics(subscriptions);
-		clusterManager.broadcast(clusterMsg);
-	}
-}
-```
-
-### Phase 5: 配置与测试（预计 2 天）
-
-#### 4.8 添加配置支持
-
-**Spring Boot Starter 配置：**
-```yaml
-mqtt:
-  server:
-    cluster:
-      enabled: true
-      host: 192.168.1.10
-      port: 9000
-      name: mica-mqtt-cluster
-      seed-members:
-        - 192.168.1.10:9000
-        - 192.168.1.11:9000
-        - 192.168.1.12:9000
-```
-
-**配置类：**
-```java
-@ConfigurationProperties(prefix = "mqtt.server.cluster")
-public class MqttServerClusterProperties {
-	private boolean enabled = false;
-	private String host = "127.0.0.1";
-	private int port = 9000;
-	private String name = "mica-mqtt-cluster";
-	private List<String> seedMembers = new ArrayList<>();
-}
-```
-
-#### 4.9 编写集成测试
-
-**创建测试用例：**
-```java
-public class ClusterIntegrationTest {
-	@Test
-	public void testThreeNodeCluster() throws Exception {
-		// 启动节点 1
-		MqttServer server1 = MqttServer.create()
-			.name("node1")
-			.nodeName("node1")
-			.enableMqtt(1883)
-			.enableCluster("127.0.0.1", 9001, "127.0.0.1:9001", "127.0.0.1:9002")
-			.start();
-
-		// 启动节点 2
-		MqttServer server2 = MqttServer.create()
-			.name("node2")
-			.nodeName("node2")
-			.enableMqtt(1884)
-			.enableCluster("127.0.0.1", 9002, "127.0.0.1:9001", "127.0.0.1:9002")
-			.start();
-
-		// 客户端 A 连接到节点 1
-		MqttClient clientA = MqttClient.create()
-			.ip("127.0.0.1")
-			.port(1883)
-			.clientId("clientA")
-			.connect();
-
-		// 客户端 B 连接到节点 2
-		MqttClient clientB = MqttClient.create()
-			.ip("127.0.0.1")
-			.port(1884)
-			.clientId("clientB")
-			.connect();
-
-		// 客户端 B 订阅 topic
-		clientB.subscribe("/test/cluster", (context, topic, message, payload) -> {
-			System.out.println("ClientB received: " + new String(payload));
-		});
-
-		Thread.sleep(1000);
-
-		// 客户端 A 发布消息（应该通过集群转发到客户端 B）
-		clientA.publish("/test/cluster", "Hello from Node1".getBytes());
-
-		Thread.sleep(2000);
-
-		// 断言客户端 B 收到消息
-	}
-}
-```
-
-### Phase 6: 文档与示例（预计 1 天）
-
-#### 4.10 编写文档
-
-**任务清单：**
-- [ ] 更新 `mica-mqtt-server/README.md`，添加集群配置章节
-- [ ] 创建 `docs/cluster-guide.md` 集群部署指南
-- [ ] 更新 `CLAUDE.md`，补充集群相关说明
-- [ ] 添加配置示例到 `example` 模块
-
-**文档内容要点：**
-- 集群配置参数说明
-- 部署架构建议（种子节点选择、网络规划）
-- 性能调优建议
-- 故障排查指南
-
----
-
-## 5. 配置示例
-
-### 5.1 Java API 配置
+### 4.1 Java API 配置
 
 ```java
-MqttServer server = MqttServer.create()
-	.name("mqtt-broker-1")
-	.nodeName("node-1")
-	.enableMqtt(1883)
-	.enableCluster("192.168.1.10", 9000,
-		"192.168.1.10:9000",  // 种子节点 1（自己）
-		"192.168.1.11:9000",  // 种子节点 2
-		"192.168.1.12:9000"   // 种子节点 3
-	)
-	.start();
+MqttServer server = MqttBroker.create()
+    .getServerCreator()
+    .nodeName("node-1")
+    .port(1883)
+    .clusterConfig(new MqttClusterConfig()
+        .enabled(true)
+        .clusterHost("192.168.1.10")
+        .clusterPort(9000)
+        .seedMembers(Arrays.asList(
+            "192.168.1.10:9000",
+            "192.168.1.11:9000",
+            "192.168.1.12:9000"
+        ))
+    )
+    .start();
 ```
 
-### 5.2 Spring Boot 配置
+### 4.2 Spring Boot 配置
 
-**application.yml:**
 ```yaml
 mqtt:
   server:
@@ -598,162 +286,81 @@ mqtt:
         - 192.168.1.12:9000
 ```
 
-### 5.3 Solon 配置
-
-**application.properties:**
-```properties
-mqtt.server.cluster.enabled=true
-mqtt.server.cluster.host=192.168.1.10
-mqtt.server.cluster.port=9000
-mqtt.server.cluster.seed-members=192.168.1.10:9000,192.168.1.11:9000
-```
-
 ---
 
-## 6. 测试计划
+## 5. 注意事项与限制
 
-### 6.1 功能测试
-
-| 测试项 | 测试场景 | 预期结果 |
-|--------|----------|----------|
-| 集群启动 | 启动 3 个节点，配置相同种子列表 | 所有节点互联成功 |
-| 客户端连接通知 | 客户端连接到节点 1 | 节点 2、3 收到连接通知 |
-| 跨节点消息转发 | 客户端 A（节点1）发布，客户端 B（节点2）订阅 | 客户端 B 收到消息 |
-| 共享订阅 | 多节点客户端订阅 `$share/group1/topic` | 消息负载均衡分发 |
-| 节点下线 | 停止节点 2 | 节点 1、3 检测到节点 2 离线 |
-| 节点重连 | 重启节点 2 | 节点 2 重新加入集群 |
-
-### 6.2 性能测试
-
-**测试指标：**
-- 消息转发延迟（本地 vs 跨节点）
-- 集群吞吐量（对比单节点）
-- 内存占用（集群元数据开销）
-
-**测试工具：**
-- JMeter MQTT 插件
-- 自定义压测脚本
-
----
-
-## 7. 注意事项与限制
-
-### 7.1 网络要求
+### 5.1 网络要求
 - **低延迟网络**：建议同机房部署（延迟 < 5ms）
 - **防火墙配置**：开放集群端口（默认 9000-9099）
 - **带宽规划**：根据消息吞吐量预估集群间流量
 
-### 7.2 集群规模
+### 5.2 集群规模
 - **推荐节点数**：3-7 个节点
 - **最大节点数**：不超过 10 个（全连接拓扑限制）
-- **超大规模**：建议使用 Redis/Kafka 消息分发方案（见 2.4.x broker 模块）
+- **超大规模**：建议使用 Redis/Kafka 消息分发方案
 
-### 7.3 数据一致性
-- **最终一致性**：集群采用异步复制，存在短暂数据不一致窗口
-- **会话粘性**：同一客户端重连应尽量路由到原节点（需负载均衡器支持）
-- **保留消息**：需持久化到共享存储（DB/Redis）
+### 5.3 数据一致性
+- **最终一致性**：集群运行期间采用异步广播，存在短暂数据不一致窗口
+- **会话接管**：如果 Client ID 发生跨节点重连，需要额外处理
+- **保留消息**：各节点在内存中保存副本快照（暂不支持跨节点共享）
 
-### 7.4 故障恢复
+### 5.4 故障恢复
+- **节点故障级联清理**：当收到 `NODE_LEAVE` 事件时，存活节点会自动清理该宕机节点上的所有远程客户端及订阅信息
 - **脑裂问题**：当前方案不处理，建议通过网络隔离避免
-- **节点故障**：客户端需实现重连机制
-- **消息丢失**：QoS 1/2 消息需持久化会话存储
 
----
+### 5.5 已知问题
 
-## 8. 后续优化方向
+#### 共享订阅集群消息重复问题
 
-### 8.1 功能增强
-- [ ] 集群监控 API（节点状态、流量统计）
-- [ ] 动态节点发现（ZooKeeper/Consul 集成）
-- [ ] 集群配置热更新
-- [ ] 客户端会话持久化（支持节点故障转移）
+**问题描述**：当同一 `$share/<group>/` 订阅的客户端分布在不同节点时，消息会被转发多次。
 
-### 8.2 性能优化
-- [ ] 消息批量转发（减少网络开销）
-- [ ] 订阅表索引优化（加速跨节点查询）
-- [ ] 零拷贝消息转发（DirectByteBuffer）
-
-### 8.3 运维工具
-- [ ] 集群管理 Web 控制台
-- [ ] 集群健康检查脚本
-- [ ] 监控指标导出（Prometheus）
-
----
-
-## 9. 时间计划总览
-
-| 阶段 | 任务 | 预计时间 | 负责人 |
-|------|------|----------|--------|
-| Phase 1 | 基础框架搭建 | 2-3 天 | - |
-| Phase 2 | Session 管理器改造 | 2 天 | - |
-| Phase 3 | 消息路由改造 | 3 天 | - |
-| Phase 4 | 集群事件同步 | 2 天 | - |
-| Phase 5 | 配置与测试 | 2 天 | - |
-| Phase 6 | 文档与示例 | 1 天 | - |
-| **总计** | - | **12-13 天** | - |
-
----
-
-## 11. 参考资料
-
-- [t-io 官方文档](https://www.tiocloud.com/)
-- [t-io cluster 示例](https://gitee.com/tywo45/t-io/tree/master/src/zoo/cluster)
-- [mica-mqtt 现有架构](../../CLAUDE.md)
-- [MQTT 3.1.1 协议规范](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/mqtt-v3.1.1.html)
-
----
-
-## 附录 A：集群消息序列化
-
-建议使用 **MessagePack** 或 **Protobuf** 进行序列化，以减少网络开销。
-
-**示例（MessagePack）：**
-```java
-public class MessagePackSerializer {
-	public byte[] serialize(ClusterMessage message) {
-		// MessagePack 序列化
-	}
-
-	public ClusterMessage deserialize(byte[] data) {
-		// MessagePack 反序列化
-	}
-}
+**场景复现**：
+```
+Node1: clientA 订阅 $share/g1/topic1
+Node2: clientB 订阅 $share/g1/topic1
 ```
 
----
+当 clientA（在 Node1）发布消息到 `topic1`：
+1. Node1 本地 `publishAll()` → 找到 clientA → ✅ 发送
+2. Node1 调用 `searchAllSubscribe("topic1")` → 返回 `[clientA, clientB]`
+3. Node1 发现 clientB 在 Node2 → 向 Node2 发送 `PublishForwardMessage`
+4. Node2 收到 → `publishAll()` → 找到 clientB → ✅ 发送
 
-## 附录 B：集群部署拓扑示例
+**结果**：clientA 和 clientB **都收到消息**，违反 `$share` 同一 group 只投一次的语义。
 
-### 场景 1：三节点集群（同机房）
-```
-┌────────────────────────────────────────────────┐
-│               负载均衡器 (LVS/HAProxy)          │
-│            mqtt://cluster.example.com:1883     │
-└────────────┬───────────────┬───────────────────┘
-             │               │
-     ┌───────▼──────┐  ┌────▼────────┐  ┌──────────────┐
-     │   Node 1     │  │   Node 2    │  │   Node 3     │
-     │ 1883/9000    │  │ 1883/9001   │  │ 1883/9002    │
-     │ 10.0.1.10    │  │ 10.0.1.11   │  │ 10.0.1.12    │
-     └──────────────┘  └─────────────┘  └──────────────┘
-           │                  │                 │
-           └──────────────────┴─────────────────┘
-                    集群内网互联 (TCP 9000-9002)
-```
-
-### 场景 2：跨机房集群（不推荐）
-```
-机房 A                          机房 B
-┌──────────────┐              ┌──────────────┐
-│   Node 1     │◀────专线────▶│   Node 2     │
-│ 1883/9000    │              │ 1883/9001    │
-└──────────────┘              └──────────────┘
-```
-**注意：** 跨机房延迟高，建议使用消息队列方案。
+**问题根因**：`MqttClusterManager.publish()` 中 `searchAllSubscribe()` 收集了所有节点订阅者，没有按 group 去重选择。
 
 ---
 
-**文档版本：** v1.0
-**创建日期：** 2026-02-12
-**作者：** mica-mqtt 团队
-**状态：** 待实施
+## 6. 功能检查清单
+
+### 6.1 节点发现与集群基础管理
+- [x] 基于 TCP 的节点互联与发现（通过 mica-net cluster 实现）
+- [x] 节点离开时的状态清理（`NODE_LEAVE` 事件处理）
+- [ ] 脑裂（Split-Brain）检测与自动恢复机制
+
+### 6.2 客户端会话与状态同步
+- [x] 客户端连接/断开事件的集群广播
+- [ ] 集群级会话接管（Client Takeover）
+- [ ] 离线会话状态漫游
+- [ ] 飞行中消息同步（In-Flight Messages）
+
+### 6.3 消息路由与订阅分发
+- [x] 订阅/取消订阅状态全网实时同步
+- [x] 跨节点 Publish 消息按需路由转发
+- [ ] 共享订阅（Shared Subscriptions `$share`）- 单机实现正常，**集群环境下存在 bug：同 group 的订阅者可能出现在不同节点时，消息会被多次转发**
+
+### 6.4 遗嘱与保留消息
+- [x] 保留消息的集群共享与存储 - 通过 `ClusterMqttMessageStore` 装饰器实现，`addRetainMessage` 时自动广播到所有节点
+- [x] 遗嘱消息的集群同步与触发代发 - 通过 `ClusterMqttMessageStore` 装饰器实现，`addWillMessage` 时自动广播到所有节点
+
+### 6.5 可观测性与高级特性
+- [ ] 集群级别的统一指标监控 API
+- [ ] 全局限流控制协调机制
+
+---
+
+**文档版本：** v2.4
+**更新日期：** 2026-03-20
+**状态：** 已实现（含已知问题）

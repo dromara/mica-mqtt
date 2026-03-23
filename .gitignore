@@ -31,8 +31,9 @@ nbdist/
 ### vscode ###
 .vscode
 
-### ai ###
+### opencode ###
 .opencode
+-p
 
 ### maven ###
 target/
