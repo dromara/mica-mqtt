@@ -46,6 +46,33 @@ public class TopicFilter {
 	}
 
 	/**
+	 * 判断是否是共享订阅
+	 *
+	 * @return true 如果是 $queue 类型
+	 */
+	public boolean isQueue() {
+		return type == TopicFilterType.QUEUE;
+	}
+
+	/**
+	 * 判断是否是共享订阅
+	 *
+	 * @return true 如果是 $share
+	 */
+	public boolean isShared() {
+		return type == TopicFilterType.SHARE;
+	}
+
+	/**
+	 * 获取分组订阅的分组名
+	 *
+	 * @return 分组名
+	 */
+	public String getShareGroupName() {
+		return TopicFilterType.getShareGroupName(topic);
+	}
+
+	/**
 	 * 判断 topicFilter 和 topicName 匹配情况
 	 *
 	 * @param topicName topicName
