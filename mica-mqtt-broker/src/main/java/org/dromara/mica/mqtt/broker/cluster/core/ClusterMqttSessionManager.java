@@ -21,10 +21,8 @@ import org.dromara.mica.mqtt.broker.cluster.message.UnsubscribeNotifyMessage;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
-import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
-import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +31,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -57,25 +54,6 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	private final IMqttSessionManager delegate;
 	private final MqttClusterManager clusterManager;
 	private final ConcurrentHashMap<String, String> clientNodeMap = new ConcurrentHashMap<>();
-	/**
-	 * 共享订阅 group -> topicFilter -> 节点映射
-	 * 结构: groupName -> Map<topicFilter, Map<nodeId, Set<clientId>>>
-	 * 用于 getSharedGroupNodes(topic) 按 topic 过滤
-	 */
-	private final ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentHashMap<String, Set<String>>>> sharedGroupTopicMap = new ConcurrentHashMap<>();
-
-	/**
-	 * 远程节点信息
-	 */
-	public static class RemoteNode {
-		public final String nodeId;
-		public final Set<String> clientIds;
-
-		public RemoteNode(String nodeId, Set<String> clientIds) {
-			this.nodeId = nodeId;
-			this.clientIds = clientIds;
-		}
-	}
 
 	/**
 	 * Constructs a cluster session manager wrapping the specified delegate.
@@ -133,22 +111,13 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 			}
 			return false;
 		});
-		// clean up sharedGroupTopicMap: remove nodeId and all empty ancestors
-		sharedGroupTopicMap.entrySet().removeIf(groupEntry -> {
-			ConcurrentHashMap<String, ConcurrentHashMap<String, Set<String>>> topicMap = groupEntry.getValue();
-			topicMap.entrySet().removeIf(filterEntry -> {
-				ConcurrentHashMap<String, Set<String>> nodeMap = filterEntry.getValue();
-				nodeMap.remove(nodeId);
-				return nodeMap.isEmpty();
-			});
-			return topicMap.isEmpty();
-		});
 	}
 
 	/**
 	 * Synchronizes remote subscriptions from a client connected to another node.
 	 * <p>
-	 * V2 方案：不再将远程订阅添加到 TrieTopicManager，只更新共享订阅 group 索引。
+	 * V1 全量复制方案：所有远程订阅都添加到本地 TrieTopicManager，
+	 * 保证各节点订阅状态完全一致，searchAllSubscribe 可查到所有订阅者。
 	 * </p>
 	 *
 	 * @param clientId the client identifier
@@ -158,18 +127,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void syncRemoteSubscriptions(String clientId, String nodeId, List<Subscribe> subscriptions) {
 		registerRemoteClient(clientId, nodeId);
 		for (Subscribe sub : subscriptions) {
-			String topicFilter = sub.getTopicFilter();
-			TopicFilterType filterType = TopicFilterType.getType(topicFilter);
-			if (TopicFilterType.SHARE == filterType || TopicFilterType.QUEUE == filterType) {
-				String groupName = TopicFilterType.QUEUE == filterType
-					? TopicFilterType.SHARE_QUEUE_PREFIX
-					: TopicFilterType.getShareGroupName(topicFilter);
-				sharedGroupTopicMap
-					.computeIfAbsent(groupName, k -> new ConcurrentHashMap<>())
-					.computeIfAbsent(topicFilter, k -> new ConcurrentHashMap<>())
-					.computeIfAbsent(nodeId, k -> ConcurrentHashMap.newKeySet())
-					.add(clientId);
-			}
+			delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), clientId, sub.getMqttQoS(), sub.isNoLocal());
 			logger.debug("[Cluster] Synced remote subscription: client={}, topic={}, node={}",
 				clientId, sub.getTopicFilter(), nodeId);
 		}
@@ -182,33 +140,8 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @param topics the list of topics to unsubscribe from
 	 */
 	public void removeRemoteSubscriptions(String clientId, List<String> topics) {
-		String nodeId = clientNodeMap.get(clientId);
 		for (String topic : topics) {
-			TopicFilterType filterType = TopicFilterType.getType(topic);
-			if ((TopicFilterType.SHARE == filterType || TopicFilterType.QUEUE == filterType) && nodeId != null) {
-				String groupName = TopicFilterType.QUEUE == filterType
-					? TopicFilterType.SHARE_QUEUE_PREFIX
-					: TopicFilterType.getShareGroupName(topic);
-				ConcurrentHashMap<String, ConcurrentHashMap<String, Set<String>>> topicMap = sharedGroupTopicMap.get(groupName);
-				if (topicMap != null) {
-					ConcurrentHashMap<String, Set<String>> clientsMap = topicMap.get(topic);
-					if (clientsMap != null) {
-						Set<String> clients = clientsMap.get(nodeId);
-						if (clients != null) {
-							clients.remove(clientId);
-							if (clients.isEmpty()) {
-								clientsMap.remove(nodeId);
-								if (clientsMap.isEmpty()) {
-									topicMap.remove(topic);
-									if (topicMap.isEmpty()) {
-										sharedGroupTopicMap.remove(groupName);
-									}
-								}
-							}
-						}
-					}
-				}
-			}
+			delegate.removeSubscribe(topic, clientId);
 			logger.debug("[Cluster] Removed remote subscription: client={}, topic={}", clientId, topic);
 		}
 	}
@@ -216,18 +149,6 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	@Override
 	public void addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal) {
 		delegate.addSubscribe(topicFilter, clientId, mqttQoS, noLocal);
-		if (topicFilter.isShared() || topicFilter.isQueue()) {
-			String groupName = topicFilter.isQueue()
-				? TopicFilterType.SHARE_QUEUE_PREFIX
-				: topicFilter.getShareGroupName();
-			String nodeId = clusterManager.getLocalNodeId();
-			String topicFilterStr = topicFilter.getTopic();
-			sharedGroupTopicMap
-				.computeIfAbsent(groupName, k -> new ConcurrentHashMap<>())
-				.computeIfAbsent(topicFilterStr, k -> new ConcurrentHashMap<>())
-				.computeIfAbsent(nodeId, k -> ConcurrentHashMap.newKeySet())
-				.add(clientId);
-		}
 
 		Subscribe subscribe = new Subscribe(topicFilter.getTopic(), clientId, mqttQoS, noLocal);
 		SubscribeNotifyMessage notifyMessage = new SubscribeNotifyMessage();
@@ -244,33 +165,6 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	@Override
 	public void removeSubscribe(String topicFilter, String clientId) {
 		delegate.removeSubscribe(topicFilter, clientId);
-
-		TopicFilter tf = new TopicFilter(topicFilter);
-		if (tf.isShared() || tf.isQueue()) {
-			String groupName = tf.isQueue()
-				? TopicFilterType.SHARE_QUEUE_PREFIX
-				: tf.getShareGroupName();
-			String nodeId = clusterManager.getLocalNodeId();
-			ConcurrentHashMap<String, ConcurrentHashMap<String, Set<String>>> topicMap = sharedGroupTopicMap.get(groupName);
-			if (topicMap != null) {
-				ConcurrentHashMap<String, Set<String>> clientsMap = topicMap.get(topicFilter);
-				if (clientsMap != null) {
-					Set<String> clients = clientsMap.get(nodeId);
-					if (clients != null) {
-						clients.remove(clientId);
-						if (clients.isEmpty()) {
-							clientsMap.remove(nodeId);
-							if (clientsMap.isEmpty()) {
-								topicMap.remove(topicFilter);
-								if (topicMap.isEmpty()) {
-									sharedGroupTopicMap.remove(groupName);
-								}
-							}
-						}
-					}
-				}
-			}
-		}
 
 		UnsubscribeNotifyMessage notifyMessage = new UnsubscribeNotifyMessage();
 		notifyMessage.setClientId(clientId);
@@ -350,21 +244,8 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void syncFullState(Map<String, String> clientNodeMap, Map<String, List<Subscribe>> subscriptionMap) {
 		this.clientNodeMap.putAll(clientNodeMap);
 		for (Map.Entry<String, List<Subscribe>> entry : subscriptionMap.entrySet()) {
-			String clientId = entry.getKey();
-			String nodeId = clientNodeMap.get(clientId);
 			for (Subscribe sub : entry.getValue()) {
-				TopicFilter tf = new TopicFilter(sub.getTopicFilter());
-				if (tf.isShared() || tf.isQueue()) {
-					String groupName = tf.isQueue()
-						? TopicFilterType.SHARE_QUEUE_PREFIX
-						: tf.getShareGroupName();
-					String topicFilter = sub.getTopicFilter();
-					sharedGroupTopicMap
-						.computeIfAbsent(groupName, k -> new ConcurrentHashMap<>())
-						.computeIfAbsent(topicFilter, k -> new ConcurrentHashMap<>())
-						.computeIfAbsent(nodeId, k -> ConcurrentHashMap.newKeySet())
-						.add(clientId);
-				}
+				delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), entry.getKey(), sub.getMqttQoS(), sub.isNoLocal());
 			}
 		}
 	}
@@ -426,78 +307,13 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void remove(String clientId) {
-		String nodeId = clientNodeMap.remove(clientId);
+		clientNodeMap.remove(clientId);
 		delegate.remove(clientId);
-		if (nodeId != null) {
-			sharedGroupTopicMap.entrySet().removeIf(groupEntry -> {
-				ConcurrentHashMap<String, ConcurrentHashMap<String, Set<String>>> topicMap = groupEntry.getValue();
-				topicMap.entrySet().removeIf(filterEntry -> {
-					ConcurrentHashMap<String, Set<String>> nodeMap = filterEntry.getValue();
-					Set<String> clients = nodeMap.get(nodeId);
-					if (clients != null) {
-						clients.remove(clientId);
-						if (clients.isEmpty()) {
-							nodeMap.remove(nodeId);
-						}
-					}
-					return nodeMap.isEmpty();
-				});
-				return topicMap.isEmpty();
-			});
-		}
 	}
 
 	@Override
 	public void clean() {
 		delegate.clean();
 		clientNodeMap.clear();
-		sharedGroupTopicMap.clear();
-	}
-
-	/**
-	 * Returns only local subscribers for a topic.
-	 * <p>
-	 * This method queries the local TrieTopicManager directly without any remote filtering.
-	 * </p>
-	 *
-	 * @param topic the topic to search
-	 * @return list of local subscribers
-	 */
-	public List<Subscribe> searchLocalSubscribe(String topic) {
-		return delegate.searchSubscribe(topic);
-	}
-
-	/**
-	 * Returns the remote nodes that have shared subscriptions matching the given topic.
-	 * <p>
-	 * For each group, this method finds all topic filters that match the published topic
-	 * and collects the corresponding remote nodes. The caller can then use round-robin
-	 * to select one node per group for message forwarding.
-	 * </p>
-	 *
-	 * @param topic the published topic
-	 * @return map of group name to set of remote nodes that have subscribers matching this topic
-	 */
-	public Map<String, Set<RemoteNode>> getSharedGroupNodes(String topic) {
-		Map<String, Set<RemoteNode>> result = new HashMap<>();
-		for (Map.Entry<String, ConcurrentHashMap<String, ConcurrentHashMap<String, Set<String>>>> groupEntry : sharedGroupTopicMap.entrySet()) {
-			String groupName = groupEntry.getKey();
-			ConcurrentHashMap<String, ConcurrentHashMap<String, Set<String>>> topicMap = groupEntry.getValue();
-			// For each topic filter in this group, check if it matches the published topic
-			for (Map.Entry<String, ConcurrentHashMap<String, Set<String>>> filterEntry : topicMap.entrySet()) {
-				String topicFilter = filterEntry.getKey();
-				// Get the actual filter string (without $share/<group>/ or $queue/ prefix)
-				int prefixLength = TopicFilterType.getType(topicFilter).getPrefixLength(topicFilter);
-				String filterStr = topicFilter.substring(prefixLength);
-				if (TopicUtil.match(filterStr, topic)) {
-					// This filter matches - collect all nodes
-					Set<RemoteNode> nodes = result.computeIfAbsent(groupName, k -> ConcurrentHashMap.newKeySet());
-					for (Map.Entry<String, Set<String>> nodeEntry : filterEntry.getValue().entrySet()) {
-						nodes.add(new RemoteNode(nodeEntry.getKey(), nodeEntry.getValue()));
-					}
-				}
-			}
-		}
-		return result;
 	}
 }

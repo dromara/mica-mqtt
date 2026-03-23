@@ -109,7 +109,7 @@ public class MqttClusterBrokerCreator {
 		);
 		serverCreator.connectStatusListener(clusterConnectStatusListener);
 
-		ClusterPublishHandler publishHandler = new ClusterPublishHandler(clusterManager, clusterSessionManager);
+		ClusterPublishHandler publishHandler = new ClusterPublishHandler(clusterManager);
 		serverCreator.addPublishPipelineHandler(publishHandler);
 
 		MqttServer mqttServer = serverCreator.build();

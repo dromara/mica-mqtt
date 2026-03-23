@@ -309,13 +309,17 @@ mqtt:
 - **节点故障级联清理**：当收到 `NODE_LEAVE` 事件时，存活节点会自动清理该宕机节点上的所有远程客户端及订阅信息
 - **脑裂问题**：当前方案不处理，建议通过网络隔离避免
 
-### 5.5 已知问题
+### 5.5 订阅同步设计（V1 全量复制）
 
-#### 共享订阅集群消息重复问题（已修复）
+**全量复制方案**：所有订阅（普通订阅 + 共享订阅）都被同步到每个节点的 TrieTopicManager，`searchAllSubscribe()` 返回全量订阅者。
 
-**问题描述**：当同一 `$share/<group>/` 订阅的客户端分布在不同节点时，消息会被转发多次。
+**路由流程**：
+1. 发布消息时，`ClusterMessageDispatcher` 拦截，调用 `searchAllSubscribe(topic)` 查到所有订阅者
+2. 通过 `clientNodeMap` 判断每个订阅者在哪个节点
+3. 向所有**远程节点**（有订阅者的非本节点）转发消息
+4. 本地订阅者由 Pipeline 后面的 `UpStreamMessageHandler` 本地投递
 
-**修复方案**：所有三个消息路径（`ClusterPublishHandler` Pipeline、HTTP API `MqttClusterManager.publish()`、`ClusterMessageDispatcher`）统一使用 `getSharedGroupNodes()` 按 group 做 round-robin 选节点，每个 group 只转发给选中的那个节点，保证同一 group 内只有 1 个订阅者收到消息。
+**已知问题**：当同一 `$share/<group>/` 订阅的客户端分布在不同节点时，消息会被多次转发（每个节点都收到并投递）。这是 V1 全量复制方案的固有局限，后续可通过 Redis 中间件方案解决。
 
 ---
 
@@ -335,7 +339,7 @@ mqtt:
 ### 6.3 消息路由与订阅分发
 - [x] 订阅/取消订阅状态全网实时同步
 - [x] 跨节点 Publish 消息按需路由转发
-- [x] 共享订阅（Shared Subscriptions `$share`）- 三个消息路径全部通过 `getSharedGroupNodes()` + round-robin 修复
+- [x] 共享订阅（Shared Subscriptions `$share` / `$queue`）- V1 全量复制方案，**存在重复转发问题**（同 group 订阅者在不同节点时消息被多次转发），后续用 Redis 方案解决
 
 ### 6.4 遗嘱与保留消息
 - [x] 保留消息的集群共享与存储 - 通过 `ClusterMqttMessageStore` 装饰器实现，`addRetainMessage` 时自动广播到所有节点
@@ -347,6 +351,6 @@ mqtt:
 
 ---
 
-**文档版本：** v2.6
+**文档版本：** v2.7
 **更新日期：** 2026-03-23
 **状态：** 已实现（含已知问题）

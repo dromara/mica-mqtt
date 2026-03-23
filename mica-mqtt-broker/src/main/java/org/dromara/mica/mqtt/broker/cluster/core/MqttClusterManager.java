@@ -33,7 +33,6 @@ import org.tio.server.cluster.core.ClusterImpl;
 import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Manager for MQTT broker cluster operations and inter-node communication.
@@ -288,36 +287,8 @@ public class MqttClusterManager {
 		mqttServer.publishAll(topic, payload, MqttQoS.valueOf(qos), retain);
 
 		if (config.isEnabled() && cluster != null) {
-			ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
-
-			// Use getSharedGroupNodes for shared subscriptions: round-robin per group
-			Map<String, Set<ClusterMqttSessionManager.RemoteNode>> groupNodesMap = sessionManager.getSharedGroupNodes(topic);
-
-			List<Subscribe> allSubs = sessionManager.searchAllSubscribe(topic);
-
-			Set<String> targetNodes = new HashSet<>();
-			// Non-shared subscriptions: forward to all remote nodes with subscribers
-			if (allSubs != null && !allSubs.isEmpty() && groupNodesMap.isEmpty()) {
-				for (Subscribe sub : allSubs) {
-					String node = sessionManager.getClientNode(sub.getClientId());
-					if (node != null && !node.equals(localNodeId)) {
-						targetNodes.add(node);
-					}
-				}
-			}
-
-			// Shared subscriptions: select one node per group via round-robin
-			for (Map.Entry<String, Set<ClusterMqttSessionManager.RemoteNode>> entry : groupNodesMap.entrySet()) {
-				Set<ClusterMqttSessionManager.RemoteNode> nodes = entry.getValue();
-				if (!nodes.isEmpty()) {
-					ClusterMqttSessionManager.RemoteNode selected = selectNodeForGroup(nodes);
-					if (!selected.nodeId.equals(localNodeId)) {
-						targetNodes.add(selected.nodeId);
-					}
-				}
-			}
-
-			if (!targetNodes.isEmpty()) {
+			Set<String> remoteNodes = getRemoteNodesWithSubscriber(topic);
+			if (!remoteNodes.isEmpty()) {
 				PublishForwardMessage clusterMsg = new PublishForwardMessage();
 				Message message = new Message();
 				message.setMessageType(MessageType.UP_STREAM);
@@ -327,18 +298,37 @@ public class MqttClusterManager {
 				message.setRetain(retain);
 				clusterMsg.setMessage(message);
 
-				for (String node : targetNodes) {
+				for (String node : remoteNodes) {
 					sendToNode(node, clusterMsg);
 				}
 			}
 		}
 	}
 
-	private ClusterMqttSessionManager.RemoteNode selectNodeForGroup(Set<ClusterMqttSessionManager.RemoteNode> nodes) {
-		String[] nodeIds = nodes.stream().map(n -> n.nodeId).toArray(String[]::new);
-		int index = ThreadLocalRandom.current().nextInt(nodeIds.length);
-		final String selectedNodeId = nodeIds[index];
-		return nodes.stream().filter(n -> n.nodeId.equals(selectedNodeId)).findFirst().orElse(nodes.iterator().next());
+	/**
+	 * Returns remote nodes that have subscribers for the given topic.
+	 * Uses searchAllSubscribe which returns all local + remote subscriptions
+	 * due to the full replication strategy (V1).
+	 *
+	 * @param topic the published topic
+	 * @return set of remote node identifiers that have subscribers
+	 */
+	public Set<String> getRemoteNodesWithSubscriber(String topic) {
+		Set<String> remoteNodes = new HashSet<>();
+		if (!config.isEnabled() || cluster == null) {
+			return remoteNodes;
+		}
+		ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
+		List<Subscribe> allSubs = sessionManager.searchAllSubscribe(topic);
+		if (allSubs != null) {
+			for (Subscribe sub : allSubs) {
+				String node = sessionManager.getClientNode(sub.getClientId());
+				if (node != null && !node.equals(localNodeId)) {
+					remoteNodes.add(node);
+				}
+			}
+		}
+		return remoteNodes;
 	}
 
 	public String getLocalNodeId() {
