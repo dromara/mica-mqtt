@@ -2,6 +2,11 @@
 
 ## 发行版本
 
+### v2.6.1 - 2026-03-28
+
+1. ✨ 新增了 mica-mqtt-broker 模块，提供 mqtt 原生集群能力（优化完善中，欢迎试用、讨论）。
+2. 🐛 修复 2.6.0 版本引入的保留消息发送 bug gitee #IH1HFV 感谢 `tan90` 反馈。
+
 ### v2.6.0 - 2026-03-17
 
 - feat(mqtt-server): 支持 MQTT 5.0 订阅的 No Local 标志功能，gitee #IDB1DN 感谢 `@rocker` 反馈。
