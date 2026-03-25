@@ -37,8 +37,7 @@ import org.tio.http.common.HttpConst;
 import org.tio.http.common.HttpRequest;
 import org.tio.http.common.HttpResponse;
 import org.tio.http.common.Method;
-import org.tio.http.mcp.server.McpServerSession;
-import org.tio.http.sse.SseEmitter;
+import org.tio.http.common.stream.HttpStream;
 import org.tio.server.TioServerConfig;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.json.JsonUtil;
@@ -100,7 +99,7 @@ public class MqttHttpApi {
 		// sse 频率，默认 3s
 		int delay = request.getInt("delay", 3000);
 		HttpResponse response = new HttpResponse(request);
-		SseEmitter emitter = SseEmitter.getEmitter(request, response);
+		HttpStream httpStream = response.startSse(request);
 		// 响应包发送后，再发送 sse 回包
 		response.setPacketListener((context, packet, isSentSuccess) -> {
 			if (isSentSuccess) {
@@ -114,7 +113,7 @@ public class MqttHttpApi {
 									// 1. 再次添加 任务
 									systemTimer.add(this);
 									// 2. 执行任务
-									emitter.send(JsonUtil.toJsonString(mqttServerConfig.getStat()));
+									httpStream.send(JsonUtil.toJsonString(mqttServerConfig.getStat()));
 								}
 							} catch (Exception e) {
 								log.error("Tio client schedule error", e);
