@@ -142,6 +142,16 @@ public class MqttServerTemplate {
 	}
 
 	/**
+	 * 服务端主动断开 mqtt 连接，mqtt5.0
+	 *
+	 * @param clientId clientId
+	 * @return 是否成功
+	 */
+	public boolean disconnect(String clientId) {
+		return mqttServer.disconnect(clientId);
+	}
+
+	/**
 	 * 获取客户端信息
 	 *
 	 * @param clientId clientId

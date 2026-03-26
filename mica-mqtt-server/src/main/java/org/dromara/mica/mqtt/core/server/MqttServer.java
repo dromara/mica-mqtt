@@ -16,7 +16,10 @@
 
 package org.dromara.mica.mqtt.core.server;
 
+import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.MqttVersion;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
@@ -286,6 +289,43 @@ public final class MqttServer {
 			publish(context, clientId, topic, payload, mqttQoS, false);
 		}
 		return true;
+	}
+
+	/**
+	 * 服务端主动断开 mqtt 连接，mqtt5.0
+	 *
+	 * @param clientId clientId
+	 * @return 是否成功
+	 */
+	public boolean disconnect(String clientId) {
+		return disconnect(getChannelContext(clientId), clientId);
+	}
+
+	/**
+	 * 服务端主动断开 mqtt 连接
+	 *
+	 * @return 是否成功
+	 */
+	private boolean disconnect(ChannelContext channelContext, String clientId) {
+		if (channelContext == null || clientId == null) {
+			logger.error("Mqtt server disconnect channelContext:{} or clientId:{} is null.", channelContext, clientId);
+			return false;
+		}
+		// 仅仅 mqtt5.0 支持服务端主动断开
+		MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(channelContext);
+		if (MqttVersion.MQTT_5 != mqttVersion) {
+			logger.error("Mqtt server disconnect clientId:{} mqtt version:{} not support.", clientId, mqttVersion);
+			return false;
+		}
+		boolean result = Tio.bSend(channelContext, MqttMessage.DISCONNECT);
+		if (result) {
+			// 设置正常断开的标识
+			channelContext.setBizStatus(true);
+			Tio.remove(channelContext, "Mqtt DisConnect");
+		} else {
+			logger.error("Mqtt DisConnect send result: false");
+		}
+		return result;
 	}
 
 	/**
