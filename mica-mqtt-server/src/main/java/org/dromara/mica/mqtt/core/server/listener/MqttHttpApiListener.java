@@ -113,7 +113,7 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 		tioServerConfig.setTioUuid(new SeqTioUuid());
 		tioServerConfig.setSslConfig(sslConfig);
 		// http api 不开启 debug 和 stat
-		tioServerConfig.debug  = false;
+		tioServerConfig.debug = false;
 		tioServerConfig.statOn = false;
 		return new TioServer(serverNode, tioServerConfig);
 	}
@@ -167,14 +167,6 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 		public Builder mcpServer(McpServer mcpServer) {
 			this.mcpServer = mcpServer;
 			return this;
-		}
-
-		public Builder mcpServer() {
-			return mcpServer(new McpServer());
-		}
-
-		public Builder mcpServer(String sseEndpoint, String messageEndpoint) {
-			return mcpServer(new McpServer(sseEndpoint, messageEndpoint));
 		}
 
 		public Builder sslConfig(SslConfig sslConfig) {

@@ -16,6 +16,9 @@ import org.noear.solon.annotation.Condition;
 import org.noear.solon.annotation.Configuration;
 import org.noear.solon.annotation.Inject;
 import org.tio.core.Node;
+import org.tio.http.mcp.server.McpServer;
+import org.tio.http.mcp.server.transport.SseTransport;
+import org.tio.http.mcp.server.transport.StreamableHttpTransport;
 
 import java.util.List;
 
@@ -120,15 +123,17 @@ public class MqttServerConfiguration {
 		if (httpListener.isEnable()) {
 			Node serverNode = httpListener.getServerNode();
 			MqttServerProperties.HttpBasicAuth basicAuth = httpListener.getBasicAuth();
-			MqttServerProperties.McpServer mcpServer = httpListener.getMcpServer();
+			MqttServerProperties.Mcp mcp = httpListener.getMcp();
 			MqttServerProperties.HttpSsl ssl = httpListener.getSsl();
 			serverCreator.enableMqttHttpApi(builder -> {
 				builder.serverNode(serverNode);
 				if (basicAuth.isEnable()) {
 					builder.basicAuth(basicAuth.getUsername(), basicAuth.getPassword());
 				}
-				if (mcpServer.isEnable()) {
-					builder.mcpServer(mcpServer.getSseEndpoint(), mcpServer.getMessageEndpoint());
+				if (mcp.isEnable()) {
+					McpServer mcpServer = new McpServer();
+					mcpServer.useStreamableTransport(mcp.getEndpoint());
+					mcpServer.useSseTransport(mcp.getSseEndpoint(), mcp.getSseMessageEndpoint());
 				}
 				if (ssl.isEnable()) {
 					builder.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());

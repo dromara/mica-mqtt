@@ -11,6 +11,9 @@ import org.tio.http.common.Method;
 import org.tio.http.mcp.schema.*;
 import org.tio.http.mcp.server.McpServer;
 import org.tio.http.mcp.server.McpServerSession;
+import org.tio.http.mcp.server.transport.McpTransport;
+import org.tio.http.mcp.server.transport.SseTransport;
+import org.tio.http.mcp.server.transport.StreamableHttpTransport;
 import org.tio.server.TioServerConfig;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.json.JsonUtil;
@@ -18,10 +21,7 @@ import org.tio.utils.mica.PayloadEncode;
 import org.tio.utils.timer.TimerTask;
 import org.tio.utils.timer.TimerTaskService;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -254,8 +254,18 @@ public class MqttMcp {
 	 */
 	public void register() {
 		// 注册路由
-		MqttHttpRoutes.register(Method.GET, mcpServer.getSseEndpoint(), mcpServer::sseEndpoint);
-		MqttHttpRoutes.register(Method.POST, mcpServer.getMessageEndpoint(), mcpServer::sseMessageEndpoint);
+		List<McpTransport> transports = mcpServer.getTransports();
+		for (McpTransport transport : transports) {
+			if (transport instanceof SseTransport) {
+				SseTransport sseTransport = (SseTransport) transport;
+				MqttHttpRoutes.register(Method.GET, sseTransport.getSseEndpoint(), sseTransport::handleSseConnection);
+				MqttHttpRoutes.register(Method.POST, sseTransport.getMessageEndpoint(), sseTransport::handleMessage);
+			} else if (transport instanceof StreamableHttpTransport) {
+				StreamableHttpTransport streamTransport = (StreamableHttpTransport) transport;
+				MqttHttpRoutes.register(Method.GET, streamTransport.getEndpoint(), streamTransport::handleSseConnection);
+				MqttHttpRoutes.register(Method.POST, streamTransport.getEndpoint(), streamTransport::handleJsonRpcRequest);
+			}
+		}
 		// mcp 信息
 		McpServerCapabilities serverCapabilities = new McpServerCapabilities();
 		McpLoggingCapabilities logging = new McpLoggingCapabilities();

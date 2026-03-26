@@ -211,7 +211,7 @@ public class MqttServerProperties {
 		/**
 		 * mcp 配置
 		 */
-		private McpServer mcpServer = new McpServer();
+		private Mcp mcp = new Mcp();
 		/**
 		 * ssl 配置
 		 */
@@ -246,11 +246,15 @@ public class MqttServerProperties {
 
 	@Getter
 	@Setter
-	public static class McpServer {
+	public static class Mcp {
 		/**
 		 * 是否启用，默认：关闭
 		 */
 		private boolean enable = false;
+		/**
+		 * stream http endpoint
+		 */
+		private String endpoint;
 		/**
 		 * sse 端点
 		 */
@@ -258,6 +262,6 @@ public class MqttServerProperties {
 		/**
 		 * message 端点
 		 */
-		private String messageEndpoint;
+		private String sseMessageEndpoint;
 	}
 }
