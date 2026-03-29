@@ -17,8 +17,6 @@ import org.noear.solon.annotation.Configuration;
 import org.noear.solon.annotation.Inject;
 import org.tio.core.Node;
 import org.tio.http.mcp.server.McpServer;
-import org.tio.http.mcp.server.transport.SseTransport;
-import org.tio.http.mcp.server.transport.StreamableHttpTransport;
 
 import java.util.List;
 

@@ -25,7 +25,6 @@ import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerPublishPermission;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
-
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
@@ -48,8 +47,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.tio.core.Node;
 import org.tio.http.mcp.server.McpServer;
-import org.tio.http.mcp.server.transport.SseTransport;
-import org.tio.http.mcp.server.transport.StreamableHttpTransport;
 
 /**
  * mqtt server 配置
