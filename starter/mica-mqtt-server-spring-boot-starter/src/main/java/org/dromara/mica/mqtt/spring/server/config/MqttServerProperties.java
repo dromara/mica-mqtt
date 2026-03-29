@@ -23,6 +23,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.unit.DataSize;
 import org.tio.core.Node;
 import org.tio.core.ssl.ClientAuth;
+import org.tio.http.mcp.server.transport.SseTransport;
+import org.tio.http.mcp.server.transport.StreamableHttpTransport;
 
 /**
  * MqttServer 配置
@@ -254,14 +256,14 @@ public class MqttServerProperties {
 		/**
 		 * stream http endpoint
 		 */
-		private String endpoint;
+		private String endpoint = StreamableHttpTransport.DEFAULT_ENDPOINT;
 		/**
 		 * sse 端点
 		 */
-		private String sseEndpoint;
+		private String sseEndpoint = SseTransport.DEFAULT_SSE_ENDPOINT;
 		/**
 		 * message 端点
 		 */
-		private String sseMessageEndpoint;
+		private String sseMessageEndpoint = SseTransport.DEFAULT_MESSAGE_ENDPOINT;
 	}
 }
