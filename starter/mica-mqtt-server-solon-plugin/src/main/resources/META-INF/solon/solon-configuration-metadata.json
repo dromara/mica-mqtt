@@ -67,14 +67,19 @@
       "defaultValue": "false"
     },
     {
-      "name": "mqtt.server.http-listener.mcp-server.message-endpoint",
+      "name": "mqtt.server.http-listener.mcp.endpoint",
       "type": "java.lang.String",
-      "description": "message 端点"
+      "description": "mcp http stream 端点"
     },
     {
-      "name": "mqtt.server.http-listener.mcp-server.sse-endpoint",
+      "name": "mqtt.server.http-listener.mcp.sse-endpoint",
       "type": "java.lang.String",
-      "description": "sse 端点"
+      "description": "mcp sse 端点"
+    },
+    {
+      "name": "mqtt.server.http-listener.mcp.sse-message-endpoint",
+      "type": "java.lang.String",
+      "description": "mcp sse message 端点"
     },
     {
       "name": "mqtt.server.http-listener.port",
