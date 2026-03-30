@@ -7,6 +7,7 @@
 1. ✨ 新增了 mica-mqtt-broker 模块，提供 mqtt 原生集群能力（优化完善中，欢迎试用、讨论）。
 2. ✨ mqtt-server 增加服务端主动断开 mqtt 连接功能（mqtt5.0）
 3. 🐛 修复 2.6.0 版本引入的保留消息发送 bug gitee #IH1HFV 感谢 `tan90` 反馈。
+4. ⬆️ mica-net 升级到 1.3.4，mcp 支持 http streamable mcp。
 
 ### v2.6.0 - 2026-03-17
 
