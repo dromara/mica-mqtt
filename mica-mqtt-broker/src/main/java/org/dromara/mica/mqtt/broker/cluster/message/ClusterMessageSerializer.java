@@ -28,14 +28,12 @@ import java.util.Map;
 
 /**
  * Serializer for cluster messages handling conversion between domain models and t-io transport format.
- * <p>
  * This class provides bidirectional serialization:
  * <ul>
  *   <li>{@link #toClusterData(ClusterMessage, String)} - serializes a {@link ClusterMessage} into a t-io {@link ClusterDataMessage}</li>
  *   <li>{@link #fromClusterData(ClusterDataMessage)} - deserializes a {@link ClusterDataMessage} back into the appropriate {@link ClusterMessage} subclass</li>
  * </ul>
  * The serialization format uses efficient binary encoding with compact header management.
- * </p>
  *
  * @author L.cm
  * @see ClusterMessage

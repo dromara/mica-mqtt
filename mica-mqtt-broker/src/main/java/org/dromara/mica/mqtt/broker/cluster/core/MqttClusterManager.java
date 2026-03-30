@@ -36,7 +36,6 @@ import java.util.*;
 
 /**
  * Manager for MQTT broker cluster operations and inter-node communication.
- * <p>
  * This class is responsible for:
  * <ul>
  *   <li>Starting and stopping the t-io cluster foundation</li>
@@ -44,7 +43,6 @@ import java.util.*;
  *   <li>Handling incoming cluster messages and dispatching to appropriate handlers</li>
  *   <li>Coordinating session synchronization across cluster nodes</li>
  * </ul>
- * </p>
  *
  * @author L.cm
  * @since 1.0.0

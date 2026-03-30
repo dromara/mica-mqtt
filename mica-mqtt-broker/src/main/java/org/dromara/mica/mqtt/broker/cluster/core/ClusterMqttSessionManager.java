@@ -35,7 +35,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Cluster-aware session manager that decorates an underlying {@link IMqttSessionManager}.
- * <p>
  * This class extends the session management capabilities to support MQTT broker clustering by:
  * <ul>
  *   <li>Tracking which cluster node each client is connected to</li>
@@ -43,7 +42,6 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>Providing unified local + remote subscription lookup for message routing</li>
  *   <li>Coordinating session cleanup when nodes depart the cluster</li>
  * </ul>
- * </p>
  *
  * @author L.cm
  * @see IMqttSessionManager

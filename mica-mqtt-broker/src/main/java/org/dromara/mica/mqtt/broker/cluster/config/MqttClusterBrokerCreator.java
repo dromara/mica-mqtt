@@ -35,7 +35,6 @@ import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
  * {@link MqttClusterConfig#enabled(boolean)}, it delegates to the standard
  * {@link MqttServerCreator#build()}.
  * </p>
- * <p>
  * In cluster mode, this builder:
  * <ol>
  *   <li>Creates a {@link MqttClusterManager} to manage inter-node communication</li>
@@ -44,7 +43,6 @@ import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
  *   <li>Decorates the connect status listener with {@link ClusterMqttConnectStatusListener}</li>
  *   <li>Adds pipeline handlers for message forwarding and dispatching</li>
  * </ol>
- * </p>
  *
  * @author L.cm
  * @see MqttServerCreator
