@@ -9,6 +9,8 @@
         <version>${revision}</version>
     </parent>
     <artifactId>mica-mqtt-broker</artifactId>
+    <name>${project.artifactId}</name>
+    <url>https://mica-mqtt.dreamlu.net/guide/java/broker.html</url>
 
     <dependencies>
         <dependency>
