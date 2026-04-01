@@ -677,11 +677,20 @@ public final class MqttClientCreator {
 			.disconnectBeforeStop(this.disconnectBeforeStop);
 	}
 
+	/**
+	 * 生成默认的 clientId
+	 *
+	 * @return clientId
+	 */
+	private static String generateClientId() {
+		// 默认为：MICA-MQTT- 前缀和 36进制的纳秒数
+		return "MICA-MQTT-" + Long.toString(System.nanoTime(), 36);
+	}
+
 	private MqttClient build() {
 		// 1. clientId 为空，生成默认的 clientId
 		if (StrUtil.isBlank(this.clientId)) {
-			// 默认为：MICA-MQTT- 前缀和 36进制的纳秒数
-			this.clientId("MICA-MQTT-" + Long.toString(System.nanoTime(), 36));
+			this.clientId = generateClientId();
 		}
 		// 2. 客户端 session
 		if (this.clientSession == null) {
@@ -796,8 +805,7 @@ public final class MqttClientCreator {
 	public MqttConnectReasonCode connectTest(long timeout, TimeUnit timeUnit) {
 		// 1. clientId 为空，生成默认的 clientId
 		if (StrUtil.isBlank(this.clientId)) {
-			// 默认为：MICA-MQTT- 前缀和 36进制的纳秒数
-			this.clientId("MICA-MQTT-" + Long.toString(System.nanoTime(), 36));
+			this.clientId = generateClientId();
 		}
 		CompletableFuture<MqttConnectReasonCode> future = new CompletableFuture<>();
 		IMqttClientProcessor processor = new MqttClientConnectTestProcessor(future);
@@ -812,7 +820,7 @@ public final class MqttClientCreator {
 		TioClient tioClient;
 		try {
 			tioClient = new TioClient(tioConfig);
-			tioClient.asyncConnect(new Node(this.getIp(), this.getPort()), this.bindIp, 0, this.timeout);
+			tioClient.asyncConnect(new Node(this.getIp(), this.getPort()), this.bindIp, this.bindPort, this.timeout);
 		} catch (Exception e) {
 			throw new IllegalStateException("Mica mqtt client start fail.", e);
 		}
