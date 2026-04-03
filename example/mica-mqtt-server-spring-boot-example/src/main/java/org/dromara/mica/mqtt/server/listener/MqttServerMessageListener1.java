@@ -1,6 +1,7 @@
 package org.dromara.mica.mqtt.server.listener;
 
 import lombok.extern.slf4j.Slf4j;
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
@@ -8,7 +9,6 @@ import org.dromara.mica.mqtt.spring.server.MqttServerTemplate;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.tio.core.ChannelContext;
 
 import java.nio.charset.StandardCharsets;
 

@@ -16,13 +16,13 @@
 
 package org.dromara.mica.mqtt.client;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.dromara.mica.mqtt.core.client.MqttClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.ChannelContext;
 
 import java.nio.charset.StandardCharsets;
 

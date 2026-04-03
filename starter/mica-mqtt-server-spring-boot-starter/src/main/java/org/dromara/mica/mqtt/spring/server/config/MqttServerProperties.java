@@ -18,13 +18,13 @@ package org.dromara.mica.mqtt.spring.server.config;
 
 import lombok.Getter;
 import lombok.Setter;
+import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.core.ssl.ClientAuth;
+import net.dreamlu.mica.net.http.mcp.server.transport.SseTransport;
+import net.dreamlu.mica.net.http.mcp.server.transport.StreamableHttpTransport;
 import org.dromara.mica.mqtt.codec.MqttConstant;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.unit.DataSize;
-import org.tio.core.Node;
-import org.tio.core.ssl.ClientAuth;
-import org.tio.http.mcp.server.transport.SseTransport;
-import org.tio.http.mcp.server.transport.StreamableHttpTransport;
 
 /**
  * MqttServer 配置

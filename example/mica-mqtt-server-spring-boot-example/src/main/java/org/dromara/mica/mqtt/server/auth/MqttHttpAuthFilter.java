@@ -1,13 +1,13 @@
 package org.dromara.mica.mqtt.server.auth;
 
+import net.dreamlu.mica.net.http.common.HttpRequest;
+import net.dreamlu.mica.net.http.common.HttpResponse;
 import org.dromara.mica.mqtt.core.server.http.api.code.ResultCode;
 import org.dromara.mica.mqtt.core.server.http.api.result.Result;
 import org.dromara.mica.mqtt.core.server.http.handler.HttpFilter;
 import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRoutes;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.annotation.Configuration;
-import org.tio.http.common.HttpRequest;
-import org.tio.http.common.HttpResponse;
 
 /**
  * 示例自定义 mqtt http 接口认证，请按照自己的需求和业务进行扩展

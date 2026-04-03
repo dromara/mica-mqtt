@@ -16,12 +16,12 @@
 
 package org.dromara.mica.mqtt.server;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Node;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.core.server.interceptor.IMqttMessageInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.ChannelContext;
-import org.tio.core.Node;
 
 /**
  * mqtt 消息拦截器

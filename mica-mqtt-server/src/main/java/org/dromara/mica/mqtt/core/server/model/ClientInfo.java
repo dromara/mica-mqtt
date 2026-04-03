@@ -16,11 +16,11 @@
 
 package org.dromara.mica.mqtt.core.server.model;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Node;
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
-import org.tio.core.ChannelContext;
-import org.tio.core.Node;
 
 import java.io.Serializable;
 import java.util.concurrent.TimeUnit;

@@ -16,9 +16,9 @@
 
 package org.dromara.mica.mqtt.core.server.auth;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.ChannelContext;
 
 /**
  * mqtt 服务端，认证处理器

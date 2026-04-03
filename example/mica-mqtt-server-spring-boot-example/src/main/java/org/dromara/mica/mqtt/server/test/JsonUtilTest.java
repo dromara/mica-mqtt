@@ -1,6 +1,6 @@
 package org.dromara.mica.mqtt.server.test;
 
-import org.tio.utils.json.JsonUtil;
+import net.dreamlu.mica.net.utils.json.JsonUtil;
 
 public class JsonUtilTest {
 

@@ -16,12 +16,12 @@
 
 package org.dromara.mica.mqtt.core.server.session;
 
+import net.dreamlu.mica.net.utils.hutool.CollUtil;
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
-import org.tio.utils.hutool.CollUtil;
 
 import java.util.ArrayList;
 import java.util.HashMap;

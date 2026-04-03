@@ -16,13 +16,13 @@
 
 package org.dromara.mica.mqtt.core.common;
 
+import net.dreamlu.mica.net.utils.collection.IntObjectHashMap;
+import net.dreamlu.mica.net.utils.collection.IntObjectMap;
+import org.dromara.mica.mqtt.core.util.TopicUtil;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.dromara.mica.mqtt.core.util.TopicUtil;
-import org.tio.utils.collection.IntObjectHashMap;
-import org.tio.utils.collection.IntObjectMap;
 
 /**
  * topic 模板带 ${var} 变量的模板

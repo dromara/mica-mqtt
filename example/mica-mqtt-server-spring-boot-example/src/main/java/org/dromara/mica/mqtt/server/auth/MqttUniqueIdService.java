@@ -1,8 +1,8 @@
 package org.dromara.mica.mqtt.server.auth;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
 import org.springframework.context.annotation.Configuration;
-import org.tio.core.ChannelContext;
 
 /**
  * 示例自定义 clientId，请按照自己的需求和业务进行扩展

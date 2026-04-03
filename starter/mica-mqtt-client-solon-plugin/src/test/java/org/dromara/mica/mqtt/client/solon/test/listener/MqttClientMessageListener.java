@@ -1,11 +1,11 @@
 package org.dromara.mica.mqtt.client.solon.test.listener;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.core.annotation.MqttClientSubscribe;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.ChannelContext;
 
 import java.nio.charset.StandardCharsets;
 

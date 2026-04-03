@@ -17,15 +17,15 @@
 package org.dromara.mica.mqtt.client.solon;
 
 import lombok.extern.slf4j.Slf4j;
+import net.dreamlu.mica.net.client.ClientChannelContext;
+import net.dreamlu.mica.net.client.TioClient;
+import net.dreamlu.mica.net.client.TioClientConfig;
+import net.dreamlu.mica.net.utils.timer.TimerTask;
+import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
-import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.client.*;
-import org.tio.client.ClientChannelContext;
-import org.tio.client.TioClient;
-import org.tio.client.TioClientConfig;
-import org.tio.utils.timer.TimerTask;
 
 import java.util.ArrayList;
 import java.util.List;

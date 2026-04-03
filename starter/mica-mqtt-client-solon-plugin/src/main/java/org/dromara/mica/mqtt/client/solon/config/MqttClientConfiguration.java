@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.client.solon.config;
 
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.client.solon.event.SolonEventMqttClientConnectListener;
 import org.dromara.mica.mqtt.core.client.IMqttClientConnectListener;
 import org.dromara.mica.mqtt.core.client.MqttClient;
@@ -26,7 +27,6 @@ import org.noear.solon.annotation.Bean;
 import org.noear.solon.annotation.Condition;
 import org.noear.solon.annotation.Configuration;
 import org.noear.solon.annotation.Inject;
-import org.tio.utils.hutool.StrUtil;
 
 import java.util.List;
 

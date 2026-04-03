@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.core.client;
 
-import org.tio.core.ssl.SSLEngineCustomizer;
+import net.dreamlu.mica.net.core.ssl.SSLEngineCustomizer;
 
 import javax.net.ssl.SNIHostName;
 import javax.net.ssl.SNIServerName;

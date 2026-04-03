@@ -16,9 +16,9 @@
 
 package org.dromara.mica.mqtt.jfinal.server;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.MqttServer;
-import org.tio.core.ChannelContext;
 
 /**
  * mica mqtt server kit

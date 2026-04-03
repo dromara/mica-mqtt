@@ -21,14 +21,14 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.dreamlu.mica.net.core.Tio;
+import net.dreamlu.mica.net.server.ServerGroupStat;
+import net.dreamlu.mica.net.server.TioServerConfig;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
-import org.tio.core.Tio;
-import org.tio.server.ServerGroupStat;
-import org.tio.server.TioServerConfig;
 
 import java.util.Collections;
 

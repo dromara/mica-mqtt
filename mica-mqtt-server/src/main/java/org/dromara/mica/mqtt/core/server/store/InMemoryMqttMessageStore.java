@@ -17,9 +17,9 @@
 package org.dromara.mica.mqtt.core.server.store;
 
 
+import net.dreamlu.mica.net.utils.cache.TimedCache;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
-import org.tio.utils.cache.TimedCache;
 
 import java.io.IOException;
 import java.util.ArrayList;

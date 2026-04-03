@@ -16,9 +16,9 @@
 
 package org.dromara.mica.mqtt.core.server.http.handler;
 
-import org.tio.http.common.Method;
-import org.tio.http.common.RequestLine;
-import org.tio.http.common.handler.HttpRequestHandler;
+import net.dreamlu.mica.net.http.common.Method;
+import net.dreamlu.mica.net.http.common.RequestLine;
+import net.dreamlu.mica.net.http.common.handler.HttpRequestHandler;
 
 import java.util.*;
 

@@ -16,6 +16,9 @@
 
 package org.dromara.mica.mqtt.jfinal.client;
 
+import net.dreamlu.mica.net.client.ClientChannelContext;
+import net.dreamlu.mica.net.client.TioClient;
+import net.dreamlu.mica.net.client.TioClientConfig;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
@@ -23,9 +26,6 @@ import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.dromara.mica.mqtt.core.client.MqttClient;
 import org.dromara.mica.mqtt.core.client.MqttClientCreator;
 import org.dromara.mica.mqtt.core.client.MqttClientSubscription;
-import org.tio.client.ClientChannelContext;
-import org.tio.client.TioClient;
-import org.tio.client.TioClientConfig;
 
 import java.util.List;
 import java.util.function.Consumer;

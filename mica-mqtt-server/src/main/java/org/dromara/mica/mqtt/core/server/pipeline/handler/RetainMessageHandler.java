@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline.handler;
 
+import net.dreamlu.mica.net.utils.mica.IntPair;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
@@ -25,7 +26,6 @@ import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.utils.mica.IntPair;
 
 /**
  * 保留消息处理器

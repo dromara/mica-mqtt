@@ -16,9 +16,9 @@
 
 package org.dromara.mica.mqtt.core.server.http.api.result;
 
+import net.dreamlu.mica.net.http.common.*;
+import net.dreamlu.mica.net.utils.json.JsonUtil;
 import org.dromara.mica.mqtt.core.server.http.api.code.ResultCode;
-import org.tio.http.common.*;
-import org.tio.utils.json.JsonUtil;
 
 import java.util.HashMap;
 import java.util.Map;

@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.core.server.func;
 
+import net.dreamlu.mica.net.utils.hutool.CollUtil;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
-import org.tio.utils.hutool.CollUtil;
 
 import java.util.ArrayList;
 import java.util.List;

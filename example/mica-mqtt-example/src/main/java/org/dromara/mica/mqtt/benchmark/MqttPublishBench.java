@@ -1,12 +1,12 @@
 package org.dromara.mica.mqtt.benchmark;
 
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
+import net.dreamlu.mica.net.utils.thread.ThreadUtils;
+import net.dreamlu.mica.net.utils.thread.pool.SynThreadPoolExecutor;
+import net.dreamlu.mica.net.utils.timer.DefaultTimerTaskService;
+import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.client.MqttClient;
-import org.tio.utils.hutool.StrUtil;
-import org.tio.utils.thread.ThreadUtils;
-import org.tio.utils.thread.pool.SynThreadPoolExecutor;
-import org.tio.utils.timer.DefaultTimerTaskService;
-import org.tio.utils.timer.TimerTaskService;
 
 import java.util.ArrayList;
 import java.util.Arrays;

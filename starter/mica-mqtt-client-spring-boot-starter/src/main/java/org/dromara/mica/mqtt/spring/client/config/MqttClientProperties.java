@@ -18,14 +18,14 @@ package org.dromara.mica.mqtt.spring.client.config;
 
 import lombok.Getter;
 import lombok.Setter;
+import net.dreamlu.mica.net.client.task.HeartbeatTimeoutStrategy;
+import net.dreamlu.mica.net.core.task.HeartbeatMode;
 import org.dromara.mica.mqtt.codec.MqttConstant;
 import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.codec.MqttVersion;
+import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.unit.DataSize;
-import org.tio.client.task.HeartbeatTimeoutStrategy;
-import org.tio.core.task.HeartbeatMode;
 
 import java.util.List;
 

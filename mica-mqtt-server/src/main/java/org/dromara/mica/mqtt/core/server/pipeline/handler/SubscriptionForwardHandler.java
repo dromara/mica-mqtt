@@ -16,6 +16,9 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline.handler;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Tio;
+import net.dreamlu.mica.net.core.TioConfig;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
@@ -29,9 +32,6 @@ import org.dromara.mica.mqtt.core.server.pipeline.PublishContext;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.ChannelContext;
-import org.tio.core.Tio;
-import org.tio.core.TioConfig;
 
 import java.util.List;
 

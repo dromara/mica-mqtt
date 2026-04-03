@@ -16,10 +16,10 @@
 
 package org.dromara.mica.mqtt.broker.cluster.core;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.broker.cluster.message.ClientConnectMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClientDisconnectMessage;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
-import org.tio.core.ChannelContext;
 
 /**
  * Decorator for {@link IMqttConnectStatusListener} that broadcasts client lifecycle events to the cluster.

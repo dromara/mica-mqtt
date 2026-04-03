@@ -1,11 +1,11 @@
 package org.dromara.mica.mqtt.client.listener;
 
 import lombok.extern.slf4j.Slf4j;
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.dromara.mica.mqtt.core.annotation.MqttClientSubscribe;
 import org.springframework.stereotype.Service;
-import org.tio.core.ChannelContext;
 
 import java.nio.charset.StandardCharsets;
 

@@ -17,9 +17,9 @@
 package org.dromara.mica.mqtt.server.listener;
 
 import lombok.extern.slf4j.Slf4j;
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.springframework.stereotype.Service;
-import org.tio.core.ChannelContext;
 
 /**
  * mqtt 连接状态

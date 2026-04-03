@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.broker.cluster.message;
 
-import org.tio.server.cluster.message.ClusterDataMessage;
+import net.dreamlu.mica.net.server.cluster.message.ClusterDataMessage;
 
 import java.util.Map;
 

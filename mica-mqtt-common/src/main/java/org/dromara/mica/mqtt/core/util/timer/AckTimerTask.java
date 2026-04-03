@@ -16,10 +16,10 @@
 
 package org.dromara.mica.mqtt.core.util.timer;
 
+import net.dreamlu.mica.net.utils.timer.Timer;
+import net.dreamlu.mica.net.utils.timer.TimerTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.utils.timer.Timer;
-import org.tio.utils.timer.TimerTask;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;

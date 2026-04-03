@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.core.server.support;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
-import org.tio.core.ChannelContext;
 
 import java.util.Objects;
 

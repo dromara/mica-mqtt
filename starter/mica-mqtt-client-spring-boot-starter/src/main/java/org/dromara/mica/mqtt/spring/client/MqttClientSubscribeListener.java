@@ -17,13 +17,13 @@
 package org.dromara.mica.mqtt.spring.client;
 
 import lombok.extern.slf4j.Slf4j;
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.function.ParamValueFunction;
 import org.dromara.mica.mqtt.core.util.MethodParamUtil;
 import org.springframework.util.ReflectionUtils;
-import org.tio.core.ChannelContext;
 
 import java.lang.reflect.Method;
 

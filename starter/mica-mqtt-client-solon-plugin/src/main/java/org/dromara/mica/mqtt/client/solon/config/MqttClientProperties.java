@@ -18,13 +18,13 @@ package org.dromara.mica.mqtt.client.solon.config;
 
 import lombok.Getter;
 import lombok.Setter;
+import net.dreamlu.mica.net.client.task.HeartbeatTimeoutStrategy;
+import net.dreamlu.mica.net.core.task.HeartbeatMode;
 import org.dromara.mica.mqtt.codec.MqttConstant;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.noear.solon.annotation.Configuration;
 import org.noear.solon.annotation.Inject;
-import org.tio.client.task.HeartbeatTimeoutStrategy;
-import org.tio.core.task.HeartbeatMode;
 
 /**
  * MqttClient 配置

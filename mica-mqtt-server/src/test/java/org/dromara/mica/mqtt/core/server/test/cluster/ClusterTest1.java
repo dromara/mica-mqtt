@@ -1,8 +1,8 @@
 package org.dromara.mica.mqtt.core.server.test.cluster;
 
-import org.tio.server.cluster.core.ClusterApi;
-import org.tio.server.cluster.core.ClusterConfig;
-import org.tio.server.cluster.core.ClusterImpl;
+import net.dreamlu.mica.net.server.cluster.core.ClusterApi;
+import net.dreamlu.mica.net.server.cluster.core.ClusterConfig;
+import net.dreamlu.mica.net.server.cluster.core.ClusterImpl;
 
 import java.nio.charset.StandardCharsets;
 

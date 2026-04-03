@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.core.server.interceptor;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
-import org.tio.core.ChannelContext;
 
 /**
  * mqtt 消息拦截器

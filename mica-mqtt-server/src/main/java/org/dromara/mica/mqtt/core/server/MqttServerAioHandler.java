@@ -16,6 +16,12 @@
 
 package org.dromara.mica.mqtt.core.server;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Tio;
+import net.dreamlu.mica.net.core.TioConfig;
+import net.dreamlu.mica.net.core.exception.TioDecodeException;
+import net.dreamlu.mica.net.core.intf.Packet;
+import net.dreamlu.mica.net.server.intf.TioServerHandler;
 import org.dromara.mica.mqtt.codec.MqttDecoder;
 import org.dromara.mica.mqtt.codec.MqttEncoder;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
@@ -28,12 +34,6 @@ import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.ChannelContext;
-import org.tio.core.Tio;
-import org.tio.core.TioConfig;
-import org.tio.core.exception.TioDecodeException;
-import org.tio.core.intf.Packet;
-import org.tio.server.intf.TioServerHandler;
 
 import java.nio.ByteBuffer;
 

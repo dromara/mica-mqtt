@@ -16,13 +16,13 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline.message;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Tio;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.ChannelContext;
-import org.tio.core.Tio;
 
 /**
  * 断开连接消息处理器
@@ -41,13 +41,13 @@ public class DisconnectMessageHandler extends BaseMessageHandler {
 		if (MessageType.DISCONNECT != message.getMessageType()) {
 			return true;
 		}
-		
+
 		String clientId = message.getClientId();
 		ChannelContext context = mqttServer.getChannelContext(clientId);
 		if (context != null) {
 			Tio.remove(context, "Mqtt server delete clients:" + clientId);
 		}
-		
+
 		return true;
 	}
 

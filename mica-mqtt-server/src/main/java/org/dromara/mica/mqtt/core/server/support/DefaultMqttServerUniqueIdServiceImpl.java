@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.core.server.support;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
-import org.tio.core.ChannelContext;
 
 /**
  * 默认的 mqtt 服务端唯一 id 绑定，使用 clientId

@@ -2,7 +2,7 @@ package org.dromara.mica.mqtt.server.solon.config;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.tio.utils.hutool.StrUtil;
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
 
 import java.util.Objects;
 import java.util.regex.Matcher;

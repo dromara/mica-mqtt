@@ -16,11 +16,11 @@
 
 package org.dromara.mica.mqtt.core.client;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Tio;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.*;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnAckVariableHeader;
-import org.tio.core.ChannelContext;
-import org.tio.core.Tio;
 
 import java.util.concurrent.CompletableFuture;
 

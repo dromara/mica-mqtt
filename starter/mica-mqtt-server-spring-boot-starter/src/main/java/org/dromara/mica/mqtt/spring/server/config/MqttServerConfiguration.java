@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.spring.server.config;
 
+import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.http.mcp.server.McpServer;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.deserialize.MqttJsonDeserializer;
 import org.dromara.mica.mqtt.core.server.MqttServer;
@@ -45,8 +47,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.tio.core.Node;
-import org.tio.http.mcp.server.McpServer;
 
 /**
  * mqtt server 配置

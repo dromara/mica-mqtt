@@ -1,13 +1,13 @@
 package org.dromara.mica.mqtt.core.common;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Tio;
+import net.dreamlu.mica.net.utils.timer.TimerTaskService;
+import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
-import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.ChannelContext;
-import org.tio.core.Tio;
-import org.tio.utils.timer.TimerTaskService;
 
 import java.util.Objects;
 

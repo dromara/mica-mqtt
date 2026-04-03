@@ -16,12 +16,12 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline.message;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.ChannelContext;
 
 /**
  * 取消订阅消息处理器
@@ -40,13 +40,13 @@ public class UnsubscribeMessageHandler extends BaseMessageHandler {
 		if (MessageType.UNSUBSCRIBE != message.getMessageType()) {
 			return true;
 		}
-		
+
 		String topic = message.getTopic();
 		String fromClientId = message.getFromClientId();
-		
+
 		// 移除订阅
 		sessionManager.removeSubscribe(topic, fromClientId);
-		
+
 		// 处理集群消息
 		ChannelContext context = mqttServer.getChannelContext(fromClientId);
 		if (context != null) {
@@ -56,7 +56,7 @@ public class UnsubscribeMessageHandler extends BaseMessageHandler {
 				sessionManager.removeSubscribe(topic, fromClientId);
 			}
 		}
-		
+
 		return true;
 	}
 

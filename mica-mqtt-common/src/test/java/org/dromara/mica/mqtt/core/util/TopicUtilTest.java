@@ -22,10 +22,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.dreamlu.mica.net.utils.mica.IntPair;
 import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.tio.utils.mica.IntPair;
 
 /**
  * TopicUtil 测试

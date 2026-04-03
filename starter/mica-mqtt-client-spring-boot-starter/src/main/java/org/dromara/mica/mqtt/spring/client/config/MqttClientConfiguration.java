@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.spring.client.config;
 
+import net.dreamlu.mica.net.core.ssl.SSLEngineCustomizer;
+import net.dreamlu.mica.net.core.ssl.SslConfig;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.core.client.IMqttClientConnectListener;
 import org.dromara.mica.mqtt.core.client.MqttClient;
@@ -35,8 +37,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
-import org.tio.core.ssl.SSLEngineCustomizer;
-import org.tio.core.ssl.SslConfig;
 
 import java.util.List;
 

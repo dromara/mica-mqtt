@@ -16,10 +16,10 @@
 
 package org.dromara.mica.mqtt.codec.message;
 
+import net.dreamlu.mica.net.core.intf.Packet;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
-import org.tio.core.intf.Packet;
 
 /**
  * Base class for all MQTT message types.

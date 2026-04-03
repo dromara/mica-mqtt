@@ -16,6 +16,9 @@
 
 package org.dromara.mica.mqtt.codec;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.utils.buffer.ByteBufferUtil;
+import net.dreamlu.mica.net.utils.hutool.FastByteBuffer;
 import org.dromara.mica.mqtt.codec.exception.EncoderException;
 import org.dromara.mica.mqtt.codec.exception.MqttIdentifierRejectedException;
 import org.dromara.mica.mqtt.codec.message.*;
@@ -27,9 +30,6 @@ import org.dromara.mica.mqtt.codec.message.payload.MqttSubscribePayload;
 import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubAckPayload;
 import org.dromara.mica.mqtt.codec.message.payload.MqttUnsubscribePayload;
 import org.dromara.mica.mqtt.codec.properties.*;
-import org.tio.core.ChannelContext;
-import org.tio.utils.buffer.ByteBufferUtil;
-import org.tio.utils.hutool.FastByteBuffer;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;

@@ -18,9 +18,9 @@ package org.dromara.mica.mqtt.spring.client.event;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.core.client.IMqttClientConnectListener;
 import org.springframework.context.ApplicationEventPublisher;
-import org.tio.core.ChannelContext;
 
 /**
  * spring event mqtt client 连接监听

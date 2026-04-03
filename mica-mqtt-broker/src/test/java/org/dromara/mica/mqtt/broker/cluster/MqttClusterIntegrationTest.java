@@ -16,16 +16,15 @@
 
 package org.dromara.mica.mqtt.broker.cluster;
 
+import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.server.cluster.core.ClusterApi;
+import net.dreamlu.mica.net.server.cluster.core.ClusterConfig;
+import net.dreamlu.mica.net.server.cluster.core.ClusterImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.Node;
-import org.tio.server.cluster.core.ClusterApi;
-import org.tio.server.cluster.core.ClusterConfig;
-import org.tio.server.cluster.core.ClusterImpl;
-import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -47,8 +46,8 @@ class MqttClusterIntegrationTest {
 
     private final AtomicBoolean node1Received = new AtomicBoolean(false);
     private final AtomicReference<String> node1ReceivedMessage = new AtomicReference<>();
-    
-    private final AtomicBoolean node2Received = new AtomicBoolean(false);
+
+	private final AtomicBoolean node2Received = new AtomicBoolean(false);
     private final AtomicReference<String> node2ReceivedMessage = new AtomicReference<>();
 
     @BeforeEach
@@ -86,8 +85,8 @@ class MqttClusterIntegrationTest {
 
         // 等待集群连接建立
         Thread.sleep(1500);
-        
-        logger.info("Cluster setup complete");
+
+		logger.info("Cluster setup complete");
     }
 
     @AfterEach
@@ -105,11 +104,11 @@ class MqttClusterIntegrationTest {
         // 验证两个节点已经互相连接
         assertNotNull(cluster1.getRemoteMembers());
         assertNotNull(cluster2.getRemoteMembers());
-        
-        logger.info("Node1 remote members: {}", cluster1.getRemoteMembers());
+
+		logger.info("Node1 remote members: {}", cluster1.getRemoteMembers());
         logger.info("Node2 remote members: {}", cluster2.getRemoteMembers());
-        
-        // 验证节点互相发现
+
+		// 验证节点互相发现
         assertTrue(cluster1.getRemoteMembers().size() >= 1, "Node1 should have remote members");
         assertTrue(cluster2.getRemoteMembers().size() >= 1, "Node2 should have remote members");
     }
@@ -119,15 +118,15 @@ class MqttClusterIntegrationTest {
         // 重置状态
         node2Received.set(false);
         node2ReceivedMessage.set(null);
-        
-        // 从 cluster1 广播消息
+
+		// 从 cluster1 广播消息
         String testMessage = "Hello from Node1 - Broadcast";
         cluster1.broadcast(testMessage.getBytes(StandardCharsets.UTF_8));
-        
-        // 等待消息传递
+
+		// 等待消息传递
         Thread.sleep(1000);
-        
-        assertTrue(node2Received.get(), "Node2 should receive broadcast message");
+
+		assertTrue(node2Received.get(), "Node2 should receive broadcast message");
         assertEquals(testMessage, node2ReceivedMessage.get());
     }
 
@@ -135,14 +134,14 @@ class MqttClusterIntegrationTest {
     void testLocalMemberInfo() {
         Node localNode1 = cluster1.getLocalMember();
         Node localNode2 = cluster2.getLocalMember();
-        
-        assertNotNull(localNode1);
+
+		assertNotNull(localNode1);
         assertNotNull(localNode2);
-        
-        logger.info("Node1 local member: {}:{}", localNode1.getIp(), localNode1.getPort());
+
+		logger.info("Node1 local member: {}:{}", localNode1.getIp(), localNode1.getPort());
         logger.info("Node2 local member: {}:{}", localNode2.getIp(), localNode2.getPort());
-        
-        assertEquals("127.0.0.1", localNode1.getIp());
+
+		assertEquals("127.0.0.1", localNode1.getIp());
         assertEquals(9001, localNode1.getPort());
         assertEquals("127.0.0.1", localNode2.getIp());
         assertEquals(9002, localNode2.getPort());

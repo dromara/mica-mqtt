@@ -2,6 +2,8 @@
 
 package org.dromara.mica.mqtt.server.solon.config;
 
+import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.http.mcp.server.McpServer;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.deserialize.MqttJsonDeserializer;
 import org.dromara.mica.mqtt.core.server.MqttServer;
@@ -15,8 +17,6 @@ import org.noear.solon.annotation.Bean;
 import org.noear.solon.annotation.Condition;
 import org.noear.solon.annotation.Configuration;
 import org.noear.solon.annotation.Inject;
-import org.tio.core.Node;
-import org.tio.http.mcp.server.McpServer;
 
 import java.util.List;
 

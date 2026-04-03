@@ -16,11 +16,11 @@
 
 package org.dromara.mica.mqtt.ssl;
 
+import net.dreamlu.mica.net.utils.buffer.ByteBufferUtil;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.server.MqttConnectStatusListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.utils.buffer.ByteBufferUtil;
 
 import java.nio.charset.StandardCharsets;
 

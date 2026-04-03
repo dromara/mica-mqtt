@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.core.client;
 
+import net.dreamlu.mica.net.utils.hutool.CollUtil;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
@@ -23,8 +24,6 @@ import org.dromara.mica.mqtt.core.annotation.MqttClientPublish;
 import org.dromara.mica.mqtt.core.annotation.MqttPayload;
 import org.dromara.mica.mqtt.core.annotation.MqttRetain;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
-import org.tio.utils.hutool.CollUtil;
-
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;

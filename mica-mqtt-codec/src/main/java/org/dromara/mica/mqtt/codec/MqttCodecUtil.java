@@ -16,10 +16,10 @@
 
 package org.dromara.mica.mqtt.codec;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.exception.MqttUnacceptableProtocolVersionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.ChannelContext;
 
 /**
  * 编解码工具

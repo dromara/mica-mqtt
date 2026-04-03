@@ -16,14 +16,14 @@
 
 package org.dromara.mica.mqtt.core.server.http.handler;
 
+import net.dreamlu.mica.net.http.common.HttpRequest;
+import net.dreamlu.mica.net.http.common.HttpResponse;
+import net.dreamlu.mica.net.http.common.RequestLine;
+import net.dreamlu.mica.net.http.common.handler.HttpRequestHandler;
 import org.dromara.mica.mqtt.core.server.http.api.code.ResultCode;
 import org.dromara.mica.mqtt.core.server.http.api.result.Result;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.http.common.HttpRequest;
-import org.tio.http.common.HttpResponse;
-import org.tio.http.common.RequestLine;
-import org.tio.http.common.handler.HttpRequestHandler;
 
 import java.util.List;
 

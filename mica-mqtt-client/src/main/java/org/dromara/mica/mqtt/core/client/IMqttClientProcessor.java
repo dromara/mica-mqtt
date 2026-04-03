@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.core.client;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.message.*;
-import org.tio.core.ChannelContext;
 
 /**
  * mqtt 客户端消息处理器

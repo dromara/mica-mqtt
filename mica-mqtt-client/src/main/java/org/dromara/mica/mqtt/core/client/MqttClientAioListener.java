@@ -16,6 +16,10 @@
 
 package org.dromara.mica.mqtt.core.client;
 
+import net.dreamlu.mica.net.client.DefaultTioClientListener;
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Tio;
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.builder.MqttConnectBuilder;
@@ -24,10 +28,6 @@ import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.client.DefaultTioClientListener;
-import org.tio.core.ChannelContext;
-import org.tio.core.Tio;
-import org.tio.utils.hutool.StrUtil;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;

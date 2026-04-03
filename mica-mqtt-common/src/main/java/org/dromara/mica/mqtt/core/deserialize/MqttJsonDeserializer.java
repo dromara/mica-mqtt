@@ -17,7 +17,7 @@
 package org.dromara.mica.mqtt.core.deserialize;
 
 
-import org.tio.utils.json.JsonUtil;
+import net.dreamlu.mica.net.utils.json.JsonUtil;
 
 import java.lang.reflect.Type;
 

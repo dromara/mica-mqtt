@@ -1,6 +1,6 @@
 package org.dromara.mica.mqtt.core.client;
 
-import org.tio.core.intf.TioUuid;
+import net.dreamlu.mica.net.core.intf.TioUuid;
 
 /**
  * 将 mqtt clientId 绑定到 context 中

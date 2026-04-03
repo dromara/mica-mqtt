@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.core.server.auth;
 
-import org.tio.core.ChannelContext;
+import net.dreamlu.mica.net.core.ChannelContext;
 
 /**
  * mqtt 服务端唯一 id 绑定

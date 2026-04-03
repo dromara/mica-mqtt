@@ -16,10 +16,10 @@
 
 package org.dromara.mica.mqtt.core.server.support;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.ChannelContext;
 
 /**
  * 默认的链接状态监听

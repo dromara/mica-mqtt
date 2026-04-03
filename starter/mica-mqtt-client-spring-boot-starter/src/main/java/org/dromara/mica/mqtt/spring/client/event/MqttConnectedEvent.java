@@ -19,7 +19,7 @@ package org.dromara.mica.mqtt.spring.client.event;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.tio.core.ChannelContext;
+import net.dreamlu.mica.net.core.ChannelContext;
 
 import java.io.Serializable;
 

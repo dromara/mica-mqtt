@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.aliyun;
 
-import org.tio.utils.mica.DigestUtils;
+import net.dreamlu.mica.net.utils.mica.DigestUtils;
 
 import java.util.Objects;
 

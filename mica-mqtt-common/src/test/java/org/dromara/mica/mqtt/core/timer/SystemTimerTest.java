@@ -1,8 +1,8 @@
 package org.dromara.mica.mqtt.core.timer;
 
+import net.dreamlu.mica.net.utils.timer.SystemTimer;
+import net.dreamlu.mica.net.utils.timer.TimingWheelThread;
 import org.dromara.mica.mqtt.core.util.timer.AckTimerTask;
-import org.tio.utils.timer.SystemTimer;
-import org.tio.utils.timer.TimingWheelThread;
 
 import java.util.concurrent.TimeUnit;
 

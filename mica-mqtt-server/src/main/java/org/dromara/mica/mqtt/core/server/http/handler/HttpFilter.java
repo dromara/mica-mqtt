@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.core.server.http.handler;
 
-import org.tio.http.common.HttpRequest;
-import org.tio.http.common.HttpResponse;
+import net.dreamlu.mica.net.http.common.HttpRequest;
+import net.dreamlu.mica.net.http.common.HttpResponse;
 
 /**
  * http 过滤器

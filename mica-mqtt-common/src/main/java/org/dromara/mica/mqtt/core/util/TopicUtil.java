@@ -16,14 +16,14 @@
 
 package org.dromara.mica.mqtt.core.util;
 
+import net.dreamlu.mica.net.utils.hutool.ClassUtil;
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
+import net.dreamlu.mica.net.utils.mica.IntPair;
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.common.TopicTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.utils.hutool.ClassUtil;
-import org.tio.utils.hutool.StrUtil;
-import org.tio.utils.mica.IntPair;
 
 import java.util.ArrayList;
 import java.util.List;

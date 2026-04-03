@@ -1,9 +1,9 @@
 package org.dromara.mica.mqtt.server.auth;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
 import org.springframework.context.annotation.Configuration;
-import org.tio.core.ChannelContext;
 
 /**
  * 示例自定义订阅校验，请按照自己的需求和业务进行扩展

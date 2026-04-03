@@ -16,10 +16,10 @@
 
 package org.dromara.mica.mqtt.core.server.http.websocket;
 
-import org.tio.core.ChannelContext;
-import org.tio.core.intf.Packet;
-import org.tio.server.intf.TioServerListener;
-import org.tio.websocket.server.WsTioServerListener;
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.intf.Packet;
+import net.dreamlu.mica.net.server.intf.TioServerListener;
+import net.dreamlu.mica.net.websocket.server.WsTioServerListener;
 
 /**
  * mqtt websocket 监听器

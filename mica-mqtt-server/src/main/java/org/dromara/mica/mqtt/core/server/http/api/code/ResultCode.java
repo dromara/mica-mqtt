@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.core.server.http.api.code;
 
-import org.tio.http.common.HttpResponseStatus;
+import net.dreamlu.mica.net.http.common.HttpResponseStatus;
 
 /**
  * 响应 code 码

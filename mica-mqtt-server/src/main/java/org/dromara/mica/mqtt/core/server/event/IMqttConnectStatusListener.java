@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.core.server.event;
 
-import org.tio.core.ChannelContext;
+import net.dreamlu.mica.net.core.ChannelContext;
 
 /**
  * mqtt 链接状态事件

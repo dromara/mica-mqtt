@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.core.server.event;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.tio.core.ChannelContext;
 
 /**
  * mqtt session 事件

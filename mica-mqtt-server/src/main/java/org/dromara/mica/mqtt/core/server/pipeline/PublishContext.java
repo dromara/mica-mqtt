@@ -16,12 +16,12 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline;
 
-import java.io.Serializable;
-
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
-import org.tio.core.ChannelContext;
+
+import java.io.Serializable;
 
 /**
  * 发布消息上下文，承载完整的发布消息信息（包括 MQTT5 properties）

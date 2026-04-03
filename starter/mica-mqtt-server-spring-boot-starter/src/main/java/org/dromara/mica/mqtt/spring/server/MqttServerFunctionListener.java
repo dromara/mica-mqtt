@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.spring.server;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
@@ -23,7 +24,6 @@ import org.dromara.mica.mqtt.core.function.ParamValueFunction;
 import org.dromara.mica.mqtt.core.server.func.IMqttFunctionMessageListener;
 import org.dromara.mica.mqtt.core.util.MethodParamUtil;
 import org.springframework.util.ReflectionUtils;
-import org.tio.core.ChannelContext;
 
 import java.lang.reflect.Method;
 

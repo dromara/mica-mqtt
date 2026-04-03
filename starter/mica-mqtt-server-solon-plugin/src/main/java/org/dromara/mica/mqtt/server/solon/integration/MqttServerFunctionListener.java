@@ -16,14 +16,14 @@
 
 package org.dromara.mica.mqtt.server.solon.integration;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.utils.mica.ExceptionUtils;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.function.ParamValueFunction;
 import org.dromara.mica.mqtt.core.server.func.IMqttFunctionMessageListener;
 import org.dromara.mica.mqtt.core.util.MethodParamUtil;
-import org.tio.core.ChannelContext;
-import org.tio.utils.mica.ExceptionUtils;
 
 import java.lang.reflect.Method;
 

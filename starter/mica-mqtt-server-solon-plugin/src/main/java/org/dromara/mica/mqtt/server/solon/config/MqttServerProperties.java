@@ -5,13 +5,13 @@ package org.dromara.mica.mqtt.server.solon.config;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
+import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.core.ssl.ClientAuth;
+import net.dreamlu.mica.net.http.mcp.server.transport.SseTransport;
+import net.dreamlu.mica.net.http.mcp.server.transport.StreamableHttpTransport;
 import org.dromara.mica.mqtt.codec.MqttConstant;
 import org.noear.solon.annotation.Configuration;
 import org.noear.solon.annotation.Inject;
-import org.tio.core.Node;
-import org.tio.core.ssl.ClientAuth;
-import org.tio.http.mcp.server.transport.SseTransport;
-import org.tio.http.mcp.server.transport.StreamableHttpTransport;
 
 /**
  * <b>(MqttServerProperties)</b>

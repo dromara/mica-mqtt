@@ -16,14 +16,14 @@
 
 package org.dromara.mica.mqtt.core.server.http.api.auth;
 
+import net.dreamlu.mica.net.http.common.HeaderName;
+import net.dreamlu.mica.net.http.common.HeaderValue;
+import net.dreamlu.mica.net.http.common.HttpRequest;
+import net.dreamlu.mica.net.http.common.HttpResponse;
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.core.server.http.api.code.ResultCode;
 import org.dromara.mica.mqtt.core.server.http.api.result.Result;
 import org.dromara.mica.mqtt.core.server.http.handler.HttpFilter;
-import org.tio.http.common.HeaderName;
-import org.tio.http.common.HeaderValue;
-import org.tio.http.common.HttpRequest;
-import org.tio.http.common.HttpResponse;
-import org.tio.utils.hutool.StrUtil;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;

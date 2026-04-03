@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline.message;
 
+import net.dreamlu.mica.net.server.ServerChannelContext;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.server.MqttServer;
@@ -23,7 +24,6 @@ import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.server.ServerChannelContext;
 
 /**
  * HTTP API 消息处理器
@@ -42,22 +42,22 @@ public class HttpApiMessageHandler extends BaseMessageHandler {
 		if (MessageType.HTTP_API != message.getMessageType()) {
 			return true;
 		}
-		
+
 		String topic = message.getTopic();
 		byte[] payload = message.getPayload();
 		MqttQoS mqttQoS = MqttQoS.valueOf(message.getQos());
 		boolean retain = message.isRetain();
-		
+
 		// 发布到所有订阅者
 		mqttServer.publishAll(topic, payload, mqttQoS, retain);
-		
+
 		// 触发消息监听器
 		try {
 			onHttpApiMessage(topic, mqttQoS, message);
 		} catch (Throwable e) {
 			logger.error("Http API message listener error", e);
 		}
-		
+
 		return true;
 	}
 
@@ -65,13 +65,13 @@ public class HttpApiMessageHandler extends BaseMessageHandler {
 		if (messageListener == null) {
 			return;
 		}
-		
+
 		String clientId = message.getClientId();
 		// 构造 context
 		ServerChannelContext context = new ServerChannelContext(mqttServer.getServerConfig());
 		context.setBsId(clientId);
 		context.setUserId(MessageType.HTTP_API.name());
-		
+
 		// 构造 MqttPublishMessage
 		MqttPublishMessage publishMessage = MqttPublishMessage.builder()
 			.topicName(topic)
@@ -79,7 +79,7 @@ public class HttpApiMessageHandler extends BaseMessageHandler {
 			.retained(message.isRetain())
 			.payload(message.getPayload())
 			.build();
-		
+
 		messageListener.onMessage(context, clientId, topic, mqttQoS, publishMessage);
 	}
 

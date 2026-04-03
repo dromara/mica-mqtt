@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.core.function;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
-import org.tio.core.ChannelContext;
 
 import java.nio.ByteBuffer;
 

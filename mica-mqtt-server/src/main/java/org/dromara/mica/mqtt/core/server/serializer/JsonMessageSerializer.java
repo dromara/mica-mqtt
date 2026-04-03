@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.core.server.serializer;
 
+import net.dreamlu.mica.net.utils.json.JsonUtil;
 import org.dromara.mica.mqtt.core.server.model.Message;
-import org.tio.utils.json.JsonUtil;
 
 /**
  * fastjson 序列化

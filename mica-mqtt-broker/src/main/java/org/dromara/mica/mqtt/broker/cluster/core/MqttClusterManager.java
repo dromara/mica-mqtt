@@ -16,6 +16,11 @@
 
 package org.dromara.mica.mqtt.broker.cluster.core;
 
+import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.server.cluster.core.ClusterApi;
+import net.dreamlu.mica.net.server.cluster.core.ClusterConfig;
+import net.dreamlu.mica.net.server.cluster.core.ClusterImpl;
+import net.dreamlu.mica.net.server.cluster.message.ClusterDataMessage;
 import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterConfig;
 import org.dromara.mica.mqtt.broker.cluster.message.*;
 import org.dromara.mica.mqtt.codec.MqttQoS;
@@ -26,11 +31,6 @@ import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.Node;
-import org.tio.server.cluster.core.ClusterApi;
-import org.tio.server.cluster.core.ClusterConfig;
-import org.tio.server.cluster.core.ClusterImpl;
-import org.tio.server.cluster.message.ClusterDataMessage;
 
 import java.util.*;
 

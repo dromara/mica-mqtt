@@ -16,13 +16,13 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline.message;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Tio;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.core.ChannelContext;
-import org.tio.core.Tio;
 
 /**
  * 连接消息处理器
@@ -43,7 +43,7 @@ public class ConnectMessageHandler extends BaseMessageHandler {
 		if (MessageType.CONNECT != message.getMessageType()) {
 			return true;
 		}
-		
+
 		// 1. 如果一个 clientId 在集群多个服务上连接时断开其他的
 		String node = message.getNode();
 		if (nodeName.equals(node)) {
@@ -54,7 +54,7 @@ public class ConnectMessageHandler extends BaseMessageHandler {
 		if (context != null) {
 			Tio.remove(context, "clientId:[" + clientId + "] now bind on mqtt node:" + node);
 		}
-		
+
 		return true;
 	}
 

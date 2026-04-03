@@ -16,14 +16,14 @@
 
 package org.dromara.mica.mqtt.core.client;
 
+import net.dreamlu.mica.net.utils.collection.IntObjectHashMap;
+import net.dreamlu.mica.net.utils.collection.IntObjectMap;
+import net.dreamlu.mica.net.utils.collection.MultiValueMap;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.utils.collection.IntObjectHashMap;
-import org.tio.utils.collection.IntObjectMap;
-import org.tio.utils.collection.MultiValueMap;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;

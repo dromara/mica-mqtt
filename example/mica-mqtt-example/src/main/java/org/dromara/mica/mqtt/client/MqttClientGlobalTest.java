@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.client;
 
+import net.dreamlu.mica.net.utils.buffer.ByteBufferUtil;
 import org.dromara.mica.mqtt.core.client.MqttClient;
-import org.tio.utils.buffer.ByteBufferUtil;
 
 /**
  * 客户端全局订阅测试

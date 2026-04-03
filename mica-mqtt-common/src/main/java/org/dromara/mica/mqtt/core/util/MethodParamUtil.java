@@ -16,13 +16,13 @@
 
 package org.dromara.mica.mqtt.core.util;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.function.ObjectParamValueFunction;
 import org.dromara.mica.mqtt.core.function.ParamValueFunction;
 import org.dromara.mica.mqtt.core.function.ParamValueFunctions;
 import org.dromara.mica.mqtt.core.function.TopicVarsParamValueFunction;
-import org.tio.core.ChannelContext;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;

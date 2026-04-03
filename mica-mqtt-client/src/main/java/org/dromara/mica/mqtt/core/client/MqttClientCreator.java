@@ -16,28 +16,29 @@
 
 package org.dromara.mica.mqtt.core.client;
 
-import org.dromara.mica.mqtt.codec.*;
+import net.dreamlu.mica.net.client.ReconnConf;
+import net.dreamlu.mica.net.client.TioClient;
+import net.dreamlu.mica.net.client.TioClientConfig;
+import net.dreamlu.mica.net.client.intf.TioClientHandler;
+import net.dreamlu.mica.net.client.intf.TioClientListener;
+import net.dreamlu.mica.net.client.task.HeartbeatTimeoutStrategy;
+import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.core.TioConfig;
+import net.dreamlu.mica.net.core.ssl.SslConfig;
+import net.dreamlu.mica.net.core.task.HeartbeatMode;
+import net.dreamlu.mica.net.utils.hutool.NetUtil;
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
+import net.dreamlu.mica.net.utils.thread.ThreadUtils;
+import net.dreamlu.mica.net.utils.thread.pool.SynThreadPoolExecutor;
+import net.dreamlu.mica.net.utils.timer.DefaultTimerTaskService;
+import net.dreamlu.mica.net.utils.timer.TimerTaskService;
+import org.dromara.mica.mqtt.codec.MqttConstant;
+import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.serializer.MqttJsonSerializer;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
-import org.tio.client.ReconnConf;
-import org.tio.client.TioClient;
-import org.tio.client.TioClientConfig;
-import org.tio.client.intf.TioClientHandler;
-import org.tio.client.intf.TioClientListener;
-import org.tio.client.task.HeartbeatTimeoutStrategy;
-import org.tio.core.Node;
-import org.tio.core.TioConfig;
-import org.tio.core.ssl.SslConfig;
-import org.tio.core.task.HeartbeatMode;
-import org.tio.utils.hutool.NetUtil;
-import org.tio.utils.hutool.StrUtil;
-import org.tio.utils.thread.ThreadUtils;
-import org.tio.utils.thread.pool.SynThreadPoolExecutor;
-import org.tio.utils.timer.DefaultTimerTaskService;
-import org.tio.utils.timer.TimerTaskService;
 
 import java.io.InputStream;
 import java.util.*;

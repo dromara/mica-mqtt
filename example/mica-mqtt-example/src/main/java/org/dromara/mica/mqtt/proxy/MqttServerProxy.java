@@ -16,12 +16,12 @@
 
 package org.dromara.mica.mqtt.proxy;
 
+import net.dreamlu.mica.net.utils.buffer.ByteBufferUtil;
 import org.dromara.mica.mqtt.core.client.MqttClient;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.server.MqttConnectStatusListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tio.utils.buffer.ByteBufferUtil;
 
 /**
  * mqtt 服务端代理到另外一个服务端

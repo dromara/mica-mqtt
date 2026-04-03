@@ -16,12 +16,12 @@
 
 package org.dromara.mica.mqtt.core.server;
 
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
-import org.tio.core.ChannelContext;
 
 /**
  * mqtt broker 处理器

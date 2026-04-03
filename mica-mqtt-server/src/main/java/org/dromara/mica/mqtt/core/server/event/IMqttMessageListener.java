@@ -16,9 +16,9 @@
 
 package org.dromara.mica.mqtt.core.server.event;
 
-import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
+import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.tio.core.ChannelContext;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 
 /**
  * mqtt 消息处理

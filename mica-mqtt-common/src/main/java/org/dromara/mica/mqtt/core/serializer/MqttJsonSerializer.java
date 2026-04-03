@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.core.serializer;
 
-import org.tio.utils.json.JsonUtil;
+import net.dreamlu.mica.net.utils.json.JsonUtil;
 
 /**
  * mqtt 消息 json 序列化
