@@ -41,6 +41,8 @@ public class MqttServerTest {
 //			.maxBytesInMessage(1024 * 100)
 //			mqtt 3.1 协议会校验 clientId 长度。
 //			.maxClientIdLength(64)
+//			开启代理协议，支持 nginx、haproxy、elb 等转发设备原始 ip
+			.proxyProtocolEnable()
 			.messageListener((context, clientId, topic, qos, message) -> {
 				logger.info("clientId:{} payload:{}", clientId, new String(message.payload(), StandardCharsets.UTF_8));
 			})

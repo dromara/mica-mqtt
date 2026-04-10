@@ -2,6 +2,12 @@
 
 ## 发行版本
 
+### v2.6.2 - 2026-04-12
+
+- ⬆️ mica-net 升级到 2.0.1。
+   - 【不兼容】从 `org.tio` 迁移到 `net.dreamlu.mica.net` 避免跟原版 `t-io` 包冲突。
+   - 支持 PROXY protocol V2 解析功能。
+
 ### v2.6.1 - 2026-03-28
 
 1. ✨ 新增了 mica-mqtt-broker 模块，提供 mqtt 原生集群能力（优化完善中，欢迎试用、讨论）。
