@@ -5,7 +5,7 @@
 ### v2.6.2 - 2026-04-12
 
 - ⬆️ mica-net 升级到 2.0.1。
-   - 【不兼容】从 `org.tio` 迁移到 `net.dreamlu.mica.net` 避免跟原版 `t-io` 包冲突。
+   - 【不兼容】从 `org.tio` 迁移到 `net.dreamlu.mica.net` 避免跟原版 `t-io` 包冲突 gitee #IFY7D6 感谢 `@wssam` 反馈。
    - 支持 PROXY protocol V2 解析功能。
 
 ### v2.6.1 - 2026-03-28
