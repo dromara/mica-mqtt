@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.broker.cluster.config;
 
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttConnectStatusListener;
 import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttMessageStore;
 import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttSessionManager;
@@ -85,14 +86,15 @@ public class MqttClusterBrokerCreator {
 			return serverCreator.build();
 		}
 
-		// 集群模式下 nodeName 必须为 host:port 格式，用于节点间点对点通信寻址
-		String nodeName = serverCreator.getNodeName();
-		if (nodeName == null || !nodeName.contains(":")) {
-			nodeName = clusterConfig.getClusterHost() + ":" + clusterConfig.getClusterPort();
-			serverCreator.nodeName(nodeName);
+		// nodeId 为 host:port 格式，用于节点间点对点通信寻址，如果为空，设置成集群节点
+		String nodeId = serverCreator.getNodeName();
+		String clusterHost = clusterConfig.getClusterHost();
+		int clusterPort = clusterConfig.getClusterPort();
+		if (StrUtil.isBlank(nodeId) || !nodeId.contains(":")) {
+			nodeId = clusterHost + ':' + clusterPort;
 		}
-
-		clusterManager = new MqttClusterManager(clusterConfig, nodeName);
+		serverCreator.nodeName(nodeId);
+		clusterManager = new MqttClusterManager(clusterConfig, nodeId);
 
 		IMqttSessionManager delegateSessionManager = serverCreator.getSessionManager();
 		if (delegateSessionManager == null) {
