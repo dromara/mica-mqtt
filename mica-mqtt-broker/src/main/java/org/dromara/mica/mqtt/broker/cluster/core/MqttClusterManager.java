@@ -118,6 +118,11 @@ public class MqttClusterManager {
 		cluster.start();
 
 		logger.info("Mqtt cluster manager started on {}:{} with nodeName {}", config.getClusterHost(), config.getClusterPort(), localNodeId);
+
+		// 新节点加入集群后，向已有节点请求全量状态同步
+		StateSyncRequestMessage syncRequest = new StateSyncRequestMessage();
+		broadcast(syncRequest);
+		logger.info("Sent state sync request to cluster");
 	}
 
 	private void handleClusterMessage(ClusterDataMessage message) {
@@ -142,7 +147,9 @@ public class MqttClusterManager {
 		switch (clusterMsg.getType()) {
 			case PUBLISH_FORWARD: {
 				PublishForwardMessage pfm = (PublishForwardMessage) clusterMsg;
-				mqttServer.publishAll(pfm.getMessage().getTopic(), pfm.getMessage().getPayload(), MqttQoS.valueOf(pfm.getMessage().getQos()), pfm.getMessage().isRetain());
+				// retain 存储由 RETAIN_MESSAGE 单独同步，此处仅投递给本地订阅者，避免通过
+				// ClusterMqttMessageStore 再次广播导致无限循环
+				mqttServer.publishAll(pfm.getMessage().getTopic(), pfm.getMessage().getPayload(), MqttQoS.valueOf(pfm.getMessage().getQos()), false);
 				break;
 			}
 			case SUBSCRIBE_NOTIFY: {
@@ -182,8 +189,9 @@ public class MqttClusterManager {
 			case WILL_MESSAGE: {
 				WillMessageNotifyMessage wmm = (WillMessageNotifyMessage) clusterMsg;
 				IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
-				if (messageStore != null && wmm.getWillMessage() != null) {
-					messageStore.addWillMessage(wmm.getClientId(), wmm.getWillMessage());
+				// 使用 Local 方法直接存储到 delegate，避免通过 ClusterMqttMessageStore 再次广播
+				if (messageStore instanceof ClusterMqttMessageStore && wmm.getWillMessage() != null) {
+					((ClusterMqttMessageStore) messageStore).addWillMessageLocal(wmm.getClientId(), wmm.getWillMessage());
 					logger.debug("[Cluster] Received and stored will message for clientId: {} from node: {}", wmm.getClientId(), sourceNode);
 				}
 				break;
@@ -191,12 +199,14 @@ public class MqttClusterManager {
 			case RETAIN_MESSAGE: {
 				RetainMessageNotifyMessage rmm = (RetainMessageNotifyMessage) clusterMsg;
 				IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
-				if (messageStore != null) {
+				// 使用 Local 方法直接存储到 delegate，避免通过 ClusterMqttMessageStore 再次广播
+				if (messageStore instanceof ClusterMqttMessageStore) {
+					ClusterMqttMessageStore clusterStore = (ClusterMqttMessageStore) messageStore;
 					if (rmm.getRetainMessage() != null) {
-						messageStore.addRetainMessage(rmm.getTopic(), rmm.getTimeout(), rmm.getRetainMessage());
+						clusterStore.addRetainMessageLocal(rmm.getTopic(), rmm.getTimeout(), rmm.getRetainMessage());
 						logger.debug("[Cluster] Received and stored retain message for topic: {} from node: {}", rmm.getTopic(), sourceNode);
 					} else {
-						messageStore.clearRetainMessage(rmm.getTopic());
+						clusterStore.clearRetainMessageLocal(rmm.getTopic());
 						logger.debug("[Cluster] Received retain clear for topic: {} from node: {}", rmm.getTopic(), sourceNode);
 					}
 				}

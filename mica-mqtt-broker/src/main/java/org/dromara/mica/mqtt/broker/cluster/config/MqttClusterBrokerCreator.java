@@ -85,7 +85,14 @@ public class MqttClusterBrokerCreator {
 			return serverCreator.build();
 		}
 
-		clusterManager = new MqttClusterManager(clusterConfig, serverCreator.getNodeName());
+		// 集群模式下 nodeName 必须为 host:port 格式，用于节点间点对点通信寻址
+		String nodeName = serverCreator.getNodeName();
+		if (nodeName == null || !nodeName.contains(":")) {
+			nodeName = clusterConfig.getClusterHost() + ":" + clusterConfig.getClusterPort();
+			serverCreator.nodeName(nodeName);
+		}
+
+		clusterManager = new MqttClusterManager(clusterConfig, nodeName);
 
 		IMqttSessionManager delegateSessionManager = serverCreator.getSessionManager();
 		if (delegateSessionManager == null) {

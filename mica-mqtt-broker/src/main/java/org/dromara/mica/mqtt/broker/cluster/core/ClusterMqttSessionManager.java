@@ -148,27 +148,31 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal) {
 		delegate.addSubscribe(topicFilter, clientId, mqttQoS, noLocal);
 
-		Subscribe subscribe = new Subscribe(topicFilter.getTopic(), clientId, mqttQoS, noLocal);
-		SubscribeNotifyMessage notifyMessage = new SubscribeNotifyMessage();
-		notifyMessage.setClientId(clientId);
-		notifyMessage.setNodeId(clusterManager.getLocalNodeId());
-		notifyMessage.setSubscriptions(Collections.singletonList(subscribe));
+		if (clusterManager.isClusterEnabled()) {
+			Subscribe subscribe = new Subscribe(topicFilter.getTopic(), clientId, mqttQoS, noLocal);
+			SubscribeNotifyMessage notifyMessage = new SubscribeNotifyMessage();
+			notifyMessage.setClientId(clientId);
+			notifyMessage.setNodeId(clusterManager.getLocalNodeId());
+			notifyMessage.setSubscriptions(Collections.singletonList(subscribe));
 
-		logger.debug("[Cluster] Broadcasting subscription: client={}, topic={}, node={}",
-			clientId, topicFilter.getTopic(), clusterManager.getLocalNodeId());
+			logger.debug("[Cluster] Broadcasting subscription: client={}, topic={}, node={}",
+				clientId, topicFilter.getTopic(), clusterManager.getLocalNodeId());
 
-		clusterManager.broadcast(notifyMessage);
+			clusterManager.broadcast(notifyMessage);
+		}
 	}
 
 	@Override
 	public void removeSubscribe(String topicFilter, String clientId) {
 		delegate.removeSubscribe(topicFilter, clientId);
 
-		UnsubscribeNotifyMessage notifyMessage = new UnsubscribeNotifyMessage();
-		notifyMessage.setClientId(clientId);
-		notifyMessage.setNodeId(clusterManager.getLocalNodeId());
-		notifyMessage.setTopics(Collections.singletonList(topicFilter));
-		clusterManager.broadcast(notifyMessage);
+		if (clusterManager.isClusterEnabled()) {
+			UnsubscribeNotifyMessage notifyMessage = new UnsubscribeNotifyMessage();
+			notifyMessage.setClientId(clientId);
+			notifyMessage.setNodeId(clusterManager.getLocalNodeId());
+			notifyMessage.setTopics(Collections.singletonList(topicFilter));
+			clusterManager.broadcast(notifyMessage);
+		}
 	}
 
 	@Override

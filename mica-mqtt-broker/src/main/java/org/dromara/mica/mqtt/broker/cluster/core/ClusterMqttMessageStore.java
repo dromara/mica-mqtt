@@ -104,6 +104,51 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 		return delegate.getRetainMessage(topicFilter);
 	}
 
+	/**
+	 * 仅本地存储遗嘱消息，不广播到集群。
+	 * 用于处理从其他节点接收到的集群消息，避免无限广播。
+	 *
+	 * @param clientId 客户端标识
+	 * @param message  遗嘱消息
+	 * @return 是否成功
+	 */
+	public boolean addWillMessageLocal(String clientId, Message message) {
+		return delegate.addWillMessage(clientId, message);
+	}
+
+	/**
+	 * 仅本地清除遗嘱消息，不广播到集群。
+	 *
+	 * @param clientId 客户端标识
+	 * @return 是否成功
+	 */
+	public boolean clearWillMessageLocal(String clientId) {
+		return delegate.clearWillMessage(clientId);
+	}
+
+	/**
+	 * 仅本地存储保留消息，不广播到集群。
+	 * 用于处理从其他节点接收到的集群消息，避免无限广播。
+	 *
+	 * @param topic   主题
+	 * @param timeout 过期时间
+	 * @param message 保留消息
+	 * @return 是否成功
+	 */
+	public boolean addRetainMessageLocal(String topic, int timeout, Message message) {
+		return delegate.addRetainMessage(topic, timeout, message);
+	}
+
+	/**
+	 * 仅本地清除保留消息，不广播到集群。
+	 *
+	 * @param topic 主题
+	 * @return 是否成功
+	 */
+	public boolean clearRetainMessageLocal(String topic) {
+		return delegate.clearRetainMessage(topic);
+	}
+
 	@Override
 	public void clean() throws java.io.IOException {
 		delegate.clean();

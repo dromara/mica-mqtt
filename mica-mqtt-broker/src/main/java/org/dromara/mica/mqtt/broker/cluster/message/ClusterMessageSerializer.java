@@ -340,8 +340,8 @@ public class ClusterMessageSerializer {
 				len += 2 + stringBytes(entry.getValue());
 			}
 		}
+		len += 4;
 		if (subscriptionMap != null && !subscriptionMap.isEmpty()) {
-			len += 4;
 			for (Map.Entry<String, List<Subscribe>> entry : subscriptionMap.entrySet()) {
 				len += 2 + stringBytes(entry.getKey());
 				byte[] subsBytes = serializeSubscriptions(entry.getValue());
