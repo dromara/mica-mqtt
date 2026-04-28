@@ -20,6 +20,7 @@ import net.dreamlu.mica.net.utils.collection.IntObjectHashMap;
 import net.dreamlu.mica.net.utils.collection.IntObjectMap;
 import net.dreamlu.mica.net.utils.collection.MultiValueMap;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 import org.slf4j.Logger;
@@ -27,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -49,6 +51,10 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 	private final IntObjectMap<MqttPendingUnSubscription> pendingUnSubscriptions = new IntObjectHashMap<>();
 	private final IntObjectMap<MqttPendingPublish> pendingPublishData = new IntObjectHashMap<>();
 	private final IntObjectMap<MqttPendingQos2Publish> pendingQos2PublishData = new IntObjectHashMap<>();
+	/**
+	 * MQTT 连接成功前的待发送发布消息队列
+	 */
+	private LinkedBlockingQueue<MqttPublishMessage> pendingPublishQueue;
 
 	@Override
 	public int getPacketId() {
@@ -196,11 +202,47 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 	}
 
 	@Override
+	public void addPendingPublishMessage(MqttPublishMessage message) {
+		if (pendingPublishQueue != null) {
+			pendingPublishQueue.offer(message);
+		}
+	}
+
+	@Override
+	public List<MqttPublishMessage> getAndClearPendingPublishMessages() {
+		if (pendingPublishQueue == null) {
+			return Collections.emptyList();
+		}
+		List<MqttPublishMessage> messages = new ArrayList<>();
+		pendingPublishQueue.drainTo(messages);
+		return messages;
+	}
+
+	@Override
+	public int getPendingPublishMessageCount() {
+		return pendingPublishQueue == null ? 0 : pendingPublishQueue.size();
+	}
+
+	/**
+	 * 初始化待发送消息队列
+	 *
+	 * @param queueSize 队列大小
+	 */
+	public void initPendingPublishQueue(int queueSize) {
+		if (queueSize > 0) {
+			this.pendingPublishQueue = new LinkedBlockingQueue<>(queueSize);
+		}
+	}
+
+	@Override
 	public void clean() {
 		subscriptions.clear();
 		pendingSubscriptions.clear();
 		pendingUnSubscriptions.clear();
 		pendingPublishData.clear();
 		pendingQos2PublishData.clear();
+		if (pendingPublishQueue != null) {
+			pendingPublishQueue.clear();
+		}
 	}
 }

@@ -406,11 +406,16 @@ public final class MqttClient implements IMqttClient {
 			logger.error("MQTT client publish fail, TCP not connected.");
 			return false;
 		}
-		// 如果已经连接成功，但是还没有 mqtt 认证，不进行休眠等待（避免大批量数据，卡死）
+		// 如果已经连接成功，但是还没有 mqtt 认证，尝试加入队列
 		// https://gitee.com/dromara/mica-mqtt/issues/IC4DWT
 		if (!clientContext.isAccepted()) {
-			logger.error("TCP is connected but mqtt is not accepted.");
-			return false;
+			// 尝试加入待发送队列
+			clientSession.addPendingPublishMessage(message);
+			int queueSize = clientSession.getPendingPublishMessageCount();
+			if (queueSize > 0) {
+				logger.warn("TCP 连接成功，MQTT 还未认证通过, 消息添加到待发布队列, 队列大小:{}", queueSize);
+			}
+			return true;
 		}
 		// 如果是高版本的 qos
 		if (isHighLevelQoS) {

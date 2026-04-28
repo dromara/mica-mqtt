@@ -181,6 +181,10 @@ public class MqttClientProperties {
 	 */
 	private boolean disconnectBeforeStop = true;
 	/**
+	 * MQTT 连接成功前的发布消息队列大小，默认：10
+	 */
+	private int pendingPublishQueueSize = 10;
+	/**
 	 * ssl 配置
 	 */
 	private Ssl ssl = new Ssl();

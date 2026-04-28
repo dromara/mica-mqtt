@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.client;
 
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
@@ -211,6 +212,27 @@ public interface IMqttClientSession {
 	 * @return MqttPendingQos2Publish
 	 */
 	MqttPendingQos2Publish removePendingQos2Publish(int messageId);
+
+	/**
+	 * 添加待发送的发布消息到队列（MQTT 未连接成功时）
+	 *
+	 * @param message MqttPublishMessage
+	 */
+	void addPendingPublishMessage(MqttPublishMessage message);
+
+	/**
+	 * 获取并清除所有待发送的发布消息
+	 *
+	 * @return 待发送的消息列表
+	 */
+	List<MqttPublishMessage> getAndClearPendingPublishMessages();
+
+	/**
+	 * 获取队列中待发送消息的数量
+	 *
+	 * @return 消息数量
+	 */
+	int getPendingPublishMessageCount();
 
 	/**
 	 * 资源清理

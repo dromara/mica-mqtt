@@ -108,6 +108,11 @@
       "description": "密码"
     },
     {
+      "name": "mqtt.client.pending-publish-queue-size",
+      "type": "java.lang.Integer",
+      "description": "MQTT 连接成功前的发布消息队列大小，默认：10"
+    },
+    {
       "name": "mqtt.client.port",
       "type": "java.lang.Integer",
       "description": "端口，默认：1883",

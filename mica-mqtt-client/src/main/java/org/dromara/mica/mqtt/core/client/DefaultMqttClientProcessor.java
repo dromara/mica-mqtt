@@ -81,6 +81,8 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 				publishConnectEvent(context);
 				// 3. 发送订阅，不管服务端是否存在 session 都发送
 				reSendSubscription(context);
+				// 4. 发送队列中待发送的消息
+				flushPendingPublishMessages(context);
 				break;
 			case CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD:
 			case CONNECTION_REFUSED_IDENTIFIER_REJECTED:
@@ -182,6 +184,26 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		// gitee issues #IB72L6 先添加并启动重试，再发送订阅
 		boolean result = Tio.send(context, message);
 		logger.info("MQTT subscriptionList:{} packetId:{} resubscribing result:{}", reSubscriptionList, packetId, result);
+	}
+
+	/**
+	 * 刷新并发送队列中待发送的消息
+	 *
+	 * @param context ChannelContext
+	 */
+	private void flushPendingPublishMessages(ChannelContext context) {
+		List<MqttPublishMessage> pendingMessages = clientSession.getAndClearPendingPublishMessages();
+		if (pendingMessages.isEmpty()) {
+			return;
+		}
+		logger.info("MQTT flushing {} pending publish messages", pendingMessages.size());
+		for (MqttPublishMessage message : pendingMessages) {
+			boolean result = Tio.send(context, message);
+			if (logger.isDebugEnabled()) {
+				String topicName = message.variableHeader().topicName();
+				logger.debug("MQTT pending publish message sent, topic:{} result:{}", topicName, result);
+			}
+		}
 	}
 
 	@Override
