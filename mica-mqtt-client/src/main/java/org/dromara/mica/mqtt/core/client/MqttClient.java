@@ -402,18 +402,14 @@ public final class MqttClient implements IMqttClient {
 			.messageId(messageId)
 			.build();
 		ClientChannelContext clientContext = getContext();
-		if (clientContext == null) {
-			logger.error("MQTT client publish fail, TCP not connected.");
-			return false;
-		}
-		// 如果已经连接成功，但是还没有 mqtt 认证，尝试加入队列
+		// mqtt 尚未连接成功的情况，加入待发送队列
 		// https://gitee.com/dromara/mica-mqtt/issues/IC4DWT
-		if (!clientContext.isAccepted()) {
+		if (clientContext == null || !clientContext.isAccepted()) {
 			// 尝试加入待发送队列
 			clientSession.addPendingPublishMessage(message);
 			int queueSize = clientSession.getPendingPublishMessageCount();
 			if (queueSize > 0) {
-				logger.warn("TCP 连接成功，MQTT 还未认证通过, 消息添加到待发布队列, 队列大小:{}", queueSize);
+				logger.warn("MQTT 尚未连接成功, 消息添加到待发布队列, 队列大小:{}", queueSize);
 			}
 			return true;
 		}
