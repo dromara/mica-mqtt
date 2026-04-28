@@ -379,7 +379,7 @@ public final class MqttClientCreator {
 		return this;
 	}
 
-	public MqttClientCreator timeout(int timeout) {
+	public MqttClientCreator timeout(Integer timeout) {
 		this.timeout = timeout;
 		return this;
 	}
