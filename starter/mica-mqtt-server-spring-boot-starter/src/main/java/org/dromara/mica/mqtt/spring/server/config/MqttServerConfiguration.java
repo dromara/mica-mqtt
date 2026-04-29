@@ -182,7 +182,7 @@ public class MqttServerConfiguration {
 		uniqueIdServiceObjectProvider.ifAvailable(serverCreator::uniqueIdService);
 		// 订阅校验
 		subscribeValidatorObjectProvider.ifAvailable(serverCreator::subscribeValidator);
-		// 订阅权限校验
+		// 发布权限校验
 		publishPermissionObjectProvider.ifAvailable(serverCreator::publishPermission);
 
 		// 消息存储
