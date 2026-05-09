@@ -235,6 +235,13 @@ public interface IMqttClientSession {
 	int getPendingPublishMessageCount();
 
 	/**
+	 * 初始化待发送消息队列
+	 *
+	 * @param queueSize 队列大小
+	 */
+	void initPendingPublishQueue(int queueSize);
+
+	/**
 	 * 资源清理
 	 */
 	void clean();

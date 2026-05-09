@@ -738,8 +738,8 @@ public final class MqttClientCreator {
 			this.clientSession = new DefaultMqttClientSession();
 		}
 		// 初始化待发送消息队列
-		if (this.pendingPublishQueueEnabled && this.clientSession instanceof DefaultMqttClientSession) {
-			((DefaultMqttClientSession) this.clientSession).initPendingPublishQueue(this.pendingPublishQueueSize);
+		if (this.pendingPublishQueueEnabled) {
+			this.clientSession.initPendingPublishQueue(this.pendingPublishQueueSize);
 		}
 		// tioExecutor
 		if (this.tioExecutor == null) {

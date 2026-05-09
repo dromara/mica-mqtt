@@ -223,11 +223,7 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 		return pendingPublishQueue == null ? 0 : pendingPublishQueue.size();
 	}
 
-	/**
-	 * 初始化待发送消息队列
-	 *
-	 * @param queueSize 队列大小
-	 */
+	@Override
 	public void initPendingPublishQueue(int queueSize) {
 		if (queueSize > 0) {
 			this.pendingPublishQueue = new LinkedBlockingQueue<>(queueSize);
