@@ -181,6 +181,10 @@ public class MqttClientProperties {
 	 */
 	private boolean disconnectBeforeStop = true;
 	/**
+	 * 是否开启 MQTT 连接前待发送消息队列，默认：false（老版本默认丢弃数据，升级时保持兼容）
+	 */
+	private boolean pendingPublishQueueEnabled = false;
+	/**
 	 * MQTT 连接成功前的发布消息队列大小，默认：10
 	 */
 	private int pendingPublishQueueSize = 10;

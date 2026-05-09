@@ -216,6 +216,10 @@ public final class MqttClientCreator {
 	 */
 	private boolean disconnectBeforeStop = true;
 	/**
+	 * 是否开启 MQTT 连接前待发送消息队列，默认：false（老版本默认丢弃数据，升级时保持兼容）
+	 */
+	private boolean pendingPublishQueueEnabled = false;
+	/**
 	 * MQTT 连接成功前的发布消息队列大小，默认：10
 	 */
 	private int pendingPublishQueueSize = 10;
@@ -366,6 +370,10 @@ public final class MqttClientCreator {
 
 	public boolean isDisconnectBeforeStop() {
 		return disconnectBeforeStop;
+	}
+
+	public boolean isPendingPublishQueueEnabled() {
+		return pendingPublishQueueEnabled;
 	}
 
 	public int getPendingPublishQueueSize() {
@@ -655,7 +663,18 @@ public final class MqttClientCreator {
 	}
 
 	/**
-	 * 设置 MQTT 连接成功前的发布消息队列大小，默认：0 不开启
+	 * 设置是否开启 MQTT 连接前待发送消息队列，默认：false
+	 *
+	 * @param pendingPublishQueueEnabled 是否开启
+	 * @return MqttClientCreator
+	 */
+	public MqttClientCreator pendingPublishQueueEnabled(boolean pendingPublishQueueEnabled) {
+		this.pendingPublishQueueEnabled = pendingPublishQueueEnabled;
+		return this;
+	}
+
+	/**
+	 * 设置 MQTT 连接成功前的发布消息队列大小，默认：10
 	 *
 	 * @param pendingPublishQueueSize 队列大小
 	 * @return MqttClientCreator
@@ -695,6 +714,7 @@ public final class MqttClientCreator {
 			.debug(this.debug)
 			.mqttJsonSerializer(this.mqttSerializer)
 			.disconnectBeforeStop(this.disconnectBeforeStop)
+			.pendingPublishQueueEnabled(this.pendingPublishQueueEnabled)
 			.pendingPublishQueueSize(this.pendingPublishQueueSize);
 	}
 
@@ -718,7 +738,7 @@ public final class MqttClientCreator {
 			this.clientSession = new DefaultMqttClientSession();
 		}
 		// 初始化待发送消息队列
-		if (this.clientSession instanceof DefaultMqttClientSession) {
+		if (this.pendingPublishQueueEnabled && this.clientSession instanceof DefaultMqttClientSession) {
 			((DefaultMqttClientSession) this.clientSession).initPendingPublishQueue(this.pendingPublishQueueSize);
 		}
 		// tioExecutor

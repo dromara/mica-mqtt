@@ -405,13 +405,18 @@ public final class MqttClient implements IMqttClient {
 		// mqtt 尚未连接成功的情况，加入待发送队列
 		// https://gitee.com/dromara/mica-mqtt/issues/IC4DWT
 		if (clientContext == null || !clientContext.isAccepted()) {
-			// 尝试加入待发送队列
-			clientSession.addPendingPublishMessage(message);
-			int queueSize = clientSession.getPendingPublishMessageCount();
-			if (queueSize > 0) {
-				logger.warn("MQTT 尚未连接成功, 消息添加到待发布队列, 队列大小:{}", queueSize);
+			// 只有开启待发送队列功能时才添加消息到队列
+			if (config.isPendingPublishQueueEnabled()) {
+				clientSession.addPendingPublishMessage(message);
+				int queueSize = clientSession.getPendingPublishMessageCount();
+				if (queueSize > 0) {
+					logger.warn("MQTT 尚未连接成功, 消息添加到待发布队列, 队列大小:{}", queueSize);
+				}
+				return true;
+			} else {
+				logger.warn("MQTT 尚未连接成功, 待发送消息队列未开启, 消息被丢弃, topic:{}", topic);
+				return false;
 			}
-			return true;
 		}
 		// 如果是高版本的 qos
 		if (isHighLevelQoS) {
