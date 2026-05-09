@@ -108,6 +108,12 @@
       "description": "密码"
     },
     {
+      "name": "mqtt.client.pending-publish-queue-enabled",
+      "type": "java.lang.Boolean",
+      "description": "是否开启 MQTT 连接前待发送消息队列，默认：false（老版本默认丢弃数据，升级时保持兼容）",
+      "defaultValue": false
+    },
+    {
       "name": "mqtt.client.pending-publish-queue-size",
       "type": "java.lang.Integer",
       "description": "MQTT 连接成功前的发布消息队列大小，默认：10"

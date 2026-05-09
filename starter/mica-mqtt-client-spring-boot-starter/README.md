@@ -45,6 +45,8 @@ mqtt:
     tio-executor-size: 8        # tio 编解码等线程数，默认：3，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数（2.5.12 开始支持）
     mqtt-executor-size: 8       # mqtt 业务线程数，默认：2或CPU核心数，如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数（取较大值）（2.5.12 开始支持）
     biz-thread-pool-size: 2     # 同 mqtt-executor-size（2.4.2 开始支持，2.5.12 已经弃用）
+    pending-publish-queue-enabled: false # 是否开启 MQTT 连接前待发送消息队列，默认：false（2.6.4 开始支持，老版本默认丢弃数据，升级时保持兼容）
+    pending-publish-queue-size: 10 # MQTT 连接成功前的发布消息队列大小，默认：10（2.6.3 开始支持，2.6.4 默认会启用，注意 2.6.4 受 pending-publish-queue-enabled 开关影响）
     ssl:
       enabled: false            # 是否开启 ssl 认证，2.1.0 开始支持双向认证
       keystore-path:            # 可选参数：ssl 双向认证 keystore 目录，支持 classpath:/ 路径。
