@@ -7,10 +7,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dreamlu.mica.net.core.ssl.SSLEngineCustomizer;
 import net.dreamlu.mica.net.core.ssl.SslConfig;
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.client.solon.MqttClientSubscribeListener;
 import org.dromara.mica.mqtt.client.solon.MqttClientTemplate;
 import org.dromara.mica.mqtt.client.solon.config.MqttClientConfiguration;
 import org.dromara.mica.mqtt.client.solon.config.MqttClientProperties;
+import org.dromara.mica.mqtt.client.solon.config.MqttClientPropertiesCustomizer;
 import org.dromara.mica.mqtt.core.annotation.MqttClientSubscribe;
 import org.dromara.mica.mqtt.core.client.*;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
@@ -55,7 +57,15 @@ public class MqttClientPluginImpl implements Plugin {
 			context.beanMake(MqttClientProperties.class);
 			context.beanMake(MqttClientConfiguration.class);
 			MqttClientProperties properties = context.getBean(MqttClientProperties.class);
-			MqttClientCreator clientCreator = context.getBean(MqttClientCreator.class);
+
+			// 在 java 中自定义的配置
+			List<MqttClientPropertiesCustomizer> clientPropertiesCustomizers = context.getBeansOfType(MqttClientPropertiesCustomizer.class);
+			clientPropertiesCustomizers.forEach(customizer -> customizer.customize(properties));
+
+			// 初始化 clientCreator
+			MqttClientCreator clientCreator = getMqttClientCreator(properties);
+			BeanWrap clientCreatorWrap = context.wrap(MqttClientCreator.class, clientCreator);
+			context.putWrap(MqttClientCreator.class, clientCreatorWrap);
 
 			// MqttClientTemplate init
 			IMqttClientConnectListener clientConnectListener = context.getBean(IMqttClientConnectListener.class);
@@ -146,7 +156,80 @@ public class MqttClientPluginImpl implements Plugin {
 		return beanWrap.get();
 	}
 
-	private String[] getTopicFilters(String[] topicTemplates) {
+	private static MqttClientCreator getMqttClientCreator(MqttClientProperties properties) {
+		MqttClientCreator clientCreator = MqttClient.create()
+			.name(properties.getName())
+			.ip(properties.getIp())
+			.port(properties.getPort())
+			.username(properties.getUsername())
+			.password(properties.getPassword())
+			.clientId(properties.getClientId())
+			.bindIp(properties.getBindIp())
+			.bindNetworkInterface(properties.getBindNetworkInterface())
+			.bindPort(properties.getBindPort())
+			.readBufferSize((int) DataSize.parse(properties.getReadBufferSize()).getBytes())
+			.maxBytesInMessage((int) DataSize.parse(properties.getMaxBytesInMessage()).getBytes())
+			.maxClientIdLength(properties.getMaxClientIdLength())
+			.keepAliveSecs(properties.getKeepAliveSecs())
+			.heartbeatMode(properties.getHeartbeatMode())
+			.heartbeatTimeoutStrategy(properties.getHeartbeatTimeoutStrategy())
+			.reconnect(properties.isReconnect())
+			.reInterval(properties.getReInterval())
+			.retryCount(properties.getRetryCount())
+			.reSubscribeBatchSize(properties.getReSubscribeBatchSize())
+			.version(properties.getVersion())
+			.cleanStart(properties.isCleanStart())
+			.sessionExpiryIntervalSecs(properties.getSessionExpiryIntervalSecs())
+			.statEnable(properties.isStatEnable())
+			.debug(properties.isDebug())
+			.disconnectBeforeStop(properties.isDisconnectBeforeStop())
+			.pendingPublishQueueEnabled(properties.isPendingPublishQueueEnabled())
+			.pendingPublishQueueSize(properties.getPendingPublishQueueSize());
+		Integer timeout = properties.getTimeout();
+		if (timeout != null && timeout > 0) {
+			clientCreator.timeout(timeout);
+		}
+		// tio 编解码等线程数
+		Integer tioExecutorSize = properties.getTioExecutorSize();
+		if (tioExecutorSize != null && tioExecutorSize > 0) {
+			clientCreator.tioExecutorSize(tioExecutorSize);
+		}
+		// AIO AsynchronousChannelGroup 的线程池
+		Integer groupExecutorSize = properties.getGroupExecutorSize();
+		if (groupExecutorSize != null && groupExecutorSize > 0) {
+			clientCreator.groupExecutorSize(groupExecutorSize);
+		}
+		// mqtt 业务线程数
+		Integer bizThreadPoolSize = properties.getBizThreadPoolSize();
+		if (bizThreadPoolSize != null && bizThreadPoolSize > 0) {
+			clientCreator.mqttExecutorSize(bizThreadPoolSize);
+		}
+		// mqtt 工作线程数
+		Integer mqttExecutorSize = properties.getMqttExecutorSize();
+		if (mqttExecutorSize != null && mqttExecutorSize > 0) {
+			clientCreator.mqttExecutorSize(mqttExecutorSize);
+		}
+		// 开启 ssl
+		MqttClientProperties.Ssl ssl = properties.getSsl();
+		if (ssl.isEnabled()) {
+			clientCreator.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass());
+		}
+		// 构造遗嘱消息
+		MqttClientProperties.WillMessage willMessage = properties.getWillMessage();
+		if (willMessage != null && StrUtil.isNotBlank(willMessage.getTopic())) {
+			clientCreator.willMessage(builder -> {
+				builder.topic(willMessage.getTopic())
+					.qos(willMessage.getQos())
+					.retain(willMessage.isRetain());
+				if (StrUtil.isNotBlank(willMessage.getMessage())) {
+					builder.messageText(willMessage.getMessage());
+				}
+			});
+		}
+		return clientCreator;
+	}
+
+	private static String[] getTopicFilters(String[] topicTemplates) {
 		// 1. 替换 solon cfg 变量
 		// 2. 替换订阅中的其他变量
 		return Arrays.stream(topicTemplates)

@@ -1,4 +1,4 @@
-package org.dromara.mica.mqtt.client.solon.config;
+package org.dromara.mica.mqtt.client.solon.integration;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
