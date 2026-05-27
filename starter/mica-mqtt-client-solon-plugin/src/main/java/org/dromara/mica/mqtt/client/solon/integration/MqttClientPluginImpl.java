@@ -17,7 +17,6 @@ import org.dromara.mica.mqtt.core.annotation.MqttClientSubscribe;
 import org.dromara.mica.mqtt.core.client.*;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
-import org.noear.solon.Solon;
 import org.noear.solon.core.AppContext;
 import org.noear.solon.core.BeanWrap;
 import org.noear.solon.core.Plugin;
@@ -138,7 +137,7 @@ public class MqttClientPluginImpl implements Plugin {
 	private MqttClientTemplate getMqttClientTemplate(MqttClientSubscribe anno) {
 		String beanName = anno.clientTemplateBean();
 		// 添加对占位符的支持：gitee #ID7PF6 https://gitee.com/dromara/mica-mqtt/issues/ID7PF6
-		String resolvedBeanName = Optional.ofNullable(Solon.cfg().getByTmpl(beanName)).orElse(beanName);
+		String resolvedBeanName = getByCfgOrDef(beanName);
 		return context.getBean(resolvedBeanName);
 	}
 
@@ -229,13 +228,17 @@ public class MqttClientPluginImpl implements Plugin {
 		return clientCreator;
 	}
 
-	private static String[] getTopicFilters(String[] topicTemplates) {
+	private String[] getTopicFilters(String[] topicTemplates) {
 		// 1. 替换 solon cfg 变量
 		// 2. 替换订阅中的其他变量
 		return Arrays.stream(topicTemplates)
-			.map((x) -> Optional.ofNullable(Solon.cfg().getByTmpl(x)).orElse(x))
+			.map(this::getByCfgOrDef)
 			.map(TopicUtil::getTopicFilter)
 			.toArray(String[]::new);
+	}
+
+	private String getByCfgOrDef(String value) {
+		return Optional.ofNullable(context.cfg().getByTmpl(value)).orElse(value);
 	}
 
 	@Data

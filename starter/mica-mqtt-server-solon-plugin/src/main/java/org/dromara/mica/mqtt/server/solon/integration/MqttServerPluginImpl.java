@@ -19,6 +19,7 @@ package org.dromara.mica.mqtt.server.solon.integration;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.mica.mqtt.core.annotation.MqttServerFunction;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
@@ -27,7 +28,6 @@ import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerPublishPermission;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
-
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
@@ -38,12 +38,10 @@ import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
-import org.dromara.mica.mqtt.core.annotation.MqttServerFunction;
 import org.dromara.mica.mqtt.server.solon.MqttServerTemplate;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerConfiguration;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerMetricsConfiguration;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerProperties;
-import org.noear.solon.Solon;
 import org.noear.solon.core.AppContext;
 import org.noear.solon.core.BeanWrap;
 import org.noear.solon.core.Plugin;
@@ -204,9 +202,13 @@ public class MqttServerPluginImpl implements Plugin {
 		// 1. 替换 solon cfg 变量
 		// 2. 替换订阅中的其他变量
 		return Arrays.stream(topicTemplates)
-			.map((x) -> Optional.ofNullable(Solon.cfg().getByTmpl(x)).orElse(x))
+			.map(this::getByCfgOrDef)
 			.map(TopicUtil::getTopicFilter)
 			.toArray(String[]::new);
+	}
+
+	private String getByCfgOrDef(String value) {
+		return Optional.ofNullable(context.cfg().getByTmpl(value)).orElse(value);
 	}
 
 	@Override
