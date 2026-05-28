@@ -175,6 +175,8 @@ public class MqttConnectOnlineListener implements EventListener<MqttClientOnline
 ```
 
 ### 2.7 Prometheus + Grafana 监控对接
+
+#### 添加依赖
 ```xml
 <dependency>
     <groupId>org.noear</groupId>
@@ -186,6 +188,7 @@ public class MqttConnectOnlineListener implements EventListener<MqttClientOnline
 </dependency>
 ```
 
+#### 指标
 | 支持的指标                          | 说明             |
 |--------------------------------| ---------------- |
 | mqtt_connections_accepted      | 共接受过连接数   |
@@ -197,3 +200,7 @@ public class MqttConnectOnlineListener implements EventListener<MqttClientOnline
 | mqtt_messages_received_bytes   | 已处理消息字节数 |
 | mqtt_messages_send_packets     | 已发送消息数      |
 | mqtt_messages_send_bytes       | 已发送消息字节数  |
+
+#### 配置说明
+
+solon 官方配置文档：https://solon.noear.org/article/588

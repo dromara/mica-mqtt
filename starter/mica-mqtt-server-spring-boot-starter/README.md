@@ -178,6 +178,8 @@ public class MqttConnectStatusListener {
 详见: [mica-mqtt-broker](../../mica-mqtt-broker)
 
 ### 2.8 Prometheus + Grafana 监控对接
+
+#### 添加依赖
 ```xml
 <dependency>
     <groupId>org.springframework.boot</groupId>
@@ -189,6 +191,7 @@ public class MqttConnectStatusListener {
 </dependency>
 ```
 
+#### 指标
 | 支持的指标                          | 说明             |
 |--------------------------------| ---------------- |
 | mqtt_connections_accepted      | 共接受过连接数   |
