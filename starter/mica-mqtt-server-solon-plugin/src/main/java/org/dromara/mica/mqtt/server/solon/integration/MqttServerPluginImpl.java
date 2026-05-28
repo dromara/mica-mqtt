@@ -152,7 +152,10 @@ public class MqttServerPluginImpl implements Plugin {
 			if (Objects.nonNull(customizers)) {
 				customizers.customize(serverCreator);
 			}
+			// mqttServer bean
 			MqttServer mqttServer = serverCreator.build();
+			context.wrapAndPut(MqttServer.class, mqttServer);
+			// mqttServerTemplate bean
 			MqttServerTemplate mqttServerTemplate = new MqttServerTemplate(mqttServer);
 			context.wrapAndPut(MqttServerTemplate.class, mqttServerTemplate);
 			// 添加启动时的函数处理
