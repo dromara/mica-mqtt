@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dreamlu.mica.net.core.Node;
 import net.dreamlu.mica.net.http.mcp.server.McpServer;
+import net.dreamlu.mica.net.utils.hutool.ClassUtil;
 import org.dromara.mica.mqtt.core.annotation.MqttServerFunction;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.server.MqttServer;
@@ -48,7 +49,6 @@ import org.dromara.mica.mqtt.server.solon.config.MqttServerPropertiesCustomizer;
 import org.noear.solon.core.AppContext;
 import org.noear.solon.core.BeanWrap;
 import org.noear.solon.core.Plugin;
-import org.noear.solon.core.util.ClassUtil;
 
 import java.lang.reflect.Method;
 import java.util.*;

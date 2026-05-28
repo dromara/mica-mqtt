@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dreamlu.mica.net.core.ssl.SSLEngineCustomizer;
 import net.dreamlu.mica.net.core.ssl.SslConfig;
+import net.dreamlu.mica.net.utils.hutool.ClassUtil;
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.client.solon.MqttClientSubscribeListener;
 import org.dromara.mica.mqtt.client.solon.MqttClientTemplate;
@@ -20,7 +21,6 @@ import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.noear.solon.core.AppContext;
 import org.noear.solon.core.BeanWrap;
 import org.noear.solon.core.Plugin;
-import org.noear.solon.core.util.ClassUtil;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
