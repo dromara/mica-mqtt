@@ -5,7 +5,7 @@
 ### v2.6.4 - 2026-05-31
 
 - 🐛 mica-mqtt-client-solon-plugin 修复 mqttClientCreator Bean 初始化，gitee #IJPTRT 感谢 `@linziguan` 反馈。
-- 🔧 mica-mqtt-client 待发送消息队列默认关闭（pendingPublishQueueEnabled 默认 false），兼容老版本行为。
+- 🔧 mica-mqtt-client 待发送消息队列默认关闭（pendingPublishQueueEnabled 默认 false），兼容老版本行为。gitee #IJLYLL 感谢 `@wssam` 反馈。
 - 🔧 solon-plugin 插件初始化改用 LifecycleBean 接口，提升兼容性（兼容2.8.0+），避免高版本 solon 编译后导致低版本 solon 运行时报错。
 - 🔧 mica-mqtt-server-solon-plugin 重构并简化服务器创建逻辑，优化指标绑定方式。
 
