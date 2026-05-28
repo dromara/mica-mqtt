@@ -21,6 +21,7 @@ import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.noear.solon.core.AppContext;
 import org.noear.solon.core.BeanWrap;
 import org.noear.solon.core.Plugin;
+import org.noear.solon.core.bean.LifecycleBean;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -52,47 +53,50 @@ public class MqttClientPluginImpl implements Plugin {
 		context.beanExtractorAdd(MqttClientSubscribe.class, (bw, method, anno) -> {
 			subscribeMethodTags.add(new ExtractorMethodTag<>(bw, method, anno));
 		});
-		context.lifecycle(-9, () -> {
-			context.beanMake(MqttClientProperties.class);
-			context.beanMake(MqttClientConfiguration.class);
-			MqttClientProperties properties = context.getBean(MqttClientProperties.class);
+		context.lifecycle(-9, new LifecycleBean() {
+			@Override
+			public void start() throws Throwable {
+				context.beanMake(MqttClientProperties.class);
+				context.beanMake(MqttClientConfiguration.class);
+				MqttClientProperties properties = context.getBean(MqttClientProperties.class);
 
-			// 在 java 中自定义的配置
-			List<MqttClientPropertiesCustomizer> clientPropertiesCustomizers = context.getBeansOfType(MqttClientPropertiesCustomizer.class);
-			clientPropertiesCustomizers.forEach(customizer -> customizer.customize(properties));
+				// 在 java 中自定义的配置
+				List<MqttClientPropertiesCustomizer> clientPropertiesCustomizers = context.getBeansOfType(MqttClientPropertiesCustomizer.class);
+				clientPropertiesCustomizers.forEach(customizer -> customizer.customize(properties));
 
-			// 初始化 clientCreator
-			MqttClientCreator clientCreator = getMqttClientCreator(properties);
-			BeanWrap clientCreatorWrap = context.wrap(MqttClientCreator.class, clientCreator);
-			context.putWrap(MqttClientCreator.class, clientCreatorWrap);
+				// 初始化 clientCreator
+				MqttClientCreator clientCreator = getMqttClientCreator(properties);
+				BeanWrap clientCreatorWrap = context.wrap(MqttClientCreator.class, clientCreator);
+				context.putWrap(MqttClientCreator.class, clientCreatorWrap);
 
-			// MqttClientTemplate init
-			IMqttClientConnectListener clientConnectListener = context.getBean(IMqttClientConnectListener.class);
-			MqttClientCustomizer customizers = context.getBean(MqttClientCustomizer.class);
-			MqttClientTemplate clientTemplate = new MqttClientTemplate(clientCreator, clientConnectListener, customizers);
-			BeanWrap mqttClientTemplateWrap = context.wrap(MqttClientTemplate.class, clientTemplate);
-			context.putWrap(MqttClientSubscribe.DEFAULT_CLIENT_TEMPLATE_BEAN, mqttClientTemplateWrap);
-			context.putWrap(MqttClientTemplate.class, mqttClientTemplateWrap);
+				// MqttClientTemplate init
+				IMqttClientConnectListener clientConnectListener = context.getBean(IMqttClientConnectListener.class);
+				MqttClientCustomizer customizers = context.getBean(MqttClientCustomizer.class);
+				MqttClientTemplate clientTemplate = new MqttClientTemplate(clientCreator, clientConnectListener, customizers);
+				BeanWrap mqttClientTemplateWrap = context.wrap(MqttClientTemplate.class, clientTemplate);
+				context.putWrap(MqttClientSubscribe.DEFAULT_CLIENT_TEMPLATE_BEAN, mqttClientTemplateWrap);
+				context.putWrap(MqttClientTemplate.class, mqttClientTemplateWrap);
 
-			// ssl 自定义配置
-			SslConfig sslConfig = clientCreator.getSslConfig();
-			if (sslConfig != null) {
-				SSLEngineCustomizer sslCustomizer = context.getBean(SSLEngineCustomizer.class);
-				if (sslCustomizer != null) {
-					sslConfig.setSslEngineCustomizer(sslCustomizer);
+				// ssl 自定义配置
+				SslConfig sslConfig = clientCreator.getSslConfig();
+				if (sslConfig != null) {
+					SSLEngineCustomizer sslCustomizer = context.getBean(SSLEngineCustomizer.class);
+					if (sslCustomizer != null) {
+						sslConfig.setSslEngineCustomizer(sslCustomizer);
+					}
 				}
-			}
 
-			// 客户端 session
-			IMqttClientSession clientSession = context.getBean(IMqttClientSession.class);
-			clientCreator.clientSession(clientSession);
+				// 客户端 session
+				IMqttClientSession clientSession = context.getBean(IMqttClientSession.class);
+				clientCreator.clientSession(clientSession);
 
-			// 添加启动时的临时订阅
-			subscribeDetector();
+				// 添加启动时的临时订阅
+				subscribeDetector();
 
-			// connect
-			if (properties.isEnabled()) {
-				clientTemplate.connect();
+				// connect
+				if (properties.isEnabled()) {
+					clientTemplate.connect();
+				}
 			}
 		});
 	}

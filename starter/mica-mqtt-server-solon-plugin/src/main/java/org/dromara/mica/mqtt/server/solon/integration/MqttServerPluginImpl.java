@@ -49,6 +49,7 @@ import org.dromara.mica.mqtt.server.solon.config.MqttServerPropertiesCustomizer;
 import org.noear.solon.core.AppContext;
 import org.noear.solon.core.BeanWrap;
 import org.noear.solon.core.Plugin;
+import org.noear.solon.core.bean.LifecycleBean;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -78,92 +79,95 @@ public class MqttServerPluginImpl implements Plugin {
 		context.beanExtractorAdd(MqttServerFunction.class, (bw, method, anno) -> {
 			functionMethodTags.add(new ExtractorMethodTag<>(bw, method, anno));
 		});
-		context.lifecycle(-9, () -> {
-			context.beanMake(MqttServerProperties.class);
-			context.beanMake(MqttServerConfiguration.class);
-			// Metrics bean
-			context.beanMake(MqttServerMetricsConfiguration.class);
-			MqttServerProperties properties = context.getBean(MqttServerProperties.class);
+		context.lifecycle(-9, new LifecycleBean() {
+			@Override
+			public void start() throws Throwable {
+				context.beanMake(MqttServerProperties.class);
+				context.beanMake(MqttServerConfiguration.class);
+				// Metrics bean
+				context.beanMake(MqttServerMetricsConfiguration.class);
+				MqttServerProperties properties = context.getBean(MqttServerProperties.class);
 
-			// 初始化自定义配置处理器
-			List<MqttServerPropertiesCustomizer> propertiesCustomizers = context.getBeansOfType(MqttServerPropertiesCustomizer.class);
-			propertiesCustomizers.forEach((customizer) -> customizer.customize(properties));
+				// 初始化自定义配置处理器
+				List<MqttServerPropertiesCustomizer> propertiesCustomizers = context.getBeansOfType(MqttServerPropertiesCustomizer.class);
+				propertiesCustomizers.forEach((customizer) -> customizer.customize(properties));
 
-			// 初始化 serverCreator
-			MqttServerCreator serverCreator = getMqttServerCreator(properties);
-			BeanWrap clientCreatorWrap = context.wrap(MqttServerCreator.class, serverCreator);
-			context.putWrap(MqttServerCreator.class, clientCreatorWrap);
+				// 初始化 serverCreator
+				MqttServerCreator serverCreator = getMqttServerCreator(properties);
+				BeanWrap clientCreatorWrap = context.wrap(MqttServerCreator.class, serverCreator);
+				context.putWrap(MqttServerCreator.class, clientCreatorWrap);
 
-			// 扩展
-			IMqttServerAuthHandler authHandler = context.getBean(IMqttServerAuthHandler.class);
-			IMqttServerUniqueIdService uniqueIdService = context.getBean(IMqttServerUniqueIdService.class);
-			IMqttServerSubscribeValidator subscribeValidator = context.getBean(IMqttServerSubscribeValidator.class);
-			IMqttServerPublishPermission publishPermission = context.getBean(IMqttServerPublishPermission.class);
+				// 扩展
+				IMqttServerAuthHandler authHandler = context.getBean(IMqttServerAuthHandler.class);
+				IMqttServerUniqueIdService uniqueIdService = context.getBean(IMqttServerUniqueIdService.class);
+				IMqttServerSubscribeValidator subscribeValidator = context.getBean(IMqttServerSubscribeValidator.class);
+				IMqttServerPublishPermission publishPermission = context.getBean(IMqttServerPublishPermission.class);
 
-			IMqttMessageStore messageStore = context.getBean(IMqttMessageStore.class);
-			IMqttSessionManager sessionManager = context.getBean(IMqttSessionManager.class);
-			IMqttSessionListener sessionListener = context.getBean(IMqttSessionListener.class);
-			IMqttMessageListener messageListener = context.getBean(IMqttMessageListener.class);
-			IMqttConnectStatusListener connectStatusListener = context.getBean(IMqttConnectStatusListener.class);
-			IMqttMessageInterceptor messageInterceptor = context.getBean(IMqttMessageInterceptor.class);
-			MqttServerCustomizer customizers = context.getBean(MqttServerCustomizer.class);
+				IMqttMessageStore messageStore = context.getBean(IMqttMessageStore.class);
+				IMqttSessionManager sessionManager = context.getBean(IMqttSessionManager.class);
+				IMqttSessionListener sessionListener = context.getBean(IMqttSessionListener.class);
+				IMqttMessageListener messageListener = context.getBean(IMqttMessageListener.class);
+				IMqttConnectStatusListener connectStatusListener = context.getBean(IMqttConnectStatusListener.class);
+				IMqttMessageInterceptor messageInterceptor = context.getBean(IMqttMessageInterceptor.class);
+				MqttServerCustomizer customizers = context.getBean(MqttServerCustomizer.class);
 
-			// 自定义消息监听
-			serverCreator.messageListener(messageListener);
-			// 认证处理器
-			MqttServerProperties.MqttAuth mqttAuth = properties.getAuth();
-			if (Objects.isNull(authHandler)) {
-				authHandler = mqttAuth.isEnable() ? new DefaultMqttServerAuthHandler(mqttAuth.getUsername(), mqttAuth.getPassword()) : null;
-			}
-			serverCreator.authHandler(authHandler);
-			// mqtt 内唯一id
-			if (Objects.nonNull(uniqueIdService)) {
-				serverCreator.uniqueIdService(uniqueIdService);
-			}
-			// 订阅校验
-			if (Objects.nonNull(subscribeValidator)) {
-				serverCreator.subscribeValidator(subscribeValidator);
-			}
-			// 订阅权限校验
-			if (Objects.nonNull(publishPermission)) {
-				serverCreator.publishPermission(publishPermission);
-			}
-			// 消息存储
-			if (Objects.nonNull(messageStore)) {
-				serverCreator.messageStore(messageStore);
-			}
-			// session 管理
-			if (Objects.nonNull(sessionManager)) {
-				serverCreator.sessionManager(sessionManager);
-			}
-			// session 监听
-			if (Objects.nonNull(sessionListener)) {
-				serverCreator.sessionListener(sessionListener);
-			}
-			// 状态监听
-			if (Objects.nonNull(connectStatusListener)) {
-				serverCreator.connectStatusListener(connectStatusListener);
-			}
-			// 消息监听器
-			if (Objects.nonNull(messageInterceptor)) {
-				serverCreator.addInterceptor(messageInterceptor);
-			}
-			// 自定义处理
-			if (Objects.nonNull(customizers)) {
-				customizers.customize(serverCreator);
-			}
-			// mqttServer bean
-			MqttServer mqttServer = serverCreator.build();
-			context.wrapAndPut(MqttServer.class, mqttServer);
-			// mqttServerTemplate bean
-			MqttServerTemplate mqttServerTemplate = new MqttServerTemplate(mqttServer);
-			context.wrapAndPut(MqttServerTemplate.class, mqttServerTemplate);
-			// 添加启动时的函数处理
-			functionDetector();
-			// 启动
-			if (properties.isEnabled() && !running) {
-				running = mqttServerTemplate.getMqttServer().start();
-				log.info("mqtt server start...");
+				// 自定义消息监听
+				serverCreator.messageListener(messageListener);
+				// 认证处理器
+				MqttServerProperties.MqttAuth mqttAuth = properties.getAuth();
+				if (Objects.isNull(authHandler)) {
+					authHandler = mqttAuth.isEnable() ? new DefaultMqttServerAuthHandler(mqttAuth.getUsername(), mqttAuth.getPassword()) : null;
+				}
+				serverCreator.authHandler(authHandler);
+				// mqtt 内唯一id
+				if (Objects.nonNull(uniqueIdService)) {
+					serverCreator.uniqueIdService(uniqueIdService);
+				}
+				// 订阅校验
+				if (Objects.nonNull(subscribeValidator)) {
+					serverCreator.subscribeValidator(subscribeValidator);
+				}
+				// 订阅权限校验
+				if (Objects.nonNull(publishPermission)) {
+					serverCreator.publishPermission(publishPermission);
+				}
+				// 消息存储
+				if (Objects.nonNull(messageStore)) {
+					serverCreator.messageStore(messageStore);
+				}
+				// session 管理
+				if (Objects.nonNull(sessionManager)) {
+					serverCreator.sessionManager(sessionManager);
+				}
+				// session 监听
+				if (Objects.nonNull(sessionListener)) {
+					serverCreator.sessionListener(sessionListener);
+				}
+				// 状态监听
+				if (Objects.nonNull(connectStatusListener)) {
+					serverCreator.connectStatusListener(connectStatusListener);
+				}
+				// 消息监听器
+				if (Objects.nonNull(messageInterceptor)) {
+					serverCreator.addInterceptor(messageInterceptor);
+				}
+				// 自定义处理
+				if (Objects.nonNull(customizers)) {
+					customizers.customize(serverCreator);
+				}
+				// mqttServer bean
+				MqttServer mqttServer = serverCreator.build();
+				context.wrapAndPut(MqttServer.class, mqttServer);
+				// mqttServerTemplate bean
+				MqttServerTemplate mqttServerTemplate = new MqttServerTemplate(mqttServer);
+				context.wrapAndPut(MqttServerTemplate.class, mqttServerTemplate);
+				// 添加启动时的函数处理
+				functionDetector();
+				// 启动
+				if (properties.isEnabled() && !running) {
+					running = mqttServerTemplate.getMqttServer().start();
+					log.info("mqtt server start...");
+				}
 			}
 		});
 	}
