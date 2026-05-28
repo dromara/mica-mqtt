@@ -2,12 +2,8 @@
 
 package org.dromara.mica.mqtt.server.solon.config;
 
-import net.dreamlu.mica.net.core.Node;
-import net.dreamlu.mica.net.http.mcp.server.McpServer;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.deserialize.MqttJsonDeserializer;
-import org.dromara.mica.mqtt.core.server.MqttServer;
-import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.func.MqttFunctionManager;
@@ -16,9 +12,6 @@ import org.dromara.mica.mqtt.server.solon.event.SolonEventMqttConnectStatusListe
 import org.noear.solon.annotation.Bean;
 import org.noear.solon.annotation.Condition;
 import org.noear.solon.annotation.Configuration;
-import org.noear.solon.annotation.Inject;
-
-import java.util.List;
 
 /**
  * <b>(MqttServerConfiguration)</b>
@@ -52,94 +45,6 @@ public class MqttServerConfiguration {
 	@Condition(onMissingBean = IMqttMessageListener.class)
 	public IMqttMessageListener mqttFunctionMessageListener(MqttFunctionManager mqttFunctionManager) {
 		return new MqttFunctionMessageListener(mqttFunctionManager);
-	}
-
-	@Bean
-	public MqttServerCreator mqttServerCreator(MqttServerProperties properties,
-											   @Inject(required = false) List<MqttServerPropertiesCustomizer> customizers) {
-		if (customizers != null) {
-			customizers.forEach(customizer -> customizer.customize(properties));
-		}
-
-		MqttServerCreator serverCreator = MqttServer.create()
-			.name(properties.getName())
-			.heartbeatTimeout(properties.getHeartbeatTimeout())
-			.keepaliveBackoff(properties.getKeepaliveBackoff())
-			.readBufferSize((int) DataSize.parse(properties.getReadBufferSize()).getBytes())
-			.maxBytesInMessage((int) DataSize.parse(properties.getMaxBytesInMessage()).getBytes())
-			.maxClientIdLength(properties.getMaxClientIdLength())
-			.nodeName(properties.getNodeName())
-			.statEnable(properties.isStatEnable())
-			.proxyProtocolEnable(properties.isProxyProtocolOn());
-		if (properties.isDebug()) {
-			serverCreator.debug();
-		}
-		// tio 编解码等线程数
-		Integer tioExecutorSize = properties.getTioExecutorSize();
-		if (tioExecutorSize != null && tioExecutorSize > 0) {
-			serverCreator.tioExecutorSize(tioExecutorSize);
-		}
-		// AIO AsynchronousChannelGroup 的线程池
-		Integer groupExecutorSize = properties.getGroupExecutorSize();
-		if (groupExecutorSize != null && groupExecutorSize > 0) {
-			serverCreator.groupExecutorSize(groupExecutorSize);
-		}
-		// mqtt 工作线程数
-		Integer mqttExecutorSize = properties.getMqttExecutorSize();
-		if (mqttExecutorSize != null && mqttExecutorSize > 0) {
-			serverCreator.mqttExecutorSize(mqttExecutorSize);
-		}
-		// mqtt 协议
-		MqttServerProperties.Listener mqttListener = properties.getMqttListener();
-		if (mqttListener.isEnable()) {
-			serverCreator.enableMqtt(builder -> builder.serverNode(mqttListener.getServerNode()).build());
-		}
-		// mqtt ssl 协议
-		MqttServerProperties.SslListener mqttSslListener = properties.getMqttSslListener();
-		if (mqttSslListener.isEnable()) {
-			MqttServerProperties.Ssl ssl = mqttSslListener.getSsl();
-			serverCreator.enableMqttSsl(sslBuilder -> sslBuilder
-				.serverNode(mqttSslListener.getServerNode())
-				.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth())
-				.build());
-		}
-		// mqtt websocket 协议
-		MqttServerProperties.Listener wsListener = properties.getWsListener();
-		if (wsListener.isEnable()) {
-			serverCreator.enableMqttWs(builder -> builder.serverNode(wsListener.getServerNode()).build());
-		}
-		MqttServerProperties.SslListener wssListener = properties.getWssListener();
-		if (mqttSslListener.isEnable()) {
-			MqttServerProperties.Ssl ssl = wssListener.getSsl();
-			serverCreator.enableMqttWss(sslBuilder -> sslBuilder
-				.serverNode(wssListener.getServerNode())
-				.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth())
-				.build());
-		}
-		// mqtt http api
-		MqttServerProperties.HttpListener httpListener = properties.getHttpListener();
-		if (httpListener.isEnable()) {
-			Node serverNode = httpListener.getServerNode();
-			MqttServerProperties.HttpBasicAuth basicAuth = httpListener.getBasicAuth();
-			MqttServerProperties.Mcp mcp = httpListener.getMcp();
-			MqttServerProperties.HttpSsl ssl = httpListener.getSsl();
-			serverCreator.enableMqttHttpApi(builder -> {
-				builder.serverNode(serverNode);
-				if (basicAuth.isEnable()) {
-					builder.basicAuth(basicAuth.getUsername(), basicAuth.getPassword());
-				}
-				if (mcp.isEnable()) {
-					McpServer mcpServer = new McpServer();
-					mcpServer.useStreamableTransport(mcp.getEndpoint());
-					mcpServer.useSseTransport(mcp.getSseEndpoint(), mcp.getSseMessageEndpoint());
-				}
-				if (ssl.isEnable()) {
-					builder.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());
-				}
-				return builder.build();
-			});
-		}
-		return serverCreator;
 	}
 
 }

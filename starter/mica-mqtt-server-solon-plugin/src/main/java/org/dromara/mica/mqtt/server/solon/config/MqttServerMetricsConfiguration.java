@@ -17,12 +17,9 @@
 package org.dromara.mica.mqtt.server.solon.config;
 
 import io.micrometer.core.instrument.MeterRegistry;
-import org.dromara.mica.mqtt.server.solon.MqttServerTemplate;
 import org.noear.solon.annotation.Bean;
 import org.noear.solon.annotation.Condition;
 import org.noear.solon.annotation.Configuration;
-import org.noear.solon.core.AppContext;
-import org.noear.solon.core.event.AppLoadEndEvent;
 
 /**
  * mica mqtt Metrics
@@ -34,15 +31,8 @@ import org.noear.solon.core.event.AppLoadEndEvent;
 public class MqttServerMetricsConfiguration {
 
 	@Bean
-	@Condition(onBean = MeterRegistry.class)
-	public MqttServerMetrics mqttServerMetrics(MeterRegistry registry, AppContext context) {
-		MqttServerMetrics metrics = new MqttServerMetrics();
-		// 应用加载完成事件
-		context.onEvent(AppLoadEndEvent.class, event -> {
-			MqttServerTemplate mqttServerTemplate = context.getBean(MqttServerTemplate.class);
-			metrics.bindTo(registry, mqttServerTemplate.getMqttServer().getServerConfig());
-		});
-		return metrics;
+	public MqttServerMetrics micaMqttMetrics() {
+		return new MqttServerMetrics();
 	}
 
 }

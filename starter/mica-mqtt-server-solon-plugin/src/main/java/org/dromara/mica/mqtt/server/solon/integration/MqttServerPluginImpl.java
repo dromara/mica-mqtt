@@ -19,6 +19,8 @@ package org.dromara.mica.mqtt.server.solon.integration;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.http.mcp.server.McpServer;
 import org.dromara.mica.mqtt.core.annotation.MqttServerFunction;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.server.MqttServer;
@@ -42,6 +44,7 @@ import org.dromara.mica.mqtt.server.solon.MqttServerTemplate;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerConfiguration;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerMetricsConfiguration;
 import org.dromara.mica.mqtt.server.solon.config.MqttServerProperties;
+import org.dromara.mica.mqtt.server.solon.config.MqttServerPropertiesCustomizer;
 import org.noear.solon.core.AppContext;
 import org.noear.solon.core.BeanWrap;
 import org.noear.solon.core.Plugin;
@@ -78,10 +81,21 @@ public class MqttServerPluginImpl implements Plugin {
 		context.lifecycle(-9, () -> {
 			context.beanMake(MqttServerProperties.class);
 			context.beanMake(MqttServerConfiguration.class);
+			// Metrics bean
+			context.beanMake(MqttServerMetricsConfiguration.class);
 			MqttServerProperties properties = context.getBean(MqttServerProperties.class);
-			MqttServerCreator serverCreator = context.getBean(MqttServerCreator.class);
 
-			IMqttServerAuthHandler authHandlerImpl = context.getBean(IMqttServerAuthHandler.class);
+			// 初始化自定义配置处理器
+			List<MqttServerPropertiesCustomizer> propertiesCustomizers = context.getBeansOfType(MqttServerPropertiesCustomizer.class);
+			propertiesCustomizers.forEach((customizer) -> customizer.customize(properties));
+
+			// 初始化 serverCreator
+			MqttServerCreator serverCreator = getMqttServerCreator(properties);
+			BeanWrap clientCreatorWrap = context.wrap(MqttServerCreator.class, serverCreator);
+			context.putWrap(MqttServerCreator.class, clientCreatorWrap);
+
+			// 扩展
+			IMqttServerAuthHandler authHandler = context.getBean(IMqttServerAuthHandler.class);
 			IMqttServerUniqueIdService uniqueIdService = context.getBean(IMqttServerUniqueIdService.class);
 			IMqttServerSubscribeValidator subscribeValidator = context.getBean(IMqttServerSubscribeValidator.class);
 			IMqttServerPublishPermission publishPermission = context.getBean(IMqttServerPublishPermission.class);
@@ -98,12 +112,10 @@ public class MqttServerPluginImpl implements Plugin {
 			serverCreator.messageListener(messageListener);
 			// 认证处理器
 			MqttServerProperties.MqttAuth mqttAuth = properties.getAuth();
-			if (Objects.isNull(authHandlerImpl)) {
-				IMqttServerAuthHandler authHandler = mqttAuth.isEnable() ? new DefaultMqttServerAuthHandler(mqttAuth.getUsername(), mqttAuth.getPassword()) : null;
-				serverCreator.authHandler(authHandler);
-			} else {
-				serverCreator.authHandler(authHandlerImpl);
+			if (Objects.isNull(authHandler)) {
+				authHandler = mqttAuth.isEnable() ? new DefaultMqttServerAuthHandler(mqttAuth.getUsername(), mqttAuth.getPassword()) : null;
 			}
+			serverCreator.authHandler(authHandler);
 			// mqtt 内唯一id
 			if (Objects.nonNull(uniqueIdService)) {
 				serverCreator.uniqueIdService(uniqueIdService);
@@ -116,7 +128,6 @@ public class MqttServerPluginImpl implements Plugin {
 			if (Objects.nonNull(publishPermission)) {
 				serverCreator.publishPermission(publishPermission);
 			}
-
 			// 消息存储
 			if (Objects.nonNull(messageStore)) {
 				serverCreator.messageStore(messageStore);
@@ -144,8 +155,6 @@ public class MqttServerPluginImpl implements Plugin {
 			MqttServer mqttServer = serverCreator.build();
 			MqttServerTemplate mqttServerTemplate = new MqttServerTemplate(mqttServer);
 			context.wrapAndPut(MqttServerTemplate.class, mqttServerTemplate);
-			// Metrics
-			context.beanMake(MqttServerMetricsConfiguration.class);
 			// 添加启动时的函数处理
 			functionDetector();
 			// 启动
@@ -209,6 +218,88 @@ public class MqttServerPluginImpl implements Plugin {
 
 	private String getByCfgOrDef(String value) {
 		return Optional.ofNullable(context.cfg().getByTmpl(value)).orElse(value);
+	}
+
+	private static MqttServerCreator getMqttServerCreator(MqttServerProperties properties) {
+		MqttServerCreator serverCreator = MqttServer.create()
+			.name(properties.getName())
+			.heartbeatTimeout(properties.getHeartbeatTimeout())
+			.keepaliveBackoff(properties.getKeepaliveBackoff())
+			.readBufferSize((int) DataSize.parse(properties.getReadBufferSize()).getBytes())
+			.maxBytesInMessage((int) DataSize.parse(properties.getMaxBytesInMessage()).getBytes())
+			.maxClientIdLength(properties.getMaxClientIdLength())
+			.nodeName(properties.getNodeName())
+			.statEnable(properties.isStatEnable())
+			.proxyProtocolEnable(properties.isProxyProtocolOn());
+		if (properties.isDebug()) {
+			serverCreator.debug();
+		}
+		// tio 编解码等线程数
+		Integer tioExecutorSize = properties.getTioExecutorSize();
+		if (tioExecutorSize != null && tioExecutorSize > 0) {
+			serverCreator.tioExecutorSize(tioExecutorSize);
+		}
+		// AIO AsynchronousChannelGroup 的线程池
+		Integer groupExecutorSize = properties.getGroupExecutorSize();
+		if (groupExecutorSize != null && groupExecutorSize > 0) {
+			serverCreator.groupExecutorSize(groupExecutorSize);
+		}
+		// mqtt 工作线程数
+		Integer mqttExecutorSize = properties.getMqttExecutorSize();
+		if (mqttExecutorSize != null && mqttExecutorSize > 0) {
+			serverCreator.mqttExecutorSize(mqttExecutorSize);
+		}
+		// mqtt 协议
+		MqttServerProperties.Listener mqttListener = properties.getMqttListener();
+		if (mqttListener.isEnable()) {
+			serverCreator.enableMqtt(builder -> builder.serverNode(mqttListener.getServerNode()).build());
+		}
+		// mqtt ssl 协议
+		MqttServerProperties.SslListener mqttSslListener = properties.getMqttSslListener();
+		if (mqttSslListener.isEnable()) {
+			MqttServerProperties.Ssl ssl = mqttSslListener.getSsl();
+			serverCreator.enableMqttSsl(sslBuilder -> sslBuilder
+				.serverNode(mqttSslListener.getServerNode())
+				.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth())
+				.build());
+		}
+		// mqtt websocket 协议
+		MqttServerProperties.Listener wsListener = properties.getWsListener();
+		if (wsListener.isEnable()) {
+			serverCreator.enableMqttWs(builder -> builder.serverNode(wsListener.getServerNode()).build());
+		}
+		MqttServerProperties.SslListener wssListener = properties.getWssListener();
+		if (mqttSslListener.isEnable()) {
+			MqttServerProperties.Ssl ssl = wssListener.getSsl();
+			serverCreator.enableMqttWss(sslBuilder -> sslBuilder
+				.serverNode(wssListener.getServerNode())
+				.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth())
+				.build());
+		}
+		// mqtt http api
+		MqttServerProperties.HttpListener httpListener = properties.getHttpListener();
+		if (httpListener.isEnable()) {
+			Node serverNode = httpListener.getServerNode();
+			MqttServerProperties.HttpBasicAuth basicAuth = httpListener.getBasicAuth();
+			MqttServerProperties.Mcp mcp = httpListener.getMcp();
+			MqttServerProperties.HttpSsl ssl = httpListener.getSsl();
+			serverCreator.enableMqttHttpApi(builder -> {
+				builder.serverNode(serverNode);
+				if (basicAuth.isEnable()) {
+					builder.basicAuth(basicAuth.getUsername(), basicAuth.getPassword());
+				}
+				if (mcp.isEnable()) {
+					McpServer mcpServer = new McpServer();
+					mcpServer.useStreamableTransport(mcp.getEndpoint());
+					mcpServer.useSseTransport(mcp.getSseEndpoint(), mcp.getSseMessageEndpoint());
+				}
+				if (ssl.isEnable()) {
+					builder.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());
+				}
+				return builder.build();
+			});
+		}
+		return serverCreator;
 	}
 
 	@Override

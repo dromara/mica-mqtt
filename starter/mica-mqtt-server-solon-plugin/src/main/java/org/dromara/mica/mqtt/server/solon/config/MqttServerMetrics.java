@@ -24,6 +24,10 @@ import lombok.extern.slf4j.Slf4j;
 import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.server.ServerGroupStat;
 import net.dreamlu.mica.net.server.TioServerConfig;
+import org.dromara.mica.mqtt.server.solon.MqttServerTemplate;
+import org.noear.solon.core.AppContext;
+import org.noear.solon.core.event.AppLoadEndEvent;
+import org.noear.solon.core.event.EventListener;
 
 import java.util.Collections;
 
@@ -34,7 +38,7 @@ import java.util.Collections;
  */
 @Slf4j
 @RequiredArgsConstructor
-public class MqttServerMetrics {
+public class MqttServerMetrics implements EventListener<AppLoadEndEvent> {
 	/**
 	 * Prefix used for all mica-mqtt metric names.
 	 */
@@ -59,6 +63,21 @@ public class MqttServerMetrics {
 
 	public MqttServerMetrics() {
 		this(Collections.emptyList());
+	}
+
+	@Override
+	public void onEvent(AppLoadEndEvent event) throws Throwable {
+		AppContext appContext = event.context();
+		MeterRegistry registry = getMeterRegistry(appContext);
+		if (registry != null) {
+			MqttServerTemplate template = appContext.getBean(MqttServerTemplate.class);
+			TioServerConfig serverConfig = template.getMqttServer().getServerConfig();
+			bindTo(registry, serverConfig);
+		}
+	}
+
+	private MeterRegistry getMeterRegistry(AppContext appContext) {
+		return appContext.getBean(MeterRegistry.class);
 	}
 
 	public void bindTo(MeterRegistry meterRegistry, TioServerConfig serverConfig) {
