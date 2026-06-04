@@ -35,6 +35,7 @@ nbdist/
 .vscode
 
 ### AI Coding ###
+.codegraph
 .claude
 .opencode
 -p
