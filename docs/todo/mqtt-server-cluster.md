@@ -1,6 +1,11 @@
 # mica-mqtt-broker 集群实现文档
 
 > **注意**：本文档描述的是 mica-mqtt-broker 模块的实际实现，与早期的设计方案可能存在差异。
+>
+> **配套文档**（按演进路线阅读）：
+> - `mqtt-server-cluster.md`（本文）— 基础集群拓扑、消息协议、Session 管理
+> - `mqtt-server-cluster-routing.md` — V2 路由层（EMQX dispatcher 风格）+ 共享订阅
+> - `mqtt-server-cluster-storage.md` (v1.1) — V3 持久化层（H2 MVStore 统一引擎）
 
 ## 1. 方案概述
 
@@ -73,7 +78,7 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
     │   └── ClusterMqttConnectStatusListener.java # 连接状态监听
     ├── message/                           # 集群消息类型
     │   ├── ClusterMessage.java            # 集群消息接口
-    │   ├── ClusterMessageType.java        # 消息类型枚举
+    │   ├── ClusterMessageType.java        # 消息类型枚举 (V1: 1-8, V2: 9-11, V3: 12-19)
     │   ├── ClusterMessageSerializer.java  # 消息序列化器
     │   ├── ClientConnectMessage.java       # 客户端连接通知
     │   ├── ClientDisconnectMessage.java    # 客户端断开通知
@@ -85,10 +90,24 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
     │   ├── StateSyncRequestMessage.java    # 状态同步请求
     │   ├── StateSyncResponseMessage.java   # 状态同步响应
     │   └── NodeLeaveMessage.java           # 节点离开通知
-    └── pipeline/                          # 消息管道
-        ├── ClusterMessageDispatcher.java   # 集群消息分发器
-        └── ClusterPublishHandler.java      # 发布消息处理器
+    ├── pipeline/                          # 消息管道
+    │   ├── ClusterMessageDispatcher.java   # 集群消息分发器
+    │   └── ClusterPublishHandler.java      # 发布消息处理器
+    └── store/                             # [V3 新增] 存储层
+        ├── LocalKvStore.java              # 存储抽象接口
+        ├── H2MvStoreImpl.java              # H2 MVStore 实现 (Session/Retain/SharedSub/Inflight)
+        ├── RetainIndex.java                # 内存 Skiplist 通配索引
+        └── InflightTtlCleaner.java         # QoS 飞行消息 TTL 后台清理线程
 ```
+
+**V2/V3 新增的协议消息**（在 `ClusterMessageType` 中按枚举值扩展，V1 节点收到新类型会记录 warning 并忽略）：
+
+| 枚举值 | 消息类型 | 所属文档 | 状态 |
+|---|---|---|---|
+| 9-11 | `SHARED_SUBSCRIBE_FORWARD` / `SHARED_PUBLISH_FORWARD` / `SHARED_DISPATCH_TO_CLIENT` | routing 文档 | V2 待实现 |
+| 12-15 | `SESSION_TAKEOVER_REQUEST/RESPONSE` / `SESSION_MIGRATED_NOTIFY` / `SESSION_DELETE_NOTIFY` | storage 文档 | V3 待实现 |
+| 16-17 | `SHARED_SUB_STATE_SYNC` / `SHARED_SUB_TAKEOVER` | storage 文档 | V3 待实现 |
+| 18-19 | `RETAIN_REPLICATE` / `RETAIN_QUERY` | storage 文档 | V3 待实现 |
 
 ### 2.3 消息路由流程
 
@@ -151,18 +170,39 @@ public interface ClusterMessage {
 ```
 
 #### 消息类型枚举
+
 ```java
 public enum ClusterMessageType {
-    CLIENT_CONNECT(1),        // 客户端连接通知
+    // ===== V1（已实现）=====
+    CLIENT_CONNECT(1),         // 客户端连接通知
     CLIENT_DISCONNECT(2),      // 客户端断开通知
-    SUBSCRIBE_NOTIFY(3),      // 订阅通知
+    SUBSCRIBE_NOTIFY(3),       // 订阅通知
     UNSUBSCRIBE_NOTIFY(4),     // 取消订阅通知
     PUBLISH_FORWARD(5),        // 消息转发
     NODE_LEAVE(6),             // 节点离开
     STATE_SYNC_REQUEST(7),     // 状态同步请求
-    STATE_SYNC_RESPONSE(8);    // 状态同步响应
+    STATE_SYNC_RESPONSE(8),    // 状态同步响应
+
+    // ===== V2（routing 文档扩展，待实现）=====
+    SHARED_SUBSCRIBE_FORWARD(9),
+    SHARED_PUBLISH_FORWARD(10),
+    SHARED_DISPATCH_TO_CLIENT(11),
+
+    // ===== V3（storage 文档扩展，待实现）=====
+    SESSION_TAKEOVER_REQUEST(12),
+    SESSION_TAKEOVER_RESPONSE(13),
+    SESSION_MIGRATED_NOTIFY(14),
+    SESSION_DELETE_NOTIFY(15),
+    SHARED_SUB_STATE_SYNC(16),
+    SHARED_SUB_TAKEOVER(17),
+    RETAIN_REPLICATE(18),
+    RETAIN_QUERY(19);
 }
 ```
+
+**向后兼容**：旧节点收到新消息类型时记录 warning 并忽略。V2/V3 完整定义见：
+- 路由层扩展：`docs/todo/mqtt-server-cluster-routing.md` §5
+- 存储层扩展：`docs/todo/mqtt-server-cluster-storage.md` §5
 
 #### 关键消息类型
 
@@ -184,7 +224,7 @@ public class SubscribeNotifyMessage implements ClusterMessage {
 
 ### 3.3 Session 管理器（装饰器模式）
 
-`ClusterMqttSessionManager` 包装了原有的 `IMqttSessionManager`：
+`ClusterMqttSessionManager` 包装了原有的 `IMqttSessionManager`。V1 状态全在内存，V3 引入 L2 持久化后会在以下位置增加 L2 落点：
 
 ```java
 public class ClusterMqttSessionManager implements IMqttSessionManager {
@@ -206,17 +246,40 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 }
 ```
 
+**V3 持久化集成点**（参见 storage 文档 §4.1）：
+
+| 当前 V1 行为 | V3 增加 L2 落点 | 触发时机 |
+|---|---|---|
+| `createSession` 写内存 | 同步写 H2 `mqtt_session` 表 | CONNACK 返回前必须落盘 |
+| `removeSession` 删内存 | 同步删 H2 + 广播 `SESSION_DELETE_NOTIFY` | DISCONNECT 时 |
+| `getSession` 读内存 | miss 时从 H2 加载 | 跨节点接管场景 |
+| `registerRemoteClient` | 写 H2 + 广播 | 远程客户端注册时 |
+
+**V3 跨节点接管协议**（参见 storage 文档 §4.1.3）：
+
+```java
+// 协议流程（新增于 V3）
+SESSION_TAKEOVER_REQUEST(12),   // 新节点 -> 老节点: { clientId }
+SESSION_TAKEOVER_RESPONSE(13),  // 老节点 -> 新节点: { session, pendingInflight }
+SESSION_MIGRATED_NOTIFY(14),    // 新节点 -> 全集群: { clientId, newNode }
+SESSION_DELETE_NOTIFY(15);      // 任何节点 -> 全集群: { clientId }
+```
+
 ### 3.4 消息分发器（ClusterMessageDispatcher）
 
 ```java
 public class ClusterMessageDispatcher extends BaseMessageHandler {
-    // 拦截 UP_STREAM 消息
-    // 1. 查找所有订阅者（含远程）
-    // 2. 按节点分组
-    // 3. 向远程节点转发（O(1) 网络开销：每个节点只发一次）
-    // 4. 返回 true 继续本地分发
+    // V1 行为（当前实现）:
+    //   1. 查找所有订阅者（含远程） - 全量广播
+    //   2. 按节点分组
+    //   3. 向远程节点转发（O(1) 网络开销：每个节点只发一次）
+    //   4. 返回 true 继续本地分发
+    //
+    // 已知问题: 共享订阅同 group 跨节点时消息被多次转发, 见 §5.5
 }
 ```
+
+**V2 演进**（routing 文档 §1.2 详细描述）：改为 EMQX dispatcher 模型，发布者所在节点本地决策"只发给 1 个目标节点"，消除 V1 的重复转发问题。新增协议消息 `SHARED_DISPATCH_TO_CLIENT(11)`，由 `ClusterMessageDispatcher` 的子类 `SharedSubscriptionDispatcher` 处理。
 
 ### 3.5 序列化方案
 
@@ -301,13 +364,34 @@ mqtt:
 - **超大规模**：建议使用 Redis/Kafka 消息分发方案
 
 ### 5.3 数据一致性
+
+**V1 现状**（纯内存 + 广播）：
 - **最终一致性**：集群运行期间采用异步广播，存在短暂数据不一致窗口
 - **会话接管**：如果 Client ID 发生跨节点重连，需要额外处理
 - **保留消息**：各节点在内存中保存副本快照（暂不支持跨节点共享）
 
+**V3 改进**（持久化层引入后，参见 storage 文档）：
+- Session 一致性：H2 `mqtt_session` 表 + WAL 崩溃安全 + 跨节点 `SESSION_TAKEOVER` 协议
+- Retain 一致性：H2 `mqtt_retain` 表 + 内存 `RetainIndex`（ConcurrentSkipListMap）+ 跨节点 `RETAIN_REPLICATE` 协议
+- Shared Sub 一致性：H2 `mqtt_shared_sub` 表 + owner/backup 角色 + 跨节点 `SHARED_SUB_STATE_SYNC` 协议
+- QoS 1/2 飞行消息：H2 `mqtt_inflight` 表 + 30s 后台 TTL 清理（接受 30s 滞后换 0 第三方依赖）
+
+**V3 关键不变量**（来自 storage 文档 §2.4）：
+- Session 写入：必须在 CONNACK 前同步落 H2
+- 节点宕机：重启后 L1 必须从 L2 完整恢复，不依赖其他节点
+
 ### 5.4 故障恢复
+
+**V1 现状**（纯内存）：
 - **节点故障级联清理**：当收到 `NODE_LEAVE` 事件时，存活节点会自动清理该宕机节点上的所有远程客户端及订阅信息
 - **脑裂问题**：当前方案不处理，建议通过网络隔离避免
+- **数据丢失**：宕机节点的 session / retain / shared sub 全部丢失，重连客户端需重新鉴权
+
+**V3 改进**（持久化层引入后）：
+- **节点重启不丢数据**：从本地 H2 恢复 session / retain / shared sub
+- **跨节点接管**：客户端 sticky 失败连接到新节点时，新节点通过 `SESSION_TAKEOVER` 协议从老节点拉取 session（含飞行消息）
+- **Shared Sub 故障切换**：owner 节点宕机时，backup 节点检测后升级为新 owner（零消息真空，对比 V1 的 15s 真空）
+- **降级模式**：L2 启动失败时允许 Broker 启动但记录告警，session 退化为纯内存（保证可用性）
 
 ### 5.5 订阅同步设计（V1 全量复制）
 
@@ -319,38 +403,67 @@ mqtt:
 3. 向所有**远程节点**（有订阅者的非本节点）转发消息
 4. 本地订阅者由 Pipeline 后面的 `UpStreamMessageHandler` 本地投递
 
-**已知问题**：当同一 `$share/<group>/` 订阅的客户端分布在不同节点时，消息会被多次转发（每个节点都收到并投递）。这是 V1 全量复制方案的固有局限，后续可通过 Redis 中间件方案解决。
+**已知问题**：当同一 `$share/<group>/` 订阅的客户端分布在不同节点时，消息会被多次转发（每个节点都收到并投递）。这是 V1 全量复制方案的固有局限。
+
+**V2 演进**：routing 文档 §1.2 引入 EMQX dispatcher 模型解决此问题。发布者所在节点本地决策"只发给 1 个目标节点"，新增 `SHARED_DISPATCH_TO_CLIENT(11)` 消息类型。
 
 ---
 
 ## 6. 功能检查清单
 
+> 状态说明：✅ 已实现 / 🚧 部分实现 / ❌ 未实现
+> 路线图：V1 = 当前版本，V2 = routing 文档目标，V3 = storage 文档目标
+
 ### 6.1 节点发现与集群基础管理
-- [x] 基于 TCP 的节点互联与发现（通过 mica-net cluster 实现）
-- [x] 节点离开时的状态清理（`NODE_LEAVE` 事件处理）
+- [x] V1: 基于 TCP 的节点互联与发现（通过 mica-net cluster 实现）
+- [x] V1: 节点离开时的状态清理（`NODE_LEAVE` 事件处理）
 - [ ] 脑裂（Split-Brain）检测与自动恢复机制
 
 ### 6.2 客户端会话与状态同步
-- [x] 客户端连接/断开事件的集群广播
-- [ ] 集群级会话接管（Client Takeover）
-- [ ] 离线会话状态漫游
-- [ ] 飞行中消息同步（In-Flight Messages）
+- [x] V1: 客户端连接/断开事件的集群广播
+- [x] V1: Client ID 跨节点重连处理（基础）
+- [ ] V3: 集群级会话接管（Client Takeover）— `SESSION_TAKEOVER` 协议
+- [ ] V3: 离线会话状态漫游 — H2 `mqtt_session` 持久化
+- [ ] V3: 飞行中消息同步（In-Flight Messages）— H2 `mqtt_inflight` + 30s TTL 清理
 
 ### 6.3 消息路由与订阅分发
-- [x] 订阅/取消订阅状态全网实时同步
-- [x] 跨节点 Publish 消息按需路由转发
-- [x] 共享订阅（Shared Subscriptions `$share` / `$queue`）- V1 全量复制方案，**存在重复转发问题**（同 group 订阅者在不同节点时消息被多次转发），后续用 Redis 方案解决
+- [x] V1: 订阅/取消订阅状态全网实时同步
+- [x] V1: 跨节点 Publish 消息按需路由转发
+- [🚧] V1: 共享订阅（`$share` / `$queue`）— 全量复制方案，**存在重复转发问题**（同 group 跨节点时多次转发）
+- [ ] V2: 共享订阅 dispatcher 模型（EMQX 风格）— `SHARED_DISPATCH_TO_CLIENT` 协议
 
 ### 6.4 遗嘱与保留消息
-- [x] 保留消息的集群共享与存储 - 通过 `ClusterMqttMessageStore` 装饰器实现，`addRetainMessage` 时自动广播到所有节点
-- [x] 遗嘱消息的集群同步与触发代发 - 通过 `ClusterMqttMessageStore` 装饰器实现，`addWillMessage` 时自动广播到所有节点
+- [x] V1: 保留消息的集群共享与存储 — `ClusterMqttMessageStore` 装饰器 + 广播
+- [x] V1: 遗嘱消息的集群同步与触发代发 — `ClusterMqttMessageStore` 装饰器 + 广播
+- [ ] V3: 保留消息持久化 — H2 `mqtt_retain` + 内存 `RetainIndex` 通配查询
+- [ ] V3: 保留消息分片复制 — `RETAIN_REPLICATE` / `RETAIN_QUERY` 协议
 
-### 6.5 可观测性与高级特性
+### 6.5 持久化能力（V3 新增，参见 storage 文档）
+- [ ] H2 MVStore 统一引擎接入（~2MB 单 jar）
+- [ ] Session 元数据持久化 + ACID 事务
+- [ ] Retain 通配查询（内存 Skiplist 索引）
+- [ ] Shared Subscription owner 状态持久化
+- [ ] QoS 1/2 飞行消息持久化 + TTL 自动清理
+- [ ] 节点重启不依赖其他节点即可恢复
+
+### 6.6 可观测性与高级特性
 - [ ] 集群级别的统一指标监控 API
 - [ ] 全局限流控制协调机制
+- [ ] 存储层 metrics（L2 文件大小、Inflight 滞后堆积、Retain 索引内存）
 
 ---
 
-**文档版本：** v2.7
-**更新日期：** 2026-03-23
-**状态：** 已实现（含已知问题）
+**文档版本：** v2.8
+**更新日期：** 2026-06-05
+**状态：** V1 已实现（含已知问题）；V2/V3 演进路线已与 routing/storage 文档对齐
+
+**v2.8 变更摘要**（与 storage v1.1 / routing 文档同步）：
+- 顶部增加"配套文档"导航
+- §2.2 组件图：补充 V3 `store/` 子包（`LocalKvStore` / `H2MvStoreImpl` / `RetainIndex` / `InflightTtlCleaner`）
+- §3.2 消息类型枚举：补全 V2 (9-11) / V3 (12-19) 共 11 个新类型
+- §3.3 Session 管理器：标注 V3 L2 落点（create/remove/get/register 四处）
+- §3.4 消息分发器：补充 V2 dispatcher 模型切换说明
+- §5.3 / §5.4 一致性与故障恢复：增加 V3 改进项（H2 持久化、跨节点接管、Shared Sub 故障切换）
+- §5.5 订阅同步：已知问题保留，指向 routing 文档的 V2 解决方案
+- §6 检查清单：拆分 V1/V2/V3 三档状态，新增 §6.5 持久化能力专章
+- 移除"用 Redis 方案解决"等过时说法

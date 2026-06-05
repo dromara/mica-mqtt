@@ -1,6 +1,6 @@
 # mica-mqtt-broker 集群存储层设计文档
 
-> **本文档定位**：本文件是 `mqtt-server-cluster.md` 的**存储层专章**，描述在引入 H2 MVStore / RocksDB 等本地嵌入式存储后，集群能力获得的升级与新特性。如未特别说明，本文假设读者已熟悉 cluster 文档中的基础集群拓扑与消息协议。
+> **本文档定位**：本文件是 `mqtt-server-cluster.md` 的**存储层专章**，描述在引入 H2 MVStore 本地嵌入式存储后，集群能力获得的升级与新特性。v1.1 起整个存储层统一为单一 H2 引擎（单 jar ~2MB），不再依赖 RocksDB / MapDB 等第三方存储引擎。如未特别说明，本文假设读者已熟悉 cluster 文档中的基础集群拓扑与消息协议。
 
 ---
 
@@ -29,16 +29,32 @@
 
 ### 1.3 选型结论
 
-| 数据类型 | 推荐存储 | 理由 |
+| 数据类型 | 存储方案 | 理由 |
 |---|---|---|
-| Session 元数据 | **H2 MVStore** | 写少读多、结构化、ACID 事务 |
-| Retain 消息 | **H2 MVStore** | 中等写入量、需 topic 检索 |
+| Session 元数据 | **H2 MVStore** | 写少读多、结构化、ACID 事务、WAL 崩溃安全 |
+| Retain 消息 | **H2 MVStore + 内存 Skiplist 索引** | H2 持久化，内存索引加速通配符查询 |
 | Shared Subscription 状态 | **H2 MVStore** | 低频变更、需一致性读 |
-| QoS 1/2 飞行消息 | **RocksDB** | 高频顺序写、TTL 清理 |
+| QoS 1/2 飞行消息 | **H2 MVStore + 定时清理线程** | 纯 Java，TTL 通过 expireAt + 后台扫描实现 |
 | Topic Trie（路由表） | **内存** | 关键路径，不落盘 |
 | 客户端连接上下文 | **内存（t-io）** | 运行时态，无需持久 |
 
-> **MVP 建议**：初期只引入 H2 MVStore（一个 jar 包，~2MB，零原生依赖），待 QoS 1/2 重放成为强需求时再叠加 RocksDB。
+> **核心原则**：**零第三方存储引擎依赖，仅 H2 一个 jar（~2MB）**。所有持久化诉求由 H2 MVStore 统一承担，配合"内存索引 + 定时清理"补齐 H2 缺失的通配查询与 TTL 能力。
+
+#### 1.3.1 关于 RocksDB / MapDB / RogueMap 的评估结论
+
+v1.0 文档曾推荐 RocksDB 承担 QoS 1/2 飞行消息存储。v1.1 重新评估后**全部排除**，理由：
+
+| 候选 | 排除理由 |
+|---|---|
+| **RocksDB JNI** | 单 jar ~80MB（含 linux-x64 / osx / win-x64 三套 jni 库），直接让 broker 体积翻倍；需要为 ARM 等平台自编译；JNI 段错误诊断困难；mica-mqtt 现有依赖皆为纯 Java，引入 JNI 风格突兀 |
+| **MapDB 3.x** | 自身 jar 1.5MB，但 transitive 依赖累计 8MB+（kotlin-stdlib、eclipse-collections、jackson 等）；社区活跃度下降（最新版本停留在 3.0.9，2020 年后无大更新） |
+| **RogueMap** | 单作者、95 star、5 open issue；缺少 range scan（无法做 Retain topic 通配）、无 WAL（事务崩溃安全不达标）、TTL 仅惰性过期（文件持续膨胀）；主打 AI Memory 场景，与 broker 关键路径不匹配 |
+
+**TTL 替代方案**：H2 MVStore 本身不内置 TTL，但 QoS 1/2 飞行消息场景对 TTL 的核心诉求是"过期数据回收"和"按 clientId 范围扫描"。前者用后台 `ScheduledExecutor` 周期扫描可解（30s 滞后完全可接受），后者 H2 MVStore 的 `Map<String,byte[]>` 已原生支持 key 精确查与迭代器过滤。
+
+**Retain 通配查询替代方案**：H2 MVStore 的 Map 只能精确查。解决方案是叠一层"**H2 持久化 + 内存 `ConcurrentSkipListMap` 索引**"——H2 负责崩溃安全，内存索引负责通配加速。10w 级 retain 规模下，全表扫或子范围扫都 < 1ms。
+
+> **MVP 建议**：整个存储层只引入 H2 MVStore（一个 jar，~2MB，零原生依赖），同时实现两层薄的自研索引（Retain 索引 + Inflight TTL 清理器）。总自研代码量约 1 周工作量，长期运行无第三方存储引擎的版本绑定风险。
 
 ### 1.4 与 cluster 文档的关系
 
@@ -62,10 +78,11 @@ docs/todo/
 |      - Topic Trie (路由表, O(logN) topic 匹配)              |
 |      - ClientNodeMap (clientId -> nodeId)                  |
 |      - Shared Subscription 候选列表 (来自 V1 全量同步)      |
+|      - Retain 内存索引 (ConcurrentSkipListMap, 通配加速)   |
 +------------------------------------------------------------+
 |  L2  本地文件存储 (Persistent)                              |
-|      - H2 MVStore -- session / retain / shared sub         |
-|      - RocksDB   -- QoS 飞行消息 (高写入)                   |
+|      - H2 MVStore -- session / retain / shared sub / 飞行  |
+|      - TTL 后台清理线程 (QoS 飞行消息)                     |
 +------------------------------------------------------------+
 |  L3  集群广播 (Cluster Sync)                                |
 |      - mica-net / t-io 集群消息                             |
@@ -90,7 +107,9 @@ docs/todo/
                        +----------------------+
                        | Local Store (L2)     |
                        |  - H2 MVStore        |
-                       |  - RocksDB           |
+                       |    (session/retain/  |
+                       |     sharedsub/飞行)  |
+                       |  - TTL 清理线程      |
                        +----------------------+
 ```
 
@@ -99,7 +118,7 @@ docs/todo/
 ```
 节点启动
   |
-  |- 1. 启动 L2 存储 (打开 H2 / RocksDB)
+  |- 1. 启动 L2 存储 (打开 H2 MVStore, 启动 TTL 清理线程)
   |
   |- 2. 从 L2 加载: session / retain / shared sub
   |     +-- 加载到 L1 内存结构
@@ -118,7 +137,7 @@ docs/todo/
 |---|---|
 | Session 写入 | 必须在返回 CONNACK 前同步落 L2 |
 | Retain 写入 | L2 落盘后异步广播（不阻塞发布） |
-| QoS 1/2 飞行消息 | 异步批量写入 RocksDB，允许短暂丢（依赖客户端重发） |
+| QoS 1/2 飞行消息 | 异步写入 H2（executor 批量刷盘），后台 TTL 线程 30s 清理一次 |
 | 共享订阅状态变更 | L2 落盘 -> 广播 -> 收到 >=1 副本 ACK 后才回执客户端 |
 | 节点宕机 | 重启后 L1 必须从 L2 完整恢复，不依赖其他节点 |
 
@@ -145,7 +164,7 @@ public interface LocalKvStore {
     /** 范围扫描 */
     List<KeyValue> scan(String prefix);
 
-    /** 事务支持（仅 H2 实现，RocksDB 可选实现） */
+    /** 事务支持（仅 H2 实现） */
     void executeInTransaction(Runnable body);
 
     /** 健康检查 */
@@ -181,43 +200,89 @@ public class H2MvStoreImpl implements LocalKvStore {
 - `compression=1`（LZF）：降低磁盘占用
 - `cacheSize=64MB`：内存缓存
 
-### 3.3 RocksDB 实现要点
+### 3.3 Inflight 飞行消息实现要点（H2 + 定时清理）
+
+v1.1 起 QoS 1/2 飞行消息不再依赖 RocksDB，改由 H2 MVStore + 后台 TTL 线程承担。设计目标：写入路径与 Session/Retain 完全一致（同一个 H2 文件），TTL 清理与 RocksDB compaction filter 行为等价但实现简单。
 
 ```java
-public class RocksDbStoreImpl implements LocalKvStore {
-    private RocksDB db;
-    private ColumnFamilyHandle inflightCf;  // 飞行消息
-    private WriteBatch writeBatch;
+public class H2InflightStore implements LocalKvStore {
+
+    private MVStore store;
+    private Map<String, Value> inflightMap;        // 表
+    private final ScheduledExecutorService cleaner;
 
     public void open(Path dataDir) {
-        try (Options options = new Options()
-                .setCreateIfMissing(true)
-                .setCompressionType(CompressionType.LZ4_COMPRESSION)
-                .setWriteBufferSize(64 * 1024 * 1024)
-                .setMaxWriteBufferNumber(3)) {
+        store = MVStore.open(dataDir.resolve("mqtt-cluster.mv").toString());
+        inflightMap = store.openMap("inflight");
 
-            db = RocksDB.open(options, dataDir.resolve("inflight-db").toString());
-            inflightCf = db.createColumnFamily(
-                new ColumnFamilyDescriptor("inflight".getBytes()));
-        }
+        // 后台 TTL 清理: 30s 一次, 滞后窗口可接受
+        cleaner = Executors.newSingleThreadScheduledExecutor(
+            r -> { Thread t = new Thread(r, "mqtt-inflight-cleaner");
+                   t.setDaemon(true); return t; });
+        cleaner.scheduleAtFixedRate(this::cleanupExpired, 30, 30, TimeUnit.SECONDS);
     }
 
-    public void put(String key, byte[] value) {
-        // 异步批量写
-        writeBatch.put(inflightCf, key.getBytes(), value);
-        if (writeBatch.count() > 1000) {
-            db.write(new WriteOptions().setSync(false), writeBatch);
-            writeBatch.clear();
-        }
+    /**
+     * key: "clientId:packetId"
+     * value: [expireAt:8B][payload:N]  -- 头部 8 字节存过期时间戳
+     */
+    public void putWithTtl(String key, byte[] value, long ttlMs) {
+        long expireAt = System.currentTimeMillis() + ttlMs;
+        byte[] wrapped = new byte[8 + value.length];
+        ByteBuffer.wrap(wrapped).putLong(expireAt);
+        System.arraycopy(value, 0, wrapped, 8, value.length);
+        inflightMap.put(key, ValueDataType.wrap(wrapped));
     }
 
-    /** 飞行消息专用：带 TTL */
-    public void putWithTtl(String key, byte[] value, long ttlSeconds) {
-        // RocksDB 5.x+ 原生支持 TTL，可省去自己写过期清理
-        // 配合 compaction filter 自动回收
+    /** 按 clientId 前缀扫描, 用于重连重放 */
+    public List<byte[]> scanByClient(String clientId) {
+        String prefix = clientId + ":";
+        List<byte[]> result = new ArrayList<>();
+        for (Map.Entry<String, Value> e : inflightMap.entrySet()) {
+            if (e.getKey().startsWith(prefix)) {
+                byte[] wrapped = e.getValue().getBytes();
+                // 跳过已过期的
+                long expireAt = ByteBuffer.wrap(wrapped, 0, 8).getLong();
+                if (expireAt > System.currentTimeMillis()) {
+                    result.add(Arrays.copyOfRange(wrapped, 8, wrapped.length));
+                }
+            }
+        }
+        return result;
+    }
+
+    /** TTL 清理线程, 30s 触发一次 */
+    private void cleanupExpired() {
+        long now = System.currentTimeMillis();
+        int removed = 0;
+        Iterator<Map.Entry<String, Value>> it = inflightMap.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, Value> e = it.next();
+            byte[] wrapped = e.getValue().getBytes();
+            long expireAt = ByteBuffer.wrap(wrapped, 0, 8).getLong();
+            if (expireAt < now) {
+                it.remove();
+                removed++;
+            }
+        }
+        if (removed > 0) {
+            // MVStore 自动 commit, 无需显式调用
+        }
     }
 }
 ```
+
+**与 RocksDB TTL 的关键差异**：
+
+| 维度 | RocksDB | H2 + 定时清理 |
+|---|---|---|
+| 过期回收时机 | compaction 时实时回收 | 后台线程 30s 周期 |
+| 最坏过期滞后 | 几乎 0 | 30s |
+| jar 体积 | +80MB | +0MB（H2 已包含） |
+| 平台依赖 | JNI / 多平台原生库 | 纯 Java |
+| 实现复杂度 | 高（LSM tree 调优） | 低（普通 Map 迭代） |
+
+**30s 滞后是否可接受**：飞行消息的实际 TTL 通常是 session.keepalive × 3 = 90s ~ 240s 量级，30s 滞后相对可忽略。客户端重连时还会做一次 `scanByClient`，过期的会被应用层过滤。
 
 ---
 
@@ -379,10 +444,10 @@ public class RetainShardRouter {
 
 ```java
 public List<RetainMessage> getRetainMessages(String topicFilter) {
-    // 1. 本地查询
-    List<RetainMessage> local = retainMap.match(topicFilter);
+    // 1. 内存索引通配查询 (主路径)
+    List<RetainMessage> local = retainIndex.match(topicFilter);
 
-    // 2. 跨节点补充 (按需)
+    // 2. 跨节点补充 (按需, 仅在分片缺失时)
     if (needsRemoteQuery(topicFilter)) {
         for (String peer : shardRouter.peersForTopic(topicFilter)) {
             local.addAll(clusterQuery(peer, new RetainQuery(topicFilter)));
@@ -392,71 +457,184 @@ public List<RetainMessage> getRetainMessages(String topicFilter) {
 }
 ```
 
+#### 4.2.4 Retain 内存索引设计（v1.1 新增）
+
+> **v1.1 变更**：4.2.3 引入"内存索引层"。H2 MVStore 的 `Map` 只能精确查，topic 通配查询（`+` / `#`）走 H2 LIKE 会全表扫不可接受。因此在 H2 之上叠一层 `ConcurrentSkipListMap`。
+
+```java
+public class RetainIndex {
+
+    // L1 索引: 纯内存, 加速通配查询
+    private final ConcurrentSkipListMap<String, RetainPayload> treeMap =
+        new ConcurrentSkipListMap<>();
+
+    // L2 持久化: H2 MVStore 同一个文件, 独立 Map
+    private final Map<String, Value> retainTable;
+
+    public void put(String topic, RetainPayload payload) {
+        // 1. 同步落 H2 (崩溃安全)
+        synchronized (retainTable) {
+            retainTable.put(topic, serialize(payload));
+        }
+        // 2. 异步更内存 (崩溃时丢一点, 启动时从 H2 rebuild)
+        treeMap.put(topic, payload);
+    }
+
+    /**
+     * 通配查询策略:
+     * 1. 提取 topicFilter 在首个 '+' / '#' 之前的字面量前缀
+     * 2. 优先用 subMap 缩小候选集
+     * 3. 再用 MqttUtil.matchTopic 做精确匹配 (剔除假阳性)
+     */
+    public List<RetainPayload> match(String topicFilter) {
+        String literalPrefix = extractLiteralPrefix(topicFilter);
+
+        if (literalPrefix.isEmpty()) {
+            // 全表扫描 (retain < 1w 时 < 1ms, 可接受)
+            return treeMap.entrySet().stream()
+                .filter(e -> MqttUtil.matchTopic(topicFilter, e.getKey()))
+                .map(Map.Entry::getValue)
+                .collect(toList());
+        }
+
+        // 范围扫描: [literalPrefix, literalPrefix + "￿")
+        return treeMap.subMap(literalPrefix, false,
+                              literalPrefix + "￿", false)
+            .entrySet().stream()
+            .filter(e -> MqttUtil.matchTopic(topicFilter, e.getKey()))
+            .map(Map.Entry::getValue)
+            .collect(toList());
+    }
+
+    /** 启动时从 H2 重建内存索引 */
+    public void reload() {
+        treeMap.clear();
+        retainTable.forEach((k, v) ->
+            treeMap.put(k, deserialize(v.getBytes())));
+    }
+}
+```
+
+**内存与 H2 一致性**：
+- 写路径：先 H2 后内存（H2 成功是事实，内存丢失可重建）
+- 启动路径：先 H2 加载到内存，再对外提供服务
+- 删除路径：同上
+
+**为什么不直接用 H2 B+Tree 索引**：H2 MVStore 不暴露 B+Tree，只暴露 Map 抽象。要么用 H2 Server 模式的 SQL（引入 H2 server，复杂度上升），要么用 Map LIKE（性能不可接受）。内存 Skiplist 是性价比最高的折中。
+
+**为什么不引入 MapDB B+Tree**：MapDB 3.x 的 transitive 依赖累计 8MB+（kotlin-stdlib / eclipse-collections / jackson），违背"零第三方存储引擎"原则。10w 级 retain 规模下，`ConcurrentSkipListMap` 的全表扫 < 1ms，已足够。
+
 ### 4.3 QoS 1/2 飞行消息持久化
 
-#### 4.3.1 数据模型（RocksDB）
+> **v1.1 变更**：存储引擎从 RocksDB 改为 H2 MVStore + 定时清理线程。详见 §1.3.1 选型评估。
+
+#### 4.3.1 数据模型（H2 MVStore）
 
 ```
-Column Family: mqtt_inflight
+Table: mqtt_inflight  (key = "clientId:packetId")
 -------------------------------------------------
-Key:   <clientId>:<packetId>     (packed long)
-Value: <MqttPublishMessage 序列化>
-TTL:   <session expireAt - now>
+Value 布局:  [expireAt: 8B][MqttPublishMessage 序列化: NB]
+expireAt   = System.currentTimeMillis() + session.keepalive * 3
 -------------------------------------------------
 ```
+
+与 Session/Retain 共用同一个 `mqtt-cluster.mv` 文件，**单文件多 Map**。
 
 #### 4.3.2 写入流程
 
 ```java
 // Qos1PublishHandler
 public void sendQos1Publish(String clientId, int packetId, MqttPublishMessage msg) {
-    // 1. 发送到 t-io 缓冲区
+    // 1. 发送到 t-io 缓冲区（关键路径, 不阻塞）
     ctx.writeAndFlush(msg);
 
-    // 2. 异步写入 RocksDB (不阻塞)
-    inflightStore.putAsync(
-        encodeKey(clientId, packetId),
-        serialize(msg),
-        ttl = session.keepalive * 3   // 经验值
-    );
+    // 2. 提交到异步写线程（不阻塞发送线程）
+    asyncWriteExecutor.submit(() -> {
+        long ttlMs = session.keepalive() * 3 * 1000L;  // 经验值
+        inflightStore.putWithTtl(
+            encodeKey(clientId, packetId),
+            serialize(msg),
+            ttlMs
+        );
+    });
 }
 
 // Qos1PubAckHandler
 public void onPubAck(String clientId, int packetId) {
-    inflightStore.deleteAsync(encodeKey(clientId, packetId));
+    asyncWriteExecutor.submit(() -> {
+        inflightStore.delete(encodeKey(clientId, packetId));
+    });
 }
 ```
+
+**关键不变量**：
+- 发送路径只 `writeAndFlush`（不落盘），由 `asyncWriteExecutor` 异步落 H2
+- ACK 路径同样异步，避免阻塞 PUBACK 响应
+- H2 MVStore 本身已开启 `autoCommit`，单条 put 即写 binlog
 
 #### 4.3.3 重连重放
 
 ```java
 // Client 重连成功, 在 session 接管完成后触发
 public void replayInflightMessages(String clientId) {
-    List<KeyValue> pending = inflightStore.scan(prefix(clientId));
+    // 按 clientId 前缀扫描, 应用层过滤过期
+    List<byte[]> pending = inflightStore.scanByClient(clientId);
 
-    for (KeyValue kv : pending) {
-        MqttPublishMessage msg = deserialize(kv.value);
+    long now = System.currentTimeMillis();
+    for (byte[] payload : pending) {
+        // payload 已剥离 expireAt 头
+        MqttPublishMessage msg = deserialize(payload);
         ctx.writeAndFlush(msg);
-        // 保留在 RocksDB, 收到 PUBACK 后再删
+        // 保留在 H2, 收到 PUBACK 后再删 (重入幂等由 packetId 保障)
     }
 }
 ```
 
 #### 4.3.4 容量与清理
 
+**自动清理**（后台守护线程，30s 周期）：
+
 ```java
-// RocksDB compaction filter 自动清理过期数据
-public class InflightTtlFilter implements CompactOptions.Filter {
-    public boolean shouldBeRemoved(byte[] key, long ttl) {
-        return System.currentTimeMillis() > ttl;
+@Scheduled(fixedRate = 30_000)
+public void cleanupExpired() {
+    long now = System.currentTimeMillis();
+    int removed = 0;
+    Iterator<Map.Entry<String, Value>> it = inflightMap.entrySet().iterator();
+    while (it.hasNext()) {
+        Map.Entry<String, Value> e = it.next();
+        long expireAt = readExpireTime(e.getValue());
+        if (expireAt < now) {
+            it.remove();
+            removed++;
+        }
+    }
+    if (removed > 0) {
+        // MVStore 自动 commit; 可选: 打点 metrics
+        metrics.recordInflightExpired(removed);
     }
 }
 ```
 
+**手动清理**（节点优雅关闭时）：
+
+```java
+// MqttBroker.stop()
+public void stop() {
+    inflightStore.cleanupExpired();  // 同步清理一次
+    store.close();
+    cleaner.shutdown();
+}
+```
+
 **存储估算**：
-- 单条飞行消息平均 1KB
+- 单条飞行消息平均 1KB（含 8B expireAt 头）
 - 1w 在线客户端 × 平均 10 条未 ack = 100w 条 ≈ 1GB
-- RocksDB 轻松应付
+- H2 MVStore 单文件可支撑数十 GB，超过时按 broker/data/{nodeId}/ 子目录分片
+
+**30s 滞后下的数据膨胀风险**：
+- 极端场景：30s 内涌入 1w 条且全部立即过期 → 清理前文件多 1w 条 ≈ 10MB
+- 接受阈值：30s 清理窗口内堆积 < 100MB
+- 监控指标：`inflight.size() - inflight.aliveCount()` 的差值，告警阈值 10w
 
 ### 4.4 Shared Subscription 状态
 
@@ -565,7 +743,7 @@ RETAIN_QUERY(19),
 
 ## 6. 配置示例
 
-### 6.1 最小配置（仅 H2）
+### 6.1 最小配置（仅 H2，v1.1 推荐方案）
 
 ```yaml
 mqtt:
@@ -580,20 +758,24 @@ mqtt:
         - 192.168.1.10:9000
         - 192.168.1.11:9000
 
-  # 存储层 (新增)
+  # 存储层 (v1.1: 单一 H2 引擎, 无 rocksdb 配置块)
   storage:
     enabled: true
-    type: h2                  # h2 | rocksdb | mixed
+    type: h2
     data-dir: ./data/mqtt
     h2:
       cache-size-mb: 64
       compress: lzf
       auto-commit-buffer: 1024
-    # rocksdb 仅在 type=mixed/rocksdb 时生效
-    rocksdb:
-      write-buffer-mb: 64
-      max-write-buffer: 3
-      compression: lz4
+    # QoS 1/2 飞行消息 TTL 清理
+    inflight:
+      cleanup-interval-seconds: 30
+      default-ttl-factor: 3      # TTL = session.keepalive * factor
+      max-stale-records: 100000  # 滞后堆积告警阈值
+    # Retain 内存索引
+    retain-index:
+      rebuild-on-startup: true
+      max-in-memory: 1000000     # 超过后降级为全表扫
 ```
 
 ### 6.2 Java API
@@ -604,10 +786,12 @@ MqttServer server = MqttBroker.create()
     .port(1883)
     .storageConfig(new MqttStorageConfig()
         .enabled(true)
-        .type(StorageType.MIXED)        // H2 + RocksDB
+        .type(StorageType.H2)            // v1.1: 仅 H2
         .dataDir("./data/mqtt")
         .h2CacheSizeMb(64)
-        .rocksdbWriteBufferMb(64)
+        .inflightCleanupIntervalSeconds(30)
+        .inflightDefaultTtlFactor(3)
+        .retainIndexMaxInMemory(1_000_000)
     )
     .clusterConfig(new MqttClusterConfig()
         .enabled(true)
@@ -620,10 +804,11 @@ MqttServer server = MqttBroker.create()
 
 | 场景 | 配置建议 |
 |---|---|
-| 高频发布、QoS 1/2 多 | `type=rocksdb` 或 `mixed`，RocksDB 写缓冲调大 |
-| Retain 消息量大 | 调小 H2 cache，让更多数据落盘 |
-| 集群节点数多 | 调小 shared sub 的 L1 内存缓存 |
-| 磁盘 IO 慢 | RocksDB 开启 `setUseFsync(false)`（有断电风险） |
+| 高频发布、QoS 1/2 多 | 调小 `cleanup-interval-seconds`（如 10s），增大 H2 `cache-size-mb` |
+| Retain 消息量大（>10w） | 启用 `max-in-memory` 限制，超出后降级为 H2 全表扫（保护 JVM 堆） |
+| 集群节点数多 | 调小 H2 cache，让更多 session 数据落盘而非缓存 |
+| 磁盘 IO 慢 | H2 开启 `compress=lzf` 减 IO（CPU 换 IO） |
+| 极致低延迟 | 关闭 Retain 持久化（仅内存），接受宕机丢失 |
 
 ---
 
@@ -649,11 +834,16 @@ MqttServer server = MqttBroker.create()
 - [ ] backup 副本同步
 - [ ] 重启恢复测试
 
-### 阶段 3：RocksDB 接入 QoS 1/2（1 周）
+### 阶段 3：H2 Inflight 存储 + TTL 清理（0.5 周）
 
-- [ ] `InflightStore` 抽象 + RocksDB 实现
-- [ ] 异步批量写、TTL 清理
-- [ ] 客户端重连重放测试
+> **v1.1 变更**：原计划 1 周接入 RocksDB，现简化为 0.5 周实现 H2 + 后台清理线程。
+
+- [ ] `InflightStore` 抽象（接口定义）
+- [ ] `H2InflightStore` 实现（同文件不同 Map）
+- [ ] 后台 TTL 清理线程（30s 周期）
+- [ ] 异步写线程池（不阻塞发送路径）
+- [ ] 客户端重连重放 + 过期过滤
+- [ ] 滞后堆积告警 metrics
 
 ### 阶段 4：Retain 分片复制（1 周）
 
@@ -669,10 +859,13 @@ MqttServer server = MqttBroker.create()
 
 ### 8.1 磁盘与备份
 
-- **磁盘 IO**：H2/RocksDB 都是顺序写为主，普通 SSD 即可，建议 `ext4` / `xfs`
+- **磁盘 IO**：H2 MVStore 顺序写为主，普通 SSD 即可，建议 `ext4` / `xfs`
 - **磁盘容量**：规划 3-5x 内存大小作为初值
-- **备份**：定期快照 `data/` 目录；H2 可在线备份，RocksDB 需 `checkpoint`
-- **监控**：H2 的 `store.getFileStore().size()`、RocksDB 的 `db.getProperty("rocksdb.estimate-live-data-size")`
+- **备份**：定期快照 `data/` 目录；H2 MVStore 支持在线备份（`MVStore.getFileStore().copyTo()`）
+- **监控指标**：
+  - H2 文件大小：`store.getFileStore().size()`
+  - Inflight 滞后堆积：`inflight.size() - inflight.aliveCount()`
+  - Retain 索引内存：`retainIndex.memoryBytes()`
 
 ### 8.2 内存保护
 
@@ -693,9 +886,8 @@ MqttServer server = MqttBroker.create()
 ### 8.4 跨平台
 
 - H2 MVStore：纯 Java，无平台问题
-- RocksDB：需在部署目标平台都有 native lib
-  - 推荐使用 `org.rocksdb:rocksdbjni:8.5.0`，其包含 linux-x64、osx、win-x64
-  - 特殊平台（arm32 等）需自行编译
+- 整个存储层 v1.1 起**完全摆脱 JNI 依赖**，ARM / 国产化平台零适配成本
+- 若后续需要切换到 RocksDB（V4+），届时再评估平台覆盖
 
 ### 8.5 与 cluster 文档的关系
 
@@ -711,15 +903,15 @@ MqttServer server = MqttBroker.create()
 ### 9.1 持久化能力
 
 - [ ] Session 元数据持久化（H2）
-- [ ] Retain 消息持久化（H2）
+- [ ] Retain 消息持久化（H2）+ 内存 Skiplist 通配索引
 - [ ] Shared Subscription 状态持久化（H2）
-- [ ] QoS 1/2 飞行消息持久化（RocksDB）
+- [ ] QoS 1/2 飞行消息持久化（H2）+ 后台 TTL 清理
 
 ### 9.2 集群能力升级
 
 - [x] 集群级 Session 接管（Client Takeover）— SESSION_TAKEOVER 协议
 - [x] 离线会话状态漫游 — session 持久化 + 跨节点迁移
-- [x] 飞行中消息同步（In-Flight Messages）— RocksDB 重放
+- [x] 飞行中消息同步（In-Flight Messages）— H2 + 定时清理重放
 - [x] Retain 持久共享 — H2 持久 + 分片复制
 - [x] Shared Subscription 持久化 — owner 状态 H2 落盘
 
@@ -733,7 +925,7 @@ MqttServer server = MqttBroker.create()
 ### 9.4 待办（V4+）
 
 - [ ] 跨数据中心复制（异地容灾）
-- [ ] RocksDB 跨节点热备份（增量同步）
+- [ ] H2 MVStore 跨节点热备份（增量同步）
 - [ ] Retain 消息压缩（多版本合并）
 
 ---
@@ -746,13 +938,21 @@ MqttServer server = MqttBroker.create()
 | V2.1 (owner) | - | - | - | + | 15s | owner 单点 |
 | V2.2 (主备) | - | - | - | + | 3s | 容忍 1 |
 | EMQX dispatcher | - | - | - | + | <1s | 较轻 |
-| **V3 + H2 + RocksDB** | + | + | + | + | **<1s** | **几乎无** |
+| **V3 + H2（统一引擎）** | + | + | + | + | **<1s** | **几乎无** |
 
 ---
 
-**文档版本**：v1.0
-**更新日期**：2026-06-03
+**文档版本**：v1.1
+**更新日期**：2026-06-05
 **状态**：设计稿，待评审
+**v1.1 变更摘要**：
+- 选型重写：去掉 RocksDB，整个存储层统一为 H2 MVStore（单 jar ~2MB）
+- 新增 §1.3.1 评估结论：详细对比 RocksDB / MapDB / RogueMap 的排除理由
+- §3.3 / §4.3 重写：Inflight 实现改为 H2 + 后台 TTL 清理线程
+- §4.2.4 新增：Retain 内存 Skiplist 索引设计
+- §6 配置示例更新：移除 rocksdb 块，新增 inflight / retain-index 配置
+- §7 阶段 3 调整：1 周 → 0.5 周
+- §8.4 跨平台更新：完全摆脱 JNI 依赖
 **配套文档**：
 - `docs/todo/mqtt-server-cluster.md`（基础集群）
 - `docs/todo/mqtt-server-cluster-routing.md`（路由 + 共享订阅）
