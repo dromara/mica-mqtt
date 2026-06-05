@@ -660,7 +660,7 @@ public class MqttServerCreator {
 		// 2. 消息监听器（同步执行，避免二次 submit）
 		this.publishPipeline.addHandler(new MessageListenerHandler(this.messageListener));
 		// 3. 订阅转发（同步执行，避免二次 submit）
-		this.publishPipeline.addHandler(new SubscriptionForwardHandler(this));
+		this.publishPipeline.addHandler(new SubscriptionForwardHandler(this, mqttServer));
 		return mqttServer;
 	}
 

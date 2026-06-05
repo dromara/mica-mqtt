@@ -19,12 +19,11 @@ package org.dromara.mica.mqtt.core.server.pipeline.handler;
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.core.TioConfig;
-import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperty;
 import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
+import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.pipeline.MqttPublishPipelineHandler;
@@ -51,9 +50,11 @@ import java.util.List;
 public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 	private static final Logger logger = LoggerFactory.getLogger(SubscriptionForwardHandler.class);
 	private final IMqttSessionManager sessionManager;
+	private final MqttServer mqttServer;
 
-	public SubscriptionForwardHandler(MqttServerCreator serverCreator) {
+	public SubscriptionForwardHandler(MqttServerCreator serverCreator, MqttServer mqttServer) {
 		this.sessionManager = serverCreator.getSessionManager();
+		this.mqttServer = mqttServer;
 	}
 
 	@Override
@@ -142,28 +143,21 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 		String publisherClientId = context.getClientId();
 		try {
 			for (Subscribe subscribe : subscribeList) {
+				String topic = context.getTopic();
+				String clientId = subscribe.getClientId();
 				// MQTT 5.0 No Local（规范 3.8.3.1）: 订阅者即发布者时跳过
-				if (subscribe.isNoLocal() && subscribe.getClientId().equals(publisherClientId)) {
-					logger.debug("Mqtt Topic:{} skip forwarding to clientId:{} due to No Local flag", context.getTopic(), subscribe.getClientId());
+				if (subscribe.isNoLocal() && clientId.equals(publisherClientId)) {
+					logger.debug("Mqtt Topic:{} skip forwarding to clientId:{} due to No Local flag", topic, clientId);
 					continue;
 				}
-				ChannelContext clientContext = Tio.getByBsId(tioConfig, subscribe.getClientId());
+				ChannelContext clientContext = Tio.getByBsId(tioConfig, clientId);
 				if (clientContext == null || clientContext.isClosed()) {
-					logger.warn("Mqtt Topic:{} publish to clientId:{} ChannelContext is null may be disconnected.", context.getTopic(), subscribe.getClientId());
+					logger.warn("Mqtt Topic:{} publish to clientId:{} ChannelContext is null may be disconnected.", topic, clientId);
 					continue;
 				}
-				// MQTT 规范: 实际 QoS 取发布 QoS 与订阅 QoS 的较小值
-				int qosValue = Math.min(context.getQos().value(), subscribe.getMqttQoS());
-				MqttQoS mqttQoS = MqttQoS.valueOf(qosValue);
-				MqttPublishMessage publishMessage = MqttPublishMessage.builder()
-					.topicName(context.getTopic())
-					.payload(context.getPayload())
-					.qos(mqttQoS)
-					.retained(false)
-					.messageId(context.getMessageId())
-					.properties(properties)
-					.build();
-				Tio.send(clientContext, publishMessage);
+				// 发送消息
+				mqttServer.publish(clientContext, clientId, topic, context.getPayload(),
+					context.getQos(), false, properties);
 			}
 		} catch (Throwable e) {
 			logger.error("Subscription forward error", e);

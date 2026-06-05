@@ -33,6 +33,7 @@ import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
@@ -69,8 +70,8 @@ public final class MqttServer {
 	private final MqttSerializer mqttSerializer;
 
 	MqttServer(MqttServerCreator serverCreator,
-			   TioServerConfig serverConfig,
-			   MqttProtocolListeners listeners) {
+	           TioServerConfig serverConfig,
+	           MqttProtocolListeners listeners) {
 		this.serverCreator = serverCreator;
 		this.serverConfig = serverConfig;
 		this.taskService = serverConfig.getTaskService();
@@ -176,21 +177,24 @@ public final class MqttServer {
 			return false;
 		}
 		MqttQoS mqttQoS = qos.value() > subMqttQoS ? MqttQoS.valueOf(subMqttQoS) : qos;
-		return publish(context, clientId, topic, payload, mqttQoS, retain);
+		return publish(context, clientId, topic, payload, mqttQoS, retain, null);
 	}
 
 	/**
 	 * 直接发布消息
 	 *
-	 * @param context  ChannelContext
-	 * @param clientId clientId
-	 * @param topic    topic
-	 * @param payload  消息体
-	 * @param qos      MqttQoS
-	 * @param retain   是否在服务器上保留消息
+	 * @param context    ChannelContext
+	 * @param clientId   clientId
+	 * @param topic      topic
+	 * @param payload    消息体
+	 * @param qos        MqttQoS
+	 * @param retain     是否在服务器上保留消息
+	 * @param properties MqttProperties
 	 * @return 是否发送成功
 	 */
-	public boolean publish(ChannelContext context, String clientId, String topic, Object payload, MqttQoS qos, boolean retain) {
+	public boolean publish(ChannelContext context, String clientId, String topic, Object payload,
+	                       MqttQoS qos, boolean retain, MqttProperties properties
+	) {
 		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
 		int messageId = isHighLevelQoS ? sessionManager.getPacketId(clientId) : -1;
 		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
@@ -200,6 +204,7 @@ public final class MqttServer {
 			.qos(qos)
 			.retained(retain)
 			.messageId(messageId)
+			.properties(properties)
 			.build();
 		// 先启动高 qos 的重试
 		if (isHighLevelQoS) {
@@ -286,7 +291,7 @@ public final class MqttServer {
 			}
 			int subMqttQoS = subscribe.getMqttQoS();
 			MqttQoS mqttQoS = qos.value() > subMqttQoS ? MqttQoS.valueOf(subMqttQoS) : qos;
-			publish(context, clientId, topic, payload, mqttQoS, false);
+			publish(context, clientId, topic, payload, mqttQoS, false, null);
 		}
 		return true;
 	}

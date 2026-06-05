@@ -69,27 +69,28 @@
 mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
 └── cluster/
     ├── MqttBroker.java                    # Broker 入口
-    ├── core/                              # 核心组件
+    ├── config/                            # 集群配置与创建器
     │   ├── MqttClusterConfig.java         # 集群配置
-    │   ├── MqttClusterManager.java         # 集群管理器
-    │   ├── MqttClusterBrokerCreator.java  # Broker 创建器
+    │   └── MqttClusterBrokerCreator.java  # Broker 创建器
+    ├── core/                              # 集群核心组件
+    │   ├── MqttClusterManager.java        # 集群管理器
     │   ├── ClusterMqttSessionManager.java # 集群会话管理器（装饰器模式）
-    │   ├── ClusterMqttMessageStore.java    # 集群消息存储（装饰器模式）
+    │   ├── ClusterMqttMessageStore.java   # 集群消息存储（装饰器模式）
     │   └── ClusterMqttConnectStatusListener.java # 连接状态监听
-    ├── message/                           # 集群消息类型
+    ├── message/                           # 集群消息类型（V1 已实现 10 个，code 标注于行尾）
     │   ├── ClusterMessage.java            # 集群消息接口
-    │   ├── ClusterMessageType.java        # 消息类型枚举 (V1: 1-8, V2: 9-11, V3: 12-19)
+    │   ├── ClusterMessageType.java        # 消息类型枚举 (V1: 1-10, V2: 11-13, V3: 14-21)
     │   ├── ClusterMessageSerializer.java  # 消息序列化器
-    │   ├── ClientConnectMessage.java       # 客户端连接通知
-    │   ├── ClientDisconnectMessage.java    # 客户端断开通知
-    │   ├── SubscribeNotifyMessage.java     # 订阅通知
-    │   ├── UnsubscribeNotifyMessage.java  # 取消订阅通知
-    │   ├── PublishForwardMessage.java      # 消息转发请求
-    │   ├── WillMessageNotifyMessage.java   # 遗嘱消息通知
-    │   ├── RetainMessageNotifyMessage.java  # 保留消息通知
-    │   ├── StateSyncRequestMessage.java    # 状态同步请求
-    │   ├── StateSyncResponseMessage.java   # 状态同步响应
-    │   └── NodeLeaveMessage.java           # 节点离开通知
+    │   ├── ClientConnectMessage.java      # 客户端连接通知 (V1, code=1)
+    │   ├── ClientDisconnectMessage.java   # 客户端断开通知 (V1, code=2)
+    │   ├── SubscribeNotifyMessage.java    # 订阅通知 (V1, code=3)
+    │   ├── UnsubscribeNotifyMessage.java  # 取消订阅通知 (V1, code=4)
+    │   ├── PublishForwardMessage.java     # 消息转发请求 (V1, code=5)
+    │   ├── NodeLeaveMessage.java          # 节点离开通知 (V1, code=6)
+    │   ├── StateSyncRequestMessage.java   # 状态同步请求 (V1, code=7)
+    │   ├── StateSyncResponseMessage.java  # 状态同步响应 (V1, code=8)
+    │   ├── WillMessageNotifyMessage.java  # 遗嘱消息通知 (V1, code=9)
+    │   └── RetainMessageNotifyMessage.java # 保留消息通知 (V1, code=10)
     ├── pipeline/                          # 消息管道
     │   ├── ClusterMessageDispatcher.java   # 集群消息分发器
     │   └── ClusterPublishHandler.java      # 发布消息处理器
@@ -104,10 +105,12 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
 
 | 枚举值 | 消息类型 | 所属文档 | 状态 |
 |---|---|---|---|
-| 9-11 | `SHARED_SUBSCRIBE_FORWARD` / `SHARED_PUBLISH_FORWARD` / `SHARED_DISPATCH_TO_CLIENT` | routing 文档 | V2 待实现 |
-| 12-15 | `SESSION_TAKEOVER_REQUEST/RESPONSE` / `SESSION_MIGRATED_NOTIFY` / `SESSION_DELETE_NOTIFY` | storage 文档 | V3 待实现 |
-| 16-17 | `SHARED_SUB_STATE_SYNC` / `SHARED_SUB_TAKEOVER` | storage 文档 | V3 待实现 |
-| 18-19 | `RETAIN_REPLICATE` / `RETAIN_QUERY` | storage 文档 | V3 待实现 |
+| 11-13 | `SHARED_SUBSCRIBE_NOTIFY` / `SHARED_SUBSCRIBE_REMOVE` / `SHARED_DISPATCH_TO_CLIENT` | routing 文档 | V2 待实现 |
+| 14-17 | `SESSION_TAKEOVER_REQUEST/RESPONSE` / `SESSION_MIGRATED_NOTIFY` / `SESSION_DELETE_NOTIFY` | storage 文档 | V3 待实现 |
+| 18-19 | `SHARED_SUB_STATE_SYNC` / `SHARED_SUB_TAKEOVER` | storage 文档 | V3 待实现 |
+| 20-21 | `RETAIN_REPLICATE` / `RETAIN_QUERY` | storage 文档 | V3 待实现 |
+
+> **v2.9 修正**：原 v2.8 把 V2/V3 编号放在 9-19，与 V1 已实现的 `WILL_MESSAGE(9)` / `RETAIN_MESSAGE(10)` 冲突。本版本起 V1 占 1-10，V2 从 11 起，V3 从 14 起。V2 中不再使用 `SHARED_PUBLISH_FORWARD`（routing v1.2 §3.5 标记为"可选优化"，未列入实现计划；如后续需要可加回 22 号）。**cluster 文档是协议号表的 canonical 来源**，routing/storage 文档必须以本表为准。
 
 ### 2.3 消息路由流程
 
@@ -174,29 +177,33 @@ public interface ClusterMessage {
 ```java
 public enum ClusterMessageType {
     // ===== V1（已实现）=====
-    CLIENT_CONNECT(1),         // 客户端连接通知
-    CLIENT_DISCONNECT(2),      // 客户端断开通知
-    SUBSCRIBE_NOTIFY(3),       // 订阅通知
-    UNSUBSCRIBE_NOTIFY(4),     // 取消订阅通知
-    PUBLISH_FORWARD(5),        // 消息转发
-    NODE_LEAVE(6),             // 节点离开
-    STATE_SYNC_REQUEST(7),     // 状态同步请求
-    STATE_SYNC_RESPONSE(8),    // 状态同步响应
+    CLIENT_CONNECT(1),          // 客户端连接通知
+    CLIENT_DISCONNECT(2),       // 客户端断开通知
+    SUBSCRIBE_NOTIFY(3),        // 订阅通知
+    UNSUBSCRIBE_NOTIFY(4),      // 取消订阅通知
+    PUBLISH_FORWARD(5),         // 消息转发
+    NODE_LEAVE(6),              // 节点离开
+    STATE_SYNC_REQUEST(7),      // 状态同步请求
+    STATE_SYNC_RESPONSE(8),     // 状态同步响应
+    WILL_MESSAGE(9),            // 遗嘱消息通知
+    RETAIN_MESSAGE(10);         // 保留消息通知
 
-    // ===== V2（routing 文档扩展，待实现）=====
-    SHARED_SUBSCRIBE_FORWARD(9),
-    SHARED_PUBLISH_FORWARD(10),
-    SHARED_DISPATCH_TO_CLIENT(11),
+    // ===== V2（routing 文档扩展，待实现，编号 11-13）=====
+    SHARED_SUBSCRIBE_NOTIFY(11),
+    SHARED_SUBSCRIBE_REMOVE(12),
+    SHARED_DISPATCH_TO_CLIENT(13);
 
-    // ===== V3（storage 文档扩展，待实现）=====
-    SESSION_TAKEOVER_REQUEST(12),
-    SESSION_TAKEOVER_RESPONSE(13),
-    SESSION_MIGRATED_NOTIFY(14),
-    SESSION_DELETE_NOTIFY(15),
-    SHARED_SUB_STATE_SYNC(16),
-    SHARED_SUB_TAKEOVER(17),
-    RETAIN_REPLICATE(18),
-    RETAIN_QUERY(19);
+    // ===== V3（storage 文档扩展，待实现，编号 14-21）=====
+    // 注：以下为规划中的枚举值，Java enum 不允许多段 // 块，
+    // 实际落地时需把 V1/V2/V3 合并为单个枚举体，并删去此处的分号。
+    SESSION_TAKEOVER_REQUEST(14),
+    SESSION_TAKEOVER_RESPONSE(15),
+    SESSION_MIGRATED_NOTIFY(16),
+    SESSION_DELETE_NOTIFY(17),
+    SHARED_SUB_STATE_SYNC(18),
+    SHARED_SUB_TAKEOVER(19),
+    RETAIN_REPLICATE(20),
+    RETAIN_QUERY(21);
 }
 ```
 
@@ -259,10 +266,10 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 ```java
 // 协议流程（新增于 V3）
-SESSION_TAKEOVER_REQUEST(12),   // 新节点 -> 老节点: { clientId }
-SESSION_TAKEOVER_RESPONSE(13),  // 老节点 -> 新节点: { session, pendingInflight }
-SESSION_MIGRATED_NOTIFY(14),    // 新节点 -> 全集群: { clientId, newNode }
-SESSION_DELETE_NOTIFY(15);      // 任何节点 -> 全集群: { clientId }
+SESSION_TAKEOVER_REQUEST(14),   // 新节点 -> 老节点: { clientId }
+SESSION_TAKEOVER_RESPONSE(15),  // 老节点 -> 新节点: { session, pendingInflight }
+SESSION_MIGRATED_NOTIFY(16),    // 新节点 -> 全集群: { clientId, newNode }
+SESSION_DELETE_NOTIFY(17);      // 任何节点 -> 全集群: { clientId }
 ```
 
 ### 3.4 消息分发器（ClusterMessageDispatcher）
@@ -279,7 +286,7 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 }
 ```
 
-**V2 演进**（routing 文档 §1.2 详细描述）：改为 EMQX dispatcher 模型，发布者所在节点本地决策"只发给 1 个目标节点"，消除 V1 的重复转发问题。新增协议消息 `SHARED_DISPATCH_TO_CLIENT(11)`，由 `ClusterMessageDispatcher` 的子类 `SharedSubscriptionDispatcher` 处理。
+**V2 演进**（routing 文档 §1.2 详细描述）：改为 EMQX dispatcher 模型，发布者所在节点本地决策"只发给 1 个目标节点"，消除 V1 的重复转发问题。新增协议消息 `SHARED_DISPATCH_TO_CLIENT(13)`，由 `ClusterMessageDispatcher` 的子类 `SharedSubscriptionDispatcher` 处理。
 
 ### 3.5 序列化方案
 
@@ -405,7 +412,7 @@ mqtt:
 
 **已知问题**：当同一 `$share/<group>/` 订阅的客户端分布在不同节点时，消息会被多次转发（每个节点都收到并投递）。这是 V1 全量复制方案的固有局限。
 
-**V2 演进**：routing 文档 §1.2 引入 EMQX dispatcher 模型解决此问题。发布者所在节点本地决策"只发给 1 个目标节点"，新增 `SHARED_DISPATCH_TO_CLIENT(11)` 消息类型。
+**V2 演进**：routing 文档 §1.2 引入 EMQX dispatcher 模型解决此问题。发布者所在节点本地决策"只发给 1 个目标节点"，新增 `SHARED_DISPATCH_TO_CLIENT(13)` 消息类型。
 
 ---
 
@@ -422,7 +429,7 @@ mqtt:
 ### 6.2 客户端会话与状态同步
 - [x] V1: 客户端连接/断开事件的集群广播
 - [x] V1: Client ID 跨节点重连处理（基础）
-- [ ] V3: 集群级会话接管（Client Takeover）— `SESSION_TAKEOVER` 协议
+- [ ] V3: 集群级会话接管（Client Takeover）— `SESSION_TAKEOVER_REQUEST(14)` / `RESPONSE(15)` / `MIGRATED_NOTIFY(16)` / `DELETE_NOTIFY(17)` 协议
 - [ ] V3: 离线会话状态漫游 — H2 `mqtt_session` 持久化
 - [ ] V3: 飞行中消息同步（In-Flight Messages）— H2 `mqtt_inflight` + 30s TTL 清理
 
@@ -430,13 +437,14 @@ mqtt:
 - [x] V1: 订阅/取消订阅状态全网实时同步
 - [x] V1: 跨节点 Publish 消息按需路由转发
 - [🚧] V1: 共享订阅（`$share` / `$queue`）— 全量复制方案，**存在重复转发问题**（同 group 跨节点时多次转发）
-- [ ] V2: 共享订阅 dispatcher 模型（EMQX 风格）— `SHARED_DISPATCH_TO_CLIENT` 协议
+- [ ] V2: 共享订阅 dispatcher 模型（EMQX 风格）— `SHARED_DISPATCH_TO_CLIENT(13)` 协议
 
 ### 6.4 遗嘱与保留消息
 - [x] V1: 保留消息的集群共享与存储 — `ClusterMqttMessageStore` 装饰器 + 广播
-- [x] V1: 遗嘱消息的集群同步与触发代发 — `ClusterMqttMessageStore` 装饰器 + 广播
+- [x] V1: 遗嘱消息的集群备份 — WILL_MESSAGE(9) 同步到所有节点
+- [ ] V3: 节点失联后的 will 消息代发（其他节点检测到老节点 NODE_LEAVE 时代为触发）— 协议待规划
 - [ ] V3: 保留消息持久化 — H2 `mqtt_retain` + 内存 `RetainIndex` 通配查询
-- [ ] V3: 保留消息分片复制 — `RETAIN_REPLICATE` / `RETAIN_QUERY` 协议
+- [ ] V3: 保留消息分片复制 — `RETAIN_REPLICATE(20)` / `RETAIN_QUERY(21)` 协议
 
 ### 6.5 持久化能力（V3 新增，参见 storage 文档）
 - [ ] H2 MVStore 统一引擎接入（~2MB 单 jar）
@@ -453,14 +461,27 @@ mqtt:
 
 ---
 
-**文档版本：** v2.8
+**文档版本：** v2.9
+**更新日期：** 2026-06-05
+**状态：** V1 已实现（含已知问题）；V2/V3 演进路线已与 routing/storage 文档对齐
+
+**v2.9 变更摘要**（对照 v2.8 修复设计文档检查报告 P0/P1 项）：
+- **§2.2 目录树修正**：config/ 从 core/ 拆出；V1 消息文件加 (V1, code=N) 标注
+- **§2.2 协议号表修正**：V1 占 1-10，V2 从 11 起（SHARED_SUBSCRIBE_NOTIFY(11) / SHARED_SUBSCRIBE_REMOVE(12) / SHARED_DISPATCH_TO_CLIENT(13)），V3 从 14 起（14-17 session 接管、18-19 shared sub、20-21 retain）。本表为 **canonical** 协议号来源，routing/storage 必须对齐
+- **§3.2 枚举块更新**：与协议号表同步；注明 V1 实际有 10 个枚举值
+- **§3.3 接管协议代码块**：12-15 → 14-17
+- **§3.4 / §5.5 dispatcher ref**：SHARED_DISPATCH_TO_CLIENT(11) → (13)
+- **§6 检查清单**：拆分 Will "备份 vs 代发"——V1 只实现备份（WILL_MESSAGE(9) 广播），代发待 V3 规划
+- **§6 编号对齐**：V2/V3 状态条目都补全具体协议号
+- **去掉 SHARED_PUBLISH_FORWARD**：routing v1.2 §3.5 标记为可选优化，V2 实施时不再使用
+
 **更新日期：** 2026-06-05
 **状态：** V1 已实现（含已知问题）；V2/V3 演进路线已与 routing/storage 文档对齐
 
 **v2.8 变更摘要**（与 storage v1.1 / routing 文档同步）：
 - 顶部增加"配套文档"导航
 - §2.2 组件图：补充 V3 `store/` 子包（`LocalKvStore` / `H2MvStoreImpl` / `RetainIndex` / `InflightTtlCleaner`）
-- §3.2 消息类型枚举：补全 V2 (9-11) / V3 (12-19) 共 11 个新类型
+- §3.2 消息类型枚举：补全 V2 (11-13) / V3 (14-21) 共 11 个新类型（v2.9 修正：原 9-19 编号与 V1 WILL_MESSAGE(9)/RETAIN_MESSAGE(10) 冲突）
 - §3.3 Session 管理器：标注 V3 L2 落点（create/remove/get/register 四处）
 - §3.4 消息分发器：补充 V2 dispatcher 模型切换说明
 - §5.3 / §5.4 一致性与故障恢复：增加 V3 改进项（H2 持久化、跨节点接管、Shared Sub 故障切换）
