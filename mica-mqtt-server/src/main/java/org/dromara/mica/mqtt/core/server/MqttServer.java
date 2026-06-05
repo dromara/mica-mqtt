@@ -176,8 +176,7 @@ public final class MqttServer {
 			logger.warn("Mqtt Topic:{} publish but clientId:{} not subscribed.", topic, clientId);
 			return false;
 		}
-		MqttQoS mqttQoS = qos.value() > subMqttQoS ? MqttQoS.valueOf(subMqttQoS) : qos;
-		return publish(context, clientId, topic, payload, mqttQoS, retain, null);
+		return publish(context, clientId, topic, payload, qos, subMqttQoS, retain, null);
 	}
 
 	/**
@@ -188,20 +187,25 @@ public final class MqttServer {
 	 * @param topic      topic
 	 * @param payload    消息体
 	 * @param qos        MqttQoS
+	 * @param subMqttQoS MqttQoS
 	 * @param retain     是否在服务器上保留消息
 	 * @param properties MqttProperties
 	 * @return 是否发送成功
 	 */
 	public boolean publish(ChannelContext context, String clientId, String topic, Object payload,
-	                       MqttQoS qos, boolean retain, MqttProperties properties
+	                       MqttQoS qos, int subMqttQoS, boolean retain, MqttProperties properties
 	) {
-		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
+		// qos 降级处理，按订阅降级
+		MqttQoS mqttQoS = qos.value() > subMqttQoS ? MqttQoS.valueOf(subMqttQoS) : qos;
+		// 判断是否高版本 qos
+		boolean isHighLevelQoS = MqttQoS.QOS1 == mqttQoS || MqttQoS.QOS2 == mqttQoS;
+		// 消息id
 		int messageId = isHighLevelQoS ? sessionManager.getPacketId(clientId) : -1;
 		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
 		MqttPublishMessage message = MqttPublishMessage.builder()
 			.topicName(topic)
 			.payload(newPayload)
-			.qos(qos)
+			.qos(mqttQoS)
 			.retained(retain)
 			.messageId(messageId)
 			.properties(properties)
@@ -289,9 +293,7 @@ public final class MqttServer {
 				logger.warn("Mqtt Topic:{} publish to clientId:{} channel is null may be disconnected.", topic, clientId);
 				continue;
 			}
-			int subMqttQoS = subscribe.getMqttQoS();
-			MqttQoS mqttQoS = qos.value() > subMqttQoS ? MqttQoS.valueOf(subMqttQoS) : qos;
-			publish(context, clientId, topic, payload, mqttQoS, false, null);
+			publish(context, clientId, topic, payload, qos, subscribe.getMqttQoS(), false, null);
 		}
 		return true;
 	}
