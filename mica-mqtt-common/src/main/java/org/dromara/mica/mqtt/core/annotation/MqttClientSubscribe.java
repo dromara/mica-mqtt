@@ -52,6 +52,14 @@ public @interface MqttClientSubscribe {
 	MqttQoS qos() default MqttQoS.QOS0;
 
 	/**
+	 * 是否开启，默认：true
+	 * <a href="https://gitee.com/dromara/mica-mqtt/issues/IJSP5A">gitee IJSP5A</a>
+	 *
+	 * @return 是否启用
+	 */
+	boolean enabled() default true;
+
+	/**
 	 * mqtt 消息反序列化
 	 *
 	 * @return 反序列化

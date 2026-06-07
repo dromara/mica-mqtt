@@ -47,11 +47,15 @@ public class MqttClientPluginImpl implements Plugin {
 		this.context = context; //todo: 去掉 Solon.context() 写法，可同时兼容 2.5 之前与之后的版本 by noear,2023-09-15
 		// 查找类上的 MqttClientSubscribe 注解
 		context.beanBuilderAdd(MqttClientSubscribe.class, (clz, beanWrap, anno) -> {
-			subscribeClassTags.add(new ExtractorClassTag<>(clz, beanWrap, anno));
+			if (anno.enabled()) {
+				subscribeClassTags.add(new ExtractorClassTag<>(clz, beanWrap, anno));
+			}
 		});
 		// 查找方法上的 MqttClientSubscribe 注解
 		context.beanExtractorAdd(MqttClientSubscribe.class, (bw, method, anno) -> {
-			subscribeMethodTags.add(new ExtractorMethodTag<>(bw, method, anno));
+			if (anno.enabled()) {
+				subscribeMethodTags.add(new ExtractorMethodTag<>(bw, method, anno));
+			}
 		});
 		context.lifecycle(-9, new LifecycleBean() {
 			@Override

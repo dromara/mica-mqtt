@@ -65,7 +65,7 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 	 */
 	protected void processClassLevelSubscription(Class<?> userClass, Object bean) {
 		MqttClientSubscribe subscribe = AnnotationUtils.findAnnotation(userClass, MqttClientSubscribe.class);
-		if (subscribe != null) {
+		if (subscribe != null && subscribe.enabled()) {
 			IMqttClientSession clientSession = getMqttClientSession(subscribe.clientTemplateBean());
 			String[] topicFilters = getTopicFilters(subscribe.value());
 			clientSession.addSubscriptionList(topicFilters, subscribe.qos(), (IMqttClientMessageListener) bean);
@@ -79,7 +79,7 @@ public class MqttClientSubscribeDetector implements BeanPostProcessor {
 	protected void processMethodLevelSubscriptions(Class<?> userClass, Object bean) {
 		ReflectionUtils.doWithMethods(userClass, method -> {
 			MqttClientSubscribe subscribe = AnnotationUtils.findAnnotation(method, MqttClientSubscribe.class);
-			if (subscribe != null) {
+			if (subscribe != null && subscribe.enabled()) {
 				// 1. 校验必须为 public 和非 static 的方法
 				int modifiers = method.getModifiers();
 				if (Modifier.isStatic(modifiers)) {
