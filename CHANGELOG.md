@@ -2,6 +2,12 @@
 
 ## 发行版本
 
+### v2.6.5 - 2026-06-07
+
+- feat(mqtt): 新增MqttClientSubscribe注解enabled属性并支持启用过滤 gitee #IJSP5A 感谢 `@tan90` 反馈。
+- fix(mqtt-server): 修复消息转发 gitee #IJSJRM 感谢 `@xego` 反馈。
+- test(mica-mqtt-server): 添加mqtt server与client集成测试覆盖。
+
 ### v2.6.4 - 2026-05-31
 
 - 🐛 mica-mqtt-client-solon-plugin 修复 mqttClientCreator Bean 初始化，gitee #IJPTRT 感谢 `@linziguan` 反馈。
