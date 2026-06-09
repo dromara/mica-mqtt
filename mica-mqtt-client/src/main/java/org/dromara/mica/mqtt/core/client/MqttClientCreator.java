@@ -663,6 +663,15 @@ public final class MqttClientCreator {
 	}
 
 	/**
+	 * 设置开启 MQTT 连接前待发送消息队列
+	 *
+	 * @return MqttClientCreator
+	 */
+	public MqttClientCreator pendingPublishQueueEnabled() {
+		return pendingPublishQueueEnabled(true);
+	}
+
+	/**
 	 * 设置是否开启 MQTT 连接前待发送消息队列，默认：false
 	 *
 	 * @param pendingPublishQueueEnabled 是否开启
