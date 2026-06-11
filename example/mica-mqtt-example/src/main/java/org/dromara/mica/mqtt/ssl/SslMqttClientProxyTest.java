@@ -17,40 +17,39 @@
 package org.dromara.mica.mqtt.ssl;
 
 import net.dreamlu.mica.net.utils.buffer.ByteBufferUtil;
-import org.dromara.mica.mqtt.core.server.MqttServer;
-import org.dromara.mica.mqtt.server.MqttConnectStatusListener;
+import org.dromara.mica.mqtt.core.client.MqttClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 
 /**
- * mqtt 服务端测试
+ * 客户端测试
  *
  * @author L.cm
  */
-public class SslMqttServerTest {
-	private static final Logger logger = LoggerFactory.getLogger(SslMqttServerTest.class);
+public class SslMqttClientProxyTest {
+	private static final Logger logger = LoggerFactory.getLogger(SslMqttClientProxyTest.class);
 
 	public static void main(String[] args) {
-		MqttServer mqttServer = MqttServer.create()
-			// 开启代理协议
-			.proxyProtocolEnable()
-			.enableMqttSsl(builder ->
-				builder.useSsl("classpath:ssl/dreamlu.net.jks", "123456")
-					.build()
-			)
-			.messageListener((context, clientId, topic, qoS, message) -> {
-				logger.info("clientId:{} message:{} payload:{}", clientId, message, ByteBufferUtil.toString(message.payload()));
-			})
-			.connectStatusListener(new MqttConnectStatusListener())
-			.debug()
-			.start();
+		// 初始化 mqtt 客户端
+		MqttClient client = MqttClient.create()
+			.ip("127.0.0.1")
+			// haproxy 代理协议端口
+			.port(9883)
+			.username("mica")
+			.password("mica")
+			.useSsl("classpath:ssl/dreamlu.net.jks", "123456")
+			.connectSync();
+
+		client.subQos0("/test/#", (context, topic, message, payload) -> {
+			logger.info(topic + '\t' + ByteBufferUtil.toString(payload));
+		});
 
 		// 定时发送数据
-		mqttServer.schedule(() -> {
-			String message = "mica最牛皮 " + System.currentTimeMillis();
-			mqttServer.publishAll("/test/123", message.getBytes(StandardCharsets.UTF_8));
+		client.schedule(() -> {
+			String message = "mqtt ssl + proxy " + System.currentTimeMillis();
+			client.publish("/test/123", message.getBytes(StandardCharsets.UTF_8));
 		}, 5000);
 	}
 }
