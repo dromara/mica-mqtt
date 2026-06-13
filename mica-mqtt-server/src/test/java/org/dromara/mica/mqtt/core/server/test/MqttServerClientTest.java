@@ -145,12 +145,14 @@ class MqttServerClientTest {
 			.ip("127.0.0.1")
 			.port(PORT)
 			.clientId("retainedPub")
+			.pendingPublishQueueEnabled()
 			.connectSync();
 
 		MqttClient subClient = MqttClient.create()
 			.ip("127.0.0.1")
 			.port(PORT)
 			.clientId("retainedSub")
+			.pendingPublishQueueEnabled()
 			.connectSync();
 
 		// Publish with retain=true
