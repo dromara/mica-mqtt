@@ -121,7 +121,105 @@ public enum ClusterMessageType {
 	 * update their retained message store to maintain consistency.
 	 * </p>
 	 */
-	RETAIN_MESSAGE(10);
+	RETAIN_MESSAGE(10),
+
+	// V2 Routing messages (11-13) — shared subscription dispatcher model
+
+	/**
+	 * Shared subscription dispatch to a specific client on a target node.
+	 * <p>
+	 * Sent by the publisher's node to the target node after the local dispatcher
+	 * selects exactly one subscriber using the configured strategy. This eliminates
+	 * duplicate delivery that occurs with V1 full broadcast for shared subscriptions.
+	 * </p>
+	 */
+	SHARED_DISPATCH_TO_CLIENT(11),
+
+	/**
+	 * Shared subscription registration notification broadcast.
+	 * <p>
+	 * Sent when a client subscribes to a {@code $share/<group>/<topic>} or
+	 * {@code $queue/<topic>} filter. Other nodes update their shared subscription
+	 * tables to include this client as a candidate for future dispatches.
+	 * </p>
+	 */
+	SHARED_SUBSCRIBE_NOTIFY(12),
+
+	/**
+	 * Shared subscription removal notification broadcast.
+	 * <p>
+	 * Sent when a client unsubscribes from a shared topic. Other nodes remove
+	 * the corresponding entry from their shared subscription candidate lists.
+	 * </p>
+	 */
+	SHARED_SUBSCRIBE_REMOVE(13),
+
+	// V3 Storage messages (14-21) — H2 MVStore persistence layer
+
+	/**
+	 * Session takeover request sent from the new node to the previous owner node.
+	 * <p>
+	 * Triggered when a client reconnects to a different node (sticky session failure).
+	 * The new node requests all persistent session state from the previous owner.
+	 * </p>
+	 */
+	SESSION_TAKEOVER_REQUEST(14),
+
+	/**
+	 * Session takeover response carrying serialized session state.
+	 * <p>
+	 * Sent by the previous owner node in reply to {@link #SESSION_TAKEOVER_REQUEST}.
+	 * Contains subscriptions, pending inflight messages, and session metadata.
+	 * </p>
+	 */
+	SESSION_TAKEOVER_RESPONSE(15),
+
+	/**
+	 * Session migration complete notification broadcast to all cluster nodes.
+	 * <p>
+	 * Sent by the new owner node after successfully absorbing the transferred session.
+	 * All nodes update their client-to-node mapping accordingly.
+	 * </p>
+	 */
+	SESSION_MIGRATED_NOTIFY(16),
+
+	/**
+	 * Session deletion notification broadcast to all cluster nodes.
+	 * <p>
+	 * Sent when a session is permanently deleted (e.g., {@code cleanSession=true}
+	 * disconnect). All nodes clean up references to the deleted session.
+	 * </p>
+	 */
+	SESSION_DELETE_NOTIFY(17),
+
+	/**
+	 * Shared subscription state synchronization message between owner and backup nodes.
+	 * <p>
+	 * Used to replicate the authoritative shared subscription membership list from
+	 * the owner node to its designated backup nodes for fault tolerance.
+	 * </p>
+	 */
+	SHARED_SUB_STATE_SYNC(18),
+
+	/**
+	 * Shared subscription ownership takeover request.
+	 * <p>
+	 * Sent by a backup node when it detects that the owner node has left the cluster.
+	 * The backup promotes itself to owner and broadcasts this message to establish
+	 * the new ownership, eliminating the message vacuum during owner failover.
+	 * </p>
+	 */
+	SHARED_SUB_TAKEOVER(19),
+
+	/**
+	 * Retain message query request sent to a remote shard owner.
+	 * <p>
+	 * Used in the optional retain sharding mode (V3, P2.5) to query retain messages
+	 * stored on a different node. In the default non-sharded mode this message is
+	 * not used and retain messages are replicated to all nodes.
+	 * </p>
+	 */
+	RETAIN_QUERY(20);
 
 	private final int code;
 

@@ -93,8 +93,18 @@ public class ClusterMessageSerializer {
 	@SuppressWarnings("unchecked")
 	public static <T extends ClusterMessage> T fromClusterData(ClusterDataMessage data) {
 		int typeCode = Integer.parseInt(data.getHeader(HEADER_TYPE));
-		ClusterMessageType type = ClusterMessageType.fromCode(typeCode);
+		ClusterMessageType type;
+		try {
+			type = ClusterMessageType.fromCode(typeCode);
+		} catch (IllegalArgumentException e) {
+			// Unknown message type — forward-compatibility: a V1 node receiving a V2/V3
+			// message should log a warning and return null so the caller can skip it.
+			return null;
+		}
 		ClusterMessage msg = createMessage(type);
+		if (msg == null) {
+			return null;
+		}
 		msg.fromClusterData(data);
 		return (T) msg;
 	}
@@ -131,6 +141,19 @@ public class ClusterMessageSerializer {
 				return new WillMessageNotifyMessage();
 			case RETAIN_MESSAGE:
 				return new RetainMessageNotifyMessage();
+			case SHARED_DISPATCH_TO_CLIENT:
+				return new SharedDispatchToClientMessage();
+			case SHARED_SUBSCRIBE_NOTIFY:
+			case SHARED_SUBSCRIBE_REMOVE:
+			case SESSION_TAKEOVER_REQUEST:
+			case SESSION_TAKEOVER_RESPONSE:
+			case SESSION_MIGRATED_NOTIFY:
+			case SESSION_DELETE_NOTIFY:
+			case SHARED_SUB_STATE_SYNC:
+			case SHARED_SUB_TAKEOVER:
+			case RETAIN_QUERY:
+				// V3 messages not yet implemented; caller will skip null return
+				return null;
 			default:
 				throw new IllegalArgumentException("Unknown message type: " + type);
 		}

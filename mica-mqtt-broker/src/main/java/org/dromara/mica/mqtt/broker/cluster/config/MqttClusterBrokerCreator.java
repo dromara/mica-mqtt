@@ -23,6 +23,12 @@ import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttSessionManager;
 import org.dromara.mica.mqtt.broker.cluster.core.MqttClusterManager;
 import org.dromara.mica.mqtt.broker.cluster.pipeline.ClusterMessageDispatcher;
 import org.dromara.mica.mqtt.broker.cluster.pipeline.ClusterPublishHandler;
+import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.HashClientStrategy;
+import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.LocalFirstStrategy;
+import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.RandomStrategy;
+import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.RoundRobinStrategy;
+import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.SharedSubscriptionStrategy;
+import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.StickyStrategy;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
@@ -122,7 +128,10 @@ public class MqttClusterBrokerCreator {
 		MqttServer mqttServer = serverCreator.build();
 		clusterManager.setMqttServer(mqttServer);
 
-		ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(mqttServer, clusterManager, clusterSessionManager);
+		SharedSubscriptionStrategy strategy = createStrategy(clusterConfig, clusterSessionManager);
+		clusterManager.setSharedStrategy(strategy);
+
+		ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(mqttServer, clusterManager, clusterSessionManager, strategy);
 		serverCreator.addMessagePipelineHandler(dispatcher);
 
 		return mqttServer;
@@ -158,5 +167,30 @@ public class MqttClusterBrokerCreator {
 
 	public ClusterMqttSessionManager getClusterSessionManager() {
 		return clusterSessionManager;
+	}
+
+	/**
+	 * Creates the shared subscription strategy based on the cluster configuration.
+	 * Falls back to {@link LocalFirstStrategy} for unrecognised names.
+	 */
+	private SharedSubscriptionStrategy createStrategy(MqttClusterConfig config,
+													  ClusterMqttSessionManager sessionManager) {
+		String strategyName = config.getSharedSubStrategy();
+		if (strategyName == null) {
+			strategyName = "local_first";
+		}
+		switch (strategyName.toLowerCase()) {
+			case "random":
+				return new RandomStrategy();
+			case "round_robin":
+				return new RoundRobinStrategy();
+			case "hash_client":
+				return new HashClientStrategy();
+			case "sticky":
+				return new StickyStrategy();
+			case "local_first":
+			default:
+				return new LocalFirstStrategy(sessionManager::getClientNode);
+		}
 	}
 }

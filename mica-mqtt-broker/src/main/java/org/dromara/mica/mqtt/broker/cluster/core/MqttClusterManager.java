@@ -23,7 +23,9 @@ import net.dreamlu.mica.net.server.cluster.core.ClusterImpl;
 import net.dreamlu.mica.net.server.cluster.message.ClusterDataMessage;
 import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterConfig;
 import org.dromara.mica.mqtt.broker.cluster.message.*;
+import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.SharedSubscriptionStrategy;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
@@ -54,6 +56,7 @@ public class MqttClusterManager {
 	private MqttServer mqttServer;
 	private final MqttClusterConfig config;
 	private final String localNodeId;
+	private SharedSubscriptionStrategy sharedStrategy;
 
 	/**
 	 * Constructs a new cluster manager with the specified configuration.
@@ -64,6 +67,16 @@ public class MqttClusterManager {
 	public MqttClusterManager(MqttClusterConfig config, String localNodeId) {
 		this.config = config;
 		this.localNodeId = localNodeId;
+	}
+
+	/**
+	 * Sets the shared subscription strategy used when re-picking a subscriber after a
+	 * {@link ClusterMessageType#SHARED_DISPATCH_TO_CLIENT} target is found offline.
+	 *
+	 * @param sharedStrategy the shared subscription strategy to use
+	 */
+	public void setSharedStrategy(SharedSubscriptionStrategy sharedStrategy) {
+		this.sharedStrategy = sharedStrategy;
 	}
 
 	/**
@@ -212,9 +225,99 @@ public class MqttClusterManager {
 				}
 				break;
 			}
+			case SHARED_DISPATCH_TO_CLIENT: {
+				SharedDispatchToClientMessage sdm = (SharedDispatchToClientMessage) clusterMsg;
+				handleSharedDispatchToClient(sdm, sessionManager);
+				break;
+			}
 			default:
 				logger.warn("Unknown cluster message type: {}", clusterMsg.getType());
 				break;
+		}
+	}
+
+	/**
+	 * Handles a SHARED_DISPATCH_TO_CLIENT message received from another node.
+	 * <p>
+	 * The publisher's node has already selected this client as the single recipient
+	 * for a shared-subscription delivery.  This node delivers the message to the
+	 * local client.
+	 * </p>
+	 * <p>
+	 * If the target client is no longer connected (race between disconnect broadcast
+	 * and this message), this node performs a local re-pick using the same strategy
+	 * and delivers to a still-active subscriber (plan B from the design doc).
+	 * </p>
+	 */
+	private void handleSharedDispatchToClient(SharedDispatchToClientMessage sdm,
+											  ClusterMqttSessionManager sessionManager) {
+		String clientId = sdm.getClientId();
+		String topic = sdm.getTopic();
+		Message msg = sdm.getMessage();
+
+		if (msg == null) {
+			logger.warn("[Cluster] Received SHARED_DISPATCH_TO_CLIENT with null message, clientId={}", clientId);
+			return;
+		}
+
+		// Try to deliver to the selected client locally.
+		boolean delivered = mqttServer.publish(clientId, msg.getTopic(),
+			msg.getPayload(), MqttQoS.valueOf(msg.getQos()));
+
+		if (delivered) {
+			logger.debug("[Cluster] Shared dispatch delivered to client={} topic={}", clientId, topic);
+			return;
+		}
+
+		// Target client is no longer local — re-pick from the local shared-subscription table.
+		logger.warn("[Cluster] Shared dispatch target client={} not found on this node for topic={}, re-picking",
+			clientId, topic);
+
+		if (sharedStrategy == null) {
+			logger.debug("[Cluster] No shared strategy configured, dropping re-pick for topic={}", topic);
+			return;
+		}
+
+		List<Subscribe> candidates = sessionManager.searchAllSubscribe(topic);
+		if (candidates == null || candidates.isEmpty()) {
+			logger.debug("[Cluster] No subscribers remain for topic={}, dropping", topic);
+			return;
+		}
+
+		// Narrow to shared subscribers only, group the same way the dispatcher does.
+		java.util.Map<String, java.util.List<Subscribe>> sharedGroups = new java.util.HashMap<>();
+		for (Subscribe sub : candidates) {
+			String topicFilter = sub.getTopicFilter();
+			if (topicFilter == null) {
+				continue;
+			}
+			if (topicFilter.startsWith(TopicFilterType.SHARE_GROUP_PREFIX)) {
+				String groupName = TopicFilterType.getShareGroupName(topicFilter);
+				sharedGroups.computeIfAbsent(groupName, k -> new java.util.ArrayList<>()).add(sub);
+			} else if (topicFilter.startsWith(TopicFilterType.SHARE_QUEUE_PREFIX)) {
+				sharedGroups.computeIfAbsent("$queue", k -> new java.util.ArrayList<>()).add(sub);
+			}
+		}
+
+		for (java.util.Map.Entry<String, java.util.List<Subscribe>> entry : sharedGroups.entrySet()) {
+			Subscribe rePicked = sharedStrategy.pick(entry.getKey(), entry.getValue(), localNodeId, msg);
+			if (rePicked == null) {
+				continue;
+			}
+			String rePickedNode = sessionManager.getClientNode(rePicked.getClientId());
+			boolean isLocal = rePickedNode == null || rePickedNode.equals(localNodeId);
+			if (isLocal) {
+				mqttServer.publish(rePicked.getClientId(), msg.getTopic(),
+					msg.getPayload(), MqttQoS.valueOf(msg.getQos()));
+				logger.debug("[Cluster] Re-pick delivered to client={} topic={}", rePicked.getClientId(), topic);
+			} else {
+				SharedDispatchToClientMessage retry = new SharedDispatchToClientMessage();
+				retry.setClientId(rePicked.getClientId());
+				retry.setTopic(topic);
+				retry.setMessage(msg);
+				sendToNode(rePickedNode, retry);
+				logger.debug("[Cluster] Re-pick forwarded to node={} client={} topic={}", rePickedNode, rePicked.getClientId(), topic);
+			}
 		}
 	}
 
