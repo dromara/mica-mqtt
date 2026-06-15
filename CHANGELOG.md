@@ -3,7 +3,7 @@
 ## 发行版本
 
 ### v2.6.6 - 2026-06-13
-- ⬆️ mica-net 升级到 2.0.5 正式版，修复 🐛 SSL + ProxyProtocol 代理协议时编解码异常。
+- ⬆️ mica-net 升级到 2.0.5 正式版，修复 🐛 SSL + ProxyProtocol 代理协议时编解码异常。gitee #IJT44K 感谢 `@zjwon` 反馈
 
 ### v2.6.5 - 2026-06-07
 
