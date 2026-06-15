@@ -88,6 +88,22 @@ public class MqttClusterConfig {
 	 */
 	private long nodeTimeout = 15000;
 
+	/**
+	 * Shared subscription dispatch strategy name.
+	 * <p>
+	 * Controls how one subscriber is selected from a shared-subscription group when
+	 * a message is published.  Built-in values:
+	 * <ul>
+	 *   <li>{@code "local_first"} <strong>(default)</strong> — prefer subscribers on the same node</li>
+	 *   <li>{@code "round_robin"} — fair rotation within each group counter</li>
+	 *   <li>{@code "random"} — stateless random pick</li>
+	 *   <li>{@code "hash_client"} — deterministic hash of message ID + group</li>
+	 *   <li>{@code "sticky"} — always route to the same subscriber per group</li>
+	 * </ul>
+	 * </p>
+	 */
+	private String sharedSubStrategy = "local_first";
+
 	public boolean isEnabled() {
 		return enabled;
 	}
@@ -176,6 +192,19 @@ public class MqttClusterConfig {
 
 	public MqttClusterConfig nodeTimeout(long nodeTimeout) {
 		this.nodeTimeout = nodeTimeout;
+		return this;
+	}
+
+	public String getSharedSubStrategy() {
+		return sharedSubStrategy;
+	}
+
+	public void setSharedSubStrategy(String sharedSubStrategy) {
+		this.sharedSubStrategy = sharedSubStrategy;
+	}
+
+	public MqttClusterConfig sharedSubStrategy(String sharedSubStrategy) {
+		this.sharedSubStrategy = sharedSubStrategy;
 		return this;
 	}
 }
