@@ -24,51 +24,78 @@
 # mqtt 服务端配置
 mqtt:
   server:
-    enabled: true               # 是否开启服务端，默认：true
-    name: Mica-Mqtt-Server      # 名称，默认：Mica-Mqtt-Server
-    heartbeat-timeout: 120000   # 心跳超时，单位毫秒，默认: 1000 * 120
-    read-buffer-size: 8KB       # 接收数据的 buffer size，默认：8k
-    max-bytes-in-message: 10MB  # 消息解析最大 bytes 长度，默认：10M
+    # ------ 基础配置 ------
+    enabled: true                       # 是否启用，默认：true
+    name: Mica-Mqtt-Server              # 名称，默认：Mica-Mqtt-Server
+    node-name:                          # 节点名称，用于处理集群
+    debug: false                        # 调试日志，开启后会影响性能，开启 prometheus 时建议关闭
+    stat-enable: true                   # 是否开启监控（指标收集），关闭可节省内存，默认：true
+    proxy-protocol-on: false            # 开启代理协议，支持 nginx proxy_protocol on;，默认：false
+    # ------ 线程池 ------
+    tio-executor-size:                  # tio 编解码等线程数
+    group-executor-size:                # AIO AsynchronousChannelGroup 的线程池
+    mqtt-executor-size:                 # mqtt 工作线程数，默认：8或2倍CPU核心数（取较大值），消息量大时调大此参数
+    # ------ mqtt 协议参数 ------
+    heartbeat-timeout: 120000           # 心跳超时时间（单位：毫秒，默认：1000 * 120），设为 0 或负数表示禁用
+    keepalive-backoff: 0.75             # MQTT 客户端 keepalive 系数（默认：0.75），连接超时 = keepalive * 系数 * 2，不得小于 0.5
+    read-buffer-size: 8KB               # 接收数据的 buffer size，默认：8k
+    max-bytes-in-message: 10MB          # 消息解析最大 bytes 长度，默认：10M
+    max-client-id-length: 64            # 客户端 ID 最大长度，mqtt 3.1 规定 23，这里默认 64 以减少问题
+    # ------ mqtt 认证 ------
     auth:
-      enable: false             # 是否开启 mqtt 认证
-      username: mica            # mqtt 认证用户名
-      password: mica            # mqtt 认证密码
-    debug: true                 # 如果开启 prometheus 指标收集建议关闭
-    stat-enable: true           # 开启指标收集，debug 和 prometheus 开启时需要打开，默认开启，关闭节省内存
-    mqtt-listener:              # mqtt 监听器
-      enable: true              # 是否开启，默认：false
-#      ip: "0.0.0.0"            # 服务端 ip 默认为空，0.0.0.0，建议不要设置
-      port: 1883                # 端口，默认：1883
-    mqtt-ssl-listener:          # mqtt ssl 监听器
-      enable: false             # 是否开启，默认：false
-      port: 8883                # 端口，默认：8883
-      ssl:                      # ssl 配置，必须
-        keystore-path:          # 必须参数：ssl keystore 目录，支持 classpath:/ 路径。
-        keystore-pass:          # 必选参数：ssl keystore 密码
-        truststore-path:        # 可选参数：ssl 双向认证 truststore 目录，支持 classpath:/ 路径。
-        truststore-pass:        # 可选参数：ssl 双向认证 truststore 密码
-        client-auth: none       # 是否需要客户端认证（双向认证），默认：NONE（不需要）
-    ws-listener:                # websocket mqtt 监听器
-      enable: true              # 是否开启，默认：false
-      port: 8083                # websocket 端口，默认：8083
-    wss-listener:               # websocket ssl mqtt 监听器
-      enable: false             # 是否开启，默认：false
-      port: 8084                # 端口，默认：8084
-      ssl:                      # ssl 配置，必须
-        keystore-path:          # 必须参数：ssl keystore 目录，支持 classpath:/ 路径。
-        keystore-pass:          # 必选参数：ssl keystore 密码
-        truststore-path:        # 可选参数：ssl 双向认证 truststore 目录，支持 classpath:/ 路径。
-        truststore-pass:        # 可选参数：ssl 双向认证 truststore 密码
-        client-auth: none       # 是否需要客户端认证（双向认证），默认：NONE（不需要）
+      enable: false                     # 是否开启 mqtt 认证，默认：false
+      username: mica                    # mqtt 认证账号
+      password: mica                    # mqtt 认证密码
+    # ------ mqtt tcp 监听器 ------
+    mqtt-listener:
+      enable: true                      # 是否启用，默认：false
+#      ip: 0.0.0.0                      # 服务端 ip，默认为空（0.0.0.0），建议不要设置
+      port: 1883                        # 端口，默认：1883
+    # ------ mqtt ssl 监听器 ------
+    mqtt-ssl-listener:
+      enable: false                     # 是否启用，默认：false
+      port: 8883                        # 端口，默认：8883
+      ssl:
+        keystore-path:                   # 必填：ssl keystore 证书路径，支持 classpath:/ 路径
+        keystore-pass:                   # 必填：ssl keystore 密码
+        truststore-path:                 # 可选：ssl 双向认证 truststore 证书路径，支持 classpath:/ 路径
+        truststore-pass:                 # 可选：ssl 双向认证 truststore 密码
+        client-auth: NONE                # 客户端认证类型，默认：NONE（不需要），可选 OPTIONAL / REQUIRE
+    # ------ websocket mqtt 监听器 ------
+    ws-listener:
+      enable: true                      # 是否启用，默认：false
+      port: 8083                        # websocket 端口，默认：8083
+    # ------ websocket ssl mqtt 监听器 ------
+    wss-listener:
+      enable: false                     # 是否启用，默认：false
+      port: 8084                        # 端口，默认：8084
+      ssl:
+        keystore-path:                   # 必填：ssl keystore 证书路径，支持 classpath:/ 路径
+        keystore-pass:                   # 必填：ssl keystore 密码
+        truststore-path:                 # 可选：ssl 双向认证 truststore 证书路径，支持 classpath:/ 路径
+        truststore-pass:                 # 可选：ssl 双向认证 truststore 密码
+        client-auth: NONE                # 客户端认证类型，默认：NONE（不需要），可选 OPTIONAL / REQUIRE
+    # ------ http api 监听器 ------
     http-listener:
-      enable: true
-      port: 18083
-      basic-auth:               # 基础认证
-        enable: true
-        username: mica
-        password: mica
-      mcp-server:               # 大模型 mcp
-        enable: true
+      enable: true                      # 是否启用，默认：false
+      port: 18083                       # http 端口
+#      ip: 0.0.0.0                      # 服务端 ip，默认为空（0.0.0.0）
+      basic-auth:                       # http Basic 认证
+        enable: false                   # 是否启用，默认：false
+        username: mica                  # http Basic 认证账号
+        password: mica                  # http Basic 认证密码
+      mcp:                              # 大模型 MCP（Model Context Protocol）
+        enable: false                   # 是否启用，默认：false
+        endpoint: /mcp/message          # stream http endpoint
+        sse-endpoint: /mcp/sse          # sse 端点
+        sse-message-endpoint: /mcp/message  # sse message 端点
+      ssl:                              # http ssl 配置
+        enable: false                   # 是否启用，默认：false
+        keystore-path:                  # 必填：ssl keystore 证书路径，支持 classpath:/ 路径
+        keystore-pass:                  # 必填：ssl keystore 密码
+        truststore-path:                # 可选：ssl 双向认证 truststore 证书路径
+        truststore-pass:                # 可选：ssl 双向认证 truststore 密码
+        client-auth: NONE               # 客户端认证类型，默认：NONE（不需要），可选 OPTIONAL / REQUIRE
 ```
 
 注意：**ssl** 存在三种情况
