@@ -42,7 +42,7 @@ import java.util.Map;
  *
  * @author L.cm
  * @see ClusterMessageType#SHARED_DISPATCH_TO_CLIENT
- * @since 1.0.0
+ * @since 2.6.0
  */
 public class SharedDispatchToClientMessage implements ClusterMessage {
 

@@ -79,7 +79,7 @@ import java.util.Set;
  * @author L.cm
  * @see BaseMessageHandler
  * @see SharedSubscriptionStrategy
- * @since 1.0.0
+ * @since 2.6.0
  */
 public class ClusterMessageDispatcher extends BaseMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(ClusterMessageDispatcher.class);

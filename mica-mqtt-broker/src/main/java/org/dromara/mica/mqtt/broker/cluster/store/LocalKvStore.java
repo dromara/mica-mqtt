@@ -45,7 +45,7 @@ import java.util.List;
  * </p>
  *
  * @author L.cm
- * @since 1.0.0
+ * @since 2.6.0
  */
 public interface LocalKvStore extends AutoCloseable {
 

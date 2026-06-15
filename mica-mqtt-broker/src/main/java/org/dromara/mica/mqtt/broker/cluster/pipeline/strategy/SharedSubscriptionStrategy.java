@@ -43,7 +43,7 @@ import java.util.List;
  * @see LocalFirstStrategy
  * @see HashClientStrategy
  * @see StickyStrategy
- * @since 1.0.0
+ * @since 2.6.0
  */
 public interface SharedSubscriptionStrategy {
 

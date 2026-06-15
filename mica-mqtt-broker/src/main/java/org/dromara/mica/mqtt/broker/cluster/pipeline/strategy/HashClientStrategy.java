@@ -41,7 +41,7 @@ import java.util.List;
  *
  * @author L.cm
  * @see SharedSubscriptionStrategy
- * @since 1.0.0
+ * @since 2.6.0
  */
 public class HashClientStrategy implements SharedSubscriptionStrategy {
 
@@ -58,7 +58,7 @@ public class HashClientStrategy implements SharedSubscriptionStrategy {
 		} else {
 			hash = groupName.hashCode();
 		}
-		return candidates.get(Math.abs(hash) % candidates.size());
+		return candidates.get((hash & Integer.MAX_VALUE) % candidates.size());
 	}
 
 	@Override

@@ -46,7 +46,7 @@ import java.util.concurrent.ConcurrentMap;
  *
  * @author L.cm
  * @see SharedSubscriptionStrategy
- * @since 1.0.0
+ * @since 2.6.0
  */
 public class StickyStrategy implements SharedSubscriptionStrategy {
 

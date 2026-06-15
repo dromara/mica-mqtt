@@ -45,7 +45,7 @@ import java.util.concurrent.ThreadLocalRandom;
  *
  * @author L.cm
  * @see SharedSubscriptionStrategy
- * @since 1.0.0
+ * @since 2.6.0
  */
 public class LocalFirstStrategy implements SharedSubscriptionStrategy {
 
