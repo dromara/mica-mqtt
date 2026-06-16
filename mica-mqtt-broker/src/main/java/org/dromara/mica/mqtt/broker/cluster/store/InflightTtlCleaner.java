@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Background thread that periodically removes expired QoS 1/2 inflight records.
@@ -55,6 +56,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class InflightTtlCleaner {
 	private static final Logger logger = LoggerFactory.getLogger(InflightTtlCleaner.class);
+	private static final AtomicInteger INSTANCE_COUNTER = new AtomicInteger(0);
 
 	/** Default TTL for inflight messages: 30 seconds. */
 	public static final long DEFAULT_TTL_MS = 30_000L;
@@ -103,7 +105,7 @@ public class InflightTtlCleaner {
 			return;
 		}
 		scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-			Thread t = new Thread(r, "mica-mqtt-inflight-ttl-cleaner");
+			Thread t = new Thread(r, "mica-mqtt-inflight-ttl-cleaner-" + INSTANCE_COUNTER.incrementAndGet());
 			t.setDaemon(true);
 			return t;
 		});

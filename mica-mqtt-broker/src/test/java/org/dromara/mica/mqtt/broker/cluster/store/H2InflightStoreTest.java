@@ -50,8 +50,6 @@ class H2InflightStoreTest {
 	@AfterEach
 	void tearDown() throws InterruptedException {
 		inflightStore.shutdown();
-		// Allow async writes to complete
-		TimeUnit.MILLISECONDS.sleep(200);
 		engine.close();
 	}
 
@@ -59,9 +57,7 @@ class H2InflightStoreTest {
 	void testPutAndListByClient() throws InterruptedException {
 		long expireAt = System.currentTimeMillis() + 30_000L;
 		inflightStore.put("client1", 1, expireAt, "test/topic", "hello".getBytes(), 1);
-
-		// Allow async write
-		TimeUnit.MILLISECONDS.sleep(300);
+		inflightStore.awaitWrites();
 
 		List<InflightStore.InflightEntry> entries = inflightStore.listByClient("client1");
 		assertEquals(1, entries.size());
@@ -77,9 +73,11 @@ class H2InflightStoreTest {
 	void testRemove() throws InterruptedException {
 		long expireAt = System.currentTimeMillis() + 30_000L;
 		inflightStore.put("c1", 5, expireAt, "t", "p".getBytes(), 1);
-		TimeUnit.MILLISECONDS.sleep(300);
+		inflightStore.awaitWrites();
 
 		inflightStore.remove("c1", 5);
+		inflightStore.awaitWrites();
+
 		List<InflightStore.InflightEntry> entries = inflightStore.listByClient("c1");
 		assertTrue(entries.isEmpty());
 	}
@@ -89,7 +87,7 @@ class H2InflightStoreTest {
 		long expireAt = System.currentTimeMillis() + 30_000L;
 		inflightStore.put("alice", 1, expireAt, "t1", "a".getBytes(), 1);
 		inflightStore.put("bob", 2, expireAt, "t2", "b".getBytes(), 1);
-		TimeUnit.MILLISECONDS.sleep(300);
+		inflightStore.awaitWrites();
 
 		List<InflightStore.InflightEntry> aliceEntries = inflightStore.listByClient("alice");
 		assertEquals(1, aliceEntries.size());
@@ -102,7 +100,7 @@ class H2InflightStoreTest {
 		long futureExpiry = System.currentTimeMillis() + 60_000L;
 		inflightStore.put("c1", 1, pastExpiry, "t", "old".getBytes(), 1);
 		inflightStore.put("c1", 2, futureExpiry, "t", "new".getBytes(), 1);
-		TimeUnit.MILLISECONDS.sleep(300);
+		inflightStore.awaitWrites();
 
 		int removed = inflightStore.removeExpired(System.currentTimeMillis());
 		assertEquals(1, removed);
@@ -116,7 +114,7 @@ class H2InflightStoreTest {
 	void testTtlCleaner() throws InterruptedException {
 		long pastExpiry = System.currentTimeMillis() - 1_000L;
 		inflightStore.put("c2", 1, pastExpiry, "t", "stale".getBytes(), 1);
-		TimeUnit.MILLISECONDS.sleep(300);
+		inflightStore.awaitWrites();
 
 		// Use a short period for the cleaner (100 ms)
 		InflightTtlCleaner cleaner = new InflightTtlCleaner(inflightStore, 100);
@@ -157,7 +155,7 @@ class H2InflightStoreTest {
 		long expireAt = System.currentTimeMillis() + 30_000L;
 		inflightStore.put("c", 1, expireAt, "t", "p".getBytes(), 1);
 		inflightStore.put("c", 2, expireAt, "t", "p".getBytes(), 1);
-		TimeUnit.MILLISECONDS.sleep(300);
+		inflightStore.awaitWrites();
 
 		assertEquals(2L, inflightStore.count());
 	}

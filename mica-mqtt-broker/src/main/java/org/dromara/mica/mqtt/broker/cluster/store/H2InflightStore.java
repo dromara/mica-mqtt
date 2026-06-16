@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -112,12 +112,11 @@ public class H2InflightStore implements InflightStore {
 		String key = buildKey(clientId, packetId);
 		byte[] value = serialize(expireAt, topic, payload, qos);
 		// Async write to avoid blocking the send path.
-		// Commit is batched: every COMMIT_BATCH_SIZE puts to reduce fsync overhead.
+		// Commit is batched via modulo: every COMMIT_BATCH_SIZE operations to reduce fsync overhead.
 		asyncWriter.submit(() -> {
 			try {
 				map.put(key, value);
-				if (pendingWrites.incrementAndGet() >= COMMIT_BATCH_SIZE) {
-					pendingWrites.set(0);
+				if (pendingWrites.incrementAndGet() % COMMIT_BATCH_SIZE == 0) {
 					engine.commit();
 				}
 			} catch (Exception e) {
@@ -129,8 +128,17 @@ public class H2InflightStore implements InflightStore {
 	@Override
 	public void remove(String clientId, int packetId) {
 		String key = buildKey(clientId, packetId);
-		map.remove(key);
-		engine.commit();
+		// Async to keep the ACK path non-blocking; same batched commit as put.
+		asyncWriter.submit(() -> {
+			try {
+				map.remove(key);
+				if (pendingWrites.incrementAndGet() % COMMIT_BATCH_SIZE == 0) {
+					engine.commit();
+				}
+			} catch (Exception e) {
+				logger.error("[InflightStore] Failed to remove inflight record clientId={} packetId={}", clientId, packetId, e);
+			}
+		});
 	}
 
 	@Override
@@ -154,18 +162,21 @@ public class H2InflightStore implements InflightStore {
 	@Override
 	public int removeExpired(long nowMs) {
 		List<String> toRemove = new ArrayList<>();
-		for (Map.Entry<String, byte[]> entry : map.entrySet()) {
-			if (!entry.getKey().startsWith(KEY_PREFIX)) {
-				continue;
+		// Use prefix cursor to avoid scanning unrelated map entries.
+		Cursor<String, byte[]> cursor = map.cursor(KEY_PREFIX);
+		while (cursor.hasNext()) {
+			String key = cursor.next();
+			if (!key.startsWith(KEY_PREFIX)) {
+				break;
 			}
-			byte[] value = entry.getValue();
+			byte[] value = cursor.getValue();
 			if (value == null || value.length < 8) {
 				continue;
 			}
 			// First 8 bytes are expireAt
 			long expireAt = readLong(value, 0);
 			if (expireAt > 0 && expireAt < nowMs) {
-				toRemove.add(entry.getKey());
+				toRemove.add(key);
 			}
 		}
 		if (!toRemove.isEmpty()) {
@@ -202,6 +213,23 @@ public class H2InflightStore implements InflightStore {
 		}
 		// Flush any pending writes that were batched but not yet committed.
 		engine.commit();
+	}
+
+	/**
+	 * Waits for all currently queued async writes to complete.
+	 * <p>
+	 * This method is intended for testing only.  It submits a barrier task to each
+	 * writer thread and blocks until all threads have processed it, ensuring that
+	 * all previously submitted puts and removes are visible.
+	 * </p>
+	 */
+	void awaitWrites() throws InterruptedException {
+		int threads = 2;
+		CountDownLatch latch = new CountDownLatch(threads);
+		for (int i = 0; i < threads; i++) {
+			asyncWriter.submit(latch::countDown);
+		}
+		latch.await(5, TimeUnit.SECONDS);
 	}
 
 	// ---- Key helpers -------------------------------------------------------------
@@ -271,7 +299,8 @@ public class H2InflightStore implements InflightStore {
 			if (lastColon >= 0 && lastColon < key.length() - 1) {
 				try {
 					packetId = Integer.parseInt(key.substring(lastColon + 1));
-				} catch (NumberFormatException ignored) {
+				} catch (NumberFormatException e) {
+					logger.warn("[InflightStore] Invalid packetId in key: {}", key);
 				}
 			}
 			return new InflightEntry(clientId, packetId, expireAt, topic, payload, qos);
