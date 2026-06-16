@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -84,6 +85,14 @@ public class H2InflightStore implements InflightStore {
 	private final ExecutorService asyncWriter;
 
 	/**
+	 * Counts async puts submitted since the last commit.
+	 * A commit is triggered every {@value #COMMIT_BATCH_SIZE} puts to reduce
+	 * fsync overhead while still maintaining reasonable durability.
+	 */
+	private final AtomicInteger pendingWrites = new AtomicInteger(0);
+	private static final int COMMIT_BATCH_SIZE = 50;
+
+	/**
 	 * Constructs an inflight store using the given shared H2 engine.
 	 * <p>
 	 * {@link H2MvStoreImpl#open(java.nio.file.Path)} must have been called before
@@ -102,11 +111,15 @@ public class H2InflightStore implements InflightStore {
 	public void put(String clientId, int packetId, long expireAt, String topic, byte[] payload, int qos) {
 		String key = buildKey(clientId, packetId);
 		byte[] value = serialize(expireAt, topic, payload, qos);
-		// Async write to avoid blocking the send path
+		// Async write to avoid blocking the send path.
+		// Commit is batched: every COMMIT_BATCH_SIZE puts to reduce fsync overhead.
 		asyncWriter.submit(() -> {
 			try {
 				map.put(key, value);
-				engine.commit();
+				if (pendingWrites.incrementAndGet() >= COMMIT_BATCH_SIZE) {
+					pendingWrites.set(0);
+					engine.commit();
+				}
 			} catch (Exception e) {
 				logger.error("[InflightStore] Failed to persist inflight record clientId={} packetId={}", clientId, packetId, e);
 			}
@@ -178,6 +191,17 @@ public class H2InflightStore implements InflightStore {
 	 */
 	public void shutdown() {
 		asyncWriter.shutdown();
+		try {
+			if (!asyncWriter.awaitTermination(5, TimeUnit.SECONDS)) {
+				logger.warn("[InflightStore] Async writer did not terminate in 5 s; forcing shutdown");
+				asyncWriter.shutdownNow();
+			}
+		} catch (InterruptedException e) {
+			asyncWriter.shutdownNow();
+			Thread.currentThread().interrupt();
+		}
+		// Flush any pending writes that were batched but not yet committed.
+		engine.commit();
 	}
 
 	// ---- Key helpers -------------------------------------------------------------

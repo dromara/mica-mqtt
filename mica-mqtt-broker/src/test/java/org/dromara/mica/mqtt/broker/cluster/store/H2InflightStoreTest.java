@@ -148,7 +148,8 @@ class H2InflightStoreTest {
 
 		byte[] serialized = H2InflightStore.serialize(expireAt, topic, payload, qos);
 		assertNotNull(serialized);
-		assertTrue(serialized.length > 8 + 4 + topic.length() + 4 + payload.length + 1 - 5);
+		int minSize = 8 + 4 + topic.getBytes(java.nio.charset.StandardCharsets.UTF_8).length + 4 + payload.length + 1;
+		assertTrue(serialized.length >= minSize);
 	}
 
 	@Test

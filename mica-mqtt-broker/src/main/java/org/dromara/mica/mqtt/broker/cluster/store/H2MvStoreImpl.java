@@ -89,7 +89,9 @@ public class H2MvStoreImpl implements LocalKvStore {
 		try {
 			store = new MVStore.Builder()
 				.fileName(filePath)
-				// Disable auto-commit so we control when changes are flushed
+				// Disable auto-commit so callers control flush timing.
+				// Sub-stores (e.g. H2InflightStore) commit after every N writes;
+				// a final commit is always performed in close() to flush uncommitted data.
 				.autoCommitDisabled()
 				.open();
 			dataMap = store.openMap(DEFAULT_MAP_NAME);

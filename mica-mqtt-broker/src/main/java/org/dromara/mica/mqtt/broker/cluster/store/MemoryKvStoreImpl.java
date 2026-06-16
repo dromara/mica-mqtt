@@ -76,8 +76,12 @@ public class MemoryKvStoreImpl implements LocalKvStore {
 				result.add(new KeyValue(entry.getKey(), entry.getValue()));
 			}
 		} else {
-			String upperBound = prefix + '\uffff';
-			for (java.util.Map.Entry<String, byte[]> entry : data.subMap(prefix, upperBound).entrySet()) {
+			// Use the prefix as an inclusive lower bound; iterate and stop once
+			// a key no longer starts with the prefix (robust for all Unicode characters).
+			for (java.util.Map.Entry<String, byte[]> entry : data.tailMap(prefix).entrySet()) {
+				if (!entry.getKey().startsWith(prefix)) {
+					break;
+				}
 				result.add(new KeyValue(entry.getKey(), entry.getValue()));
 			}
 		}
