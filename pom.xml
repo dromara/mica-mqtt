@@ -26,6 +26,7 @@
         <solon.version>4.0.0</solon.version>
         <jfinal.version>5.2.7</jfinal.version>
         <tinylog.version>2.7.0</tinylog.version>
+        <h2.version>2.2.224</h2.version>
         <snakeyaml.version>2.6</snakeyaml.version>
         <lombok.version>1.18.46</lombok.version>
     </properties>
@@ -133,6 +134,11 @@
                 <groupId>org.dromara.mica-mqtt</groupId>
                 <artifactId>mica-mqtt-server-solon-plugin</artifactId>
                 <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.h2database</groupId>
+                <artifactId>h2-mvstore</artifactId>
+                <version>${h2.version}</version>
             </dependency>
             <!-- tinylog 内存占用更小、性能更好，适合边缘设备 -->
             <dependency>
