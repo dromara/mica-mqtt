@@ -79,15 +79,16 @@ public class H2InflightStore implements InflightStore {
 
 	/**
 	 * Small async writer pool — keeps the hot send path non-blocking.
-	 * The pool size of 2 is intentional: inflight writes are sequential per clientId
-	 * and rarely need more than one thread; a second thread covers bursts.
+	 * The pool size of {@value #WRITER_POOL_SIZE} is intentional: inflight writes are sequential
+	 * per clientId and rarely need more than one thread; a second thread covers bursts.
 	 */
+	private static final int WRITER_POOL_SIZE = 2;
 	private final ExecutorService asyncWriter;
 
 	/**
-	 * Counts async puts submitted since the last commit.
-	 * A commit is triggered every {@value #COMMIT_BATCH_SIZE} puts to reduce
-	 * fsync overhead while still maintaining reasonable durability.
+	 * Monotonically increasing write counter used for batched commits.
+	 * Using {@code getAndIncrement()} in the async path ensures exactly one thread
+	 * per {@value #COMMIT_BATCH_SIZE} operations triggers a commit.
 	 */
 	private final AtomicInteger pendingWrites = new AtomicInteger(0);
 	private static final int COMMIT_BATCH_SIZE = 50;
@@ -104,7 +105,7 @@ public class H2InflightStore implements InflightStore {
 	public H2InflightStore(H2MvStoreImpl engine) {
 		this.engine = engine;
 		this.map = engine.openMap(MAP_NAME);
-		this.asyncWriter = Executors.newFixedThreadPool(2, new InflightWriterThreadFactory());
+		this.asyncWriter = Executors.newFixedThreadPool(WRITER_POOL_SIZE, new InflightWriterThreadFactory());
 	}
 
 	@Override
@@ -112,11 +113,12 @@ public class H2InflightStore implements InflightStore {
 		String key = buildKey(clientId, packetId);
 		byte[] value = serialize(expireAt, topic, payload, qos);
 		// Async write to avoid blocking the send path.
-		// Commit is batched via modulo: every COMMIT_BATCH_SIZE operations to reduce fsync overhead.
+		// Commit is batched: getAndIncrement() is atomic so exactly one thread per
+		// COMMIT_BATCH_SIZE operations triggers the commit — no double-fire possible.
 		asyncWriter.submit(() -> {
 			try {
 				map.put(key, value);
-				if (pendingWrites.incrementAndGet() % COMMIT_BATCH_SIZE == 0) {
+				if ((pendingWrites.getAndIncrement() + 1) % COMMIT_BATCH_SIZE == 0) {
 					engine.commit();
 				}
 			} catch (Exception e) {
@@ -132,7 +134,7 @@ public class H2InflightStore implements InflightStore {
 		asyncWriter.submit(() -> {
 			try {
 				map.remove(key);
-				if (pendingWrites.incrementAndGet() % COMMIT_BATCH_SIZE == 0) {
+				if ((pendingWrites.getAndIncrement() + 1) % COMMIT_BATCH_SIZE == 0) {
 					engine.commit();
 				}
 			} catch (Exception e) {
@@ -224,9 +226,8 @@ public class H2InflightStore implements InflightStore {
 	 * </p>
 	 */
 	void awaitWrites() throws InterruptedException {
-		int threads = 2;
-		CountDownLatch latch = new CountDownLatch(threads);
-		for (int i = 0; i < threads; i++) {
+		CountDownLatch latch = new CountDownLatch(WRITER_POOL_SIZE);
+		for (int i = 0; i < WRITER_POOL_SIZE; i++) {
 			asyncWriter.submit(latch::countDown);
 		}
 		latch.await(5, TimeUnit.SECONDS);

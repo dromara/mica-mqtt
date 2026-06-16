@@ -119,11 +119,19 @@ class H2InflightStoreTest {
 		// Use a short period for the cleaner (100 ms)
 		InflightTtlCleaner cleaner = new InflightTtlCleaner(inflightStore, 100);
 		cleaner.start();
-		TimeUnit.MILLISECONDS.sleep(500);
+
+		// Poll until the entry disappears, with a generous timeout
+		List<InflightStore.InflightEntry> entries = null;
+		for (int i = 0; i < 50; i++) {
+			entries = inflightStore.listByClient("c2");
+			if (entries.isEmpty()) {
+				break;
+			}
+			TimeUnit.MILLISECONDS.sleep(50);
+		}
 		cleaner.stop();
 
-		// The expired entry should have been cleaned up
-		List<InflightStore.InflightEntry> entries = inflightStore.listByClient("c2");
+		assertNotNull(entries);
 		assertTrue(entries.isEmpty(), "Expired inflight entry should have been removed by TTL cleaner");
 	}
 
