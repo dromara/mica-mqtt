@@ -1,0 +1,163 @@
+/*
+ * Copyright (c) 2019-2029, Dreamlu 卢春梦 (596392912@qq.com & dreamlu.net).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.dromara.mica.mqtt.broker.cluster.store;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Unit tests for {@link H2InflightStore} and {@link InflightTtlCleaner}.
+ *
+ * @author L.cm
+ */
+class H2InflightStoreTest {
+
+	@TempDir
+	Path tempDir;
+
+	private H2MvStoreImpl engine;
+	private H2InflightStore inflightStore;
+
+	@BeforeEach
+	void setUp() {
+		engine = new H2MvStoreImpl();
+		engine.open(tempDir);
+		inflightStore = new H2InflightStore(engine);
+	}
+
+	@AfterEach
+	void tearDown() throws InterruptedException {
+		inflightStore.shutdown();
+		// Allow async writes to complete
+		TimeUnit.MILLISECONDS.sleep(200);
+		engine.close();
+	}
+
+	@Test
+	void testPutAndListByClient() throws InterruptedException {
+		long expireAt = System.currentTimeMillis() + 30_000L;
+		inflightStore.put("client1", 1, expireAt, "test/topic", "hello".getBytes(), 1);
+
+		// Allow async write
+		TimeUnit.MILLISECONDS.sleep(300);
+
+		List<InflightStore.InflightEntry> entries = inflightStore.listByClient("client1");
+		assertEquals(1, entries.size());
+		InflightStore.InflightEntry entry = entries.get(0);
+		assertEquals("client1", entry.getClientId());
+		assertEquals(1, entry.getPacketId());
+		assertEquals("test/topic", entry.getTopic());
+		assertEquals("hello", new String(entry.getPayload()));
+		assertEquals(1, entry.getQos());
+	}
+
+	@Test
+	void testRemove() throws InterruptedException {
+		long expireAt = System.currentTimeMillis() + 30_000L;
+		inflightStore.put("c1", 5, expireAt, "t", "p".getBytes(), 1);
+		TimeUnit.MILLISECONDS.sleep(300);
+
+		inflightStore.remove("c1", 5);
+		List<InflightStore.InflightEntry> entries = inflightStore.listByClient("c1");
+		assertTrue(entries.isEmpty());
+	}
+
+	@Test
+	void testListByClientReturnsOnlyThatClient() throws InterruptedException {
+		long expireAt = System.currentTimeMillis() + 30_000L;
+		inflightStore.put("alice", 1, expireAt, "t1", "a".getBytes(), 1);
+		inflightStore.put("bob", 2, expireAt, "t2", "b".getBytes(), 1);
+		TimeUnit.MILLISECONDS.sleep(300);
+
+		List<InflightStore.InflightEntry> aliceEntries = inflightStore.listByClient("alice");
+		assertEquals(1, aliceEntries.size());
+		assertEquals("alice", aliceEntries.get(0).getClientId());
+	}
+
+	@Test
+	void testRemoveExpired() throws InterruptedException {
+		long pastExpiry = System.currentTimeMillis() - 1_000L;
+		long futureExpiry = System.currentTimeMillis() + 60_000L;
+		inflightStore.put("c1", 1, pastExpiry, "t", "old".getBytes(), 1);
+		inflightStore.put("c1", 2, futureExpiry, "t", "new".getBytes(), 1);
+		TimeUnit.MILLISECONDS.sleep(300);
+
+		int removed = inflightStore.removeExpired(System.currentTimeMillis());
+		assertEquals(1, removed);
+
+		List<InflightStore.InflightEntry> remaining = inflightStore.listByClient("c1");
+		assertEquals(1, remaining.size());
+		assertEquals(2, remaining.get(0).getPacketId());
+	}
+
+	@Test
+	void testTtlCleaner() throws InterruptedException {
+		long pastExpiry = System.currentTimeMillis() - 1_000L;
+		inflightStore.put("c2", 1, pastExpiry, "t", "stale".getBytes(), 1);
+		TimeUnit.MILLISECONDS.sleep(300);
+
+		// Use a short period for the cleaner (100 ms)
+		InflightTtlCleaner cleaner = new InflightTtlCleaner(inflightStore, 100);
+		cleaner.start();
+		TimeUnit.MILLISECONDS.sleep(500);
+		cleaner.stop();
+
+		// The expired entry should have been cleaned up
+		List<InflightStore.InflightEntry> entries = inflightStore.listByClient("c2");
+		assertTrue(entries.isEmpty(), "Expired inflight entry should have been removed by TTL cleaner");
+	}
+
+	@Test
+	void testKeyFormat() {
+		// Verify zero-padded key ordering
+		String key1 = H2InflightStore.buildKey("c", 1);
+		String key5 = H2InflightStore.buildKey("c", 5);
+		String key100 = H2InflightStore.buildKey("c", 100);
+		assertTrue(key1.compareTo(key5) < 0);
+		assertTrue(key5.compareTo(key100) < 0);
+	}
+
+	@Test
+	void testSerializeDeserializeRoundTrip() {
+		long expireAt = 1_700_000_000_000L;
+		String topic = "sensors/temperature";
+		byte[] payload = "42.5".getBytes();
+		int qos = 2;
+
+		byte[] serialized = H2InflightStore.serialize(expireAt, topic, payload, qos);
+		assertNotNull(serialized);
+		assertTrue(serialized.length > 8 + 4 + topic.length() + 4 + payload.length + 1 - 5);
+	}
+
+	@Test
+	void testCount() throws InterruptedException {
+		long expireAt = System.currentTimeMillis() + 30_000L;
+		inflightStore.put("c", 1, expireAt, "t", "p".getBytes(), 1);
+		inflightStore.put("c", 2, expireAt, "t", "p".getBytes(), 1);
+		TimeUnit.MILLISECONDS.sleep(300);
+
+		assertEquals(2L, inflightStore.count());
+	}
+}
