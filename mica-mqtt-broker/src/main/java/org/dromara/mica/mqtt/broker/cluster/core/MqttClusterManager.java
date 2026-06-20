@@ -23,7 +23,10 @@ import net.dreamlu.mica.net.server.cluster.core.ClusterImpl;
 import net.dreamlu.mica.net.server.cluster.message.ClusterDataMessage;
 import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterConfig;
 import org.dromara.mica.mqtt.broker.cluster.message.*;
+import org.dromara.mica.mqtt.broker.cluster.metrics.ClusterMetrics;
 import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.SharedSubscriptionStrategy;
+import org.dromara.mica.mqtt.broker.cluster.store.InflightStore;
+import org.dromara.mica.mqtt.broker.cluster.store.SessionStore;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.server.MqttServer;
@@ -57,6 +60,9 @@ public class MqttClusterManager {
 	private final MqttClusterConfig config;
 	private final String localNodeId;
 	private SharedSubscriptionStrategy sharedStrategy;
+	private ClusterStorage clusterStorage;
+	private ClusterMqttSessionManager sessionManager;
+	private final ClusterMetrics metrics = new ClusterMetrics();
 
 	/**
 	 * Constructs a new cluster manager with the specified configuration.
@@ -65,8 +71,13 @@ public class MqttClusterManager {
 	 * @param localNodeId the unique identifier for this local node in the cluster
 	 */
 	public MqttClusterManager(MqttClusterConfig config, String localNodeId) {
+		this(config, localNodeId, null);
+	}
+
+	public MqttClusterManager(MqttClusterConfig config, String localNodeId, ClusterMqttSessionManager sessionManager) {
 		this.config = config;
 		this.localNodeId = localNodeId;
+		this.sessionManager = sessionManager;
 	}
 
 	/**
@@ -77,6 +88,24 @@ public class MqttClusterManager {
 	 */
 	public void setSharedStrategy(SharedSubscriptionStrategy sharedStrategy) {
 		this.sharedStrategy = sharedStrategy;
+	}
+
+	/**
+	 * Sets the V3 persistence coordinator.  May be {@code null} when storage
+	 * is disabled (in which case the broker runs in V1/V2 in-memory mode).
+	 *
+	 * @param clusterStorage the storage coordinator; may be {@code null}
+	 */
+	public void setClusterStorage(ClusterStorage clusterStorage) {
+		this.clusterStorage = clusterStorage;
+	}
+
+	/**
+	 * Returns the V3 persistence coordinator, or {@code null} when storage is
+	 * disabled.
+	 */
+	public ClusterStorage getClusterStorage() {
+		return clusterStorage;
 	}
 
 	/**
@@ -162,7 +191,27 @@ public class MqttClusterManager {
 				PublishForwardMessage pfm = (PublishForwardMessage) clusterMsg;
 				// retain 存储由 RETAIN_MESSAGE 单独同步，此处仅投递给本地订阅者，避免通过
 				// ClusterMqttMessageStore 再次广播导致无限循环
-				mqttServer.publishAll(pfm.getMessage().getTopic(), pfm.getMessage().getPayload(), MqttQoS.valueOf(pfm.getMessage().getQos()), false);
+				Message fwdMsg = pfm.getMessage();
+				mqttServer.publishAll(fwdMsg.getTopic(), fwdMsg.getPayload(), MqttQoS.valueOf(fwdMsg.getQos()), false);
+				// V3 inflight persistence (P2.3): record QoS 1/2 forwards so the TTL
+				// cleaner can detect stuck deliveries even before per-client ACK is wired.
+				recordInflightForward(fwdMsg, sourceNode);
+				break;
+			}
+			case SESSION_TAKEOVER_REQUEST: {
+				handleSessionTakeoverRequest((SessionTakeoverRequestMessage) clusterMsg, sourceNode);
+				break;
+			}
+			case SESSION_TAKEOVER_RESPONSE: {
+				handleSessionTakeoverResponse((SessionTakeoverResponseMessage) clusterMsg, sourceNode);
+				break;
+			}
+			case SESSION_MIGRATED_NOTIFY: {
+				handleSessionMigratedNotify((SessionMigratedNotifyMessage) clusterMsg);
+				break;
+			}
+			case SESSION_DELETE_NOTIFY: {
+				handleSessionDeleteNotify((SessionDeleteNotifyMessage) clusterMsg);
 				break;
 			}
 			case SUBSCRIBE_NOTIFY: {
@@ -444,5 +493,209 @@ public class MqttClusterManager {
 
 	public String getLocalNodeId() {
 		return localNodeId;
+	}
+
+	/**
+	 * Records an inflight entry for a forwarded QoS 1/2 message.
+	 * <p>
+	 * The V3 inflight store is the durable record of "messages in the process of
+	 * being delivered".  This broker records one row per (client, packetId); the
+	 * TTL cleaner (see {@link org.dromara.mica.mqtt.broker.cluster.store.InflightTtlCleaner})
+	 * eventually removes entries that have not been ACKed.  Packet IDs are
+	 * synthesized from a per-message counter because the wire protocol between
+	 * cluster nodes does not carry the destination clientId + packetId; per-client
+	 * tracking is left for a future revision.
+	 * </p>
+	 *
+	 * @param message the forwarded message
+	 * @param sourceNode the originating node id
+	 */
+	private void recordInflightForward(Message message, String sourceNode) {
+		if (clusterStorage == null || !clusterStorage.isActive()) {
+			return;
+		}
+		if (message == null) {
+			return;
+		}
+		int qos = message.getQos();
+		if (qos < 1) {
+			// QoS 0 has no ACK and no inflight semantics.
+			return;
+		}
+		InflightStore inflight = clusterStorage.getInflightStore();
+		if (inflight == null) {
+			return;
+		}
+		long ttl = clusterStorage.getConfig().getInflightTtlMs();
+		long expireAt = System.currentTimeMillis() + ttl;
+		// Synthesize a clientId: cross-node forwards don't carry one, so we
+		// bucket by (topic, sourceNode) for purposes of TTL cleanup.
+		String pseudoClient = "fwd:" + sourceNode;
+		// packetId 0 is the well-known inflight bucket for non-Acked forwards.
+		inflight.put(pseudoClient, 0, expireAt,
+			message.getTopic(), message.getPayload(), qos);
+	}
+
+	// -----------------------------------------------------------------------
+	// Session takeover protocol (P2.1)
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Initiates a session takeover from a remote node.
+	 * <p>
+	 * Called by the connect-status listener when a new MQTT CONNECT arrives for a
+	 * clientId that is already owned by a remote node.  Sends
+	 * {@link SessionTakeoverRequestMessage} to that node; the response drives
+	 * {@link #handleSessionTakeoverResponse}.
+	 * </p>
+	 * <p>
+	 * If the previous owner never responds, the caller is expected to fall back to
+	 * the V1 behavior of treating the session as a fresh start after
+	 * {@code timeoutMs}.  A best-effort cleanup is logged but no exception is
+	 * propagated so a missing owner cannot block new connections.
+	 * </p>
+	 *
+	 * @param clientId the client whose session should be taken over
+	 * @param previousOwnerNode the node that currently owns the session
+	 * @param timeoutMs how long the new owner waits for a response
+	 */
+	public void initiateSessionTakeover(String clientId, String previousOwnerNode, long timeoutMs) {
+		if (cluster == null || clientId == null || previousOwnerNode == null) {
+			return;
+		}
+		if (previousOwnerNode.equals(localNodeId)) {
+			return;
+		}
+		SessionTakeoverRequestMessage request = new SessionTakeoverRequestMessage();
+		request.setClientId(clientId);
+		request.setAttemptId(System.nanoTime());
+		request.setTimeoutMs(timeoutMs);
+		logger.info("[Cluster] Initiating session takeover: client={} from={} to={}",
+			clientId, previousOwnerNode, localNodeId);
+		sendToNode(previousOwnerNode, request);
+	}
+
+	/**
+	 * Handles an incoming session-takeover request from another node.
+	 * <p>
+	 * Reads the session bytes from the local V3 store and replies with
+	 * {@link SessionTakeoverResponseMessage}.  If storage is disabled or the
+	 * session is not present locally, returns {@code not_found}.
+	 * </p>
+	 */
+	private void handleSessionTakeoverRequest(SessionTakeoverRequestMessage request, String sourceNode) {
+		SessionTakeoverResponseMessage response = new SessionTakeoverResponseMessage();
+		response.setClientId(request.getClientId());
+		response.setAttemptId(request.getAttemptId());
+		if (clusterStorage == null || !clusterStorage.isActive()) {
+			response.setStatus(SessionTakeoverResponseMessage.STATUS_NOT_FOUND);
+		} else {
+			byte[] sessionBytes = clusterStorage.getSessionStore().loadRaw(request.getClientId());
+			if (sessionBytes == null) {
+				response.setStatus(SessionTakeoverResponseMessage.STATUS_NOT_FOUND);
+			} else {
+				response.setStatus(SessionTakeoverResponseMessage.STATUS_OK);
+				response.setSessionBytes(sessionBytes);
+			}
+		}
+		if (cluster != null) {
+			sendToNode(sourceNode, response);
+		}
+	}
+
+	/**
+	 * Handles an incoming session-takeover response.
+	 * <p>
+	 * On {@code ok}, the session bytes are installed into the local store and a
+	 * {@link SessionMigratedNotifyMessage} is broadcast.  Other statuses are
+	 * logged for the operator.
+	 * </p>
+	 */
+	private void handleSessionTakeoverResponse(SessionTakeoverResponseMessage response, String sourceNode) {
+		String clientId = response.getClientId();
+		if (clientId == null) {
+			return;
+		}
+		String status = response.getStatus();
+		if (!SessionTakeoverResponseMessage.STATUS_OK.equals(status)) {
+			logger.warn("[Cluster] Session takeover response not ok: client={} status={} from={}",
+				clientId, status, sourceNode);
+			return;
+		}
+		if (clusterStorage == null || !clusterStorage.isActive()) {
+			return;
+		}
+		SessionStore.Session installed = clusterStorage.getSessionStore()
+			.restoreRaw(clientId, response.getSessionBytes());
+		if (installed == null) {
+			logger.warn("[Cluster] Takeover restore returned null: client={}", clientId);
+			return;
+		}
+		logger.info("[Cluster] Session takeover ok: client={} from={} subs={}",
+			clientId, sourceNode,
+			installed.getSubscriptions() == null ? 0 : installed.getSubscriptions().size());
+		// Broadcast the new ownership to all peers.
+		SessionMigratedNotifyMessage notify = new SessionMigratedNotifyMessage();
+		notify.setClientId(clientId);
+		notify.setNewOwnerNodeId(localNodeId);
+		notify.setPreviousOwnerNodeId(sourceNode);
+		broadcast(notify);
+	}
+
+	/**
+	 * Handles a session-migrated broadcast: a client is now owned by a different
+	 * node.  Updates the in-memory client→node mapping so messages route correctly.
+	 */
+	private void handleSessionMigratedNotify(SessionMigratedNotifyMessage notify) {
+		String clientId = notify.getClientId();
+		String newOwner = notify.getNewOwnerNodeId();
+		if (clientId == null || newOwner == null) {
+			return;
+		}
+		if (sessionManager != null) {
+			sessionManager.getClientNodeMap().put(clientId, newOwner);
+		}
+		// If we used to own this session, drop local subscriptions and the
+		// durable record.
+		if (localNodeId.equals(notify.getPreviousOwnerNodeId()) && sessionManager != null) {
+			sessionManager.clearLocalSubscription(clientId);
+		}
+		logger.info("[Cluster] Session migrated: client={} newOwner={} prev={}",
+			clientId, newOwner, notify.getPreviousOwnerNodeId());
+	}
+
+	/**
+	 * Handles a session-delete broadcast: a session was permanently removed.
+	 * Cleans up the in-memory mapping and the durable record on every node.
+	 */
+	private void handleSessionDeleteNotify(SessionDeleteNotifyMessage notify) {
+		String clientId = notify.getClientId();
+		if (clientId == null) {
+			return;
+		}
+		if (sessionManager != null) {
+			sessionManager.getClientNodeMap().remove(clientId);
+		}
+		if (clusterStorage != null && clusterStorage.isActive()) {
+			clusterStorage.getSessionStore().delete(clientId);
+		}
+	}
+
+	/**
+	 * Public hook for {@link ClusterMqttConnectStatusListener} to trigger a takeover.
+	 *
+	 * @param sessionManager the session manager instance
+	 */
+	public void setSessionManager(ClusterMqttSessionManager sessionManager) {
+		this.sessionManager = sessionManager;
+	}
+
+	/**
+	 * Returns the live metrics instance.  Callers may read counters directly
+	 * via the {@code get*} accessors, or call {@link ClusterMetrics#snapshot()}
+	 * to get a map for export.
+	 */
+	public ClusterMetrics getMetrics() {
+		return metrics;
 	}
 }

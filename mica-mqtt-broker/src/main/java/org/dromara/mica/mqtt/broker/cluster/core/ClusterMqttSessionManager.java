@@ -18,9 +18,12 @@ package org.dromara.mica.mqtt.broker.cluster.core;
 
 import org.dromara.mica.mqtt.broker.cluster.message.SubscribeNotifyMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.UnsubscribeNotifyMessage;
+import org.dromara.mica.mqtt.broker.cluster.store.SessionStore;
+import org.dromara.mica.mqtt.broker.cluster.store.SharedSubStore;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
+import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.slf4j.Logger;
@@ -41,6 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>Synchronizing subscription state across cluster nodes via broadcast messages</li>
  *   <li>Providing unified local + remote subscription lookup for message routing</li>
  *   <li>Coordinating session cleanup when nodes depart the cluster</li>
+ *   <li>Persisting session state to V3 storage (P2.1) when wired in</li>
  * </ul>
  *
  * @author L.cm
@@ -52,6 +56,8 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	private final IMqttSessionManager delegate;
 	private final MqttClusterManager clusterManager;
 	private final ConcurrentHashMap<String, String> clientNodeMap = new ConcurrentHashMap<>();
+	private volatile SessionStore sessionStore;
+	private volatile SharedSubStore sharedSubStore;
 
 	/**
 	 * Constructs a cluster session manager wrapping the specified delegate.
@@ -160,6 +166,14 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 			clusterManager.broadcast(notifyMessage);
 		}
+
+		// V3 shared-subscription persistence (P2.2): add this member to the
+		// persistent group snapshot so a backup can recover membership.
+		updateSharedGroupOnSubscribe(topicFilter.getTopic(), clientId);
+
+		// V3 session persistence (P2.1): record the new subscription state so a
+		// future takeover can recover it.
+		persistSession(clientId);
 	}
 
 	@Override
@@ -172,6 +186,171 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 			notifyMessage.setNodeId(clusterManager.getLocalNodeId());
 			notifyMessage.setTopics(Collections.singletonList(topicFilter));
 			clusterManager.broadcast(notifyMessage);
+		}
+
+		// V3 shared-subscription persistence: drop this member from the group.
+		updateSharedGroupOnUnsubscribe(topicFilter, clientId);
+
+		// V3 session persistence: refresh the persisted session so the latest
+		// subscription set is on disk.
+		persistSession(clientId);
+	}
+
+	/**
+	 * Updates the persistent shared-subscription group when a new member joins.
+	 */
+	private void updateSharedGroupOnSubscribe(String topicFilter, String clientId) {
+		if (sharedSubStore == null) {
+			return;
+		}
+		if (topicFilter == null) {
+			return;
+		}
+		String groupName = extractGroupName(topicFilter);
+		if (groupName == null) {
+			return;
+		}
+		String underlyingTopic = extractUnderlyingTopic(topicFilter);
+		SharedSubStore.SharedSubGroup current = sharedSubStore.get(groupName);
+		long version = current == null ? 0L : current.getVersion();
+		java.util.List<String> members = new java.util.ArrayList<>();
+		if (current != null && current.getMembers() != null) {
+			members.addAll(current.getMembers());
+		}
+		if (!members.contains(clientId)) {
+			members.add(clientId);
+		}
+		SharedSubStore.SharedSubGroup updated = new SharedSubStore.SharedSubGroup(
+			groupName, underlyingTopic, members,
+			current == null ? clusterManager.getLocalNodeId() : current.getOwnerNodeId(),
+			current == null ? null : current.getBackupNodeId(),
+			version + 1, System.currentTimeMillis());
+		sharedSubStore.save(updated);
+	}
+
+	/**
+	 * Updates the persistent shared-subscription group when a member leaves.
+	 * If the group becomes empty, the group record is deleted.
+	 */
+	private void updateSharedGroupOnUnsubscribe(String topicFilter, String clientId) {
+		if (sharedSubStore == null) {
+			return;
+		}
+		if (topicFilter == null) {
+			return;
+		}
+		String groupName = extractGroupName(topicFilter);
+		if (groupName == null) {
+			return;
+		}
+		SharedSubStore.SharedSubGroup current = sharedSubStore.get(groupName);
+		if (current == null || current.getMembers() == null || !current.getMembers().contains(clientId)) {
+			return;
+		}
+		java.util.List<String> members = new java.util.ArrayList<>(current.getMembers());
+		members.remove(clientId);
+		if (members.isEmpty()) {
+			sharedSubStore.delete(groupName);
+		} else {
+			SharedSubStore.SharedSubGroup updated = new SharedSubStore.SharedSubGroup(
+				groupName, current.getTopicFilter(), members,
+				current.getOwnerNodeId(), current.getBackupNodeId(),
+				current.getVersion() + 1, System.currentTimeMillis());
+			sharedSubStore.save(updated);
+		}
+	}
+
+	private static String extractGroupName(String topicFilter) {
+		if (topicFilter.startsWith(TopicFilterType.SHARE_GROUP_PREFIX)) {
+			return TopicFilterType.getShareGroupName(topicFilter);
+		}
+		if (topicFilter.startsWith(TopicFilterType.SHARE_QUEUE_PREFIX)) {
+			return "$queue";
+		}
+		return null;
+	}
+
+	private static String extractUnderlyingTopic(String topicFilter) {
+		// $share/<group>/<topic>  ->  <topic>
+		// $queue/<topic>          ->  <topic>
+		if (topicFilter.startsWith(TopicFilterType.SHARE_GROUP_PREFIX)) {
+			String withoutPrefix = topicFilter.substring(TopicFilterType.SHARE_GROUP_PREFIX.length());
+			int slash = withoutPrefix.indexOf('/');
+			if (slash < 0) {
+				return withoutPrefix;
+			}
+			return withoutPrefix.substring(slash + 1);
+		}
+		if (topicFilter.startsWith(TopicFilterType.SHARE_QUEUE_PREFIX)) {
+			return topicFilter.substring(TopicFilterType.SHARE_QUEUE_PREFIX.length());
+		}
+		return topicFilter;
+	}
+
+	/**
+	 * Persists the current local subscriptions of a client to the V3 session store.
+	 * <p>
+	 * No-op when storage is disabled or when the client is registered as remote
+	 * (a remote client's subscriptions live on its owning node, not here).
+	 * </p>
+	 */
+	private void persistSession(String clientId) {
+		if (sessionStore == null) {
+			return;
+		}
+		String ownerNode = clientNodeMap.get(clientId);
+		if (ownerNode != null) {
+			// Remote client — do not persist; its state lives on the owning node.
+			return;
+		}
+		List<Subscribe> subs = delegate.getSubscriptions(clientId);
+		SessionStore.Session session = new SessionStore.Session(
+			clientId, subs, false, 0L, clusterManager.getLocalNodeId());
+		sessionStore.save(clientId, session);
+	}
+
+	/**
+	 * Wires the V3 session store.  When set, subscription add/remove operations
+	 * refresh the persistent session snapshot for the affected client.
+	 *
+	 * @param sessionStore the session store; may be {@code null} to disable
+	 */
+	public void setSessionStore(SessionStore sessionStore) {
+		this.sessionStore = sessionStore;
+	}
+
+	/**
+	 * Wires the V3 shared-subscription store.  When set, subscribe/unsubscribe
+	 * operations update the persistent group membership.
+	 *
+	 * @param sharedSubStore the shared-sub store; may be {@code null} to disable
+	 */
+	public void setSharedSubStore(SharedSubStore sharedSubStore) {
+		this.sharedSubStore = sharedSubStore;
+	}
+
+	/**
+	 * Returns the live clientId→node mapping.  Used by the cluster manager to
+	 * find the previous owner of a session during takeover.
+	 */
+	public ConcurrentHashMap<String, String> getClientNodeMap() {
+		return clientNodeMap;
+	}
+
+	/**
+	 * Removes the local subscriptions of a client.  Called by the cluster
+	 * manager when this node loses ownership of a session (handed off to a
+	 * peer via the takeover protocol).
+	 */
+	public void clearLocalSubscription(String clientId) {
+		if (clientId == null) {
+			return;
+		}
+		List<Subscribe> subs = delegate.getSubscriptions(clientId);
+		if (subs != null) {
+			for (Subscribe s : subs) {
+				delegate.removeSubscribe(s.getTopicFilter(), clientId);
+			}
 		}
 	}
 
@@ -311,6 +490,10 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void remove(String clientId) {
 		clientNodeMap.remove(clientId);
 		delegate.remove(clientId);
+		// V3 session persistence: clear the persistent record on disconnect.
+		if (sessionStore != null) {
+			sessionStore.delete(clientId);
+		}
 	}
 
 	@Override

@@ -18,11 +18,13 @@ package org.dromara.mica.mqtt.broker.cluster.core;
 
 import org.dromara.mica.mqtt.broker.cluster.message.RetainMessageNotifyMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.WillMessageNotifyMessage;
+import org.dromara.mica.mqtt.broker.cluster.store.RetainIndex;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -31,6 +33,15 @@ import java.util.List;
  * This store wraps an existing {@link IMqttMessageStore} and extends it with
  * cluster synchronization. When a will message is set or a retained message is
  * published/cleared, it broadcasts the change to all other cluster nodes.
+ * </p>
+ *
+ * <h3>V3 retain persistence (P2.4)</h3>
+ * <p>
+ * When a {@link RetainIndex} is wired in via {@link #setRetainIndex(RetainIndex)},
+ * retain messages are written to the durable store as well as the in-memory
+ * delegate.  Read-side ({@link #getRetainMessage}) prefers the in-memory delegate
+ * (which is the broadcast-replicated copy) and falls back to the durable index
+ * when the delegate is empty (e.g. after a restart before the first sync).
  * </p>
  *
  * @author L.cm
@@ -42,10 +53,21 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 
 	private final IMqttMessageStore delegate;
 	private final MqttClusterManager clusterManager;
+	private volatile RetainIndex retainIndex;
 
 	public ClusterMqttMessageStore(IMqttMessageStore delegate, MqttClusterManager clusterManager) {
 		this.delegate = delegate;
 		this.clusterManager = clusterManager;
+	}
+
+	/**
+	 * Wires the V3 retain index.  When set, all retain add/clear operations are
+	 * mirrored to the durable index; reads also consult the index as a fallback.
+	 *
+	 * @param retainIndex the retain index; may be {@code null} to disable
+	 */
+	public void setRetainIndex(RetainIndex retainIndex) {
+		this.retainIndex = retainIndex;
 	}
 
 	@Override
@@ -74,6 +96,10 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	@Override
 	public boolean addRetainMessage(String topic, int timeout, Message message) {
 		delegate.addRetainMessage(topic, timeout, message);
+		// V3 persistence: mirror to durable retain index when storage is enabled
+		if (retainIndex != null) {
+			retainIndex.put(topic, message);
+		}
 		if (clusterManager.isClusterEnabled()) {
 			RetainMessageNotifyMessage retainMsg = new RetainMessageNotifyMessage();
 			retainMsg.setTopic(topic);
@@ -88,6 +114,10 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	@Override
 	public boolean clearRetainMessage(String topic) {
 		delegate.clearRetainMessage(topic);
+		// V3 persistence: remove from durable retain index
+		if (retainIndex != null) {
+			retainIndex.remove(topic);
+		}
 		if (clusterManager.isClusterEnabled()) {
 			RetainMessageNotifyMessage retainMsg = new RetainMessageNotifyMessage();
 			retainMsg.setTopic(topic);
@@ -101,7 +131,16 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 
 	@Override
 	public List<Message> getRetainMessage(String topicFilter) {
-		return delegate.getRetainMessage(topicFilter);
+		List<Message> messages = delegate.getRetainMessage(topicFilter);
+		if ((messages == null || messages.isEmpty()) && retainIndex != null) {
+			// Fallback to durable index when the in-memory delegate has nothing
+			// (e.g. just after a node restart before the first broadcast has arrived).
+			messages = retainIndex.match(topicFilter);
+			if (messages == null) {
+				return new ArrayList<>(0);
+			}
+		}
+		return messages;
 	}
 
 	/**
@@ -136,7 +175,12 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	 * @return 是否成功
 	 */
 	public boolean addRetainMessageLocal(String topic, int timeout, Message message) {
-		return delegate.addRetainMessage(topic, timeout, message);
+		boolean ok = delegate.addRetainMessage(topic, timeout, message);
+		// V3 persistence: also write to durable index when receiving retain from peer
+		if (retainIndex != null && ok && message != null) {
+			retainIndex.put(topic, message);
+		}
+		return ok;
 	}
 
 	/**
@@ -146,7 +190,12 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	 * @return 是否成功
 	 */
 	public boolean clearRetainMessageLocal(String topic) {
-		return delegate.clearRetainMessage(topic);
+		boolean ok = delegate.clearRetainMessage(topic);
+		// V3 persistence: also remove from durable index
+		if (retainIndex != null && ok) {
+			retainIndex.remove(topic);
+		}
+		return ok;
 	}
 
 	@Override

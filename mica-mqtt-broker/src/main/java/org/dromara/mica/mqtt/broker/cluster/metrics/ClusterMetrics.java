@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.broker.cluster.metrics;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -184,6 +186,74 @@ public class ClusterMetrics {
 
 	public long getClusterSendErrors() {
 		return clusterSendErrors.get();
+	}
+
+	/**
+	 * Returns all counters as a name → value map, suitable for export to
+	 * monitoring systems (Prometheus exporter, Spring Boot Actuator
+	 * {@code /actuator/metrics}, or a JSON status endpoint).
+	 * <p>
+	 * The returned map is a defensive copy with stable ordering.  Values are
+	 * snapshots — they may be stale by the time the caller inspects them.
+	 * </p>
+	 *
+	 * @return immutable snapshot of all counters
+	 */
+	public Map<String, Long> snapshot() {
+		Map<String, Long> snap = new LinkedHashMap<>();
+		snap.put("publishForwardSent", publishForwardSent.get());
+		snap.put("sharedDispatchSent", sharedDispatchSent.get());
+		snap.put("sharedDispatchReceived", sharedDispatchReceived.get());
+		snap.put("sharedDispatchRepick", sharedDispatchRepick.get());
+		snap.put("sharedDispatchDropped", sharedDispatchDropped.get());
+		snap.put("stateSyncRequests", stateSyncRequests.get());
+		snap.put("stateSyncResponses", stateSyncResponses.get());
+		snap.put("clientConnectBroadcast", clientConnectBroadcast.get());
+		snap.put("clientDisconnectBroadcast", clientDisconnectBroadcast.get());
+		snap.put("clusterMessagesSent", clusterMessagesSent.get());
+		snap.put("clusterMessagesReceived", clusterMessagesReceived.get());
+		snap.put("clusterSendErrors", clusterSendErrors.get());
+		return snap;
+	}
+
+	/**
+	 * Returns a Prometheus-format text dump of all counters.  Useful for
+	 * implementing a {@code /metrics} HTTP endpoint without depending on the
+	 * Micrometer library.
+	 * <p>
+	 * Example output:
+	 * </p>
+	 * <pre>
+	 * # HELP mqtt_cluster_publish_forward_sent_total Total PUBLISH_FORWARD messages sent
+	 * # TYPE mqtt_cluster_publish_forward_sent_total counter
+	 * mqtt_cluster_publish_forward_sent_total 1234
+	 * </pre>
+	 *
+	 * @return Prometheus text format
+	 */
+	public String toPrometheus() {
+		StringBuilder sb = new StringBuilder(2048);
+		Map<String, Long> snap = snapshot();
+		for (Map.Entry<String, Long> entry : snap.entrySet()) {
+			// Prometheus convention: counter metrics should end with _total
+			String metricName = "mqtt_cluster_" + camelToSnake(entry.getKey()) + "_total";
+			sb.append("# HELP ").append(metricName).append(" Cluster metric ").append(entry.getKey()).append('\n');
+			sb.append("# TYPE ").append(metricName).append(" counter\n");
+			sb.append(metricName).append(' ').append(entry.getValue()).append('\n');
+		}
+		return sb.toString();
+	}
+
+	private static String camelToSnake(String camel) {
+		StringBuilder sb = new StringBuilder(camel.length() + 4);
+		for (int i = 0; i < camel.length(); i++) {
+			char c = camel.charAt(i);
+			if (i > 0 && Character.isUpperCase(c)) {
+				sb.append('_');
+			}
+			sb.append(Character.toLowerCase(c));
+		}
+		return sb.toString();
 	}
 
 	@Override

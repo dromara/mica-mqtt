@@ -20,6 +20,8 @@ import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.broker.cluster.message.ClientConnectMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClientDisconnectMessage;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Decorator for {@link IMqttConnectStatusListener} that broadcasts client lifecycle events to the cluster.
@@ -29,24 +31,56 @@ import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
  * to all other cluster nodes so they can update their client-to-node mappings.
  * </p>
  *
+ * <h3>V3 session takeover (P2.1)</h3>
+ * <p>
+ * When a client connects and another node is recorded as its previous owner in
+ * {@link ClusterMqttSessionManager#getClientNodeMap()}, this listener triggers
+ * a session takeover via {@link MqttClusterManager#initiateSessionTakeover}.
+ * </p>
+ *
  * @author L.cm
  * @see IMqttConnectStatusListener
  * @since 1.0.0
  */
 public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListener {
+	private static final Logger logger = LoggerFactory.getLogger(ClusterMqttConnectStatusListener.class);
+
+	/** Default takeover timeout (matches the one used in MqttClusterManager). */
+	private static final long DEFAULT_TAKEOVER_TIMEOUT_MS = 5_000L;
 
 	private final IMqttConnectStatusListener delegate;
 	private final MqttClusterManager clusterManager;
+	private ClusterMqttSessionManager sessionManager;
 
 	public ClusterMqttConnectStatusListener(IMqttConnectStatusListener delegate, MqttClusterManager clusterManager) {
 		this.delegate = delegate;
 		this.clusterManager = clusterManager;
 	}
 
+	/**
+	 * Wires the session manager so the listener can detect previous-owner
+	 * connections and trigger session takeover (P2.1).
+	 */
+	public void setSessionManager(ClusterMqttSessionManager sessionManager) {
+		this.sessionManager = sessionManager;
+	}
+
 	@Override
 	public void online(ChannelContext context, String clientId, String username) {
 		if (delegate != null) {
 			delegate.online(context, clientId, username);
+		}
+
+		// V3 takeover: if the clientId is already mapped to another node, request
+		// takeover before broadcasting the new connect.  The previous owner
+		// responds with a SessionTakeoverResponse carrying the persisted session
+		// bytes; the new owner then broadcasts SessionMigratedNotify to all
+		// peers to update routing.
+		String previousOwner = lookupPreviousOwner(clientId);
+		if (previousOwner != null && !previousOwner.isEmpty()) {
+			logger.info("[Cluster] online() detected previous owner {} for client {}, requesting takeover",
+				previousOwner, clientId);
+			clusterManager.initiateSessionTakeover(clientId, previousOwner, DEFAULT_TAKEOVER_TIMEOUT_MS);
 		}
 
 		ClientConnectMessage msg = new ClientConnectMessage();
@@ -63,5 +97,12 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 		ClientDisconnectMessage msg = new ClientDisconnectMessage();
 		msg.setClientId(clientId);
 		clusterManager.broadcast(msg);
+	}
+
+	private String lookupPreviousOwner(String clientId) {
+		if (sessionManager == null) {
+			return null;
+		}
+		return sessionManager.getClientNodeMap().get(clientId);
 	}
 }

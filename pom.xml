@@ -117,6 +117,11 @@
             </dependency>
             <dependency>
                 <groupId>org.dromara.mica-mqtt</groupId>
+                <artifactId>mica-mqtt-broker</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.dromara.mica-mqtt</groupId>
                 <artifactId>mica-mqtt-server-spring-boot-starter</artifactId>
                 <version>${revision}</version>
             </dependency>

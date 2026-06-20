@@ -20,6 +20,7 @@ import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttConnectStatusListener;
 import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttMessageStore;
 import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttSessionManager;
+import org.dromara.mica.mqtt.broker.cluster.core.ClusterStorage;
 import org.dromara.mica.mqtt.broker.cluster.core.MqttClusterManager;
 import org.dromara.mica.mqtt.broker.cluster.pipeline.ClusterMessageDispatcher;
 import org.dromara.mica.mqtt.broker.cluster.pipeline.ClusterPublishHandler;
@@ -61,6 +62,7 @@ public class MqttClusterBrokerCreator {
 	private MqttClusterConfig clusterConfig;
 	private MqttClusterManager clusterManager;
 	private ClusterMqttSessionManager clusterSessionManager;
+	private ClusterStorage clusterStorage;
 
 	/**
 	 * Constructs a new cluster broker creator wrapping the specified server creator.
@@ -102,24 +104,46 @@ public class MqttClusterBrokerCreator {
 		serverCreator.nodeName(nodeId);
 		clusterManager = new MqttClusterManager(clusterConfig, nodeId);
 
+		// Initialize V3 persistence layer if enabled.  Failure to open the H2 file
+		// is logged and the broker continues in pure-memory mode (INV-6).
+		MqttStorageConfig storageConfig = clusterConfig.getStorageConfig();
+		if (storageConfig != null && storageConfig.isEnabled()) {
+			clusterStorage = new ClusterStorage(storageConfig);
+			clusterStorage.start();
+		}
+		if (clusterStorage != null) {
+			clusterManager.setClusterStorage(clusterStorage);
+		}
+
 		IMqttSessionManager delegateSessionManager = serverCreator.getSessionManager();
 		if (delegateSessionManager == null) {
 			delegateSessionManager = new InMemoryMqttSessionManager();
 		}
 
 		clusterSessionManager = new ClusterMqttSessionManager(delegateSessionManager, clusterManager);
+		clusterManager.setSessionManager(clusterSessionManager);
 		serverCreator.sessionManager(clusterSessionManager);
+
+		// Wire V3 storage into session/message stores when enabled.
+		if (clusterStorage != null) {
+			clusterSessionManager.setSessionStore(clusterStorage.getSessionStore());
+			clusterSessionManager.setSharedSubStore(clusterStorage.getSharedSubStore());
+		}
 
 		if (serverCreator.getMessageStore() != null) {
 			ClusterMqttMessageStore clusterMessageStore = new ClusterMqttMessageStore(
 				serverCreator.getMessageStore(), clusterManager
 			);
+			if (clusterStorage != null) {
+				clusterMessageStore.setRetainIndex(clusterStorage.getRetainIndex());
+			}
 			serverCreator.messageStore(clusterMessageStore);
 		}
 
 		ClusterMqttConnectStatusListener clusterConnectStatusListener = new ClusterMqttConnectStatusListener(
 			serverCreator.getConnectStatusListener(), clusterManager
 		);
+		clusterConnectStatusListener.setSessionManager(clusterSessionManager);
 		serverCreator.connectStatusListener(clusterConnectStatusListener);
 
 		ClusterPublishHandler publishHandler = new ClusterPublishHandler(clusterManager);
@@ -167,6 +191,10 @@ public class MqttClusterBrokerCreator {
 
 	public ClusterMqttSessionManager getClusterSessionManager() {
 		return clusterSessionManager;
+	}
+
+	public ClusterStorage getClusterStorage() {
+		return clusterStorage;
 	}
 
 	/**

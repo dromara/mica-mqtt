@@ -104,6 +104,16 @@ public class MqttClusterConfig {
 	 */
 	private String sharedSubStrategy = "local_first";
 
+	/**
+	 * Storage configuration for the V3 persistence layer (H2 MVStore).
+	 * <p>
+	 * When {@code null} the broker runs in pure-memory mode (V1/V2 behavior).
+	 * Set {@link MqttStorageConfig#setEnabled(boolean) storageConfig.enabled(true)}
+	 * to opt in.
+	 * </p>
+	 */
+	private MqttStorageConfig storageConfig;
+
 	public boolean isEnabled() {
 		return enabled;
 	}
@@ -205,6 +215,19 @@ public class MqttClusterConfig {
 
 	public MqttClusterConfig sharedSubStrategy(String sharedSubStrategy) {
 		this.sharedSubStrategy = sharedSubStrategy;
+		return this;
+	}
+
+	public MqttStorageConfig getStorageConfig() {
+		return storageConfig;
+	}
+
+	public void setStorageConfig(MqttStorageConfig storageConfig) {
+		this.storageConfig = storageConfig;
+	}
+
+	public MqttClusterConfig storageConfig(MqttStorageConfig storageConfig) {
+		this.storageConfig = storageConfig;
 		return this;
 	}
 }

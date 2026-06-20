@@ -144,16 +144,21 @@ public class ClusterMessageSerializer {
 			case SHARED_DISPATCH_TO_CLIENT:
 				return new SharedDispatchToClientMessage();
 			case SHARED_SUBSCRIBE_NOTIFY:
-			case SHARED_SUBSCRIBE_REMOVE:
-			case SESSION_TAKEOVER_REQUEST:
-			case SESSION_TAKEOVER_RESPONSE:
-			case SESSION_MIGRATED_NOTIFY:
-			case SESSION_DELETE_NOTIFY:
-			case SHARED_SUB_STATE_SYNC:
-			case SHARED_SUB_TAKEOVER:
-			case RETAIN_QUERY:
-				// V3 messages not yet implemented; caller will skip null return
-				return null;
+		case SHARED_SUBSCRIBE_REMOVE:
+		case SHARED_SUB_STATE_SYNC:
+		case SHARED_SUB_TAKEOVER:
+		case RETAIN_QUERY:
+			// V2 shared-subscribe notifications and V3 storage messages that
+			// are still under development; the caller will skip the null return.
+			return null;
+		case SESSION_TAKEOVER_REQUEST:
+			return new SessionTakeoverRequestMessage();
+		case SESSION_TAKEOVER_RESPONSE:
+			return new SessionTakeoverResponseMessage();
+		case SESSION_MIGRATED_NOTIFY:
+			return new SessionMigratedNotifyMessage();
+		case SESSION_DELETE_NOTIFY:
+			return new SessionDeleteNotifyMessage();
 			default:
 				throw new IllegalArgumentException("Unknown message type: " + type);
 		}
