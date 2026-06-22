@@ -129,7 +129,7 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		if (otherContext != null) {
 			Tio.unbindBsId(otherContext);
 			String remark = String.format("uniqueId:[%s] clientId:[%s] 被踢出，请检查是否有相同 clientId 互踢，新 contextId:[%s]", uniqueId, clientId, context.getId());
-			Tio.remove(otherContext, remark);
+			Tio.remove(otherContext, remark, ChannelContext.CloseCode.KICK_EACH_OTHER);
 			cleanSession(uniqueId);
 		}
 		// 4.5 广播上线消息，避免一个 uniqueId 多个集群服务器中连接。
