@@ -130,6 +130,9 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 */
 	public void syncRemoteSubscriptions(String clientId, String nodeId, List<Subscribe> subscriptions) {
 		registerRemoteClient(clientId, nodeId);
+		if (subscriptions == null || subscriptions.isEmpty()) {
+			return;
+		}
 		for (Subscribe sub : subscriptions) {
 			delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), clientId, sub.getMqttQoS(), sub.isNoLocal());
 			logger.debug("[Cluster] Synced remote subscription: client={}, topic={}, node={}",
@@ -347,10 +350,14 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 			return;
 		}
 		List<Subscribe> subs = delegate.getSubscriptions(clientId);
-		if (subs != null) {
-			for (Subscribe s : subs) {
-				delegate.removeSubscribe(s.getTopicFilter(), clientId);
-			}
+		if (subs == null) {
+			return;
+		}
+		for (Subscribe s : subs) {
+			delegate.removeSubscribe(s.getTopicFilter(), clientId);
+			// V3 shared-subscription persistence: remove this client from
+			// persistent group membership so the strategy won't pick it.
+			updateSharedGroupOnUnsubscribe(s.getTopicFilter(), clientId);
 		}
 	}
 
@@ -424,7 +431,13 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 */
 	public void syncFullState(Map<String, String> clientNodeMap, Map<String, List<Subscribe>> subscriptionMap) {
 		this.clientNodeMap.putAll(clientNodeMap);
+		if (subscriptionMap == null) {
+			return;
+		}
 		for (Map.Entry<String, List<Subscribe>> entry : subscriptionMap.entrySet()) {
+			if (entry.getValue() == null) {
+				continue;
+			}
 			for (Subscribe sub : entry.getValue()) {
 				delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), entry.getKey(), sub.getMqttQoS(), sub.isNoLocal());
 			}

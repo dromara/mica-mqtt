@@ -1,6 +1,6 @@
 # mica-mqtt-broker 集群存储层设计文档
 
-> **本文档定位**：本文件是 `mqtt-server-cluster.md` 的**存储层专章**，描述在引入 H2 MVStore 本地嵌入式存储后，集群能力获得的升级与新特性。v1.1 起整个存储层统一为单一 H2 引擎（单 jar ~2MB），不再依赖 RocksDB / MapDB 等第三方存储引擎。如未特别说明，本文假设读者已熟悉 cluster 文档中的基础集群拓扑与消息协议。
+> **本文档定位**：本文件是 `mqtt-server-cluster.md` (v3.0) 的**存储层专章**，描述在引入 H2 MVStore 本地嵌入式存储后，集群能力获得的升级与新特性。v1.2 起整个存储层统一为单一 H2 引擎（单 jar ~2MB），不再依赖 RocksDB / MapDB 等第三方存储引擎。如未特别说明，本文假设读者已熟悉 cluster 文档中的基础集群拓扑与消息协议。
 
 ---
 
@@ -148,7 +148,7 @@ docs/todo/
 ### 3.1 接口设计
 
 ```java
-public interface LocalKvStore {
+public interface LocalKvStore extends AutoCloseable {
 
     /** 启动并打开底层存储 */
     void open(Path dataDir);
@@ -164,7 +164,7 @@ public interface LocalKvStore {
     /** 范围扫描 */
     List<KeyValue> scan(String prefix);
 
-    /** 事务支持（仅 H2 实现） */
+    /** 事务支持 */
     void executeInTransaction(Runnable body);
 
     /** 健康检查 */
@@ -177,28 +177,29 @@ public interface LocalKvStore {
 ```java
 public class H2MvStoreImpl implements LocalKvStore {
     private MVStore store;
-    private Map<String, Value> sessionMap;     // 表 1
-    private Map<String, Value> retainMap;      // 表 2
-    private Map<String, Value> sharedSubMap;   // 表 3
+    private MVMap<String, byte[]> dataMap;     // 默认 Map
 
     public void open(Path dataDir) {
-        store = MVStore.open(dataDir.resolve("mqtt-cluster.mv").toString());
-        sessionMap = store.openMap("sessions");
-        retainMap  = store.openMap("retain");
-        // ...
+        store = new MVStore.Builder()
+            .fileName(dataDir.resolve("mica-mqtt-store").toString())
+            // 禁用 auto-commit，由调用方控制刷盘时机
+            .autoCommitDisabled()
+            .open();
+        dataMap = store.openMap("mica_mqtt_data");
     }
 
     public void executeInTransaction(Runnable body) {
-        store.commit();  // H2 MVStore 默认自动 commit
-        // 复杂事务可使用 store.registerVersion()
+        // 获取写锁 -> 执行 body -> store.commit()
+        // MVStore 的事务模型与关系型 DB 不同，此处简化为
+        // "body 成功后 commit，失败则不 commit（变更可能部分写入）"
     }
 }
 ```
 
-**关键配置**：
-- `autoCommitBufferSize=1024`：批量写入缓冲
-- `compression=1`（LZF）：降低磁盘占用
-- `cacheSize=64MB`：内存缓存
+**关键配置**（与代码实现对齐）：
+- `.autoCommitDisabled()`：禁用 H2 默认自动 commit，由调用方显式调用 `store.commit()` 控制刷盘
+- 文件名为 `mica-mqtt-store`（H2 自动加 `.mv.db` 后缀）
+- 使用 `ReentrantReadWriteLock` 保护 store-level 操作（commit、close）
 
 ### 3.3 Inflight 飞行消息实现要点（H2 + 定时清理）
 
@@ -212,9 +213,9 @@ public class H2InflightStore implements LocalKvStore {
     private final ScheduledExecutorService cleaner;
 
     public void open(Path dataDir) {
-        store = MVStore.open(dataDir.resolve("mqtt-cluster.mv").toString());
-        inflightMap = store.openMap("inflight");
-
+        // 复用 H2MvStoreImpl 实例（同一个 H2 文件，不同 Map）
+        // inflightMap = h2Store.openMap("inflight");
+        // 此处示例代码展示独立用法，实际实现应共享 H2MvStoreImpl 实例
         // 后台 TTL 清理: 30s 一次, 滞后窗口可接受
         cleaner = Executors.newSingleThreadScheduledExecutor(
             r -> { Thread t = new Thread(r, "mqtt-inflight-cleaner");
@@ -266,7 +267,8 @@ public class H2InflightStore implements LocalKvStore {
             }
         }
         if (removed > 0) {
-            // MVStore 自动 commit, 无需显式调用
+            // autoCommitDisabled 模式下需显式 commit
+            h2Store.commit();
         }
     }
 }
@@ -329,10 +331,10 @@ public void createSession(String clientId, MqttSession session) {
 新增集群消息：
 
 ```java
-SESSION_TAKEOVER_REQUEST(12),   // 新节点 -> 老节点
-SESSION_TAKEOVER_RESPONSE(13),  // 老节点 -> 新节点
-SESSION_MIGRATED_NOTIFY(14),    // 新节点 -> 全集群广播
-SESSION_DELETE_NOTIFY(15),      // 任何节点 -> 全集群
+SESSION_TAKEOVER_REQUEST(14),   // 新节点 -> 老节点
+SESSION_TAKEOVER_RESPONSE(15),  // 老节点 -> 新节点
+SESSION_MIGRATED_NOTIFY(16),    // 新节点 -> 全集群广播
+SESSION_DELETE_NOTIFY(17),      // 任何节点 -> 全集群
 ```
 
 **协议流程**：
@@ -538,7 +540,7 @@ expireAt   = System.currentTimeMillis() + session.keepalive * 3
 -------------------------------------------------
 ```
 
-与 Session/Retain 共用同一个 `mqtt-cluster.mv` 文件，**单文件多 Map**。
+与 Session/Retain 共用同一个 `mica-mqtt-store` 文件（`H2MvStoreImpl` 单实例，不同 Map 名），**单文件多 Map**。
 
 #### 4.3.2 写入流程
 
@@ -570,7 +572,7 @@ public void onPubAck(String clientId, int packetId) {
 **关键不变量**：
 - 发送路径只 `writeAndFlush`（不落盘），由 `asyncWriteExecutor` 异步落 H2
 - ACK 路径同样异步，避免阻塞 PUBACK 响应
-- H2 MVStore 本身已开启 `autoCommit`，单条 put 即写 binlog
+- H2 MVStore 采用 `autoCommitDisabled()` 模式，由 `executeInTransaction` 或显式 `commit()` 控制刷盘
 
 #### 4.3.3 重连重放
 
@@ -609,7 +611,8 @@ public void cleanupExpired() {
         }
     }
     if (removed > 0) {
-        // MVStore 自动 commit; 可选: 打点 metrics
+        // autoCommitDisabled 模式下需显式 commit
+        h2Store.commit();
         metrics.recordInflightExpired(removed);
     }
 }
@@ -666,8 +669,8 @@ group "g1":
 #### 4.4.3 状态同步协议
 
 ```java
-SHARED_SUB_STATE_SYNC(16),    // owner -> backup
-SHARED_SUB_TAKEOVER(17),      // 新 owner 接管宣告
+SHARED_SUB_STATE_SYNC(18),    // owner -> backup
+SHARED_SUB_TAKEOVER(19),      // 新 owner 接管宣告
 ```
 
 ```java
@@ -711,7 +714,7 @@ Owner (Node1) 宕机
 新增的集群消息类型：
 
 ```java
-// 之前已有
+// 之前已有 (V1)
 CLIENT_CONNECT(1),
 CLIENT_DISCONNECT(2),
 SUBSCRIBE_NOTIFY(3),
@@ -720,22 +723,25 @@ PUBLISH_FORWARD(5),
 NODE_LEAVE(6),
 STATE_SYNC_REQUEST(7),
 STATE_SYNC_RESPONSE(8),
+WILL_MESSAGE(9),
+RETAIN_MESSAGE(10),
 
-// routing 文档新增
-SHARED_SUBSCRIBE_FORWARD(9),
-SHARED_PUBLISH_FORWARD(10),
+// routing 文档新增 (V2)
 SHARED_DISPATCH_TO_CLIENT(11),
+SHARED_SUBSCRIBE_NOTIFY(12),
+SHARED_SUBSCRIBE_REMOVE(13),
 
-// 本文档新增 (存储层)
-SESSION_TAKEOVER_REQUEST(12),
-SESSION_TAKEOVER_RESPONSE(13),
-SESSION_MIGRATED_NOTIFY(14),
-SESSION_DELETE_NOTIFY(15),
-SHARED_SUB_STATE_SYNC(16),
-SHARED_SUB_TAKEOVER(17),
-RETAIN_REPLICATE(18),
-RETAIN_QUERY(19),
+// 本文档新增 (V3 存储层)
+SESSION_TAKEOVER_REQUEST(14),
+SESSION_TAKEOVER_RESPONSE(15),
+SESSION_MIGRATED_NOTIFY(16),
+SESSION_DELETE_NOTIFY(17),
+SHARED_SUB_STATE_SYNC(18),
+SHARED_SUB_TAKEOVER(19),
+RETAIN_QUERY(20),
 ```
+
+> **v1.2 修正**：原 v1.1 使用 9-19 编号，与 V1 已实现的 WILL_MESSAGE(9)/RETAIN_MESSAGE(10) 冲突。本版起与 cluster v3.0 对齐，V2 占 11-13，V3 占 14-20。移除未实现的 `RETAIN_REPLICATE`（原 code=20，P2.5 可选分片未实现），RETAIN_QUERY 调整为 code=20，总计 20 个枚举值。
 
 向后兼容：旧节点收到新消息类型时记录 warning 并忽略。
 
@@ -942,17 +948,15 @@ MqttServer server = MqttBroker.create()
 
 ---
 
-**文档版本**：v1.1
-**更新日期**：2026-06-05
-**状态**：设计稿，待评审
-**v1.1 变更摘要**：
-- 选型重写：去掉 RocksDB，整个存储层统一为 H2 MVStore（单 jar ~2MB）
-- 新增 §1.3.1 评估结论：详细对比 RocksDB / MapDB / RogueMap 的排除理由
-- §3.3 / §4.3 重写：Inflight 实现改为 H2 + 后台 TTL 清理线程
-- §4.2.4 新增：Retain 内存 Skiplist 索引设计
-- §6 配置示例更新：移除 rocksdb 块，新增 inflight / retain-index 配置
-- §7 阶段 3 调整：1 周 → 0.5 周
-- §8.4 跨平台更新：完全摆脱 JNI 依赖
+**文档版本**：v1.2
+**更新日期**：2026-06-22
+**状态**：设计稿 + V3 部分实现
+**v1.2 变更摘要**（以代码实现为准全面对齐 cluster v3.0）：
+- §3.1 接口签名修正：`executeInTransaction` 改为 `void executeInTransaction(Runnable body)`，接口继承 `AutoCloseable`
+- §3.2 H2 配置修正：`autoCommitDisabled()` 替代原先描述的自动 commit 配置；文件名修正为 `mica-mqtt-store`；补充 `ReentrantReadWriteLock` 线程安全说明
+- §4.1.3 协议号修正：SESSION_TAKEOVER 12-15 → 14-17
+- §4.4.3 协议号修正：SHARED_SUB_STATE_SYNC 16→18，SHARED_SUB_TAKEOVER 17→19
+- §5 全量协议号修正：与 cluster v3.0 / routing v1.2 对齐，V1 占 1-10，V2 占 11-13，V3 占 14-20；移除不存在的 SHARED_SUBSCRIBE_FORWARD/SHARED_PUBLISH_FORWARD/RETAIN_REPLICATE
 **配套文档**：
 - `docs/todo/mqtt-server-cluster.md`（基础集群）
 - `docs/todo/mqtt-server-cluster-routing.md`（路由 + 共享订阅）

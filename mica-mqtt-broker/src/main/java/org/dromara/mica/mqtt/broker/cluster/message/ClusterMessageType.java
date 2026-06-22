@@ -154,7 +154,7 @@ public enum ClusterMessageType {
 	 */
 	SHARED_SUBSCRIBE_REMOVE(13),
 
-	// V3 Storage messages (14-21) — H2 MVStore persistence layer
+	// V3 Storage messages (14-20) — H2 MVStore persistence layer
 
 	/**
 	 * Session takeover request sent from the new node to the previous owner node.

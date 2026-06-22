@@ -86,9 +86,10 @@ public class H2InflightStore implements InflightStore {
 	private final ExecutorService asyncWriter;
 
 	/**
-	 * Monotonically increasing write counter used for batched commits.
-	 * Using {@code getAndIncrement()} in the async path ensures exactly one thread
+	 * Write counter used for batched commits.
+	 * Using {@code incrementAndGet()} in the async path ensures exactly one thread
 	 * per {@value #COMMIT_BATCH_SIZE} operations triggers a commit.
+	 * The counter is reset after each commit to prevent integer overflow.
 	 */
 	private final AtomicInteger pendingWrites = new AtomicInteger(0);
 	private static final int COMMIT_BATCH_SIZE = 50;
@@ -118,7 +119,8 @@ public class H2InflightStore implements InflightStore {
 		asyncWriter.submit(() -> {
 			try {
 				map.put(key, value);
-				if ((pendingWrites.getAndIncrement() + 1) % COMMIT_BATCH_SIZE == 0) {
+				if (pendingWrites.incrementAndGet() % COMMIT_BATCH_SIZE == 0) {
+					pendingWrites.set(0);
 					engine.commit();
 				}
 			} catch (Exception e) {
@@ -134,7 +136,8 @@ public class H2InflightStore implements InflightStore {
 		asyncWriter.submit(() -> {
 			try {
 				map.remove(key);
-				if ((pendingWrites.getAndIncrement() + 1) % COMMIT_BATCH_SIZE == 0) {
+				if (pendingWrites.incrementAndGet() % COMMIT_BATCH_SIZE == 0) {
+					pendingWrites.set(0);
 					engine.commit();
 				}
 			} catch (Exception e) {

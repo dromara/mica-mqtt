@@ -1,12 +1,12 @@
 # mica-mqtt-broker 集群能力实施任务清单
 
-> **本文档定位**：将 `cluster` (v2.8) / `routing` (v1.1) / `storage` (v1.1) 三份设计文档中的 V2 / V3 演进内容，**拆解为可独立发布、可回滚的 PR 级别任务**。每个任务给出工作量、依赖、风险、验收标准，可直接作为迭代排期表。
+> **本文档定位**：将 `cluster` (v3.0) / `routing` (v1.2) / `storage` (v1.2) 三份设计文档中的 V2 / V3 演进内容，**拆解为可独立发布、可回滚的 PR 级别任务**。每个任务给出工作量、依赖、风险、验收标准，可直接作为迭代排期表。
 >
 > **配套文档**：
-> - `mqtt-server-cluster.md` (v2.8) — V1 基础集群
-> - `mqtt-server-cluster-routing.md` (v1.1) — V2 路由层
-> - `mqtt-server-cluster-storage.md` (v1.1) — V3 持久化层
-> - **本文档** (v1.0) — V2/V3 实施任务分解
+> - `mqtt-server-cluster.md` (v3.0) — V1 基础集群
+> - `mqtt-server-cluster-routing.md` (v1.2) — V2 路由层
+> - `mqtt-server-cluster-storage.md` (v1.2) — V3 持久化层
+> - **本文档** (v1.1) — V2/V3 实施任务分解
 
 ---
 
@@ -83,21 +83,23 @@ P0 (基础)
 | 风险 | 低（纯枚举扩展，向后兼容） |
 | 验收 | 11 个新枚举值编译通过；旧消息类型仍可用；`ClusterMessageType.values()` 测试覆盖 |
 | 涉及文件 | `cluster/message/ClusterMessageType.java` |
-| 设计参考 | cluster v2.8 §3.2 |
+| 设计参考 | cluster v3.0 §3.2 |
 
 ```java
 // 一次性添加所有 V2/V3 消息类型（避免后续多次改这个文件）
 public enum ClusterMessageType {
     // V1（已存在）
     CLIENT_CONNECT(1), ..., STATE_SYNC_RESPONSE(8),
+    WILL_MESSAGE(9),
+    RETAIN_MESSAGE(10),
 
-    // V2 routing (9-11, P1.x 使用)
-    SHARED_SUBSCRIBE_FORWARD(9),
-    SHARED_PUBLISH_FORWARD(10),
+    // V2 routing (11-13, P1.x 使用)
     SHARED_DISPATCH_TO_CLIENT(11),
+    SHARED_SUBSCRIBE_NOTIFY(12),
+    SHARED_SUBSCRIBE_REMOVE(13),
 
-    // V3 storage (12-19, P2.x 使用)
-    SESSION_TAKEOVER_REQUEST(12), ..., RETAIN_QUERY(19);
+    // V3 storage (14-20, P2.x 使用)
+    SESSION_TAKEOVER_REQUEST(14), ..., RETAIN_QUERY(20);
 }
 ```
 
@@ -107,10 +109,10 @@ public enum ClusterMessageType {
 |---|---|
 | 工作量 | 1 天 |
 | 依赖 | 无 |
-| 风险 | 低（接口设计，参考 storage v1.1 §3.1） |
+| 风险 | 低（接口设计，参考 storage v1.2 §3.1） |
 | 验收 | 接口编译；`H2MvStoreImpl` / `MemoryKvStoreImpl` 两个实现可切换；包含 `executeInTransaction` 事务方法 |
 | 涉及文件 | `cluster/store/LocalKvStore.java`（新建） |
-| 设计参考 | storage v1.1 §3.1 |
+| 设计参考 | storage v1.2 §3.1 |
 
 ```java
 public interface LocalKvStore extends AutoCloseable {
@@ -120,7 +122,7 @@ public interface LocalKvStore extends AutoCloseable {
     void put(String key, byte[] value);
     void delete(String key);
     List<KeyValue> scan(String prefix);  // P2.5 之前可返回空 list
-    <T> T executeInTransaction(Function<Transaction, T> body);
+    void executeInTransaction(Runnable body);
     StoreStats stats();
 }
 ```
@@ -144,7 +146,7 @@ public interface LocalKvStore extends AutoCloseable {
 | 风险 | 低 |
 | 验收 | `ClusterMetrics` 类提供计数器 / 计时器；后续 PR 仅需 `metrics.xxxInc()` 调用 |
 | 涉及文件 | `cluster/metrics/ClusterMetrics.java`（新建） |
-| 设计参考 | routing v1.1 §8.4 + storage v1.1 §9.3 |
+| 设计参考 | routing v1.2 §8.4 + storage v1.2 §9.3 |
 
 ### P0.5 `MqttBroker` 集成入口
 
@@ -164,9 +166,9 @@ public interface LocalKvStore extends AutoCloseable {
 
 ## 3. 阶段 P1：V2 Routing（2.5 周，A 同学）
 
-> **目标**：解决 V1 共享订阅重复投递问题（cluster v2.8 §6.3 标记的 🚧 项）
+> **目标**：解决 V1 共享订阅重复投递问题（cluster v3.0 §6.3 标记的 🚧 项）
 >
-> **设计依据**：`mqtt-server-cluster-routing.md` v1.1 全文
+> **设计依据**：`mqtt-server-cluster-routing.md` v1.2 全文
 
 ### P1.0 `SharedSubscriptionStrategy` 接口与基础设施
 
@@ -177,12 +179,12 @@ public interface LocalKvStore extends AutoCloseable {
 | 风险 | 低（纯接口 + 5 个简单实现） |
 | 验收 | 5 个 strategy 单元测试通过；`MqttClusterConfig.sharedSubStrategy()` 可注入 |
 | 涉及文件 | `cluster/pipeline/strategy/*.java`（5 个文件） |
-| 设计参考 | routing v1.1 §3.4 |
+| 设计参考 | routing v1.2 §3.4 |
 
 ```java
 // 接口设计
 public interface SharedSubscriptionStrategy {
-    Subscribe pick(String group, List<Subscribe> candidates, String publisherNodeId);
+    Subscribe pick(String groupName, List<Subscribe> candidates, String localNodeId, Message message);
 }
 
 // 5 个实现
@@ -195,7 +197,7 @@ public interface SharedSubscriptionStrategy {
 - 中等：LocalFirst, Sticky（带本地查表）— 各 0.5 天
 - 较复杂：RoundRobin（带计数器）— 1 天
 
-**验收测试**（routing v1.1 §7 阶段 2）：
+**验收测试**（routing v1.2 §7 阶段 2）：
 - [ ] 目标订阅者掉线 → Node 端重选
 - [ ] 空 group 跳过
 - [ ] 大量订阅者下的 strategy 性能（10w 订阅者 < 10ms pick）
@@ -209,7 +211,7 @@ public interface SharedSubscriptionStrategy {
 | 风险 | **高**（涉及消息分发核心路径） |
 | 验收 | 普通订阅走 V1 行为不变；共享订阅走 strategy + 跨节点单点转发；5 节点集成测试无重复投递 |
 | 涉及文件 | `cluster/pipeline/ClusterMessageDispatcher.java`（重写） |
-| 设计参考 | routing v1.1 §3.5 / §4 |
+| 设计参考 | routing v1.2 §3.5 / §4 |
 
 **子任务拆分**：
 
@@ -235,7 +237,7 @@ public interface SharedSubscriptionStrategy {
 | 工作量 | 3 天 |
 | 依赖 | P1.1 |
 | 风险 | 中 |
-| 验收 | routing v1.1 §7 阶段 2 全部覆盖 |
+| 验收 | routing v1.2 §7 阶段 2 全部覆盖 |
 | 涉及文件 | `cluster/pipeline/ClusterMessageDispatcher.java` 等 |
 
 **测试用例清单**：
@@ -260,9 +262,9 @@ public interface SharedSubscriptionStrategy {
 
 ## 4. 阶段 P2：V3 Storage（5 周，B 同学）
 
-> **目标**：节点宕机后状态不丢失（cluster v2.8 §6.2 标记的未实现项）
+> **目标**：节点宕机后状态不丢失（cluster v3.0 §6.2 标记的未实现项）
 >
-> **设计依据**：`mqtt-server-cluster-storage.md` v1.1 全文
+> **设计依据**：`mqtt-server-cluster-storage.md` v1.2 全文
 >
 > **核心原则**：单一 H2 引擎（单 jar ~2MB），无 RocksDB 依赖
 
@@ -275,7 +277,7 @@ public interface SharedSubscriptionStrategy {
 | 风险 | 中（H2 配置错误会导致启动失败） |
 | 验收 | `H2MvStoreImpl` 通过 `LocalKvStore` 接口测试；启动/关闭/事务三个核心场景 |
 | 涉及文件 | `cluster/store/H2MvStoreImpl.java`（新建） |
-| 设计参考 | storage v1.1 §3.2 |
+| 设计参考 | storage v1.2 §3.2 |
 
 **子任务**：
 
@@ -289,12 +291,12 @@ public interface SharedSubscriptionStrategy {
 | 2.0.6 单元测试 + 集成测试 | 1 天 | 含断电恢复测试 |
 | 2.0.7 `ClusterMqttSessionManager` 接入 | 0.5 天 | 验证 V1 行为不变（仅多写 H2） |
 
-**关键不变量**（storage v1.1 §2.4）：
+**关键不变量**（storage v1.2 §2.4）：
 - Session 写入必须在 CONNACK 前同步落 H2
 - 启动时 L1 必须从 L2 完整恢复
 
 **P2.0 风险点**：
-- H2 默认 autoCommit 行为与 mica-mqtt 现有 session 写入频率是否匹配
+- H2 `autoCommitDisabled()` 模式下的 commit 频率与 mica-mqtt 现有 session 写入频率是否匹配
 - 文件锁：H2 默认 `FILE_LOCK=FILE`，集群多个 broker 不能共用同一目录
 - 测试要包含：kill -9 模拟崩溃 → 重启验证 H2 数据完整
 
@@ -307,13 +309,13 @@ public interface SharedSubscriptionStrategy {
 | 风险 | **高**（涉及集群协议） |
 | 验收 | 客户端 sticky 失败时自动接管；接管时锁、幂等、超时完备；不会重复接管 |
 | 涉及文件 | `cluster/message/Session*Message.java`（4 个新消息类） |
-| 设计参考 | storage v1.1 §4.1.3 |
+| 设计参考 | storage v1.2 §4.1.3 |
 
 **子任务**：
 
 | 子任务 | 工作量 | 备注 |
 |---|---|---|
-| 2.1.1 4 个 session 消息类（REQUEST/RESPONSE/MIGRATED/DELETE） | 1 天 | 消息 12-15 |
+| 2.1.1 4 个 session 消息类（REQUEST/RESPONSE/MIGRATED/DELETE） | 1 天 | 消息 14-17 |
 | 2.1.2 `SessionManager.takeover(clientId)` 协议入口 | 1 天 | 失败回退到 V1 行为 |
 | 2.1.3 接管时分布式锁（基于 H2 + 内存双重锁） | 1 天 | 防并发接管 |
 | 2.1.4 sticky 失败重定向逻辑 | 0.5 天 | t-io 客户端重连触发 |
@@ -322,7 +324,7 @@ public interface SharedSubscriptionStrategy {
 **P2.1 风险点**：
 - 接管时锁的实现：如果用 H2 全局锁会阻塞所有 session
 - 接管超时：默认 5s，跨机房场景需调大
-- 与 V1 节点共存：V1 节点收到 SESSION_TAKEOVER_REQUEST(12) 应记录 warning 忽略
+- 与 V1 节点共存：V1 节点收到 SESSION_TAKEOVER_REQUEST(14) 应记录 warning 忽略
 
 ### P2.2 Shared Subscription 持久化（1 周）
 
@@ -333,7 +335,7 @@ public interface SharedSubscriptionStrategy {
 | 风险 | 中 |
 | 验收 | owner 宕机后 backup 升级为新 owner；零消息真空 |
 | 涉及文件 | `cluster/store/SharedSubStore.java`（新建） |
-| 设计参考 | storage v1.1 §4.4 |
+| 设计参考 | storage v1.2 §4.4 |
 
 **子任务**：
 
@@ -342,7 +344,7 @@ public interface SharedSubscriptionStrategy {
 | 2.2.1 `mqtt_shared_sub` 表 schema | 0.5 天 | groupName / strategy / members / version / updatedAt |
 | 2.2.2 `SharedSubStore` 抽象 + H2 实现 | 1.5 天 | 含 version 乐观锁 |
 | 2.2.3 owner/backup 角色管理 | 1 天 | 一致性哈希分片 |
-| 2.2.4 `SHARED_SUB_STATE_SYNC(16)` / `SHARED_SUB_TAKEOVER(17)` 消息 | 1 天 | 协议 16-17 |
+| 2.2.4 `SHARED_SUB_STATE_SYNC(18)` / `SHARED_SUB_TAKEOVER(19)` 消息 | 1 天 | 协议 18-19 |
 | 2.2.5 故障切换测试 | 1 天 | owner kill -9 后 backup 接管 |
 
 **P2.2 风险点**：
@@ -360,7 +362,7 @@ public interface SharedSubscriptionStrategy {
 | 风险 | 低 |
 | 验收 | inflight 消息 30s TTL 清理；客户端重连可重放 |
 | 涉及文件 | `cluster/store/InflightStore.java`, `cluster/store/InflightTtlCleaner.java` |
-| 设计参考 | storage v1.1 §4.3 |
+| 设计参考 | storage v1.2 §4.3 |
 
 **子任务**：
 
@@ -385,7 +387,7 @@ public interface SharedSubscriptionStrategy {
 | 风险 | 中（涉及通配查询性能） |
 | 验收 | retain 消息可持久化；通配查询 < 1ms（10w retain） |
 | 涉及文件 | `cluster/store/RetainIndex.java`（新建） |
-| 设计参考 | storage v1.1 §4.2.4 |
+| 设计参考 | storage v1.2 §4.2.4 |
 
 **子任务**：
 
@@ -411,7 +413,7 @@ public interface SharedSubscriptionStrategy {
 | 风险 | 高（涉及集群分片） |
 | 验收 | 10w retain 不会全节点内存爆炸；读路径仍能查本地 + 跨节点 |
 | 涉及文件 | `cluster/store/RetainShardRouter.java`, 2 个新消息类 |
-| 设计参考 | storage v1.1 §4.2.2 |
+| 设计参考 | storage v1.2 §4.2.2 |
 
 > **P2.5 可选原因**：分片方案主要解决"10w+ retain 内存爆炸"问题，对大多数 IoT 场景（<1w retain）不必要。建议先 P2.4 上线，监控 retain 增长再决定。
 
@@ -561,7 +563,7 @@ public interface SharedSubscriptionStrategy {
 
 ## 10. 关键不变量（实施中必须遵守）
 
-> 来自 storage v1.1 §2.4 + cluster v2.8 §3.3
+> 来自 storage v1.2 §2.4 + cluster v3.0 §3.3
 
 | ID | 不变量 | 验证方式 |
 |---|---|---|
@@ -579,7 +581,7 @@ public interface SharedSubscriptionStrategy {
 
 ## 11. 与三份设计文档的对照表
 
-| 任务 | cluster v2.8 | routing v1.1 | storage v1.1 |
+| 任务 | cluster v3.0 | routing v1.2 | storage v1.2 |
 |---|---|---|---|
 | P0.1 消息枚举 | §3.2 | §5 | §5 |
 | P0.2 LocalKvStore | - | - | §3.1 |
@@ -619,10 +621,17 @@ public interface SharedSubscriptionStrategy {
 
 ---
 
-**文档版本**：v1.0
-**更新日期**：2026-06-05
+**文档版本**：v1.1
+**更新日期**：2026-06-22
 **状态**：执行中
+
+**v1.1 变更摘要**（以代码实现为准全面对齐 cluster v3.0）：
+- P0.1 代码示例修正：协议号 9-11 → 11-13，补充 WILL_MESSAGE(9)/RETAIN_MESSAGE(10)，移除不存在的 SHARED_SUBSCRIBE_FORWARD/SHARED_PUBLISH_FORWARD
+- P1.0 策略接口签名修正：与代码对齐 `pick(String, List, String, Message)`
+- P2.1 协议号修正：SESSION_TAKEOVER 12-15 → 14-17
+- P2.2 协议号修正：SHARED_SUB_STATE_SYNC 16→18，SHARED_SUB_TAKEOVER 17→19
+
 **配套文档**：
-- `docs/todo/mqtt-server-cluster.md` (v2.8)
-- `docs/todo/mqtt-server-cluster-routing.md` (v1.1)
-- `docs/todo/mqtt-server-cluster-storage.md` (v1.1)
+- `docs/todo/mqtt-server-cluster.md` (v3.0)
+- `docs/todo/mqtt-server-cluster-routing.md` (v1.2)
+- `docs/todo/mqtt-server-cluster-storage.md` (v1.2)

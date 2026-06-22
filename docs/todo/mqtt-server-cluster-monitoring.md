@@ -133,7 +133,7 @@ The H2 MVStore file is journaled; transient corruption is usually recovered
 automatically on the next open.  If the file is permanently damaged:
 
 1. Stop the broker
-2. Move `data/<node>/mica-mqtt.mv.db` to a backup location
+2. Move `data/<node>/mica-mqtt-store.mv.db` to a backup location
 3. Restart — the broker will start in pure-memory mode (INV-6) and clients
    will reconnect with fresh sessions
 4. After all clients are connected, stop and re-enable the V3 storage

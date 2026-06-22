@@ -1,6 +1,6 @@
 # mica-mqtt-broker 集群设计文档索引
 
-> mica-mqtt-broker 集群化设计的完整文档体系。从基础到进阶共 4 个文档，按依赖顺序阅读。
+> mica-mqtt-broker 集群化设计的完整文档体系。从基础到进阶共 5 个文档，按依赖顺序阅读。
 
 ---
 
@@ -9,10 +9,11 @@
 ```
 docs/todo/
 ├── README.md                          # 本文档: 索引与导读
-├── mqtt-server-cluster.md             # [1] 基础集群 (v2.8): 拓扑、消息协议、V1 实现
-├── mqtt-server-cluster-routing.md     # [2] 路由 (v1.1): V2 dispatcher + 共享订阅
-├── mqtt-server-cluster-storage.md     # [3] 存储 (v1.1): V3 H2 MVStore 持久化层
-└── mqtt-server-cluster-tasks.md       # [4] 任务清单 (v1.0): V2/V3 实施分解
+├── mqtt-server-cluster.md             # [1] 基础集群 (v3.0): 拓扑、消息协议、V1/V2 实现
+├── mqtt-server-cluster-routing.md     # [2] 路由 (v1.2): V2 dispatcher + 共享订阅
+├── mqtt-server-cluster-storage.md     # [3] 存储 (v1.2): V3 H2 MVStore 持久化层
+├── mqtt-server-cluster-tasks.md       # [4] 任务清单 (v1.1): V2/V3 实施分解
+└── mqtt-server-cluster-monitoring.md  # [5] 监控: 指标、告警、运维手册
 ```
 
 ## 阅读顺序
@@ -25,6 +26,7 @@ docs/todo/
 | 2 | `mqtt-server-cluster-routing.md` | 40 min | 共享订阅 `$share` 怎么去重投递 |
 | 3 | `mqtt-server-cluster-storage.md` | 30 min | 节点宕机后状态怎么恢复 |
 | 4 | `mqtt-server-cluster-tasks.md` | 20 min | 怎么把 V2/V3 排进迭代 |
+| 5 | `mqtt-server-cluster-monitoring.md` | 15 min | 指标采集、Prometheus 告警、运维 Runbook |
 
 ### 按角色阅读
 
@@ -32,7 +34,7 @@ docs/todo/
 |---|---|
 | **架构师** | 全读，重点 §1 §2 §3 |
 | **后端开发** | cluster §3, routing §3, storage §3-§4, tasks §2-§6 |
-| **运维** | cluster §5, storage §6 §8, tasks §6 |
+| **运维** | cluster §5, storage §6 §8, tasks §6, monitoring 全文 |
 | **测试** | cluster §6, routing §7, storage §7, tasks §3-§5 |
 | **PM / TL** | tasks 全文 |
 
@@ -41,17 +43,21 @@ docs/todo/
 ## 四份文档的依赖关系
 
 ```
-mqtt-server-cluster.md          (基础, v2.8, 已实现)
+mqtt-server-cluster.md          (基础, v3.0, V1+V2 已实现)
         |
         ├─────────────────────────┐
         v                         v
 mqtt-server-cluster-routing.md  mqtt-server-cluster-storage.md
-  (V2 dispatcher, v1.1)            (V3 H2 持久化, v1.1)
+  (V2 dispatcher, v1.2)            (V3 H2 持久化, v1.2)
         │                          │
         └──────────┬───────────────┘
                    v
         mqtt-server-cluster-tasks.md
-          (V2/V3 实施任务分解, v1.0)
+          (V2/V3 实施任务分解, v1.1)
+                   │
+                   v
+        mqtt-server-cluster-monitoring.md
+          (监控告警与运维, 补充文档)
 ```
 
 - **routing** 与 **storage** 是**正交**的两条演进线：可以只做 routing（V2 共享订阅去重），也可以只做 storage（V3 节点宕机恢复），推荐两个都做
@@ -134,11 +140,12 @@ MVP 路径（1 人 / 2 周）：tasks §9
 
 | 文档 | 版本 | 状态 | 更新日期 |
 |---|---|---|---|
-| `mqtt-server-cluster.md` | v2.8 | 已实现（含已知问题）+ V2/V3 演进路线 | 2026-06-05 |
-| `mqtt-server-cluster-routing.md` | v1.1 | 设计稿，待评审 | 2026-06-05 |
-| `mqtt-server-cluster-storage.md` | v1.1 | 设计稿，待评审 | 2026-06-05 |
-| `mqtt-server-cluster-tasks.md` | v1.0 | 执行中 | 2026-06-05 |
-| `README.md` | v1.1 | 索引 | 2026-06-05 |
+| `mqtt-server-cluster.md` | v3.0 | V1+V2 已实现；V3 部分实现 | 2026-06-22 |
+| `mqtt-server-cluster-routing.md` | v1.2 | V2 dispatcher 已实现 | 2026-06-22 |
+| `mqtt-server-cluster-storage.md` | v1.2 | V3 部分实现 | 2026-06-22 |
+| `mqtt-server-cluster-tasks.md` | v1.1 | 执行中 | 2026-06-22 |
+| `mqtt-server-cluster-monitoring.md` | v1.0 | 补充文档 | 2026-06-05 |
+| `README.md` | v1.2 | 索引 | 2026-06-22 |
 
 ---
 

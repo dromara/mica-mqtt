@@ -58,7 +58,9 @@ public class RoundRobinStrategy implements SharedSubscriptionStrategy {
 			return null;
 		}
 		long seq = counters.computeIfAbsent(groupName, k -> new AtomicLong(0L)).getAndIncrement();
-		return candidates.get((int) (seq % candidates.size()));
+		// 使用 & Long.MAX_VALUE 防止溢出后产生负索引
+		int index = (int) ((seq & Long.MAX_VALUE) % candidates.size());
+		return candidates.get(index);
 	}
 
 	@Override

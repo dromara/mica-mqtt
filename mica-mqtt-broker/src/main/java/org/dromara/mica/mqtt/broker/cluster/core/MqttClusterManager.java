@@ -184,7 +184,9 @@ public class MqttClusterManager {
 	}
 
 	private void handleClusterMessageInternal(ClusterMessage clusterMsg, String sourceNode) {
-		ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
+		ClusterMqttSessionManager sessionManager = this.sessionManager != null
+			? this.sessionManager
+			: (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
 		switch (clusterMsg.getType()) {
 			case PUBLISH_FORWARD: {
 				PublishForwardMessage pfm = (PublishForwardMessage) clusterMsg;
@@ -370,7 +372,9 @@ public class MqttClusterManager {
 	}
 
 	private void handleStateSyncRequest(String requestNodeId) {
-		ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
+		ClusterMqttSessionManager sessionManager = this.sessionManager != null
+			? this.sessionManager
+			: (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
 
 		Map<String, String> clientNodeMap = sessionManager.getRemoteClientNodeMap();
 		Map<String, List<Subscribe>> subscriptionMap = new HashMap<>();
@@ -389,6 +393,10 @@ public class MqttClusterManager {
 		try {
 			ClusterDataMessage data = ClusterMessageSerializer.toClusterData(response, localNodeId);
 			String[] parts = requestNodeId.split(":");
+			if (parts.length != 2) {
+				logger.warn("Invalid node id format for state sync request: {}", requestNodeId);
+				return;
+			}
 			Node node = new Node(parts[0], Integer.parseInt(parts[1]));
 			cluster.send(node, data);
 			logger.info("Sent state sync response to node: {}", requestNodeId);
@@ -477,7 +485,9 @@ public class MqttClusterManager {
 		if (!config.isEnabled() || cluster == null) {
 			return remoteNodes;
 		}
-		ClusterMqttSessionManager sessionManager = (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
+		ClusterMqttSessionManager sessionManager = this.sessionManager != null
+			? this.sessionManager
+			: (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
 		List<Subscribe> allSubs = sessionManager.searchAllSubscribe(topic);
 		if (allSubs != null) {
 			for (Subscribe sub : allSubs) {
