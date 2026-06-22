@@ -92,10 +92,18 @@ class MqttClusterIntegrationTest {
     @AfterEach
     void tearDown() {
         if (cluster1 != null) {
-            cluster1.stop();
+            try {
+                cluster1.stop();
+            } catch (Exception e) {
+                logger.debug("Error stopping cluster1", e);
+            }
         }
         if (cluster2 != null) {
-            cluster2.stop();
+            try {
+                cluster2.stop();
+            } catch (Exception e) {
+                logger.debug("Error stopping cluster2", e);
+            }
         }
     }
 

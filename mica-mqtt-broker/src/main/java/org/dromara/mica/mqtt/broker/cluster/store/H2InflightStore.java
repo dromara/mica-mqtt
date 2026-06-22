@@ -218,7 +218,8 @@ public class H2InflightStore implements InflightStore {
 	}
 
 	/**
-	 * Waits for all currently queued async writes to complete.
+	 * Waits for all currently queued async writes to complete, then commits
+	 * so that subsequent reads (e.g. cursor scans) see the latest data.
 	 * <p>
 	 * This method is intended for testing only.  It submits a barrier task to each
 	 * writer thread and blocks until all threads have processed it, ensuring that
@@ -231,6 +232,9 @@ public class H2InflightStore implements InflightStore {
 			asyncWriter.submit(latch::countDown);
 		}
 		latch.await(5, TimeUnit.SECONDS);
+		// Flush uncommitted writes so cursor scans can see them
+		// (required when auto-commit is disabled).
+		engine.commit();
 	}
 
 	// ---- Key helpers -------------------------------------------------------------

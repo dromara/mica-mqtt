@@ -169,15 +169,14 @@ public class MqttClusterManager {
 
 	private void handleClusterMessage(ClusterDataMessage message) {
 		try {
-			byte[] payload = message.getPayload();
-			if (payload == null || payload.length == 0) {
-				return;
-			}
 			ClusterMessage clusterMsg = ClusterMessageSerializer.fromClusterData(message);
 			if (clusterMsg != null) {
 				logger.debug("Received cluster message of type: {}", clusterMsg.getType());
 				String sourceNode = ClusterMessageSerializer.getSourceNode(message);
 				handleClusterMessageInternal(clusterMsg, sourceNode);
+			} else {
+				logger.debug("Skipped unknown or unsupported cluster message, type header: {}",
+					message.getHeader(ClusterMessageSerializer.HEADER_TYPE));
 			}
 		} catch (Exception e) {
 			logger.error("Error handling cluster message", e);
