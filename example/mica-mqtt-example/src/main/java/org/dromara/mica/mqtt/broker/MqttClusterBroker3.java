@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.cluster;
+package org.dromara.mica.mqtt.broker;
 
+import org.dromara.mica.mqtt.broker.cluster.MqttBroker;
 import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterBrokerCreator;
 import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterConfig;
 import org.dromara.mica.mqtt.broker.cluster.config.MqttStorageConfig;
@@ -23,6 +24,8 @@ import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 
 import java.net.InetAddress;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Two-node cluster broker with V3 H2 persistence.
@@ -31,10 +34,10 @@ import java.net.InetAddress;
  * </p>
  * <pre>
  *   # Node A
- *   java -cp ... org.dromara.mica.mqtt.broker.cluster.MqttClusterBrokerWithStorageExample 1883 9001 node-a
+ *   java -cp ... org.dromara.mica.mqtt.broker.MqttClusterBrokerWithStorageExample 1883 9001 node-a
  *
  *   # Node B
- *   java -cp ... org.dromara.mica.mqtt.broker.cluster.MqttClusterBrokerWithStorageExample 1884 9002 node-b
+ *   java -cp ... org.dromara.mica.mqtt.broker.MqttClusterBrokerWithStorageExample 1884 9002 node-b
  * </pre>
  * <p>
  * Then connect a client to either node — the session, retain messages, shared
@@ -45,27 +48,23 @@ import java.net.InetAddress;
  * @author L.cm
  * @since 2.6.0
  */
-public class MqttClusterBrokerWithStorageExample {
+public class MqttClusterBroker3 {
 
 	public static void main(String[] args) {
 		// 1st arg: MQTT listener port (default 1883).
 		// 2nd arg: cluster port (default 9001).
 		// 3rd arg: data-dir suffix to disambiguate per-node H2 file (default "node-a").
-		int mqttPort = args.length > 0 ? Integer.parseInt(args[0]) : 1883;
-		int clusterPort = args.length > 1 ? Integer.parseInt(args[1]) : 9001;
-		String suffix = args.length > 2 ? args[2] : "node-a";
+		int mqttPort = args.length > 0 ? Integer.parseInt(args[0]) : 1885;
+		int clusterPort = args.length > 1 ? Integer.parseInt(args[1]) : 9003;
+		String suffix = args.length > 2 ? args[2] : "node-c";
 
-		String localIp;
-		try {
-			localIp = InetAddress.getLocalHost().getHostAddress();
-		} catch (Exception e) {
-			localIp = "127.0.0.1";
-		}
-
+		String localIp = "127.0.0.1";
 		MqttClusterConfig clusterConfig = new MqttClusterConfig()
 			.enabled(true)
 			.clusterHost(localIp)
 			.clusterPort(clusterPort)
+			// 集群种子节点
+			.seedMembers(Arrays.asList("127.0.0.1:9001", "127.0.0.1:9002", "127.0.0.1:9003"))
 			// Use the local-first strategy so messages stay on-node whenever possible.
 			.sharedSubStrategy("local_first")
 			// V3 persistence: enable H2 MVStore, write per-node to its own directory.

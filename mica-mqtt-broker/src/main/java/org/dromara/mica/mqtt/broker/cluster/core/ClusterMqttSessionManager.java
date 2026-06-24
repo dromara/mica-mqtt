@@ -430,6 +430,9 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @param subscriptionMap the client-to-subscriptions mapping to synchronize
 	 */
 	public void syncFullState(Map<String, String> clientNodeMap, Map<String, List<Subscribe>> subscriptionMap) {
+		if (clientNodeMap == null) {
+			return;
+		}
 		this.clientNodeMap.putAll(clientNodeMap);
 		if (subscriptionMap == null) {
 			return;
