@@ -21,19 +21,11 @@ import org.h2.mvstore.MVMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -75,7 +67,7 @@ public class H2InflightStore implements InflightStore {
 	private static final String KEY_PREFIX = "inflight:";
 
 	private final H2MvStoreImpl engine;
-	private volatile MVMap<String, byte[]> map;
+	private final MVMap<String, byte[]> map;
 
 	/**
 	 * Small async writer pool — keeps the hot send path non-blocking.

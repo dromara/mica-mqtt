@@ -241,7 +241,7 @@ public class MqttClusterManager {
 			case STATE_SYNC_RESPONSE: {
 				StateSyncResponseMessage ssm = (StateSyncResponseMessage) clusterMsg;
 				sessionManager.syncFullState(ssm.getClientNodeMap(), ssm.getSubscriptionMap());
-				logger.info("State sync completed, received {} client mappings", ssm.getClientNodeMap().size());
+				logger.info("State sync completed, received {} client mappings", ssm.getClientNodeMap());
 				break;
 			}
 			case NODE_LEAVE: {

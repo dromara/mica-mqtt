@@ -22,6 +22,7 @@ import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
 
 /**
  * Local-first subscriber selection — the <strong>recommended default</strong> strategy.
@@ -50,7 +51,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class LocalFirstStrategy implements SharedSubscriptionStrategy {
 
 	/** Node-ID to client-ID lookup supplied by the cluster session manager. */
-	private final java.util.function.Function<String, String> clientNodeResolver;
+	private final Function<String, String> clientNodeResolver;
 
 	/**
 	 * Constructs a {@code LocalFirstStrategy} with the supplied node resolver.
@@ -59,7 +60,7 @@ public class LocalFirstStrategy implements SharedSubscriptionStrategy {
 	 *                           node ID; returns {@code null} if the client is local
 	 *                           or its node is unknown
 	 */
-	public LocalFirstStrategy(java.util.function.Function<String, String> clientNodeResolver) {
+	public LocalFirstStrategy(Function<String, String> clientNodeResolver) {
 		this.clientNodeResolver = clientNodeResolver;
 	}
 
