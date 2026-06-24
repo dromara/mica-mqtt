@@ -45,11 +45,6 @@
             <artifactId>tinylog-impl</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.dromara.mica-mqtt</groupId>
-            <artifactId>mica-mqtt-client</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
