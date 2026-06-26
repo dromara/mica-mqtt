@@ -19,7 +19,7 @@ package org.dromara.mica.mqtt.core.server.http.websocket;
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.core.intf.Packet;
-import net.dreamlu.mica.net.core.intf.TioHandler;
+import net.dreamlu.mica.net.core.intf.TcpHandler;
 import net.dreamlu.mica.net.http.common.HttpRequest;
 import net.dreamlu.mica.net.http.common.HttpResponse;
 import net.dreamlu.mica.net.utils.buffer.ByteBufferUtil;
@@ -51,16 +51,16 @@ public class MqttWsMsgHandler implements IWsMsgHandler {
 	 * websocket 握手端点
 	 */
 	private final String[] supportedSubProtocols;
-	private final TioHandler mqttServerAioHandler;
+	private final TcpHandler mqttServerAioHandler;
 	private final MqttMessageInterceptors messageInterceptors;
 
-	public MqttWsMsgHandler(MqttServerCreator serverCreator, TioHandler handler) {
+	public MqttWsMsgHandler(MqttServerCreator serverCreator, TcpHandler handler) {
 		this(serverCreator, new String[]{"mqtt", "mqttv3.1", "mqttv3.1.1"}, handler);
 	}
 
 	public MqttWsMsgHandler(MqttServerCreator serverCreator,
 							String[] supportedSubProtocols,
-							TioHandler handler) {
+							TcpHandler handler) {
 		this.supportedSubProtocols = supportedSubProtocols;
 		this.mqttServerAioHandler = handler;
 		this.messageInterceptors = serverCreator.getMessageInterceptors();
