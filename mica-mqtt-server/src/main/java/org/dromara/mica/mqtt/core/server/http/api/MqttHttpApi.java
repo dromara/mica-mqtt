@@ -18,10 +18,8 @@ package org.dromara.mica.mqtt.core.server.http.api;
 
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Tio;
-import net.dreamlu.mica.net.http.common.HttpConst;
-import net.dreamlu.mica.net.http.common.HttpRequest;
-import net.dreamlu.mica.net.http.common.HttpResponse;
-import net.dreamlu.mica.net.http.common.Method;
+import net.dreamlu.mica.net.http.common.*;
+import net.dreamlu.mica.net.http.common.router.ErrorHandler;
 import net.dreamlu.mica.net.http.common.router.HttpRouter;
 import net.dreamlu.mica.net.http.common.stream.HttpStream;
 import net.dreamlu.mica.net.server.TioServerConfig;
@@ -467,10 +465,22 @@ public class MqttHttpApi {
 	}
 
 	/**
+	 * 异常情况处理
+	 * @param request request
+	 * @param error error
+	 * @return HttpResponse
+	 */
+	private HttpResponse errorResponse(HttpRequest request, Throwable error) {
+		log.error(error.getMessage(), error);
+		return Result.fail(request, ResultCode.E101);
+	}
+
+	/**
 	 * 注册路由
 	 */
 	public void register(HttpRouter httpRouter) {
 		// @formatter:off
+		// 1. 注册路由
 		httpRouter.get("/api/v1/endpoints", this::endpoints);
 		httpRouter.get("/api/v1/stats", this::stats);
 		httpRouter.get("/api/v1/stats/sse", this::statsSse);
@@ -484,6 +494,8 @@ public class MqttHttpApi {
 		httpRouter.get("/api/v1/clients", this::getClients);
 		httpRouter.post("/api/v1/clients/delete", this::deleteClients);
 		httpRouter.get("/api/v1/client/subscriptions", this::getClientSubscriptions);
+		// 2. 异常处理
+		httpRouter.error(this::errorResponse);
 		// @formatter:on
 	}
 
