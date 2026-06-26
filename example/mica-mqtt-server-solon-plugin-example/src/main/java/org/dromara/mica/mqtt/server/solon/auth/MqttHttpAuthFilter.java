@@ -1,4 +1,4 @@
-package org.dromara.mica.mqtt.server.auth;
+package org.dromara.mica.mqtt.server.solon.auth;
 
 import lombok.extern.slf4j.Slf4j;
 import net.dreamlu.mica.net.http.common.HttpRequest;
@@ -6,7 +6,7 @@ import net.dreamlu.mica.net.http.common.HttpResponse;
 import net.dreamlu.mica.net.http.common.RequestLine;
 import net.dreamlu.mica.net.http.common.router.HttpFilter;
 import net.dreamlu.mica.net.http.common.router.HttpFilterChain;
-import org.springframework.context.annotation.Configuration;
+import org.noear.solon.annotation.Configuration;
 
 /**
  * 示例自定义 mqtt http 接口认证，请按照自己的需求和业务进行扩展
@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
  * @author L.cm
  */
 @Slf4j
-@Configuration(proxyBeanMethods = false)
+@Configuration
 public class MqttHttpAuthFilter implements HttpFilter {
 
 	@Override

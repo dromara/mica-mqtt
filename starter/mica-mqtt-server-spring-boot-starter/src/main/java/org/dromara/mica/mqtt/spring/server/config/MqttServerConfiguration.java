@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.spring.server.config;
 
 import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.http.common.router.HttpFilter;
 import net.dreamlu.mica.net.http.mcp.server.McpServer;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
 import org.dromara.mica.mqtt.core.deserialize.MqttJsonDeserializer;
@@ -82,7 +83,7 @@ public class MqttServerConfiguration {
 											   ObjectProvider<IMqttServerUniqueIdService> uniqueIdServiceObjectProvider,
 											   ObjectProvider<IMqttServerSubscribeValidator> subscribeValidatorObjectProvider,
 											   ObjectProvider<IMqttServerPublishPermission> publishPermissionObjectProvider,
-
+											   ObjectProvider<HttpFilter> httpFilterObjectProvider,
 											   ObjectProvider<IMqttMessageStore> messageStoreObjectProvider,
 											   ObjectProvider<IMqttSessionManager> sessionManagerObjectProvider,
 											   ObjectProvider<IMqttSessionListener> sessionListenerObjectProvider,
@@ -167,6 +168,8 @@ public class MqttServerConfiguration {
 				if (ssl.isEnable()) {
 					builder.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());
 				}
+				// 认证处理
+				httpFilterObjectProvider.ifAvailable(builder::authFilter);
 				return builder.build();
 			});
 		}

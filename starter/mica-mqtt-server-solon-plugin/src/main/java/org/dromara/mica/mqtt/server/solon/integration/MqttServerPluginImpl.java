@@ -20,6 +20,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.http.common.router.HttpFilter;
 import net.dreamlu.mica.net.http.mcp.server.McpServer;
 import net.dreamlu.mica.net.utils.hutool.ClassUtil;
 import org.dromara.mica.mqtt.core.annotation.MqttServerFunction;
@@ -93,7 +94,7 @@ public class MqttServerPluginImpl implements Plugin {
 				propertiesCustomizers.forEach((customizer) -> customizer.customize(properties));
 
 				// 初始化 serverCreator
-				MqttServerCreator serverCreator = getMqttServerCreator(properties);
+				MqttServerCreator serverCreator = getMqttServerCreator(context, properties);
 				BeanWrap clientCreatorWrap = context.wrap(MqttServerCreator.class, serverCreator);
 				context.putWrap(MqttServerCreator.class, clientCreatorWrap);
 
@@ -227,7 +228,7 @@ public class MqttServerPluginImpl implements Plugin {
 		return Optional.ofNullable(context.cfg().getByTmpl(value)).orElse(value);
 	}
 
-	private static MqttServerCreator getMqttServerCreator(MqttServerProperties properties) {
+	private static MqttServerCreator getMqttServerCreator(AppContext context, MqttServerProperties properties) {
 		MqttServerCreator serverCreator = MqttServer.create()
 			.name(properties.getName())
 			.heartbeatTimeout(properties.getHeartbeatTimeout())
@@ -302,6 +303,10 @@ public class MqttServerPluginImpl implements Plugin {
 				}
 				if (ssl.isEnable()) {
 					builder.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());
+				}
+				HttpFilter authFilter = context.getBean(HttpFilter.class);
+				if (authFilter != null) {
+					builder.authFilter(authFilter);
 				}
 				return builder.build();
 			});
