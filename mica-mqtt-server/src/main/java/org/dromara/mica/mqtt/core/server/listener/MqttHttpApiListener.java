@@ -22,6 +22,8 @@ import net.dreamlu.mica.net.core.ssl.ClientAuth;
 import net.dreamlu.mica.net.core.ssl.SslConfig;
 import net.dreamlu.mica.net.core.uuid.SeqTioUuid;
 import net.dreamlu.mica.net.http.common.HttpConfig;
+import net.dreamlu.mica.net.http.common.router.HttpFilter;
+import net.dreamlu.mica.net.http.common.router.HttpRouter;
 import net.dreamlu.mica.net.http.mcp.server.McpServer;
 import net.dreamlu.mica.net.http.server.HttpTioServerHandler;
 import net.dreamlu.mica.net.http.server.HttpTioServerListener;
@@ -30,9 +32,6 @@ import net.dreamlu.mica.net.server.TioServerConfig;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.http.api.MqttHttpApi;
 import org.dromara.mica.mqtt.core.server.http.api.auth.BasicAuthFilter;
-import org.dromara.mica.mqtt.core.server.http.handler.HttpFilter;
-import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRequestHandler;
-import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRoutes;
 import org.dromara.mica.mqtt.core.server.http.mcp.MqttMcp;
 import org.dromara.mica.mqtt.core.server.protocol.MqttProtocol;
 
@@ -86,22 +85,23 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 
 	@Override
 	public TioServer config(MqttServerCreator serverCreator, TioServerConfig mqttServerConfig) {
+		HttpRouter httpRouter = new HttpRouter();
 		// 1 http 路由配置
 		MqttHttpApi httpApi = new MqttHttpApi(serverCreator, mqttServerConfig);
-		httpApi.register();
+		httpApi.register(httpRouter);
 		// 2 认证配置
 		if (authFilter != null) {
-			MqttHttpRoutes.addFilter(authFilter);
+			httpRouter.filter(authFilter);
 		}
 		// 3. 是否开启 mcp
 		if (mcpServer != null) {
 			MqttMcp mqttMcp = new MqttMcp(serverCreator, mqttServerConfig, mcpServer);
-			mqttMcp.register();
+			mqttMcp.register(httpRouter);
 		}
 		// 4. http 服务配置
 		TioServerConfig tioServerConfig = new TioServerConfig(
 			serverCreator.getName() + '/' + this.getProtocol().name(),
-			new HttpTioServerHandler(new HttpConfig(), new MqttHttpRequestHandler()),
+			new HttpTioServerHandler(new HttpConfig(), httpRouter),
 			new HttpTioServerListener(),
 			mqttServerConfig.tioExecutor, mqttServerConfig.groupExecutor
 		);

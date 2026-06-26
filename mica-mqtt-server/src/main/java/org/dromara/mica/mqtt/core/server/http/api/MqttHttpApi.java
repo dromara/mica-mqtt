@@ -22,6 +22,7 @@ import net.dreamlu.mica.net.http.common.HttpConst;
 import net.dreamlu.mica.net.http.common.HttpRequest;
 import net.dreamlu.mica.net.http.common.HttpResponse;
 import net.dreamlu.mica.net.http.common.Method;
+import net.dreamlu.mica.net.http.common.router.HttpRouter;
 import net.dreamlu.mica.net.http.common.stream.HttpStream;
 import net.dreamlu.mica.net.server.TioServerConfig;
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
@@ -37,7 +38,7 @@ import org.dromara.mica.mqtt.core.server.http.api.form.BaseForm;
 import org.dromara.mica.mqtt.core.server.http.api.form.PublishForm;
 import org.dromara.mica.mqtt.core.server.http.api.form.SubscribeForm;
 import org.dromara.mica.mqtt.core.server.http.api.result.Result;
-import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRoutes;
+import org.dromara.mica.mqtt.core.server.http.handler.RouteInfo;
 import org.dromara.mica.mqtt.core.server.model.ClientInfo;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
@@ -45,7 +46,10 @@ import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 /**
@@ -72,7 +76,21 @@ public class MqttHttpApi {
 	 * @return HttpResponse
 	 */
 	public HttpResponse endpoints(HttpRequest request) {
-		return Result.ok(request, MqttHttpRoutes.getRouts().keySet());
+		List<RouteInfo> endpoints = new ArrayList<>();
+		endpoints.add(new RouteInfo("/api/v1/endpoints", Method.GET));
+		endpoints.add(new RouteInfo("/api/v1/stats", Method.GET));
+		endpoints.add(new RouteInfo("/api/v1/stats/sse", Method.GET));
+		endpoints.add(new RouteInfo("/api/v1/mqtt/publish", Method.POST));
+		endpoints.add(new RouteInfo("/api/v1/mqtt/publish/batch", Method.POST));
+		endpoints.add(new RouteInfo("/api/v1/mqtt/subscribe", Method.POST));
+		endpoints.add(new RouteInfo("/api/v1/mqtt/subscribe/batch", Method.POST));
+		endpoints.add(new RouteInfo("/api/v1/mqtt/unsubscribe", Method.POST));
+		endpoints.add(new RouteInfo("/api/v1/mqtt/unsubscribe/batch", Method.POST));
+		endpoints.add(new RouteInfo("/api/v1/clients/info", Method.GET));
+		endpoints.add(new RouteInfo("/api/v1/clients", Method.GET));
+		endpoints.add(new RouteInfo("/api/v1/clients/delete", Method.POST));
+		endpoints.add(new RouteInfo("/api/v1/client/subscriptions", Method.GET));
+		return Result.ok(request, endpoints);
 	}
 
 	/**
@@ -451,21 +469,21 @@ public class MqttHttpApi {
 	/**
 	 * 注册路由
 	 */
-	public void register() {
+	public void register(HttpRouter httpRouter) {
 		// @formatter:off
-		MqttHttpRoutes.register(Method.GET, "/api/v1/endpoints", this::endpoints);
-		MqttHttpRoutes.register(Method.GET, "/api/v1/stats", this::stats);
-		MqttHttpRoutes.register(Method.GET, "/api/v1/stats/sse", this::statsSse);
-		MqttHttpRoutes.register(Method.POST, "/api/v1/mqtt/publish", this::publish);
-		MqttHttpRoutes.register(Method.POST, "/api/v1/mqtt/publish/batch", this::publishBatch);
-		MqttHttpRoutes.register(Method.POST, "/api/v1/mqtt/subscribe", this::subscribe);
-		MqttHttpRoutes.register(Method.POST, "/api/v1/mqtt/subscribe/batch", this::subscribeBatch);
-		MqttHttpRoutes.register(Method.POST, "/api/v1/mqtt/unsubscribe", this::unsubscribe);
-		MqttHttpRoutes.register(Method.POST, "/api/v1/mqtt/unsubscribe/batch", this::unsubscribeBatch);
-		MqttHttpRoutes.register(Method.GET, "/api/v1/clients/info", this::getClientInfo);
-		MqttHttpRoutes.register(Method.GET, "/api/v1/clients", this::getClients);
-		MqttHttpRoutes.register(Method.POST, "/api/v1/clients/delete", this::deleteClients);
-		MqttHttpRoutes.register(Method.GET, "/api/v1/client/subscriptions", this::getClientSubscriptions);
+		httpRouter.get("/api/v1/endpoints", this::endpoints);
+		httpRouter.get("/api/v1/stats", this::stats);
+		httpRouter.get("/api/v1/stats/sse", this::statsSse);
+		httpRouter.post("/api/v1/mqtt/publish", this::publish);
+		httpRouter.post("/api/v1/mqtt/publish/batch", this::publishBatch);
+		httpRouter.post("/api/v1/mqtt/subscribe", this::subscribe);
+		httpRouter.post("/api/v1/mqtt/subscribe/batch", this::subscribeBatch);
+		httpRouter.post("/api/v1/mqtt/unsubscribe", this::unsubscribe);
+		httpRouter.post("/api/v1/mqtt/unsubscribe/batch", this::unsubscribeBatch);
+		httpRouter.get("/api/v1/clients/info", this::getClientInfo);
+		httpRouter.get("/api/v1/clients", this::getClients);
+		httpRouter.post("/api/v1/clients/delete", this::deleteClients);
+		httpRouter.get("/api/v1/client/subscriptions", this::getClientSubscriptions);
 		// @formatter:on
 	}
 

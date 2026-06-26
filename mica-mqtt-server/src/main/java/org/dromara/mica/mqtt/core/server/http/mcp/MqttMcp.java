@@ -2,13 +2,10 @@ package org.dromara.mica.mqtt.core.server.http.mcp;
 
 
 import net.dreamlu.mica.net.core.stat.vo.StatVo;
-import net.dreamlu.mica.net.http.common.Method;
+import net.dreamlu.mica.net.http.common.router.HttpRouter;
 import net.dreamlu.mica.net.http.mcp.schema.*;
 import net.dreamlu.mica.net.http.mcp.server.McpServer;
 import net.dreamlu.mica.net.http.mcp.server.McpServerSession;
-import net.dreamlu.mica.net.http.mcp.server.transport.McpTransport;
-import net.dreamlu.mica.net.http.mcp.server.transport.SseTransport;
-import net.dreamlu.mica.net.http.mcp.server.transport.StreamableHttpTransport;
 import net.dreamlu.mica.net.server.TioServerConfig;
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import net.dreamlu.mica.net.utils.json.JsonUtil;
@@ -18,10 +15,12 @@ import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.http.api.form.PublishForm;
-import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRoutes;
 import org.dromara.mica.mqtt.core.server.model.Message;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -33,12 +32,6 @@ public class MqttMcp {
 	private final MqttServerCreator serverCreator;
 	private final TioServerConfig mqttServerConfig;
 	private final McpServer mcpServer;
-
-	public MqttMcp(MqttServerCreator serverCreator,
-				   TioServerConfig mqttServerConfig) {
-		this(serverCreator, mqttServerConfig, new McpServer());
-	}
-
 	public MqttMcp(MqttServerCreator serverCreator,
 				   TioServerConfig mqttServerConfig,
 				   McpServer mcpServer) {
@@ -252,20 +245,9 @@ public class MqttMcp {
 	/**
 	 * 注册 mcp
 	 */
-	public void register() {
+	public void register(HttpRouter httpRouter) {
 		// 注册路由
-		List<McpTransport> transports = mcpServer.getTransports();
-		for (McpTransport transport : transports) {
-			if (transport instanceof SseTransport) {
-				SseTransport sseTransport = (SseTransport) transport;
-				MqttHttpRoutes.register(Method.GET, sseTransport.getSseEndpoint(), sseTransport::handleSseConnection);
-				MqttHttpRoutes.register(Method.POST, sseTransport.getMessageEndpoint(), sseTransport::handleMessage);
-			} else if (transport instanceof StreamableHttpTransport) {
-				StreamableHttpTransport streamTransport = (StreamableHttpTransport) transport;
-				MqttHttpRoutes.register(Method.GET, streamTransport.getEndpoint(), streamTransport::handleSseConnection);
-				MqttHttpRoutes.register(Method.POST, streamTransport.getEndpoint(), streamTransport::handleJsonRpcRequest);
-			}
-		}
+		mcpServer.registerRoute(httpRouter);
 		// mcp 信息
 		McpServerCapabilities serverCapabilities = new McpServerCapabilities();
 		McpLoggingCapabilities logging = new McpLoggingCapabilities();

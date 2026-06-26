@@ -20,10 +20,11 @@ import net.dreamlu.mica.net.http.common.HeaderName;
 import net.dreamlu.mica.net.http.common.HeaderValue;
 import net.dreamlu.mica.net.http.common.HttpRequest;
 import net.dreamlu.mica.net.http.common.HttpResponse;
+import net.dreamlu.mica.net.http.common.router.HttpFilter;
+import net.dreamlu.mica.net.http.common.router.HttpFilterChain;
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.core.server.http.api.code.ResultCode;
 import org.dromara.mica.mqtt.core.server.http.api.result.Result;
-import org.dromara.mica.mqtt.core.server.http.handler.HttpFilter;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -46,19 +47,23 @@ public class BasicAuthFilter implements HttpFilter {
 	}
 
 	@Override
-	public boolean filter(HttpRequest request) throws Exception {
+	public HttpResponse doFilter(HttpRequest request, HttpFilterChain chain) throws Exception {
 		String authorization = request.getHeader(BASIC_AUTH_HEADER_NAME);
 		if (StrUtil.isBlank(authorization)) {
-			return false;
+			return response(request);
 		}
 		int length = AUTHORIZATION_PREFIX.length();
 		if (length >= authorization.length()) {
-			return false;
+			return response(request);
 		}
-		return token.equals(authorization.substring(length));
+		boolean equals = token.equals(authorization.substring(length));
+		if (equals) {
+			return chain.doFilter(request);
+		} else  {
+			return response(request);
+		}
 	}
 
-	@Override
 	public HttpResponse response(HttpRequest request) {
 		HttpResponse response = new HttpResponse(request);
 		response.addHeader(WWW_AUTHENTICATE, BASIC_REALM);

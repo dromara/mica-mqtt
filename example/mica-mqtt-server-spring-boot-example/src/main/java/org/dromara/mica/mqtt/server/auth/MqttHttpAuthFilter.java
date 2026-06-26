@@ -4,8 +4,6 @@ import net.dreamlu.mica.net.http.common.HttpRequest;
 import net.dreamlu.mica.net.http.common.HttpResponse;
 import org.dromara.mica.mqtt.core.server.http.api.code.ResultCode;
 import org.dromara.mica.mqtt.core.server.http.api.result.Result;
-import org.dromara.mica.mqtt.core.server.http.handler.HttpFilter;
-import org.dromara.mica.mqtt.core.server.http.handler.MqttHttpRoutes;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.annotation.Configuration;
 
