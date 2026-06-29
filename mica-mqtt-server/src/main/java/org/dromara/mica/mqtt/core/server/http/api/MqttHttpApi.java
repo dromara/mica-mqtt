@@ -465,6 +465,16 @@ public class MqttHttpApi {
 	}
 
 	/**
+	 * 404 处理
+	 * @param request request
+	 * @return HttpResponse
+	 */
+	private HttpResponse notFoundResponse(HttpRequest request) {
+		log.error("404 Not Found: {}", request.getRequestLine());
+		return Result.fail(request, ResultCode.E404);
+	}
+
+	/**
 	 * 异常情况处理
 	 * @param request request
 	 * @param error error
@@ -472,7 +482,7 @@ public class MqttHttpApi {
 	 */
 	private HttpResponse errorResponse(HttpRequest request, Throwable error) {
 		log.error(error.getMessage(), error);
-		return Result.fail(request, ResultCode.E101);
+		return Result.fail(request, ResultCode.E105);
 	}
 
 	/**
@@ -495,6 +505,7 @@ public class MqttHttpApi {
 		httpRouter.post("/api/v1/clients/delete", this::deleteClients);
 		httpRouter.get("/api/v1/client/subscriptions", this::getClientSubscriptions);
 		// 2. 异常处理
+		httpRouter.notFound(this::notFoundResponse);
 		httpRouter.error(this::errorResponse);
 		// @formatter:on
 	}
