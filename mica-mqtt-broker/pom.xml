@@ -18,10 +18,6 @@
             <artifactId>mica-mqtt-server</artifactId>
         </dependency>
         <dependency>
-            <groupId>net.dreamlu</groupId>
-            <artifactId>mica-net-core</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2-mvstore</artifactId>
         </dependency>
