@@ -99,7 +99,11 @@ public class MemoryKvStoreImpl implements LocalKvStore {
 		return new StoreStats(-1L, data.size(), open);
 	}
 
-	/** Returns the number of entries in the store (for test assertions). */
+	/**
+	 * Returns the number of entries in the store (for test assertions).
+	 *
+	 * @return the number of entries currently held in this in-memory store
+	 */
 	public int size() {
 		return data.size();
 	}

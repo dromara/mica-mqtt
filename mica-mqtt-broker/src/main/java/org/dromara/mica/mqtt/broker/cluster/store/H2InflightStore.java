@@ -37,14 +37,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  * small async thread pool so that H2 file I/O does not block t-io worker threads.
  * </p>
  *
- * <h3>Key format</h3>
+ * <h2>Key format</h2>
  * <pre>
  *   "inflight:{clientId}:{packetId:05d}"
  * </pre>
  * The zero-padded packet-id ensures lexicographic key ordering matches numeric
  * ordering, making {@code listByClient} return entries in packet-id order.
  *
- * <h3>Value format</h3>
+ * <h2>Value format</h2>
  * <p>
  * A compact binary encoding (big-endian):
  * </p>

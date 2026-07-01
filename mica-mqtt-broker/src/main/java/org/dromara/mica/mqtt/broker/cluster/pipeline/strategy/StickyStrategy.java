@@ -35,11 +35,13 @@ import java.util.concurrent.ConcurrentMap;
  * </p>
  * <p>
  * Use cases:
+ * </p>
  * <ul>
  *   <li>Applications that maintain in-process state (e.g. aggregations) and
  *       need all messages for a device to land on the same subscriber instance</li>
  *   <li>Long-lived connection affinity where reconnection cost is high</li>
  * </ul>
+ * <p>
  * <strong>Warning</strong>: load distribution is <em>not</em> guaranteed.  If one
  * subscriber handles a hot topic group it may become overloaded.
  * </p>

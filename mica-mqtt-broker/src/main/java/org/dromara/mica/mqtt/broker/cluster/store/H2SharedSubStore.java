@@ -32,10 +32,10 @@ import java.util.List;
  * H2 MVStore-backed implementation of {@link SharedSubStore}.
  * <p>
  * Persists each {@link SharedSubStore.SharedSubGroup} under key
- * {@code "shared_sub:<groupName>"} in a dedicated {@link MVMap} inside the
+ * {@code "shared_sub:<groupName>"} in a dedicated {@link org.h2.mvstore.MVMap} inside the
  * shared {@link H2MvStoreImpl} engine.
  * </p>
- * <h3>Value format</h3>
+ * <h2>Value format</h2>
  * <pre>
  *   [2 bytes]  topicFilter length (short)
  *   [N bytes]  topicFilter (UTF-8)

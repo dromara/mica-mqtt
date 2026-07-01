@@ -33,12 +33,12 @@ import java.util.function.Function;
  * </p>
  * <p>
  * <strong>Selection algorithm</strong>:
+ * </p>
  * <ol>
  *   <li>Collect all candidates whose {@code clientId} maps to the local node.</li>
  *   <li>If any local candidates exist, return one chosen at random among them.</li>
  *   <li>Otherwise fall back to a random pick among all remote candidates.</li>
  * </ol>
- * </p>
  * <p>
  * This strategy works best when publishers and subscribers are evenly distributed
  * across nodes, which is the typical IoT deployment pattern.

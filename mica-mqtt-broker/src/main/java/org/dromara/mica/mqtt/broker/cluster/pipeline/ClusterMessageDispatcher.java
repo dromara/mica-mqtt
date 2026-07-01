@@ -45,7 +45,7 @@ import java.util.Set;
  * delivery of messages published on this node.
  * </p>
  *
- * <h3>Normal subscriptions (non-shared)</h3>
+ * <h2>Normal subscriptions (non-shared)</h2>
  * <p>
  * The V1 full-replica strategy is preserved: every node holds a complete copy of
  * the subscription table.  When a remote node has subscribers for a topic, the
@@ -54,7 +54,7 @@ import java.util.Set;
  * subscribers.
  * </p>
  *
- * <h3>Shared subscriptions ({@code $share/&lt;group&gt;/…} and {@code $queue/…})</h3>
+ * <h2>Shared subscriptions ({@code $share/&lt;group&gt;/…} and {@code $queue/…})</h2>
  * <p>
  * V1 broadcast causes duplicate delivery: every node that has a subscriber in the
  * group receives the message and delivers it locally, so all subscribers get the
@@ -62,6 +62,7 @@ import java.util.Set;
  * </p>
  * <p>
  * V2 (this class) uses the <strong>EMQX dispatcher model</strong> to fix this:
+ * </p>
  * <ol>
  *   <li>All candidates for a group are gathered (local + remote, full replica).</li>
  *   <li>The configured {@link SharedSubscriptionStrategy} picks exactly <em>one</em>
@@ -72,6 +73,7 @@ import java.util.Set;
  *       {@link SharedDispatchToClientMessage} is sent to that subscriber's node.
  *       The remote node delivers to the specific client only.</li>
  * </ol>
+ * <p>
  * This eliminates duplicate delivery while still using the full-replica table
  * (no per-group owner node, no single point of failure).
  * </p>

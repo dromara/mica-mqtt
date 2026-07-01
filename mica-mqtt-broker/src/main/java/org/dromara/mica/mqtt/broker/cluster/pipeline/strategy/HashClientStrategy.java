@@ -30,11 +30,13 @@ import java.util.List;
  * </p>
  * <p>
  * This strategy is suitable when:
+ * </p>
  * <ul>
  *   <li>Messages within the same group should be processed by the same subscriber
  *       (ordering guarantee per message sequence)</li>
  *   <li>The application relies on state locality (e.g. caches warmed per subscriber)</li>
  * </ul>
+ * <p>
  * <strong>Limitation</strong>: the distribution is deterministic but not necessarily
  * uniform; neighbouring hash values may map to the same subscriber bucket.
  * </p>

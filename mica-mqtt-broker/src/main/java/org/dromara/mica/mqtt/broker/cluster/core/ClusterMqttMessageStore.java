@@ -35,7 +35,7 @@ import java.util.List;
  * published/cleared, it broadcasts the change to all other cluster nodes.
  * </p>
  *
- * <h3>V3 retain persistence (P2.4)</h3>
+ * <h2>V3 retain persistence (P2.4)</h2>
  * <p>
  * When a {@link RetainIndex} is wired in via {@link #setRetainIndex(RetainIndex)},
  * retain messages are written to the durable store as well as the in-memory

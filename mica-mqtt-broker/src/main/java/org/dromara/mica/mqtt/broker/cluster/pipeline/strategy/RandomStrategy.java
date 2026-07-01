@@ -27,12 +27,14 @@ import java.util.concurrent.ThreadLocalRandom;
  * <p>
  * This is the simplest possible strategy: it picks a subscriber uniformly at
  * random on every invocation, maintaining no state.  It works well when:
+ * </p>
  * <ul>
  *   <li>Subscribers are roughly equal in processing capacity</li>
  *   <li>Message volume is high enough that the law of large numbers distributes
  *       load evenly over time</li>
  *   <li>Predictability or ordering is <em>not</em> required</li>
  * </ul>
+ * <p>
  * Downside: individual hot-spots are possible in the short term because two
  * consecutive messages may land on the same subscriber by chance.
  * </p>

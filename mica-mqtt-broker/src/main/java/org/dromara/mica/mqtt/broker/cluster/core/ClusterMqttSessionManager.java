@@ -335,6 +335,8 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	/**
 	 * Returns the live clientId→node mapping.  Used by the cluster manager to
 	 * find the previous owner of a session during takeover.
+	 *
+	 * @return the live mapping of clientId to its owning node id
 	 */
 	public ConcurrentHashMap<String, String> getClientNodeMap() {
 		return clientNodeMap;
@@ -344,6 +346,9 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * Removes the local subscriptions of a client.  Called by the cluster
 	 * manager when this node loses ownership of a session (handed off to a
 	 * peer via the takeover protocol).
+	 *
+	 * @param clientId the client identifier whose local subscriptions should
+	 *                 be removed; ignored when {@code null}
 	 */
 	public void clearLocalSubscription(String clientId) {
 		if (clientId == null) {

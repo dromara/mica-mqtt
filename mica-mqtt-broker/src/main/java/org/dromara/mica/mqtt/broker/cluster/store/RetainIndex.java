@@ -164,6 +164,8 @@ public class RetainIndex {
 
 	/**
 	 * Returns the total number of retained messages currently indexed.
+	 *
+	 * @return the number of retained messages held in the in-memory index
 	 */
 	public int size() {
 		return index.size();

@@ -27,7 +27,7 @@ import java.util.List;
  * broker replays all inflight records to guarantee at-least-once delivery.
  * </p>
  *
- * <h3>TTL</h3>
+ * <h2>TTL</h2>
  * <p>
  * Inflight messages carry an {@code expireAt} timestamp (milliseconds since epoch).
  * A background {@link InflightTtlCleaner} periodically sweeps expired records so that
@@ -35,7 +35,7 @@ import java.util.List;
  * state.  The default TTL is 30 seconds (see {@link InflightTtlCleaner#DEFAULT_TTL_MS}).
  * </p>
  *
- * <h3>Key structure</h3>
+ * <h2>Key structure</h2>
  * <p>
  * Each record is stored under a composite key
  * {@code "inflight:<clientId>:<packetId>"} so that a prefix scan on

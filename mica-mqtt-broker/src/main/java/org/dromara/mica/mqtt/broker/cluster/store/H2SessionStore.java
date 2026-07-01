@@ -31,7 +31,7 @@ import java.util.List;
  * without re-serialization (the {@link #loadRaw} bytes are reused directly
  * as the payload of {@code SessionTakeoverResponseMessage}).
  * </p>
- * <h3>Value format</h3>
+ * <h2>Value format</h2>
  * <pre>
  *   [1 byte]   cleanSession flag
  *   [8 bytes]  sessionExpirySeconds (long)

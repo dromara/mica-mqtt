@@ -33,15 +33,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  * {@link #DEFAULT_PERIOD_MS} milliseconds (default 30 s).
  * </p>
  *
- * <h3>Alert threshold</h3>
+ * <h2>Alert threshold</h2>
  * <p>
  * If the total inflight count exceeds {@link #ALERT_THRESHOLD} after a scan, a
  * {@code WARN} log is emitted.  This surfaces situations where clients are not
  * acknowledging messages (e.g. slow consumers, silent crashes).  Connect this
- * to an external metrics pipeline via {@link ClusterMetrics} if needed.
+ * to an external metrics pipeline via {@link org.dromara.mica.mqtt.broker.cluster.metrics.ClusterMetrics} if needed.
  * </p>
  *
- * <h3>Accuracy</h3>
+ * <h2>Accuracy</h2>
  * <p>
  * Records may linger for at most {@code TTL + period} milliseconds before removal
  * (e.g. with a 30 s TTL and 30 s period, a record is removed at most 60 s after

@@ -37,21 +37,21 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * single store file but use different named maps to avoid key collisions.
  * </p>
  *
- * <h3>Thread safety</h3>
+ * <h2>Thread safety</h2>
  * <p>
  * {@link MVMap} operations in H2 are themselves thread-safe, but {@link MVStore#commit()}
  * and {@link MVStore#close()} are guarded by a write lock here to prevent concurrent
  * partial commits during shutdown.
  * </p>
  *
- * <h3>Crash safety</h3>
+ * <h2>Crash safety</h2>
  * <p>
  * MVStore writes are append-only (WAL).  An abrupt process kill ({@code kill -9}) leaves
  * at most the last uncommitted chunk unreplayed; MVStore recovers automatically on the
  * next open via WAL replay.
  * </p>
  *
- * <h3>File locking</h3>
+ * <h2>File locking</h2>
  * <p>
  * H2 uses {@code FILE_LOCK=FILE} by default, which prevents two JVM processes from
  * opening the same store file simultaneously.  Each broker node must therefore use its

@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
  * to all other cluster nodes so they can update their client-to-node mappings.
  * </p>
  *
- * <h3>V3 session takeover (P2.1)</h3>
+ * <h2>V3 session takeover (P2.1)</h2>
  * <p>
  * When a client connects and another node is recorded as its previous owner in
  * {@link ClusterMqttSessionManager#getClientNodeMap()}, this listener triggers
@@ -60,6 +60,9 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 	/**
 	 * Wires the session manager so the listener can detect previous-owner
 	 * connections and trigger session takeover (P2.1).
+	 *
+	 * @param sessionManager the cluster session manager used to look up the
+	 *                       previous owner of a clientId
 	 */
 	public void setSessionManager(ClusterMqttSessionManager sessionManager) {
 		this.sessionManager = sessionManager;

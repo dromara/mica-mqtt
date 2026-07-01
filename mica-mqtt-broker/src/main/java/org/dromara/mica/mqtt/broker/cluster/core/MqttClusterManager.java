@@ -103,6 +103,8 @@ public class MqttClusterManager {
 	/**
 	 * Returns the V3 persistence coordinator, or {@code null} when storage is
 	 * disabled.
+	 *
+	 * @return the storage coordinator, or {@code null} when storage is disabled
 	 */
 	public ClusterStorage getClusterStorage() {
 		return clusterStorage;
@@ -703,6 +705,8 @@ public class MqttClusterManager {
 	 * Returns the live metrics instance.  Callers may read counters directly
 	 * via the {@code get*} accessors, or call {@link ClusterMetrics#snapshot()}
 	 * to get a map for export.
+	 *
+	 * @return the shared {@link ClusterMetrics} instance for this manager
 	 */
 	public ClusterMetrics getMetrics() {
 		return metrics;

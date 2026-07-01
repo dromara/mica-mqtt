@@ -32,11 +32,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * </p>
  * <p>
  * Usage in components:
- * <pre>{@code
+ * </p>
+ * <pre>
  * ClusterMetrics metrics = clusterManager.getMetrics();
  * metrics.sharedDispatchSentInc();   // called every time a SHARED_DISPATCH_TO_CLIENT is sent
- * }</pre>
- * </p>
+ * </pre>
  *
  * @author L.cm
  * @since 2.6.0
