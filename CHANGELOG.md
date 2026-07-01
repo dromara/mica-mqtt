@@ -4,7 +4,7 @@
 
 ### v2.6.7 - 2026-07-01
 - 🐛 mqtt-server 优化客户端互踢时的会话清理逻辑，感谢 `@十年` 反馈。
-- ⬆️ mica-net 升级到 2.0.7，修复重连后 TcpSendRunnable.writing 未复位，可能导致 MQTT CONNECT 无法发送的问题 (gitee #IJVOZ7)，感谢 `@weibin268` 反馈。
+- ⬆️ mica-net 升级到 2.0.8，修复重连后 TcpSendRunnable.writing 未复位，可能导致 MQTT CONNECT 无法发送的问题 (gitee #IJVOZ7)，感谢 `@weibin268` 反馈。
 
 ### v2.6.6 - 2026-06-13
 - ⬆️ mica-net 升级到 2.0.5 正式版，修复 🐛 SSL + ProxyProtocol 代理协议时编解码异常。gitee #IJT44K 感谢 `@zjwon` 反馈。
