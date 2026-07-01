@@ -3,7 +3,7 @@
 ## 发行版本
 
 ### v2.6.7 - 2026-07-01
-- fix(mqtt-server): 优化客户端互踢时的会话清理逻辑，感谢 `@十年` 反馈。
+- 🐛 mqtt-server 优化客户端互踢时的会话清理逻辑，感谢 `@十年` 反馈。
 - ⬆️ mica-net 升级到 2.0.7，修复重连后 TcpSendRunnable.writing 未复位，可能导致 MQTT CONNECT 无法发送的问题 (gitee #IJVOZ7)，感谢 `@weibin268` 反馈。
 
 ### v2.6.6 - 2026-06-13
