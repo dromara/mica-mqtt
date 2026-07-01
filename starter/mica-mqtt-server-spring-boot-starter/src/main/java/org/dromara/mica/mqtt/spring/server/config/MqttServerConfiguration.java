@@ -47,6 +47,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.tio.core.Node;
+import org.tio.http.mcp.server.McpServer;
 
 /**
  * mqtt server 配置
@@ -137,15 +138,17 @@ public class MqttServerConfiguration {
 		if (httpListener.isEnable()) {
 			Node serverNode = httpListener.getServerNode();
 			MqttServerProperties.HttpBasicAuth basicAuth = httpListener.getBasicAuth();
-			MqttServerProperties.McpServer mcpServer = httpListener.getMcpServer();
+			MqttServerProperties.McpServer mcp = httpListener.getMcpServer();
 			MqttServerProperties.HttpSsl ssl = httpListener.getSsl();
 			serverCreator.enableMqttHttpApi(builder -> {
 				builder.serverNode(serverNode);
 				if (basicAuth.isEnable()) {
 					builder.basicAuth(basicAuth.getUsername(), basicAuth.getPassword());
 				}
-				if (mcpServer.isEnable()) {
-					builder.mcpServer(mcpServer.getSseEndpoint(), mcpServer.getMessageEndpoint());
+				if (mcp.isEnable()) {
+					McpServer mcpServer = new McpServer();
+					mcpServer.useStreamableTransport(mcp.getEndpoint());
+					mcpServer.useSseTransport(mcp.getSseEndpoint(), mcp.getSseMessageEndpoint());
 				}
 				if (ssl.isEnable()) {
 					builder.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());

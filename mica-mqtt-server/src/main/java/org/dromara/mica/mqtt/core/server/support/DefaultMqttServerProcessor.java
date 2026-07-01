@@ -127,10 +127,13 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 		// 4. 判断 uniqueId 是否在多个地方使用，如果在其他地方有使用，先解绑
 		ChannelContext otherContext = Tio.getByBsId(context.getTioConfig(), uniqueId);
 		if (otherContext != null) {
+			// 解绑 clientId
 			Tio.unbindBsId(otherContext);
-			String remark = String.format("uniqueId:[%s] clientId:[%s] 被踢出，请检查是否有相同 clientId 互踢，新 contextId:[%s]", uniqueId, clientId, context.getId());
-			Tio.remove(otherContext, remark);
+			// 清除 session
 			cleanSession(uniqueId);
+			// 提出连接
+			String remark = String.format("uniqueId:[%s] clientId:[%s] 被踢出，请检查是否有相同 clientId 互踢，新 contextId:[%s]", uniqueId, clientId, context.getId());
+			Tio.remove(otherContext, remark, ChannelContext.CloseCode.KICK_EACH_OTHER);
 		}
 		// 4.5 广播上线消息，避免一个 uniqueId 多个集群服务器中连接。
 		sendConnected(context, uniqueId);

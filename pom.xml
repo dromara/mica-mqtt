@@ -13,14 +13,14 @@
 
     <properties>
         <!-- mica-mqtt version -->
-        <revision>2.5.13-SNAPSHOT</revision>
+        <revision>2.5.13</revision>
         <!-- java version -->
         <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven-jar-plugin.version>3.5.0</maven-jar-plugin.version>
         <maven-flatten.version>1.7.3</maven-flatten.version>
         <!-- mica-net version -->
-        <mica-net.version>1.2.8</mica-net.version>
+        <mica-net.version>1.3.6</mica-net.version>
         <mica-auto.version>2.3.5</mica-auto.version>
         <spring.boot.version>2.7.18</spring.boot.version>
         <solon.version>3.8.3</solon.version>
@@ -286,6 +286,8 @@
                     <configuration>
                         <publishingServerId>central</publishingServerId>
                         <autoPublish>true</autoPublish>
+                        <!-- 只生成 md5 + sha1，砍掉 sha256/sha512，减少文件数 -->
+                        <checksums>required</checksums>
                     </configuration>
                 </plugin>
             </plugins>

@@ -37,8 +37,8 @@ import org.tio.http.common.HttpConst;
 import org.tio.http.common.HttpRequest;
 import org.tio.http.common.HttpResponse;
 import org.tio.http.common.Method;
-import org.tio.http.mcp.server.McpServerSession;
-import org.tio.http.sse.SseEmitter;
+import org.tio.http.common.stream.HttpStream;
+import org.tio.http.common.stream.HttpStreamType;
 import org.tio.server.TioServerConfig;
 import org.tio.utils.hutool.StrUtil;
 import org.tio.utils.json.JsonUtil;
@@ -100,7 +100,7 @@ public class MqttHttpApi {
 		// sse 频率，默认 3s
 		int delay = request.getInt("delay", 3000);
 		HttpResponse response = new HttpResponse(request);
-		SseEmitter emitter = SseEmitter.getEmitter(request, response);
+		HttpStream emitter = response.startSse(request);
 		// 响应包发送后，再发送 sse 回包
 		response.setPacketListener((context, packet, isSentSuccess) -> {
 			if (isSentSuccess) {

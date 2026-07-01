@@ -164,17 +164,16 @@ public class MqttHttpApiListener implements IMqttProtocolListener {
 			return this.authFilter(new BasicAuthFilter(username, password));
 		}
 
+		public Builder mcpServer() {
+			McpServer mcpServer = new McpServer();
+			mcpServer.useStreamableTransport();
+			mcpServer.useSseTransport();
+			return mcpServer(mcpServer);
+		}
+
 		public Builder mcpServer(McpServer mcpServer) {
 			this.mcpServer = mcpServer;
 			return this;
-		}
-
-		public Builder mcpServer() {
-			return mcpServer(new McpServer());
-		}
-
-		public Builder mcpServer(String sseEndpoint, String messageEndpoint) {
-			return mcpServer(new McpServer(sseEndpoint, messageEndpoint));
 		}
 
 		public Builder sslConfig(SslConfig sslConfig) {
