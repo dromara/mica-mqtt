@@ -94,7 +94,7 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		if (isNotNormalDisconnect) {
 			sendWillMessage(clientId);
 		}
-		// 5. 会话清理，互踢不要清
+		// 5. 会话清理，互踢已清，不用再清（避免误删刚订阅的 topic）
 		ChannelContext.CloseCode closeCode = context.getCloseCode();
 		if (closeCode != ChannelContext.CloseCode.KICK_EACH_OTHER) {
 			cleanSession(clientId);

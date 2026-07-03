@@ -277,7 +277,7 @@ public class MqttServerPluginImpl implements Plugin {
 			serverCreator.enableMqttWs(builder -> builder.serverNode(wsListener.getServerNode()).build());
 		}
 		MqttServerProperties.SslListener wssListener = properties.getWssListener();
-		if (mqttSslListener.isEnable()) {
+		if (wssListener.isEnable()) {
 			MqttServerProperties.Ssl ssl = wssListener.getSsl();
 			serverCreator.enableMqttWss(sslBuilder -> sslBuilder
 				.serverNode(wssListener.getServerNode())
