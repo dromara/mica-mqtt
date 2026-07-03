@@ -34,10 +34,20 @@ public enum MqttUnSubAckReasonCode implements MqttReasonCode {
 	TOPIC_FILTER_INVALID((byte) 0x8F),
 	PACKET_IDENTIFIER_IN_USE((byte) 0x91);
 
+	private static final MqttUnSubAckReasonCode[] VALUES = new MqttUnSubAckReasonCode[0x92];
+
+	static {
+		ReasonCodeUtils.fillValuesByCode(VALUES, values());
+	}
+
 	private final byte byteValue;
 
 	MqttUnSubAckReasonCode(byte byteValue) {
 		this.byteValue = byteValue;
+	}
+
+	public static MqttUnSubAckReasonCode valueOf(byte b) {
+		return ReasonCodeUtils.codeLoopUp(VALUES, b, "UNSUBACK");
 	}
 
 	@Override

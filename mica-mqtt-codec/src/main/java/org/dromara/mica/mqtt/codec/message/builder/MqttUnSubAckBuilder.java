@@ -60,7 +60,7 @@ public final class MqttUnSubAckBuilder {
 	}
 
 	public MqttUnSubAckBuilder addReasonCode(short reasonCode) {
-		this.reasonCodes.add(MqttUnSubAckReasonCode.values()[reasonCode]);
+		this.reasonCodes.add(MqttUnSubAckReasonCode.valueOf((byte) reasonCode));
 		return this;
 	}
 
@@ -71,7 +71,7 @@ public final class MqttUnSubAckBuilder {
 
 	public MqttUnSubAckBuilder addReasonCodes(Short... reasonCodes) {
 		for (Short reasonCode : reasonCodes) {
-			this.reasonCodes.add(MqttUnSubAckReasonCode.values()[reasonCode]);
+			this.reasonCodes.add(MqttUnSubAckReasonCode.valueOf((byte) reasonCode.shortValue()));
 		}
 		return this;
 	}
