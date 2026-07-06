@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.codec.properties;
 
+import java.util.Objects;
+
 /**
  * MQTT property base class
  *
@@ -50,7 +52,7 @@ public abstract class MqttProperty<T> {
 
 	@Override
 	public int hashCode() {
-		return propertyId + 31 * value.hashCode();
+		return propertyId + 31 * Objects.hashCode(value);
 	}
 
 	@Override
@@ -61,7 +63,7 @@ public abstract class MqttProperty<T> {
 		if (obj == null || getClass() != obj.getClass()) {
 			return false;
 		}
-		MqttProperty that = (MqttProperty) obj;
-		return this.propertyId == that.propertyId && this.value.equals(that.value);
+		MqttProperty<?> that = (MqttProperty<?>) obj;
+		return this.propertyId == that.propertyId && Objects.equals(this.value, that.value);
 	}
 }
