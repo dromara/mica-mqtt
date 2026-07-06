@@ -1,6 +1,6 @@
-# mica-mqtt-broker 集群设计文档索引
+# mica-mqtt 待办文档索引
 
-> mica-mqtt-broker 集群化设计的完整文档体系。从基础到进阶共 5 个文档，按依赖顺序阅读。
+> mica-mqtt 演进方向与待办事项的完整文档体系。集群化与 MQTT 5.0 兼容性两大主题，按依赖顺序阅读。
 
 ---
 
@@ -13,7 +13,8 @@ docs/todo/
 ├── mqtt-server-cluster-routing.md     # [2] 路由 (v1.2): V2 dispatcher + 共享订阅
 ├── mqtt-server-cluster-storage.md     # [3] 存储 (v1.2): V3 H2 MVStore 持久化层
 ├── mqtt-server-cluster-tasks.md       # [4] 任务清单 (v1.1): V2/V3 实施分解
-└── mqtt-server-cluster-monitoring.md  # [5] 监控: 指标、告警、运维手册
+├── mqtt-server-cluster-monitoring.md  # [5] 监控: 指标、告警、运维手册
+└── mqtt5-features.md                  # [6] MQTT 5.0 特性梳理与待实现清单 (v1.0)
 ```
 
 ## 阅读顺序
@@ -27,16 +28,17 @@ docs/todo/
 | 3 | `mqtt-server-cluster-storage.md` | 30 min | 节点宕机后状态怎么恢复 |
 | 4 | `mqtt-server-cluster-tasks.md` | 20 min | 怎么把 V2/V3 排进迭代 |
 | 5 | `mqtt-server-cluster-monitoring.md` | 15 min | 指标采集、Prometheus 告警、运维 Runbook |
+| 6 | `mqtt5-features.md` | 20 min | MQTT 5.0 协议特性梳理、哪些已实现、哪些待办、优先级与工作量 |
 
 ### 按角色阅读
 
 | 角色 | 重点文档 |
 |---|---|
-| **架构师** | 全读，重点 §1 §2 §3 |
-| **后端开发** | cluster §3, routing §3, storage §3-§4, tasks §2-§6 |
+| **架构师** | 全读，重点 cluster §1 §2 §3、routing §3、storage §3-§4、mqtt5 §4 §6 |
+| **后端开发** | cluster §3, routing §3, storage §3-§4, tasks §2-§6, mqtt5 §5 §6 |
 | **运维** | cluster §5, storage §6 §8, tasks §6, monitoring 全文 |
-| **测试** | cluster §6, routing §7, storage §7, tasks §3-§5 |
-| **PM / TL** | tasks 全文 |
+| **测试** | cluster §6, routing §7, storage §7, tasks §3-§5, mqtt5 §7 §8 |
+| **PM / TL** | tasks 全文、mqtt5 §5 |
 
 ---
 
@@ -79,6 +81,9 @@ mqtt-server-cluster-routing.md  mqtt-server-cluster-storage.md
 | 用什么存储引擎？ | `mqtt-server-cluster-storage.md` §1.3, §1.3.1 |
 | 怎么排期做 V2/V3？ | `mqtt-server-cluster-tasks.md` §1, §7 |
 | 怎么回滚？ | `mqtt-server-cluster-tasks.md` §6.3 (灰度发布) |
+| MQTT 5.0 哪些特性已实现？ | `mqtt5-features.md` §3 |
+| MQTT 5.0 哪些待实现？优先级如何？ | `mqtt5-features.md` §4 §5 |
+| 怎么补齐 Reason Code / Receive Maximum / AUTH？ | `mqtt5-features.md` §6 |
 
 ---
 
@@ -145,7 +150,8 @@ MVP 路径（1 人 / 2 周）：tasks §9
 | `mqtt-server-cluster-storage.md` | v1.2 | V3 部分实现 | 2026-06-22 |
 | `mqtt-server-cluster-tasks.md` | v1.1 | 执行中 | 2026-06-22 |
 | `mqtt-server-cluster-monitoring.md` | v1.0 | 补充文档 | 2026-06-05 |
-| `README.md` | v1.2 | 索引 | 2026-06-22 |
+| `mqtt5-features.md` | v1.0 | 初稿 | 2026-07-06 |
+| `README.md` | v1.3 | 索引（新增 MQTT 5.0 文档） | 2026-07-06 |
 
 ---
 
@@ -155,4 +161,5 @@ MVP 路径（1 人 / 2 周）：tasks §9
 - 建议新的策略实现: 参考 `mqtt-server-cluster-routing.md` §3.4 的接口
 - 部署问题: 参考各文档的"注意事项"小节
 - 排期问题: 参考 `mqtt-server-cluster-tasks.md` §7, §8
+- MQTT 5.0 协议兼容问题: 参考 `mqtt5-features.md` §7 §8
 
