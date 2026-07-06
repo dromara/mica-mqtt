@@ -18,7 +18,7 @@ package org.dromara.mica.mqtt.core.server;
 
 import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
-import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
 
 /**
  * mqtt broker 处理器
@@ -31,18 +31,17 @@ public interface MqttServerProcessor {
 	 * 处理链接
 	 *
 	 * @param context ChannelContext
-	 * @param message MqttConnectMessage
+	 * @param message MqttMessage（消息类型必须为 CONNECT）
 	 */
-	void processConnect(ChannelContext context, MqttConnectMessage message);
+	void processConnect(ChannelContext context, MqttMessage message);
 
 	/**
 	 * 消息分发
 	 *
 	 * @param type    MqttMessageType
 	 * @param context ChannelContext
-	 * @param message message
-	 * @param <M>     泛型
+	 * @param message 解码器产出的 MqttMessage
 	 */
-	<M> void processDispatch(MqttMessageType type, ChannelContext context, M message);
+	void processDispatch(MqttMessageType type, ChannelContext context, MqttMessage message);
 
 }

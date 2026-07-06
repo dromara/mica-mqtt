@@ -47,7 +47,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @author L.cm
  */
-public class MqttPublishHandler extends AbstractMqttMessageHandler implements IMqttMessageHandler<MqttPublishMessage> {
+public class MqttPublishHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttPublishHandler.class);
 
 	private final IMqttServerPublishPermission publishPermission;
@@ -69,7 +69,8 @@ public class MqttPublishHandler extends AbstractMqttMessageHandler implements IM
 	}
 
 	@Override
-	public void handle(ChannelContext context, MqttPublishMessage message) {
+	public void handle(ChannelContext context, MqttMessage rawMessage) {
+		MqttPublishMessage message = (MqttPublishMessage) rawMessage;
 		String clientId = context.getBsId();
 		MqttFixedHeader fixedHeader = message.fixedHeader();
 		MqttQoS mqttQoS = fixedHeader.qosLevel();

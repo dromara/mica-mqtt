@@ -46,7 +46,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @author L.cm
  */
-public class MqttSubscribeHandler extends AbstractMqttMessageHandler implements IMqttMessageHandler<MqttSubscribeMessage> {
+public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttSubscribeHandler.class);
 
 	private final IMqttServerSubscribeValidator subscribeValidator;
@@ -70,7 +70,8 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler implements 
 	}
 
 	@Override
-	public void handle(ChannelContext context, MqttSubscribeMessage message) {
+	public void handle(ChannelContext context, MqttMessage rawMessage) {
+		MqttSubscribeMessage message = (MqttSubscribeMessage) rawMessage;
 		String clientId = context.getBsId();
 		int packetId = message.variableHeader().messageId();
 		List<MqttTopicSubscription> topicSubscriptionList = message.payload().topicSubscriptions();

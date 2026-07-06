@@ -20,6 +20,7 @@ import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +32,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @author L.cm
  */
-public class MqttDisConnectHandler extends AbstractMqttMessageHandler implements IMqttMessageHandler<Void> {
+public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttDisConnectHandler.class);
 
 	public MqttDisConnectHandler(MqttServerCreator serverCreator,
@@ -46,7 +47,7 @@ public class MqttDisConnectHandler extends AbstractMqttMessageHandler implements
 	}
 
 	@Override
-	public void handle(ChannelContext context, Void message) {
+	public void handle(ChannelContext context, MqttMessage message) {
 		String clientId = context.getBsId();
 		logger.info("DisConnect - clientId:{} contextId:{}", clientId, context.getId());
 		context.setBizStatus(true);

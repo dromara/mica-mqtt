@@ -37,7 +37,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @author L.cm
  */
-public class MqttUnSubscribeHandler extends AbstractMqttMessageHandler implements IMqttMessageHandler<MqttUnSubscribeMessage> {
+public class MqttUnSubscribeHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttUnSubscribeHandler.class);
 
 	private final IMqttSessionManager sessionManager;
@@ -57,7 +57,8 @@ public class MqttUnSubscribeHandler extends AbstractMqttMessageHandler implement
 	}
 
 	@Override
-	public void handle(ChannelContext context, MqttUnSubscribeMessage message) {
+	public void handle(ChannelContext context, MqttMessage rawMessage) {
+		MqttUnSubscribeMessage message = (MqttUnSubscribeMessage) rawMessage;
 		String clientId = context.getBsId();
 		int packetId = message.variableHeader().messageId();
 		List<String> topicFilterList = message.payload().topics();

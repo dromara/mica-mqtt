@@ -32,7 +32,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @author L.cm
  */
-public class MqttPingReqHandler extends AbstractMqttMessageHandler implements IMqttMessageHandler<Void> {
+public class MqttPingReqHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttPingReqHandler.class);
 
 	public MqttPingReqHandler(MqttServerCreator serverCreator,
@@ -47,7 +47,7 @@ public class MqttPingReqHandler extends AbstractMqttMessageHandler implements IM
 	}
 
 	@Override
-	public void handle(ChannelContext context, Void message) {
+	public void handle(ChannelContext context, MqttMessage message) {
 		String clientId = context.getBsId();
 		boolean result = Tio.send(context, MqttMessage.PINGRESP);
 		logger.debug("PingReq - PingResp send clientId:{} result:{}", clientId, result);

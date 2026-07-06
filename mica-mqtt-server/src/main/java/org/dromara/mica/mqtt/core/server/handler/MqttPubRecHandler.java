@@ -37,7 +37,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @author L.cm
  */
-public class MqttPubRecHandler extends AbstractMqttMessageHandler implements IMqttMessageHandler<MqttMessageIdVariableHeader> {
+public class MqttPubRecHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttPubRecHandler.class);
 
 	private final IMqttSessionManager sessionManager;
@@ -55,7 +55,8 @@ public class MqttPubRecHandler extends AbstractMqttMessageHandler implements IMq
 	}
 
 	@Override
-	public void handle(ChannelContext context, MqttMessageIdVariableHeader variableHeader) {
+	public void handle(ChannelContext context, MqttMessage rawMessage) {
+		MqttMessageIdVariableHeader variableHeader = (MqttMessageIdVariableHeader) rawMessage.variableHeader();
 		String clientId = context.getBsId();
 		int packetId = variableHeader.messageId();
 		logger.debug("PubRec - clientId:{}, packetId:{}", clientId, packetId);

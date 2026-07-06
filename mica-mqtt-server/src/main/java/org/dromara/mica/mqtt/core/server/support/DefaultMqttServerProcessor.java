@@ -20,10 +20,7 @@ import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
-import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
-import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
-import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
-import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.MqttServerProcessor;
 import org.dromara.mica.mqtt.core.server.handler.IMqttMessageHandler;
@@ -48,12 +45,16 @@ import java.util.concurrent.ExecutorService;
  * mqtt server 默认消息处理器（外观层）：按 {@link MqttMessageType}
  * 进行路由分发，真正的业务实现已下沉到 {@code handler} 目录下
  * 各个 {@link IMqttMessageHandler} 中。
+ * <p>
+ * 外观层只做"按类型找 handler、把 MqttMessage 转给 handler"，不做任何
+ * 不安全强转。handler 内部按需做 {@code instanceof} 拆箱成具体的
+ * {@code MqttConnectMessage} / {@code MqttPublishMessage} 等。
  *
  * @author L.cm
  */
 public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	private static final Logger logger = LoggerFactory.getLogger(DefaultMqttServerProcessor.class);
-	private final Map<MqttMessageType, IMqttMessageHandler<?>> handlers = new EnumMap<>(MqttMessageType.class);
+	private final Map<MqttMessageType, IMqttMessageHandler> handlers = new EnumMap<>(MqttMessageType.class);
 
 	public DefaultMqttServerProcessor(MqttServerCreator serverCreator,
 									  TimerTaskService taskService,
@@ -77,13 +78,13 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	 * @param handler IMqttMessageHandler
 	 * @return DefaultMqttServerProcessor
 	 */
-	public DefaultMqttServerProcessor register(IMqttMessageHandler<?> handler) {
+	public DefaultMqttServerProcessor register(IMqttMessageHandler handler) {
 		MqttMessageType[] types = handler.messageTypes();
 		if (types == null || types.length == 0) {
 			throw new IllegalArgumentException("handler " + handler.getClass().getName() + " must declare at least one MqttMessageType");
 		}
 		for (MqttMessageType type : types) {
-			IMqttMessageHandler<?> old = handlers.put(type, handler);
+			IMqttMessageHandler old = handlers.put(type, handler);
 			if (old != null && old != handler) {
 				logger.warn("DefaultMqttServerProcessor replace handler for {}: {} -> {}",
 					type, old.getClass().getName(), handler.getClass().getName());
@@ -93,12 +94,17 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	}
 
 	@Override
-	public void processConnect(ChannelContext context, MqttConnectMessage message) {
+	public void processConnect(ChannelContext context, MqttMessage message) {
+		if (!(message instanceof MqttConnectMessage)) {
+			logger.error("Mqtt CONNECT expected MqttConnectMessage, got {} contextId:{}",
+				message == null ? "null" : message.getClass().getName(), context.getId());
+			return;
+		}
 		processDispatch(MqttMessageType.CONNECT, context, message);
 	}
 
-	@SuppressWarnings({"unchecked", "rawtypes"})
-	public <M> void processDispatch(MqttMessageType type, ChannelContext context, M message) {
+	@Override
+	public void processDispatch(MqttMessageType type, ChannelContext context, MqttMessage message) {
 		IMqttMessageHandler handler = handlers.get(type);
 		if (handler == null) {
 			logger.warn("Mqtt server no handler registered for {} contextId: {}", type, context.getId());

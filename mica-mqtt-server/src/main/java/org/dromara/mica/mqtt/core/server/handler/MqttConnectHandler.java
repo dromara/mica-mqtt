@@ -26,6 +26,7 @@ import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.MqttConnAckMessage;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
@@ -47,7 +48,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @author L.cm
  */
-public class MqttConnectHandler extends AbstractMqttMessageHandler implements IMqttMessageHandler<MqttConnectMessage> {
+public class MqttConnectHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttConnectHandler.class);
 	/**
 	 * 2 倍客户端 keepAlive 时间
@@ -83,7 +84,8 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler implements IM
 	}
 
 	@Override
-	public void handle(ChannelContext context, MqttConnectMessage mqttMessage) {
+	public void handle(ChannelContext context, MqttMessage rawMessage) {
+		MqttConnectMessage mqttMessage = (MqttConnectMessage) rawMessage;
 		MqttConnectPayload payload = mqttMessage.payload();
 		String clientId = payload.clientIdentifier();
 		String userName = payload.username();

@@ -22,16 +22,12 @@ import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import java.util.concurrent.ExecutorService;
 
 /**
- * handler 可选基类，集中最常被引用的 3 个依赖：
- * MqttServerCreator、ExecutorService、TimerTaskService。
- * <p>
- * 基类本身不实现 {@link IMqttMessageHandler}，由具体子类同时
- * 指定消息类型（{@code IMqttMessageHandler<MqttXxxMessage>}），
- * 这样可以让 {@code handle(ChannelContext, MqttXxxMessage)} 互不冲突。
+ * mqtt server 消息处理器抽象基类，提供 serverCreator / executor / taskService
+ * 等通用依赖注入。子类按 mqtt 消息类型拆解业务逻辑。
  *
  * @author L.cm
  */
-public abstract class AbstractMqttMessageHandler {
+public abstract class AbstractMqttMessageHandler implements IMqttMessageHandler {
 	protected final MqttServerCreator serverCreator;
 	protected final ExecutorService executor;
 	protected final TimerTaskService taskService;

@@ -39,7 +39,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @author L.cm
  */
-public class MqttPubRelHandler extends AbstractMqttMessageHandler implements IMqttMessageHandler<MqttMessageIdVariableHeader> {
+public class MqttPubRelHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttPubRelHandler.class);
 
 	private final IMqttSessionManager sessionManager;
@@ -60,7 +60,8 @@ public class MqttPubRelHandler extends AbstractMqttMessageHandler implements IMq
 	}
 
 	@Override
-	public void handle(ChannelContext context, MqttMessageIdVariableHeader variableHeader) {
+	public void handle(ChannelContext context, MqttMessage rawMessage) {
+		MqttMessageIdVariableHeader variableHeader = (MqttMessageIdVariableHeader) rawMessage.variableHeader();
 		String clientId = context.getBsId();
 		int packetId = variableHeader.messageId();
 		logger.debug("PubRel - clientId:{}, packetId:{}", clientId, packetId);
@@ -74,7 +75,6 @@ public class MqttPubRelHandler extends AbstractMqttMessageHandler implements IMq
 		MqttMessage message = MqttMessageFactory.newMessage(
 			new MqttFixedHeader(MqttMessageType.PUBCOMP, false, MqttQoS.QOS0, false, 0),
 			MqttMessageIdVariableHeader.from(packetId), null);
-
 		boolean result = Tio.send(context, message);
 		logger.debug("Publish - PubComp send clientId:{} packetId:{} result:{}", clientId, packetId, result);
 	}

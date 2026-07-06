@@ -19,6 +19,7 @@ package org.dromara.mica.mqtt.core.server.handler;
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
@@ -33,7 +34,7 @@ import java.util.concurrent.ExecutorService;
  *
  * @author L.cm
  */
-public class MqttPubCompHandler extends AbstractMqttMessageHandler implements IMqttMessageHandler<MqttMessageIdVariableHeader> {
+public class MqttPubCompHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttPubCompHandler.class);
 
 	private final IMqttSessionManager sessionManager;
@@ -51,8 +52,8 @@ public class MqttPubCompHandler extends AbstractMqttMessageHandler implements IM
 	}
 
 	@Override
-	public void handle(ChannelContext context, MqttMessageIdVariableHeader variableHeader) {
-		int packetId = variableHeader.messageId();
+	public void handle(ChannelContext context, MqttMessage rawMessage) {
+		int packetId = ((MqttMessageIdVariableHeader) rawMessage.variableHeader()).messageId();
 		String clientId = context.getBsId();
 		logger.debug("PubComp - clientId:{}, packetId:{}", clientId, packetId);
 		MqttPendingPublish pendingPublish = sessionManager.getPendingPublish(clientId, packetId);

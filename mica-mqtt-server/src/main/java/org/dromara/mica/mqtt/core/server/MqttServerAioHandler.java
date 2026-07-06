@@ -30,9 +30,7 @@ import org.dromara.mica.mqtt.codec.exception.DecoderException;
 import org.dromara.mica.mqtt.codec.exception.MqttIdentifierRejectedException;
 import org.dromara.mica.mqtt.codec.exception.MqttUnacceptableProtocolVersionException;
 import org.dromara.mica.mqtt.codec.message.MqttConnAckMessage;
-import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
-import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,11 +95,10 @@ public class MqttServerAioHandler implements TioServerHandler {
 	public void handler(Packet packet, ChannelContext context) {
 		MqttMessage mqttMessage = (MqttMessage) packet;
 		log.debug("MqttMessage:{}", mqttMessage);
-		MqttFixedHeader fixedHeader = mqttMessage.fixedHeader();
-		MqttMessageType messageType = fixedHeader.messageType();
+		MqttMessageType messageType = mqttMessage.fixedHeader().messageType();
 		// 2. 单独处理 CONNECT 的消息
 		if (MqttMessageType.CONNECT == messageType) {
-			processor.processConnect(context, (MqttConnectMessage) mqttMessage);
+			processor.processConnect(context, mqttMessage);
 			return;
 		}
 		// 3. 判定是否认证成功
