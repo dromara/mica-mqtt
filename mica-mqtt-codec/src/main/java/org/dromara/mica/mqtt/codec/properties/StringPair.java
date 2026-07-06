@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.codec.properties;
 
+import java.util.Objects;
+
 public final class StringPair {
 	public final String key;
 	public final String value;
@@ -27,7 +29,7 @@ public final class StringPair {
 
 	@Override
 	public int hashCode() {
-		return key.hashCode() + 31 * value.hashCode();
+		return Objects.hash(key, value);
 	}
 
 	@Override
@@ -39,7 +41,6 @@ public final class StringPair {
 			return false;
 		}
 		StringPair that = (StringPair) obj;
-
-		return that.key.equals(this.key) && that.value.equals(this.value);
+		return Objects.equals(this.key, that.key) && Objects.equals(this.value, that.value);
 	}
 }
