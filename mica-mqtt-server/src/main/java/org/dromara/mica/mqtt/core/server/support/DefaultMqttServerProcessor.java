@@ -17,538 +17,93 @@
 package org.dromara.mica.mqtt.core.server.support;
 
 import net.dreamlu.mica.net.core.ChannelContext;
-import net.dreamlu.mica.net.core.Node;
-import net.dreamlu.mica.net.core.Tio;
-import net.dreamlu.mica.net.core.TioConfig;
-import net.dreamlu.mica.net.utils.hutool.StrUtil;
-import net.dreamlu.mica.net.utils.mica.IntPair;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
-import org.dromara.mica.mqtt.codec.MqttMessageFactory;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
-import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
-import org.dromara.mica.mqtt.codec.message.*;
-import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
-import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
+import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttPublishVariableHeader;
-import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
-import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
-import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
-import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.MqttServerProcessor;
-import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
-import org.dromara.mica.mqtt.core.server.auth.IMqttServerPublishPermission;
-import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
-import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
-import org.dromara.mica.mqtt.core.server.enums.MessageType;
-import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
-import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
-import org.dromara.mica.mqtt.core.server.model.Message;
-import org.dromara.mica.mqtt.core.server.pipeline.IMqttPublishPipeline;
-import org.dromara.mica.mqtt.core.server.pipeline.PublishContext;
-import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
-import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
-import org.dromara.mica.mqtt.core.util.TopicUtil;
+import org.dromara.mica.mqtt.core.server.handler.IMqttMessageHandler;
+import org.dromara.mica.mqtt.core.server.handler.MqttConnectHandler;
+import org.dromara.mica.mqtt.core.server.handler.MqttDisConnectHandler;
+import org.dromara.mica.mqtt.core.server.handler.MqttPingReqHandler;
+import org.dromara.mica.mqtt.core.server.handler.MqttPubAckHandler;
+import org.dromara.mica.mqtt.core.server.handler.MqttPubCompHandler;
+import org.dromara.mica.mqtt.core.server.handler.MqttPubRecHandler;
+import org.dromara.mica.mqtt.core.server.handler.MqttPubRelHandler;
+import org.dromara.mica.mqtt.core.server.handler.MqttPublishHandler;
+import org.dromara.mica.mqtt.core.server.handler.MqttSubscribeHandler;
+import org.dromara.mica.mqtt.core.server.handler.MqttUnSubscribeHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
 /**
- * mqtt broker 处理器
+ * mqtt server 默认消息处理器（外观层）：按 {@link MqttMessageType}
+ * 进行路由分发，真正的业务实现已下沉到 {@code handler} 目录下
+ * 各个 {@link IMqttMessageHandler} 中。
  *
  * @author L.cm
  */
 public class DefaultMqttServerProcessor implements MqttServerProcessor {
 	private static final Logger logger = LoggerFactory.getLogger(DefaultMqttServerProcessor.class);
-	/**
-	 * 2 倍客户端 keepAlive 时间
-	 */
-	private static final long KEEP_ALIVE_UNIT = 2000L;
-	private final MqttServerCreator serverCreator;
-	private final long heartbeatTimeout;
-	private final IMqttMessageStore messageStore;
-	private final IMqttSessionManager sessionManager;
-	private final IMqttServerAuthHandler authHandler;
-	private final IMqttServerUniqueIdService uniqueIdService;
-	private final IMqttServerSubscribeValidator subscribeValidator;
-	private final IMqttServerPublishPermission publishPermission;
-	private final IMqttConnectStatusListener connectStatusListener;
-	private final IMqttSessionListener sessionListener;
-	private final TimerTaskService taskService;
-	private final ExecutorService executor;
-	private final IMqttPublishPipeline publishPipeline;
+	private final Map<MqttMessageType, IMqttMessageHandler<?>> handlers = new EnumMap<>(MqttMessageType.class);
 
 	public DefaultMqttServerProcessor(MqttServerCreator serverCreator,
 									  TimerTaskService taskService,
 									  ExecutorService executor) {
-		this.serverCreator = serverCreator;
-		this.heartbeatTimeout = serverCreator.getHeartbeatTimeout() == null ? TioConfig.DEFAULT_HEARTBEAT_TIMEOUT : serverCreator.getHeartbeatTimeout();
-		this.messageStore = serverCreator.getMessageStore();
-		this.sessionManager = serverCreator.getSessionManager();
-		this.authHandler = serverCreator.getAuthHandler();
-		this.uniqueIdService = serverCreator.getUniqueIdService();
-		this.subscribeValidator = serverCreator.getSubscribeValidator();
-		this.publishPermission = serverCreator.getPublishPermission();
-		this.connectStatusListener = serverCreator.getConnectStatusListener();
-		this.sessionListener = serverCreator.getSessionListener();
-		this.taskService = taskService;
-		this.executor = executor;
-		// 初始化发布消息管线
-		this.publishPipeline = serverCreator.getPublishPipeline();
-	}
-
-	@Override
-	public void processConnect(ChannelContext context, MqttConnectMessage mqttMessage) {
-		MqttConnectPayload payload = mqttMessage.payload();
-		// 参数
-		String clientId = payload.clientIdentifier();
-		String userName = payload.username();
-		String password = payload.password();
-		// 1. 获取唯一id，用于 mqtt 内部绑定，部分用户的业务采用 userName 作为唯一id，故抽象之，默认：uniqueId == clientId
-		String uniqueId = uniqueIdService.getUniqueId(context, clientId, userName, password);
-		// 2. 客户端必须提供 uniqueId, 不管 cleanSession 是否为1, 此处没有参考标准协议实现
-		if (StrUtil.isBlank(uniqueId)) {
-			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_IDENTIFIER_REJECTED);
-			return;
-		}
-		// 3. 认证
-		if (authHandler != null && !authHandler.verifyAuthenticate(context, uniqueId, clientId, userName, password)) {
-			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
-			return;
-		}
-		// 认证成功
-		context.setAccepted(true);
-		// 4. 判断 uniqueId 是否在多个地方使用，如果在其他地方有使用，先解绑
-		ChannelContext otherContext = Tio.getByBsId(context.getTioConfig(), uniqueId);
-		if (otherContext != null) {
-			// 解绑 clientId
-			Tio.unbindBsId(otherContext);
-			// 清除 session
-			cleanSession(uniqueId);
-			// 提出连接
-			String remark = String.format("uniqueId:[%s] clientId:[%s] 被踢出，请检查是否有相同 clientId 互踢，新 contextId:[%s]", uniqueId, clientId, context.getId());
-			Tio.remove(otherContext, remark, ChannelContext.CloseCode.KICK_EACH_OTHER);
-		}
-		// 4.5 广播上线消息，避免一个 uniqueId 多个集群服务器中连接。
-		sendConnected(context, uniqueId);
-		// 5. 绑定 uniqueId、保存 username
-		Tio.bindBsId(context, uniqueId);
-		if (StrUtil.isNotBlank(userName)) {
-			Tio.bindUser(context, userName);
-		}
-		// 6. 心跳超时时间，当然这个值如果小于全局配置（默认：120s），定时检查的时间间隔还是以全局为准，只是在判断时用此值
-		MqttConnectVariableHeader variableHeader = mqttMessage.variableHeader();
-		int keepAliveSeconds = variableHeader.keepAliveTimeSeconds();
-		// keepAlive * keepAliveBackoff * 2 时间作为服务端心跳超时时间，如果配置同全局默认不设置，节约内存
-		long keepAliveTimeout = keepAliveSeconds * KEEP_ALIVE_UNIT;
-		if (keepAliveSeconds > 0 && heartbeatTimeout != keepAliveTimeout) {
-			context.setHeartbeatTimeout(keepAliveTimeout);
-		}
-		// 7. session 处理，先默认全部连接关闭时清除，mqtt5 为 CleanStart，
-		// 按照 mqtt 协议的规则是下一次连接时清除，emq 是添加了全局 session 超时，关闭时激活 session 有效期倒计时
-//		boolean cleanSession = variableHeader.isCleanSession();
-//		if (cleanSession) {
-//			// TODO L.cm 考虑 session 处理 可参数： https://www.emqx.com/zh/blog/mqtt-session
-//			// mqtt v5.0 会话超时时间
-//			MqttProperties properties = variableHeader.properties();
-//			Integer sessionExpiryInterval = properties.getPropertyValue(MqttProperties.MqttPropertyType.SESSION_EXPIRY_INTERVAL);
-//			System.out.println(sessionExpiryInterval);
-//		}
-		// 8. 存储遗嘱消息
-		boolean willFlag = variableHeader.isWillFlag();
-		if (willFlag) {
-			Message willMessage = new Message();
-			willMessage.setMessageType(MessageType.DOWN_STREAM);
-			willMessage.setFromClientId(uniqueId);
-			willMessage.setFromUsername(userName);
-			willMessage.setTopic(payload.willTopic());
-			byte[] willMessageInBytes = payload.willMessageInBytes();
-			if (willMessageInBytes != null) {
-				willMessage.setPayload(willMessageInBytes);
-			}
-			willMessage.setQos(variableHeader.willQos());
-			willMessage.setRetain(variableHeader.isWillRetain());
-			willMessage.setTimestamp(System.currentTimeMillis());
-			Node clientNode = context.getClientNode();
-			// 客户端 ip:端口
-			willMessage.setPeerHost(clientNode.getPeerHost());
-			willMessage.setNode(serverCreator.getNodeName());
-			messageStore.addWillMessage(uniqueId, willMessage);
-		}
-		// 9. 返回 ack
-		connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_ACCEPTED);
-		// 10. 在线状态
-		executor.execute(() -> {
-			try {
-				connectStatusListener.online(context, uniqueId, userName);
-			} catch (Throwable e) {
-				logger.error("Mqtt server uniqueId:{} clientId:{} online notify error.", uniqueId, clientId, e);
-			}
-		});
-	}
-
-	private static void connAckByReturnCode(String clientId, String uniqueId, ChannelContext context, MqttConnectReasonCode returnCode) {
-		MqttConnAckMessage message = MqttConnAckMessage.builder()
-			.returnCode(returnCode)
-			.sessionPresent(false)
-			.build();
-		boolean result = Tio.send(context, message);
-		if (returnCode.isAccepted()) {
-			logger.info("Connect successful, clientId: {} uniqueId:{} result:{}", clientId, uniqueId, result);
-		} else {
-			logger.error("Connect error - clientId: {} uniqueId:{} returnCode:{} result:{}", clientId, uniqueId, returnCode, result);
-		}
-	}
-
-	private void sendConnected(ChannelContext context, String uniqueId) {
-		Message message = new Message();
-		message.setClientId(uniqueId);
-		message.setMessageType(MessageType.CONNECT);
-		message.setNode(serverCreator.getNodeName());
-		message.setTimestamp(System.currentTimeMillis());
-		Node clientNode = context.getClientNode();
-		message.setPeerHost(clientNode.getPeerHost());
-		serverCreator.getMessagePipeline().handle(message);
-	}
-
-	private void cleanSession(String clientId) {
-		try {
-			sessionManager.remove(clientId);
-		} catch (Throwable throwable) {
-			logger.error("Mqtt server clientId:{} session clean error.", clientId, throwable);
-		}
-	}
-
-	@Override
-	public void processPublish(ChannelContext context, MqttPublishMessage message) {
-		String clientId = context.getBsId();
-		MqttFixedHeader fixedHeader = message.fixedHeader();
-		MqttQoS mqttQoS = fixedHeader.qosLevel();
-		MqttPublishVariableHeader variableHeader = message.variableHeader();
-		String topicName = variableHeader.topicName();
-		// 1. 权限判断，在 MQTT v3.1 和 v3.1.1 协议中，发布操作被拒绝后服务器无任何报文错误返回，这是协议设计的一个缺陷。但在 MQTT v5.0 协议上已经支持应答一个相应的错误报文。
-		if (publishPermission != null && !publishPermission.verifyPermission(context, clientId, topicName, mqttQoS, fixedHeader.isRetain())) {
-			logger.error("Mqtt clientId:{} username:{} topic:{} 没有发布权限。", clientId, context.getUserId(), topicName);
-			return;
-		}
-		// 2. 处理发布逻辑
-		int packetId = variableHeader.packetId();
-		logger.debug("Publish - clientId:{} topicName:{} mqttQoS:{} packetId:{}", clientId, topicName, mqttQoS, packetId);
-		switch (mqttQoS) {
-			case QOS0:
-				invokeListenerForPublish(context, clientId, mqttQoS, topicName, message);
-				break;
-			case QOS1:
-				invokeListenerForPublish(context, clientId, mqttQoS, topicName, message);
-				if (packetId != -1) {
-					MqttMessage messageAck = MqttPubAckMessage.builder()
-						.packetId(packetId)
-						.build();
-					boolean resultPubAck = Tio.send(context, messageAck);
-					logger.debug("Publish - PubAck send clientId:{} topicName:{} mqttQoS:{} packetId:{} result:{}", clientId, topicName, mqttQoS, packetId, resultPubAck);
-				}
-				break;
-			case QOS2:
-				if (packetId != -1) {
-					MqttFixedHeader pubRecFixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, MqttQoS.QOS0, false, 0);
-					MqttMessage pubRecMessage = new MqttMessage(pubRecFixedHeader, MqttMessageIdVariableHeader.from(packetId));
-					MqttPendingQos2Publish pendingQos2Publish = new MqttPendingQos2Publish(message, pubRecMessage);
-					// 添加重试
-					sessionManager.addPendingQos2Publish(clientId, packetId, pendingQos2Publish);
-					pendingQos2Publish.startPubRecRetransmitTimer(taskService, context);
-					// 发送消息
-					boolean resultPubRec = Tio.send(context, pubRecMessage);
-					logger.debug("Publish - PubRec send clientId:{} topicName:{} mqttQoS:{} packetId:{} result:{}", clientId, topicName, mqttQoS, packetId, resultPubRec);
-				}
-				break;
-			case FAILURE:
-			default:
-				break;
-		}
-	}
-
-	@Override
-	public void processPubAck(ChannelContext context, MqttMessageIdVariableHeader variableHeader) {
-		int packetId = variableHeader.messageId();
-		String clientId = context.getBsId();
-		logger.debug("PubAck - clientId:{}, packetId:{}", clientId, packetId);
-		MqttPendingPublish pendingPublish = sessionManager.getPendingPublish(clientId, packetId);
-		if (pendingPublish == null) {
-			return;
-		}
-		pendingPublish.onPubAckReceived();
-		sessionManager.removePendingPublish(clientId, packetId);
-	}
-
-	@Override
-	public void processPubRec(ChannelContext context, MqttMessageIdVariableHeader variableHeader) {
-		String clientId = context.getBsId();
-		int packetId = variableHeader.messageId();
-		logger.debug("PubRec - clientId:{}, packetId:{}", clientId, packetId);
-		MqttPendingPublish pendingPublish = sessionManager.getPendingPublish(clientId, packetId);
-		if (pendingPublish == null) {
-			return;
-		}
-		pendingPublish.onPubAckReceived();
-		MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBREL, false, MqttQoS.QOS1, false, 0);
-		MqttMessage pubRelMessage = new MqttMessage(fixedHeader, variableHeader);
-
-		pendingPublish.setPubRelMessage(pubRelMessage);
-		pendingPublish.startPubRelRetransmissionTimer(taskService, context);
-
-		boolean result = Tio.send(context, pubRelMessage);
-		logger.debug("Publish - PubRel send clientId:{} packetId:{} result:{}", clientId, packetId, result);
-	}
-
-	@Override
-	public void processPubRel(ChannelContext context, MqttMessageIdVariableHeader variableHeader) {
-		String clientId = context.getBsId();
-		int packetId = variableHeader.messageId();
-		logger.debug("PubRel - clientId:{}, packetId:{}", clientId, packetId);
-		MqttPendingQos2Publish pendingQos2Publish = sessionManager.getPendingQos2Publish(clientId, packetId);
-		if (pendingQos2Publish != null) {
-			MqttPublishMessage incomingPublish = pendingQos2Publish.getIncomingPublish();
-			String topicName = incomingPublish.variableHeader().topicName();
-			MqttFixedHeader incomingFixedHeader = incomingPublish.fixedHeader();
-			MqttQoS mqttQoS = incomingFixedHeader.qosLevel();
-			invokeListenerForPublish(context, clientId, mqttQoS, topicName, incomingPublish);
-			pendingQos2Publish.onPubRelReceived();
-			sessionManager.removePendingQos2Publish(clientId, packetId);
-		}
-		MqttMessage message = MqttMessageFactory.newMessage(
-			new MqttFixedHeader(MqttMessageType.PUBCOMP, false, MqttQoS.QOS0, false, 0),
-			MqttMessageIdVariableHeader.from(packetId), null);
-
-		boolean result = Tio.send(context, message);
-		logger.debug("Publish - PubComp send clientId:{} packetId:{} result:{}", clientId, packetId, result);
-	}
-
-	@Override
-	public void processPubComp(ChannelContext context, MqttMessageIdVariableHeader variableHeader) {
-		int packetId = variableHeader.messageId();
-		String clientId = context.getBsId();
-		logger.debug("PubComp - clientId:{}, packetId:{}", clientId, packetId);
-		MqttPendingPublish pendingPublish = sessionManager.getPendingPublish(clientId, packetId);
-		if (pendingPublish != null) {
-			pendingPublish.onPubCompReceived();
-			sessionManager.removePendingPublish(clientId, packetId);
-		}
-	}
-
-	@Override
-	public void processSubscribe(ChannelContext context, MqttSubscribeMessage message) {
-		String clientId = context.getBsId();
-		int packetId = message.variableHeader().messageId();
-		// 1. 校验订阅的 topicFilter
-		List<MqttTopicSubscription> topicSubscriptionList = message.payload().topicSubscriptions();
-		List<MqttQoS> grantedQosList = new ArrayList<>();
-		// 校验订阅
-		List<String> subscribedTopicList = new ArrayList<>();
-		boolean enableSubscribeValidator = subscribeValidator != null;
-		for (MqttTopicSubscription subscription : topicSubscriptionList) {
-			String topicFilter = subscription.topicFilter();
-			// 校验 topicFilter 是否合法
-			TopicUtil.validateTopicFilter(topicFilter);
-			MqttQoS mqttQoS = subscription.qualityOfService();
-			// 获取 MQTT 5.0 订阅选项中的 No Local 标志
-			boolean noLocal = subscription.option().isNoLocal();
-			// 校验是否可以订阅
-			if (enableSubscribeValidator && !subscribeValidator.verifyTopicFilter(context, clientId, topicFilter, mqttQoS)) {
-				grantedQosList.add(MqttQoS.FAILURE);
-				logger.error("Subscribe - clientId:{} username:{} topicFilter:{} mqttQoS:{} 没有订阅权限 packetId:{}", clientId, context.getUserId(), topicFilter, mqttQoS, packetId);
-			} else {
-				grantedQosList.add(mqttQoS);
-				subscribedTopicList.add(topicFilter);
-				sessionManager.addSubscribe(new TopicFilter(topicFilter), clientId, mqttQoS.value(), noLocal);
-				logger.info("Subscribe - clientId:{} topicFilter:{} mqttQoS:{} noLocal:{} packetId:{}", clientId, topicFilter, mqttQoS, noLocal, packetId);
-				publishSubscribedEvent(context, clientId, topicFilter, mqttQoS);
-			}
-		}
-		// 3. 返回 ack
-		MqttMessage subAckMessage = MqttSubAckMessage.builder()
-			.addGrantedQosList(grantedQosList)
-			.packetId(packetId)
-			.build();
-		boolean result = Tio.send(context, subAckMessage);
-		logger.info("Subscribe - SubAck send clientId:{} subscribedTopicList:{} packetId:{} result:{}", clientId, subscribedTopicList, packetId, result);
-		// 4. 发送保留消息
-		for (String topic : subscribedTopicList) {
-			executor.submit(() -> {
-				List<Message> retainMessageList = messageStore.getRetainMessage(topic);
-				if (retainMessageList != null && !retainMessageList.isEmpty()) {
-					for (Message retainMessage : retainMessageList) {
-						// 直接处理保留消息
-						MqttQoS mqttQoS = MqttQoS.valueOf(retainMessage.getQos());
-						// 创建发布消息
-						boolean isHighLevelQoS = MqttQoS.QOS1 == mqttQoS || MqttQoS.QOS2 == mqttQoS;
-						int messageId = isHighLevelQoS ? sessionManager.getPacketId(clientId) : -1;
-						MqttPublishMessage publishMessage = MqttPublishMessage.builder()
-							.topicName(retainMessage.getTopic())
-							.payload(retainMessage.getPayload())
-							.qos(mqttQoS)
-							.retained(true)
-							.messageId(messageId)
-							.properties(retainMessage.getProperties())
-							.build();
-						// 发送消息
-						Tio.send(context, publishMessage);
-					}
-				}
-			});
-		}
+		MqttPublishHandler publishHandler = new MqttPublishHandler(serverCreator, executor, taskService);
+		register(new MqttConnectHandler(serverCreator, executor, taskService))
+			.register(publishHandler)
+			.register(new MqttPubAckHandler(serverCreator, executor, taskService))
+			.register(new MqttPubRecHandler(serverCreator, executor, taskService))
+			.register(new MqttPubRelHandler(serverCreator, executor, taskService, publishHandler))
+			.register(new MqttPubCompHandler(serverCreator, executor, taskService))
+			.register(new MqttSubscribeHandler(serverCreator, executor, taskService))
+			.register(new MqttUnSubscribeHandler(serverCreator, executor, taskService))
+			.register(new MqttPingReqHandler(serverCreator, executor, taskService))
+			.register(new MqttDisConnectHandler(serverCreator, executor, taskService));
 	}
 
 	/**
-	 * 发送订阅事件
+	 * 注册一个 handler，按其声明的 messageTypes() 占用对应槽位。
 	 *
-	 * @param context     ChannelContext
-	 * @param clientId    clientId
-	 * @param topicFilter topicFilter
-	 * @param mqttQoS     MqttQoS
+	 * @param handler IMqttMessageHandler
+	 * @return DefaultMqttServerProcessor
 	 */
-	private void publishSubscribedEvent(ChannelContext context, String clientId, String topicFilter, MqttQoS mqttQoS) {
-		if (sessionListener == null) {
+	public DefaultMqttServerProcessor register(IMqttMessageHandler<?> handler) {
+		MqttMessageType[] types = handler.messageTypes();
+		if (types == null || types.length == 0) {
+			throw new IllegalArgumentException("handler " + handler.getClass().getName() + " must declare at least one MqttMessageType");
+		}
+		for (MqttMessageType type : types) {
+			IMqttMessageHandler<?> old = handlers.put(type, handler);
+			if (old != null && old != handler) {
+				logger.warn("DefaultMqttServerProcessor replace handler for {}: {} -> {}",
+					type, old.getClass().getName(), handler.getClass().getName());
+			}
+		}
+		return this;
+	}
+
+	@Override
+	public void processConnect(ChannelContext context, MqttConnectMessage message) {
+		processDispatch(MqttMessageType.CONNECT, context, message);
+	}
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	public <M> void processDispatch(MqttMessageType type, ChannelContext context, M message) {
+		IMqttMessageHandler handler = handlers.get(type);
+		if (handler == null) {
+			logger.warn("Mqtt server no handler registered for {} contextId: {}", type, context.getId());
 			return;
 		}
-		executor.execute(() -> {
-			try {
-				sessionListener.onSubscribed(context, clientId, topicFilter, mqttQoS);
-			} catch (Throwable e) {
-				logger.error("Mqtt server clientId:{} topicFilter:{} onUnsubscribed error.", clientId, topicFilter, e);
-			}
-		});
+		handler.handle(context, message);
 	}
-
-	@Override
-	public void processUnSubscribe(ChannelContext context, MqttUnSubscribeMessage message) {
-		String clientId = context.getBsId();
-		int packetId = message.variableHeader().messageId();
-		List<String> topicFilterList = message.payload().topics();
-		for (String topicFilter : topicFilterList) {
-			sessionManager.removeSubscribe(topicFilter, clientId);
-			publishUnsubscribedEvent(context, clientId, topicFilter);
-		}
-		logger.info("UnSubscribe - clientId:{} Topic:{} packetId:{}", clientId, topicFilterList, packetId);
-		MqttMessage unSubMessage = MqttUnSubAckMessage.builder()
-			.packetId(packetId)
-			.build();
-		boolean result = Tio.send(context, unSubMessage);
-		logger.debug("UnSubscribe - UnSubAck send clientId:{} result:{}", clientId, result);
-	}
-
-	/**
-	 * 发送取消订阅事件
-	 *
-	 * @param context     ChannelContext
-	 * @param clientId    clientId
-	 * @param topicFilter topicFilter
-	 */
-	private void publishUnsubscribedEvent(ChannelContext context, String clientId, String topicFilter) {
-		if (sessionListener == null) {
-			return;
-		}
-		executor.execute(() -> {
-			try {
-				sessionListener.onUnsubscribed(context, clientId, topicFilter);
-			} catch (Throwable e) {
-				logger.error("Mqtt server clientId:{} topicFilter:{} onUnsubscribed error.", clientId, topicFilter, e);
-			}
-		});
-	}
-
-	@Override
-	public void processPingReq(ChannelContext context) {
-		String clientId = context.getBsId();
-		boolean result = Tio.send(context, MqttMessage.PINGRESP);
-		logger.debug("PingReq - PingResp send clientId:{} result:{}", clientId, result);
-	}
-
-	@Override
-	public void processDisConnect(ChannelContext context) {
-		String clientId = context.getBsId();
-		logger.info("DisConnect - clientId:{} contextId:{}", clientId, context.getId());
-		// 设置正常断开的标识
-		context.setBizStatus(true);
-		Tio.remove(context, "Mqtt DisConnect");
-	}
-
-	/**
-	 * 处理订阅的消息
-	 *
-	 * @param context        ChannelContext
-	 * @param clientId       clientId
-	 * @param topicName      topicName
-	 * @param publishMessage MqttPublishMessage
-	 */
-	private void invokeListenerForPublish(ChannelContext context, String clientId, MqttQoS mqttQoS,
-										  String topicName, MqttPublishMessage publishMessage) {
-		// 使用管线处理发布消息
-		PublishContext publishContext = buildPublishContext(context, clientId, mqttQoS, topicName, publishMessage);
-		if (publishContext != null) {
-			// 异步处理，避免阻塞 I/O 线程
-			executor.execute(() -> {
-				try {
-					publishPipeline.handle(publishContext);
-				} catch (Throwable e) {
-					logger.error("Mqtt server clientId:{} topic:{} publish pipeline handle error.", clientId, topicName, e);
-				}
-			});
-		}
-	}
-
-	/**
-	 * 构建发布上下文
-	 *
-	 * @param context        ChannelContext
-	 * @param clientId       clientId
-	 * @param mqttQoS        MqttQoS
-	 * @param topicName      topicName
-	 * @param publishMessage MqttPublishMessage
-	 * @return PublishContext
-	 */
-	private PublishContext buildPublishContext(ChannelContext context, String clientId, MqttQoS mqttQoS,
-											   String topicName, MqttPublishMessage publishMessage) {
-		MqttFixedHeader fixedHeader = publishMessage.fixedHeader();
-		MqttPublishVariableHeader variableHeader = publishMessage.variableHeader();
-		Node clientNode = context.getClientNode();
-		boolean isRetain = fixedHeader.isRetain();
-		byte[] payload = publishMessage.payload();
-		String username = context.getUserId();
-		// 处理 retain topic
-		String actualTopic = topicName;
-		if (isRetain) {
-			IntPair<String> retainPair = TopicUtil.retainTopicName(topicName);
-			int timeOut = retainPair.getKey();
-			if (timeOut < 0) {
-				logger.error("MqttPublishMessage topic {} 不符合 $retain/${ttl}/topic 规则.", topicName);
-				return null;
-			}
-			actualTopic = retainPair.getValue();
-		}
-		// 构建发布上下文
-		return PublishContext.builder()
-			.publishMessage(publishMessage)
-			.context(context)
-			.clientId(clientId)
-			.username(username)
-			.topic(actualTopic)
-			.qos(mqttQoS)
-			.dup(fixedHeader.isDup())
-			.retain(isRetain)
-			.payload(payload)
-			.messageId(variableHeader.packetId() != -1 ? variableHeader.packetId() : null)
-			.properties(variableHeader.properties())
-			.peerHost(clientNode.getPeerHost())
-			.nodeName(serverCreator.getNodeName())
-			.timestamp(System.currentTimeMillis())
-			.publishReceivedAt(System.currentTimeMillis())
-			.build();
-	}
-
 }

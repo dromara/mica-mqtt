@@ -3,6 +3,7 @@ open module org.dromara.mica.mqtt.broker {
 	requires transitive net.dreamlu.mica.net.core;
 	requires com.h2database.mvstore;
 
+	exports org.dromara.mica.mqtt.broker.cluster;
 	exports org.dromara.mica.mqtt.broker.cluster.config;
 	exports org.dromara.mica.mqtt.broker.cluster.core;
 	exports org.dromara.mica.mqtt.broker.cluster.message;

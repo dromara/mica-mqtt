@@ -29,9 +29,10 @@ import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.exception.DecoderException;
 import org.dromara.mica.mqtt.codec.exception.MqttIdentifierRejectedException;
 import org.dromara.mica.mqtt.codec.exception.MqttUnacceptableProtocolVersionException;
-import org.dromara.mica.mqtt.codec.message.*;
+import org.dromara.mica.mqtt.codec.message.MqttConnAckMessage;
+import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,37 +110,7 @@ public class MqttServerAioHandler implements TioServerHandler {
 			return;
 		}
 		// 4. 按类型的消息处理
-		switch (messageType) {
-			case PUBLISH:
-				processor.processPublish(context, (MqttPublishMessage) mqttMessage);
-				break;
-			case PUBACK:
-				processor.processPubAck(context, (MqttMessageIdVariableHeader) mqttMessage.variableHeader());
-				break;
-			case PUBREC:
-				processor.processPubRec(context, (MqttMessageIdVariableHeader) mqttMessage.variableHeader());
-				break;
-			case PUBREL:
-				processor.processPubRel(context, (MqttMessageIdVariableHeader) mqttMessage.variableHeader());
-				break;
-			case PUBCOMP:
-				processor.processPubComp(context, (MqttMessageIdVariableHeader) mqttMessage.variableHeader());
-				break;
-			case SUBSCRIBE:
-				processor.processSubscribe(context, (MqttSubscribeMessage) mqttMessage);
-				break;
-			case UNSUBSCRIBE:
-				processor.processUnSubscribe(context, (MqttUnSubscribeMessage) mqttMessage);
-				break;
-			case PINGREQ:
-				processor.processPingReq(context);
-				break;
-			case DISCONNECT:
-				processor.processDisConnect(context);
-				break;
-			default:
-				break;
-		}
+		processor.processDispatch(messageType, context, mqttMessage);
 	}
 
 	/**

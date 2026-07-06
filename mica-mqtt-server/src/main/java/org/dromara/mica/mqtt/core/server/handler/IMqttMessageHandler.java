@@ -14,35 +14,35 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.core.server;
+package org.dromara.mica.mqtt.core.server.handler;
 
 import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
-import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 
 /**
- * mqtt broker 处理器
+ * mqtt server 消息处理器，按 mqtt 消息类型拆分。
+ * <p>
+ * 每个 handler 负责一种 MQTT 消息类型，由 {@code DefaultMqttServerProcessor}
+ * 通过 {@link #messageTypes()} 做路由查找。
  *
+ * @param <M> handler 关心的消息类型（CONNECT 用 MqttConnectMessage，
+ *            PUBACK/REC/REL/COMP 用 MqttMessageIdVariableHeader，等等）
  * @author L.cm
  */
-public interface MqttServerProcessor {
+public interface IMqttMessageHandler<M> {
 
 	/**
-	 * 处理链接
+	 * 声明本 handler 处理哪些 mqtt 消息类型。
 	 *
-	 * @param context ChannelContext
-	 * @param message MqttConnectMessage
+	 * @return MqttMessageType[]
 	 */
-	void processConnect(ChannelContext context, MqttConnectMessage message);
+	MqttMessageType[] messageTypes();
 
 	/**
-	 * 消息分发
+	 * 处理消息。
 	 *
-	 * @param type    MqttMessageType
 	 * @param context ChannelContext
-	 * @param message message
-	 * @param <M>     泛型
+	 * @param message 强类型消息对象
 	 */
-	<M> void processDispatch(MqttMessageType type, ChannelContext context, M message);
-
+	void handle(ChannelContext context, M message);
 }
