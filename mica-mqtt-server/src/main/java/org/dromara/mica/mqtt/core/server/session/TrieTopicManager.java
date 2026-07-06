@@ -121,21 +121,17 @@ public class TrieTopicManager {
 	/**
 	 * root 节点
 	 */
-	private final Node root = Node.getRoot("root");
+	private final Node root = Node.getRoot();
 	/**
 	 * share 分组
 	 */
 	private final Map<String, Node> share = new ConcurrentHashMap<>();
 	/**
-	 * queue 分组
+	 * queue 分组 $queue
 	 */
-	private final Node queue = Node.getRoot("$queue");
+	private final Node queue = Node.getRoot();
 
 	private static class Node {
-		/**
-		 * topic 片段
-		 */
-		private final String part;
 		/**
 		 * 订阅的数据存储 {clientId: encoded_byte}
 		 * 编码格式: bit 0-1: qos (0-2), bit 2: noLocal (0-1)
@@ -146,12 +142,11 @@ public class TrieTopicManager {
 		 */
 		private final Map<String, Byte> subscriptions;
 		/**
-		 * 子节点
+		 * 子节点，key 即为该层 topic 片段（与原 part 字段相同信息）
 		 */
 		private final Map<String, Node> children;
 
-		private Node(String part, Map<String, Byte> subscriptions, Map<String, Node> children) {
-			this.part = part;
+		private Node(Map<String, Byte> subscriptions, Map<String, Node> children) {
 			this.subscriptions = subscriptions;
 			this.children = children;
 		}
@@ -159,21 +154,19 @@ public class TrieTopicManager {
 		/**
 		 * 获取 root node
 		 *
-		 * @param name name
 		 * @return root node
 		 */
-		protected static Node getRoot(String name) {
-			return new Node(name, null, new ConcurrentHashMap<>(8));
+		protected static Node getRoot() {
+			return new Node(null, new ConcurrentHashMap<>(8));
 		}
 
 		/**
 		 * 用于存储数据的节点
 		 *
-		 * @param part part
 		 * @return node
 		 */
-		protected static Node getNode(String part) {
-			return new Node(part, new ConcurrentHashMap<>(16), new ConcurrentHashMap<>(16));
+		protected static Node getNode() {
+			return new Node(new ConcurrentHashMap<>(16), new ConcurrentHashMap<>(16));
 		}
 
 		/**
@@ -184,37 +177,12 @@ public class TrieTopicManager {
 		 */
 		protected Node addChildIfAbsent(String nodePart) {
 			assert children != null;
-			return CollUtil.computeIfAbsent(this.children, nodePart, Node::getNode);
+			return CollUtil.computeIfAbsent(this.children, nodePart, k -> getNode());
 		}
 
 		protected Node findNodeByPart(String nodePart) {
 			assert children != null;
 			return children.get(nodePart);
-		}
-
-		@Override
-		public boolean equals(Object o) {
-			if (this == o) {
-				return true;
-			}
-			if (o == null || Node.class != o.getClass() || part == null) {
-				return false;
-			}
-			return part.equals(((Node) o).part);
-		}
-
-		@Override
-		public int hashCode() {
-			return part == null ? 0 : part.hashCode();
-		}
-
-		@Override
-		public String toString() {
-			return "Node{" +
-				"part='" + part + '\'' +
-				", subscriptions=" + subscriptions +
-				", children=" + children +
-				'}';
 		}
 	}
 
@@ -248,7 +216,7 @@ public class TrieTopicManager {
 		} else if (TopicFilterType.SHARE == topicFilterType) {
 			int prefixLen = TopicFilterType.SHARE_GROUP_PREFIX.length();
 			String groupName = TopicFilterType.getShareGroupName(topic);
-			Node groupNode = share.computeIfAbsent(groupName, Node::getNode);
+			Node groupNode = share.computeIfAbsent(groupName, k -> Node.getNode());
 			prefixLen = prefixLen + groupName.length() + 1;
 			addSubscribe(groupNode, topic.substring(prefixLen), clientId, (byte) mqttQoS, noLocal);
 		}
@@ -317,7 +285,7 @@ public class TrieTopicManager {
 		} else if (TopicFilterType.SHARE == topicFilterType) {
 			int prefixLen = TopicFilterType.SHARE_GROUP_PREFIX.length();
 			String groupName = TopicFilterType.getShareGroupName(topic);
-			Node groupNode = share.computeIfAbsent(groupName, Node::getNode);
+			Node groupNode = share.computeIfAbsent(groupName, k -> Node.getNode());
 			prefixLen = prefixLen + groupName.length() + 1;
 			removeSubscribe(groupNode, topic.substring(prefixLen), clientId);
 		}
@@ -413,9 +381,10 @@ public class TrieTopicManager {
 	 */
 	private static List<Subscribe> getSubscriptions(Node node, String prefix, String clientId) {
 		List<Subscribe> subscribeList = new ArrayList<>();
-		for (Node child : node.children.values()) {
-			String topicPrefix = prefix == null ? child.part : prefix + child.part;
-			getSubscribeRecursively(subscribeList, child, topicPrefix, clientId);
+		for (Map.Entry<String, Node> entry : node.children.entrySet()) {
+			String childPart = entry.getKey();
+			String topicPrefix = prefix == null ? childPart : prefix + childPart;
+			getSubscribeRecursively(subscribeList, entry.getValue(), topicPrefix, clientId);
 		}
 		return subscribeList;
 	}
@@ -435,11 +404,12 @@ public class TrieTopicManager {
 			subscribeList.add(new Subscribe(childPart, clientId, data.qos, data.noLocal));
 		}
 		assert child.children != null;
-		for (Node node : child.children.values()) {
+		for (Map.Entry<String, Node> entry : child.children.entrySet()) {
+			String nodePartStr = entry.getKey();
 			// 拼接订阅的 topic，存储时没存，可以减少内存占用。
-			String topicPrefix = isNotNeedAppendTopicLayer(childPart, node.part) ?
-				childPart + node.part : childPart + MqttCodecUtil.TOPIC_LAYER + node.part;
-			getSubscribeRecursively(subscribeList, node, topicPrefix, clientId);
+			String topicPrefix = isNotNeedAppendTopicLayer(childPart, nodePartStr) ?
+				childPart + nodePartStr : childPart + MqttCodecUtil.TOPIC_LAYER + nodePartStr;
+			getSubscribeRecursively(subscribeList, entry.getValue(), topicPrefix, clientId);
 		}
 	}
 
