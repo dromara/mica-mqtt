@@ -2,6 +2,12 @@
 
 ## 发行版本
 
+### v2.6.8 - 2026-07-07
+- refactor(session): 优化 `TrieTopicManager` 订阅管理结构，降低内存占用。
+- fix(mqtt-codec): 修正 `MqttUnSubAckBuilder` 中原因码的处理逻辑。
+- fix(mqtt): 修正 `WSS监听器` 启用逻辑判断 github #193 感谢 `@laoLiangLoveProgram` 反馈。
+- test(session): 完善 `InMemoryMqttSessionManager` 单元测试覆盖。
+
 ### v2.6.7 - 2026-07-01
 - 🐛 mqtt-server 优化客户端互踢时的会话清理逻辑，感谢 `@十年` 反馈。
 - ⬆️ mica-net 升级到 2.0.8，修复重连后 TcpSendRunnable.writing 未复位，可能导致 MQTT CONNECT 无法发送的问题 (gitee #IJVOZ7)，感谢 `@weibin268` 反馈。
