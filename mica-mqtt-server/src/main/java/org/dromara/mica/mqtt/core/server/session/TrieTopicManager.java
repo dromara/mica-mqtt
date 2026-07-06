@@ -33,101 +33,42 @@ import java.util.function.BinaryOperator;
 import java.util.stream.Collectors;
 
 /**
- * 前缀树
+ * 混合订阅管理：非通配 topic 使用 Map 直存，通配 topic 与共享订阅使用前缀树。
  *
  * @author L.cm
  */
 public class TrieTopicManager {
-
 	/**
-	 * 订阅数据内部类 - 使用享元模式复用实例
-	 * MQTT QoS 只有 0/1/2 三个值，noLocal 只有 true/false 两个值
-	 * 总共 6 种组合，预先创建实例池，避免频繁创建对象
+	 * 前缀树 children 初始容量：每层 literal + + + # 分支有限
 	 */
-	private static class SubscribeData {
-		/**
-		 * 实例池：[qos][noLocal ? 1 : 0]
-		 * 索引：qos=0/1/2, noLocal=0(false)/1(true)
-		 */
-		private static final SubscribeData[][] POOL = new SubscribeData[3][2];
-		/**
-		 * 解码缓存：直接通过 encoded 值索引获取实例，避免位运算
-		 * encoded 有效值：0,1,2,4,5,6 对应 6 种组合
-		 */
-		private static final SubscribeData[] DECODE_CACHE = new SubscribeData[8];
-
-		static {
-			for (int qos = 0; qos <= 2; qos++) {
-				for (int noLocal = 0; noLocal <= 1; noLocal++) {
-					SubscribeData data = new SubscribeData((byte) qos, noLocal == 1);
-					POOL[qos][noLocal] = data;
-					// 同时填充解码缓存，通过 encoded 值直接索引
-					DECODE_CACHE[data.encoded] = data;
-				}
-			}
-		}
-
-		final byte qos;
-		final boolean noLocal;
-		final byte encoded;
-
-		private SubscribeData(byte qos, boolean noLocal) {
-			this.qos = qos;
-			this.noLocal = noLocal;
-			this.encoded = (byte) ((qos & 0x03) | ((noLocal ? 1 : 0) << 2));
-		}
-
-		/**
-		 * 获取 SubscribeData 实例（享元模式）
-		 *
-		 * @param qos     QoS 级别 (0-2)
-		 * @param noLocal No Local 标志
-		 * @return SubscribeData 实例
-		 */
-		static SubscribeData of(byte qos, boolean noLocal) {
-			// 合法的 QoS 值从池中获取
-			if (qos >= 0 && qos <= 2) {
-				return POOL[qos][noLocal ? 1 : 0];
-			}
-			// QoS 非法值（理论上不会出现）降级为创建新实例
-			return new SubscribeData(qos, noLocal);
-		}
-
-		/**
-		 * 从字节编码中解析（直接通过缓存数组获取，O(1) 性能）
-		 * 编码格式: bit 0-1: qos, bit 2: noLocal
-		 *
-		 * @param encoded 编码的字节值
-		 * @return SubscribeData 实例
-		 */
-		static SubscribeData decode(byte encoded) {
-			// 直接通过 encoded 值索引缓存数组，避免位运算
-			// encoded 有效值范围: 0-7，对应索引直接可用
-			SubscribeData data = DECODE_CACHE[encoded & 0x07];
-			if (data != null) {
-				return data;
-			}
-			// 降级处理：理论上不会到这里，除非 encoded 值非法
-			byte qos = (byte) (encoded & 0x03);
-			boolean noLocal = (encoded & 0x04) != 0;
-			return of(qos, noLocal);
-		}
-	}
-
+	private static final int CHILDREN_CAPACITY = 4;
+	/**
+	 * 通配订阅叶子：同一 filter 通常仅少数 client
+	 */
+	private static final int WILDCARD_SUBSCRIPTIONS_CAPACITY = 4;
+	/**
+	 * 共享订阅叶子：同组同 topic 可挂载大量 client
+	 */
+	private static final int SHARE_SUBSCRIPTIONS_CAPACITY = 16;
 	/**
 	 * 较大的 qos
 	 */
 	public static final BinaryOperator<Byte> MAX_QOS = (a, b) -> (a > b) ? a : b;
 	/**
-	 * root 节点
+	 * 非通配普通订阅：topicFilter -> {clientId: encoded_byte}
+	 * 生产环境精确 topic 占绝大多数，Map 直存避免前缀树每层 Node 的双 Map 开销
 	 */
-	private final Node root = Node.getRoot();
+	private final Map<String, Map<String, Byte>> exactSubscriptions = new ConcurrentHashMap<>();
 	/**
-	 * share 分组
+	 * 含 + / # 的普通订阅前缀树（exactSubscriptions 放不下的才进这里）
+	 */
+	private final Node wildcardRoot = Node.getRoot();
+	/**
+	 * $share/{group}/ 分组共享订阅，每组独立一棵前缀树
 	 */
 	private final Map<String, Node> share = new ConcurrentHashMap<>();
 	/**
-	 * queue 分组 $queue
+	 * $queue/ 无分组共享订阅前缀树
 	 */
 	private final Node queue = Node.getRoot();
 
@@ -157,27 +98,38 @@ public class TrieTopicManager {
 		 * @return root node
 		 */
 		protected static Node getRoot() {
-			return new Node(null, new ConcurrentHashMap<>(8));
+			// 根节点只作路由入口，不挂载 subscriptions
+			return new Node(null, new ConcurrentHashMap<>(CHILDREN_CAPACITY));
 		}
 
 		/**
-		 * 用于存储数据的节点
-		 *
-		 * @return node
+		 * 通配订阅前缀树节点（+ / #）
 		 */
-		protected static Node getNode() {
-			return new Node(new ConcurrentHashMap<>(16), new ConcurrentHashMap<>(16));
+		protected static Node getWildcardNode() {
+			return new Node(new ConcurrentHashMap<>(WILDCARD_SUBSCRIPTIONS_CAPACITY), new ConcurrentHashMap<>(CHILDREN_CAPACITY));
 		}
 
 		/**
-		 * 获取或者添加节点
-		 *
-		 * @param nodePart nodePart
-		 * @return Node
+		 * $queue / $share 共享订阅前缀树节点
+		 */
+		protected static Node getShareNode() {
+			return new Node(new ConcurrentHashMap<>(SHARE_SUBSCRIPTIONS_CAPACITY), new ConcurrentHashMap<>(CHILDREN_CAPACITY));
+		}
+
+		/**
+		 * 通配树：逐层创建子节点
 		 */
 		protected Node addChildIfAbsent(String nodePart) {
 			assert children != null;
-			return CollUtil.computeIfAbsent(this.children, nodePart, k -> getNode());
+			return CollUtil.computeIfAbsent(this.children, nodePart, k -> getWildcardNode());
+		}
+
+		/**
+		 * 共享订阅树：逐层创建子节点（叶子 subscriptions 预留更大容量）
+		 */
+		protected Node addShareChildIfAbsent(String nodePart) {
+			assert children != null;
+			return CollUtil.computeIfAbsent(this.children, nodePart, k -> getShareNode());
 		}
 
 		protected Node findNodeByPart(String nodePart) {
@@ -209,52 +161,63 @@ public class TrieTopicManager {
 		String topic = topicFilter.getTopic();
 		TopicFilterType topicFilterType = topicFilter.getType();
 		if (TopicFilterType.NONE == topicFilterType) {
-			addSubscribe(root, topic, clientId, (byte) mqttQoS, noLocal);
+			// 普通订阅按是否含通配符分流：精确 -> Map，通配 -> 前缀树
+			if (MqttCodecUtil.isTopicFilter(topic)) {
+				addTrieSubscribe(wildcardRoot, topic, clientId, (byte) mqttQoS, noLocal, false);
+			} else {
+				addExactSubscribe(topic, clientId, (byte) mqttQoS, noLocal);
+			}
 		} else if (TopicFilterType.QUEUE == topicFilterType) {
+			// 共享订阅（含精确后缀）统一走前缀树，便于组内随机负载均衡
 			int prefixLen = TopicFilterType.SHARE_QUEUE_PREFIX.length();
-			addSubscribe(queue, topic.substring(prefixLen), clientId, (byte) mqttQoS, noLocal);
+			// 去掉 $queue/ 前缀后再写入前缀树
+			addTrieSubscribe(queue, topic.substring(prefixLen), clientId, (byte) mqttQoS, noLocal, true);
 		} else if (TopicFilterType.SHARE == topicFilterType) {
 			int prefixLen = TopicFilterType.SHARE_GROUP_PREFIX.length();
 			String groupName = TopicFilterType.getShareGroupName(topic);
-			Node groupNode = share.computeIfAbsent(groupName, k -> Node.getNode());
+			Node groupNode = share.computeIfAbsent(groupName, k -> Node.getRoot());
+			// 去掉 $share/{group}/ 前缀后再写入该组的前缀树
 			prefixLen = prefixLen + groupName.length() + 1;
-			addSubscribe(groupNode, topic.substring(prefixLen), clientId, (byte) mqttQoS, noLocal);
+			addTrieSubscribe(groupNode, topic.substring(prefixLen), clientId, (byte) mqttQoS, noLocal, true);
 		}
 	}
 
 	/**
-	 * 添加订阅
-	 *
-	 * @param node        node
-	 * @param topicFilter topicFilter
-	 * @param clientId    clientId
-	 * @param mqttQoS     mqttQoS
-	 * @param noLocal     MQTT 5.0 No Local 标志
+	 * 添加非通配订阅
 	 */
-	private static void addSubscribe(Node node, String topicFilter, String clientId, byte mqttQoS, boolean noLocal) {
+	private void addExactSubscribe(String topicFilter, String clientId, byte mqttQoS, boolean noLocal) {
+		// key 为完整 topicFilter，发布时 topicName 可直接 O(1) 命中
+		Map<String, Byte> subscriptions = CollUtil.computeIfAbsent(this.exactSubscriptions, topicFilter, k -> new ConcurrentHashMap<>(CHILDREN_CAPACITY));
+		putSubscription(subscriptions, clientId, mqttQoS, noLocal);
+	}
+
+	private static void addTrieSubscribe(Node node, String topicFilter, String clientId, byte mqttQoS, boolean noLocal, boolean shareTree) {
 		Node prev = node;
+		// 按 / 层级拆分为 part 数组，如 "/a/b" -> ["/", "a", "b"]
 		String[] topicParts = TopicUtil.getTopicParts(topicFilter);
 		int partLength = topicParts.length - 1;
 		for (int i = 0; i < topicParts.length; i++) {
-			prev = prev.addChildIfAbsent(topicParts[i]);
-			// 判断是否结尾，添加订阅数据
+			// 逐层创建或查找子节点，+ / # 也作为普通 part 存储
+			prev = shareTree ? prev.addShareChildIfAbsent(topicParts[i]) : prev.addChildIfAbsent(topicParts[i]);
 			boolean isEnd = i == partLength;
 			if (isEnd) {
 				assert prev.subscriptions != null;
-				// 使用位运算编码 qos 和 noLocal，存储为单个 byte
-				SubscribeData data = SubscribeData.of(mqttQoS, noLocal);
-				Byte existingEncoded = prev.subscriptions.get(clientId);
-				if (existingEncoded == null) {
-					prev.subscriptions.put(clientId, data.encoded);
-				} else {
-					// 如果已存在，取更大的 QoS，noLocal 取或运算
-					SubscribeData existing = SubscribeData.decode(existingEncoded);
-					byte maxQos = MAX_QOS.apply(existing.qos, mqttQoS);
-					boolean mergedNoLocal = existing.noLocal || noLocal;
-					SubscribeData merged = SubscribeData.of(maxQos, mergedNoLocal);
-					prev.subscriptions.put(clientId, merged.encoded);
-				}
+				putSubscription(prev.subscriptions, clientId, mqttQoS, noLocal);
 			}
+		}
+	}
+
+	private static void putSubscription(Map<String, Byte> subscriptions, String clientId, byte mqttQoS, boolean noLocal) {
+		SubscribeData data = SubscribeData.of(mqttQoS, noLocal);
+		Byte existingEncoded = subscriptions.get(clientId);
+		if (existingEncoded == null) {
+			subscriptions.put(clientId, data.encoded);
+		} else {
+			// 同一 client 重复订阅同一 topic 时，取较大 QoS，noLocal 取或
+			SubscribeData existing = SubscribeData.decode(existingEncoded);
+			byte maxQos = MAX_QOS.apply(existing.qos, mqttQoS);
+			boolean mergedNoLocal = existing.noLocal || noLocal;
+			subscriptions.put(clientId, SubscribeData.of(maxQos, mergedNoLocal).encoded);
 		}
 	}
 
@@ -278,14 +241,18 @@ public class TrieTopicManager {
 		String topic = topicFilter.getTopic();
 		TopicFilterType topicFilterType = topicFilter.getType();
 		if (TopicFilterType.NONE == topicFilterType) {
-			removeSubscribe(root, topic, clientId);
+			if (MqttCodecUtil.isTopicFilter(topic)) {
+				removeSubscribe(wildcardRoot, topic, clientId);
+			} else {
+				removeExactSubscribe(topic, clientId);
+			}
 		} else if (TopicFilterType.QUEUE == topicFilterType) {
 			int prefixLen = TopicFilterType.SHARE_QUEUE_PREFIX.length();
 			removeSubscribe(queue, topic.substring(prefixLen), clientId);
 		} else if (TopicFilterType.SHARE == topicFilterType) {
 			int prefixLen = TopicFilterType.SHARE_GROUP_PREFIX.length();
 			String groupName = TopicFilterType.getShareGroupName(topic);
-			Node groupNode = share.computeIfAbsent(groupName, k -> Node.getNode());
+			Node groupNode = share.computeIfAbsent(groupName, k -> Node.getRoot());
 			prefixLen = prefixLen + groupName.length() + 1;
 			removeSubscribe(groupNode, topic.substring(prefixLen), clientId);
 		}
@@ -297,9 +264,22 @@ public class TrieTopicManager {
 	 * @param topicFilter topicFilter
 	 * @param clientId    clientId
 	 */
+	private void removeExactSubscribe(String topicFilter, String clientId) {
+		Map<String, Byte> subscriptions = exactSubscriptions.get(topicFilter);
+		if (subscriptions == null) {
+			return;
+		}
+		subscriptions.remove(clientId);
+		if (subscriptions.isEmpty()) {
+			// remove(key, value) 避免并发下误删新写入的同名 topic
+			exactSubscriptions.remove(topicFilter, subscriptions);
+		}
+	}
+
 	private static void removeSubscribe(Node node, String topicFilter, String clientId) {
 		Node prev = node;
 		String[] topicParts = TopicUtil.getTopicParts(topicFilter);
+		// 沿 part 路径定位到叶子节点
 		for (String part : topicParts) {
 			Node nodePart = prev.findNodeByPart(part);
 			if (nodePart != null) {
@@ -309,10 +289,10 @@ public class TrieTopicManager {
 				break;
 			}
 		}
-		// 找到则取消订阅
 		if (prev != null) {
 			assert prev.subscriptions != null;
 			prev.subscriptions.remove(clientId);
+			// 注意：此处不回收空节点，避免并发订阅时误删仍在使用的路径
 		}
 	}
 
@@ -322,7 +302,12 @@ public class TrieTopicManager {
 	 * @param clientId clientId
 	 */
 	public void removeSubscribe(String clientId) {
-		removeSubscribe(root, clientId);
+		// 精确订阅无反向索引，断开连接时扫描 exactMap（冷路径，可接受）
+		exactSubscriptions.entrySet().removeIf(entry -> {
+			entry.getValue().remove(clientId);
+			return entry.getValue().isEmpty();
+		});
+		removeSubscribe(wildcardRoot, clientId);
 		removeSubscribe(queue, clientId);
 		for (Node node : share.values()) {
 			removeSubscribe(node, clientId);
@@ -336,6 +321,7 @@ public class TrieTopicManager {
 	 */
 	private static void removeSubscribe(Node node, String clientId) {
 		assert node.children != null;
+		// 断开连接时遍历整棵子树，清除该 client 在所有节点的订阅
 		for (Node child : node.children.values()) {
 			removeSubscribeRecursively(child, clientId);
 		}
@@ -348,9 +334,9 @@ public class TrieTopicManager {
 	 * @param clientId clientId
 	 */
 	private static void removeSubscribeRecursively(Node child, String clientId) {
-		// 删除订阅
-		assert child.subscriptions != null;
-		child.subscriptions.remove(clientId);
+		if (child.subscriptions != null) {
+			child.subscriptions.remove(clientId);
+		}
 		assert child.children != null;
 		for (Node node : child.children.values()) {
 			removeSubscribeRecursively(node, clientId);
@@ -364,12 +350,23 @@ public class TrieTopicManager {
 	 * @return 订阅集合
 	 */
 	public List<Subscribe> getSubscriptions(String clientId) {
-		List<Subscribe> subscribeList = getSubscriptions(root, null, clientId);
+		List<Subscribe> subscribeList = new ArrayList<>();
+		// 精确订阅：遍历 exactMap，key 即 topicFilter，无需前缀树拼接
+		for (Map.Entry<String, Map<String, Byte>> entry : exactSubscriptions.entrySet()) {
+			Byte encoded = entry.getValue().get(clientId);
+			if (encoded != null) {
+				SubscribeData data = SubscribeData.decode(encoded);
+				subscribeList.add(new Subscribe(entry.getKey(), clientId, data.qos, data.noLocal));
+			}
+		}
+		subscribeList.addAll(getSubscriptions(wildcardRoot, null, clientId));
 		subscribeList.addAll(getSubscriptions(queue, TopicFilterType.SHARE_QUEUE_PREFIX, clientId));
 		for (Map.Entry<String, Node> entry : share.entrySet()) {
+			// 还原 $share/{group}/ 前缀，拼接完整 topicFilter
 			String prefix = TopicFilterType.SHARE_GROUP_PREFIX + entry.getKey() + TopicUtil.TOPIC_LAYER;
 			subscribeList.addAll(getSubscriptions(entry.getValue(), prefix, clientId));
 		}
+		// 通配与共享路径可能产生重复，去重后返回
 		return subscribeList.stream().distinct().collect(Collectors.toList());
 	}
 
@@ -383,6 +380,7 @@ public class TrieTopicManager {
 		List<Subscribe> subscribeList = new ArrayList<>();
 		for (Map.Entry<String, Node> entry : node.children.entrySet()) {
 			String childPart = entry.getKey();
+			// prefix 为 null 表示普通通配树根，首层 part 即为 topic 起始片段
 			String topicPrefix = prefix == null ? childPart : prefix + childPart;
 			getSubscribeRecursively(subscribeList, entry.getValue(), topicPrefix, clientId);
 		}
@@ -396,17 +394,18 @@ public class TrieTopicManager {
 	 * @param clientId clientId
 	 */
 	private static void getSubscribeRecursively(List<Subscribe> subscribeList, Node child, String childPart, String clientId) {
-		// 获取订阅
-		assert child.subscriptions != null;
-		Byte encoded = child.subscriptions.get(clientId);
-		if (encoded != null) {
-			SubscribeData data = SubscribeData.decode(encoded);
-			subscribeList.add(new Subscribe(childPart, clientId, data.qos, data.noLocal));
+		if (child.subscriptions != null) {
+			Byte encoded = child.subscriptions.get(clientId);
+			if (encoded != null) {
+				SubscribeData data = SubscribeData.decode(encoded);
+				// childPart 为递归拼接的 topicFilter，存储时未冗余保存完整字符串
+				subscribeList.add(new Subscribe(childPart, clientId, data.qos, data.noLocal));
+			}
 		}
 		assert child.children != null;
 		for (Map.Entry<String, Node> entry : child.children.entrySet()) {
 			String nodePartStr = entry.getKey();
-			// 拼接订阅的 topic，存储时没存，可以减少内存占用。
+			// 处理 leading/trailing / 等边界，避免拼接出错误 topic
 			String topicPrefix = isNotNeedAppendTopicLayer(childPart, nodePartStr) ?
 				childPart + nodePartStr : childPart + MqttCodecUtil.TOPIC_LAYER + nodePartStr;
 			getSubscribeRecursively(subscribeList, entry.getValue(), topicPrefix, clientId);
@@ -421,6 +420,7 @@ public class TrieTopicManager {
 	 * @return 是否需要添加层级
 	 */
 	private static boolean isNotNeedAppendTopicLayer(String prefix, String suffix) {
+		// 如 prefix="/" 或 suffix="/" 时，相邻层级本身已含 /，无需再插入分隔符
 		return TopicUtil.TOPIC_LAYER.equals(prefix) || prefix.endsWith("//") || TopicUtil.TOPIC_LAYER.equals(suffix);
 	}
 
@@ -434,17 +434,19 @@ public class TrieTopicManager {
 	public Byte searchSubscribe(String topicName, String clientId) {
 		String[] topicParts = TopicUtil.getTopicParts(topicName);
 		Map<String, SubscribeData> subscribeMap = new HashMap<>(32);
-		searchSubscribeRecursively(root, subscribeMap, topicParts, 0);
+		// 发布热路径：先 O(1) 查精确订阅，再递归匹配通配与共享
+		mergeExactSubscriptions(topicName, subscribeMap);
+		searchSubscribeRecursively(wildcardRoot, subscribeMap, topicParts, 0);
 		SubscribeData data = subscribeMap.get(clientId);
 		if (data != null) {
 			return data.qos;
 		}
+		// 依次查找 $queue 与各 $share 组，命中即返回（用于 PUBACK QoS 确认）
 		searchSubscribeRecursively(queue, subscribeMap, topicParts, 0);
 		data = subscribeMap.get(clientId);
 		if (data != null) {
 			return data.qos;
 		}
-		// 共享订阅
 		for (Node node : share.values()) {
 			searchSubscribeRecursively(node, subscribeMap, topicParts, 0);
 		}
@@ -461,14 +463,15 @@ public class TrieTopicManager {
 	public List<Subscribe> searchSubscribe(String topicName) {
 		String[] topicParts = TopicUtil.getTopicParts(topicName);
 		Map<String, SubscribeData> subscribeMap = new HashMap<>(32);
-		searchSubscribeRecursively(root, subscribeMap, topicParts, 0);
-		// 共享订阅
+		mergeExactSubscriptions(topicName, subscribeMap);
+		searchSubscribeRecursively(wildcardRoot, subscribeMap, topicParts, 0);
+		// $queue 共享：组内多 client 随机选一个
 		Map<String, SubscribeData> queueSubscribeMap = new HashMap<>(8);
 		searchSubscribeRecursively(queue, queueSubscribeMap, topicParts, 0);
 		if (!queueSubscribeMap.isEmpty()) {
 			randomStrategy(subscribeMap, queueSubscribeMap);
 		}
-		// 分组订阅
+		// 分组订阅：每组独立随机选一个 client
 		for (Node node : share.values()) {
 			Map<String, SubscribeData> shareSubscribeMap = new HashMap<>(8);
 			searchSubscribeRecursively(node, shareSubscribeMap, topicParts, 0);
@@ -476,7 +479,6 @@ public class TrieTopicManager {
 				randomStrategy(subscribeMap, shareSubscribeMap);
 			}
 		}
-		// 转换，排重
 		List<Subscribe> subscribeList = new ArrayList<>();
 		subscribeMap.forEach((clientId, data) -> subscribeList.add(new Subscribe(clientId, data.qos, data.noLocal)));
 		subscribeMap.clear();
@@ -484,75 +486,77 @@ public class TrieTopicManager {
 	}
 
 	/**
-	 * 递归查找
+	 * 合并精确订阅到结果集（topicName 与 topicFilter 完全一致时才命中）
 	 *
-	 * @param node         node
-	 * @param subscribeMap subscribeMap
-	 * @param topicParts   topicParts
-	 * @param index        index
+	 * @param topicName    发布的 topic，不含通配符
+	 * @param subscribeMap 待合并的结果集
 	 */
+	private void mergeExactSubscriptions(String topicName, Map<String, SubscribeData> subscribeMap) {
+		Map<String, Byte> subscriptions = exactSubscriptions.get(topicName);
+		if (subscriptions == null || subscriptions.isEmpty()) {
+			return;
+		}
+		for (Map.Entry<String, Byte> entry : subscriptions.entrySet()) {
+			SubscribeData data = SubscribeData.decode(entry.getValue());
+			subscribeMap.merge(entry.getKey(), data, TrieTopicManager::mergeSubscribeData);
+		}
+	}
+
+	/**
+	 * 合并同一 client 的多条匹配订阅（如同时命中精确 topic 与通配 filter）
+	 */
+	private static SubscribeData mergeSubscribeData(SubscribeData old, SubscribeData val) {
+		byte maxQos = MAX_QOS.apply(old.qos, val.qos);
+		boolean mergedNoLocal = old.noLocal || val.noLocal;
+		return SubscribeData.of(maxQos, mergedNoLocal);
+	}
+
 	private static void searchSubscribeRecursively(Node node, Map<String, SubscribeData> subscribeMap, String[] topicParts, int index) {
-		// 层级已经超过，跳出
 		if (index >= topicParts.length) {
 			return;
 		}
-		// # 单独处理
+		// # 匹配当前层级及后续所有层级，无需继续向下递归
 		Node nodeMore = node.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_MORE);
-		if (nodeMore != null) {
+		if (nodeMore != null && nodeMore.subscriptions != null) {
 			for (Map.Entry<String, Byte> entry : nodeMore.subscriptions.entrySet()) {
-				String clientId = entry.getKey();
 				SubscribeData data = SubscribeData.decode(entry.getValue());
-				subscribeMap.merge(clientId, data, (old, val) -> {
-					byte maxQos = MAX_QOS.apply(old.qos, val.qos);
-					boolean mergedNoLocal = old.noLocal || val.noLocal;
-					return SubscribeData.of(maxQos, mergedNoLocal);
-				});
+				subscribeMap.merge(entry.getKey(), data, TrieTopicManager::mergeSubscribeData);
 			}
 		}
 		int topicPartLen = topicParts.length - 1;
-		// + 处理
+		// + 匹配当前层级任意一个 part
 		Node nodeOne = node.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_ONE);
 		if (nodeOne != null) {
-			// 最后一位为 +
 			if (index == topicPartLen) {
-				for (Map.Entry<String, Byte> entry : nodeOne.subscriptions.entrySet()) {
-					String clientId = entry.getKey();
-					SubscribeData data = SubscribeData.decode(entry.getValue());
-					subscribeMap.merge(clientId, data, (old, val) -> {
-						byte maxQos = MAX_QOS.apply(old.qos, val.qos);
-						boolean mergedNoLocal = old.noLocal || val.noLocal;
-						return SubscribeData.of(maxQos, mergedNoLocal);
-					});
+				// + 在 filter 末尾：匹配 topic 的最后一个 part
+				if (nodeOne.subscriptions != null) {
+					for (Map.Entry<String, Byte> entry : nodeOne.subscriptions.entrySet()) {
+						SubscribeData data = SubscribeData.decode(entry.getValue());
+						subscribeMap.merge(entry.getKey(), data, TrieTopicManager::mergeSubscribeData);
+					}
 				}
 			} else {
+				// + 在中间：跳过当前 part，继续匹配下一层
 				searchSubscribeRecursively(nodeOne, subscribeMap, topicParts, index + 1);
 			}
 		}
 		String topicPart = topicParts[index];
 		Node nodePart = node.findNodeByPart(topicPart);
 		if (nodePart != null) {
-			// 跳出循环
 			if (index == topicPartLen) {
-				for (Map.Entry<String, Byte> entry : nodePart.subscriptions.entrySet()) {
-					String clientId = entry.getKey();
-					SubscribeData data = SubscribeData.decode(entry.getValue());
-					subscribeMap.merge(clientId, data, (old, val) -> {
-						byte maxQos = MAX_QOS.apply(old.qos, val.qos);
-						boolean mergedNoLocal = old.noLocal || val.noLocal;
-						return SubscribeData.of(maxQos, mergedNoLocal);
-					});
-				}
-				// 判断是否还有 #
-				Node nodePartMore = nodePart.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_MORE);
-				if (nodePartMore != null) {
-					for (Map.Entry<String, Byte> entry : nodePartMore.subscriptions.entrySet()) {
-						String clientId = entry.getKey();
+				// 精确 part 匹配到 topic 末尾，收集该节点上的订阅
+				if (nodePart.subscriptions != null) {
+					for (Map.Entry<String, Byte> entry : nodePart.subscriptions.entrySet()) {
 						SubscribeData data = SubscribeData.decode(entry.getValue());
-						subscribeMap.merge(clientId, data, (old, val) -> {
-							byte maxQos = MAX_QOS.apply(old.qos, val.qos);
-							boolean mergedNoLocal = old.noLocal || val.noLocal;
-							return SubscribeData.of(maxQos, mergedNoLocal);
-						});
+						subscribeMap.merge(entry.getKey(), data, TrieTopicManager::mergeSubscribeData);
+					}
+				}
+				// 同时检查末尾 # 子节点，如 filter "a/b/#" 匹配 topic "a/b"
+				Node nodePartMore = nodePart.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_MORE);
+				if (nodePartMore != null && nodePartMore.subscriptions != null) {
+					for (Map.Entry<String, Byte> entry : nodePartMore.subscriptions.entrySet()) {
+						SubscribeData data = SubscribeData.decode(entry.getValue());
+						subscribeMap.merge(entry.getKey(), data, TrieTopicManager::mergeSubscribeData);
 					}
 				}
 			} else {
@@ -565,18 +569,17 @@ public class TrieTopicManager {
 	 * 清理
 	 */
 	public void clear() {
-		// 清理普通订阅
-		root.children.clear();
-		// 清理共享订阅
+		exactSubscriptions.clear();
+		wildcardRoot.children.clear();
 		queue.children.clear();
-		// 清理分组共享订阅
 		share.clear();
 	}
 
 	@Override
 	public String toString() {
 		return "TrieTopicManager{" +
-			"root=" + root +
+			"exactSubscriptions=" + exactSubscriptions.size() +
+			", wildcardRoot=" + wildcardRoot +
 			", share=" + share +
 			", queue=" + queue +
 			'}';
@@ -591,14 +594,11 @@ public class TrieTopicManager {
 	private static void randomStrategy(Map<String, SubscribeData> subscribeMap, Map<String, SubscribeData> randomSubscribeMap) {
 		String[] keys = randomSubscribeMap.keySet().toArray(new String[0]);
 		int keyLength = keys.length;
-		// 大于 1 随机
+		// 共享订阅语义：同一组内每条消息只投递给一个 client
 		String key = keyLength > 1 ? keys[ThreadLocalRandom.current().nextInt(keyLength)] : keys[0];
 		SubscribeData data = randomSubscribeMap.get(key);
-		subscribeMap.merge(key, data, (old, val) -> {
-			byte maxQos = MAX_QOS.apply(old.qos, val.qos);
-			boolean mergedNoLocal = old.noLocal || val.noLocal;
-			return SubscribeData.of(maxQos, mergedNoLocal);
-		});
+		// 若该 client 同时有普通订阅，merge 取较大 QoS
+		subscribeMap.merge(key, data, TrieTopicManager::mergeSubscribeData);
 	}
 
 }
