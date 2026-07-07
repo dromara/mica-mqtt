@@ -19,21 +19,10 @@ package org.dromara.mica.mqtt.core.server.support;
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
-import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.MqttServerProcessor;
-import org.dromara.mica.mqtt.core.server.handler.IMqttMessageHandler;
-import org.dromara.mica.mqtt.core.server.handler.MqttConnectHandler;
-import org.dromara.mica.mqtt.core.server.handler.MqttDisConnectHandler;
-import org.dromara.mica.mqtt.core.server.handler.MqttPingReqHandler;
-import org.dromara.mica.mqtt.core.server.handler.MqttPubAckHandler;
-import org.dromara.mica.mqtt.core.server.handler.MqttPubCompHandler;
-import org.dromara.mica.mqtt.core.server.handler.MqttPubRecHandler;
-import org.dromara.mica.mqtt.core.server.handler.MqttPubRelHandler;
-import org.dromara.mica.mqtt.core.server.handler.MqttPublishHandler;
-import org.dromara.mica.mqtt.core.server.handler.MqttSubscribeHandler;
-import org.dromara.mica.mqtt.core.server.handler.MqttUnSubscribeHandler;
+import org.dromara.mica.mqtt.core.server.handler.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,16 +80,6 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			}
 		}
 		return this;
-	}
-
-	@Override
-	public void processConnect(ChannelContext context, MqttMessage message) {
-		if (!(message instanceof MqttConnectMessage)) {
-			logger.error("Mqtt CONNECT expected MqttConnectMessage, got {} contextId:{}",
-				message == null ? "null" : message.getClass().getName(), context.getId());
-			return;
-		}
-		processDispatch(MqttMessageType.CONNECT, context, message);
 	}
 
 	@Override

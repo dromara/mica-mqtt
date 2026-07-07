@@ -28,14 +28,6 @@ import org.dromara.mica.mqtt.codec.message.MqttMessage;
 public interface MqttServerProcessor {
 
 	/**
-	 * 处理链接
-	 *
-	 * @param context ChannelContext
-	 * @param message MqttMessage（消息类型必须为 CONNECT）
-	 */
-	void processConnect(ChannelContext context, MqttMessage message);
-
-	/**
 	 * 消息分发
 	 *
 	 * @param type    MqttMessageType

@@ -98,7 +98,7 @@ public class MqttServerAioHandler implements TioServerHandler {
 		MqttMessageType messageType = mqttMessage.fixedHeader().messageType();
 		// 2. 单独处理 CONNECT 的消息
 		if (MqttMessageType.CONNECT == messageType) {
-			processor.processConnect(context, mqttMessage);
+			processor.processDispatch(messageType, context, mqttMessage);
 			return;
 		}
 		// 3. 判定是否认证成功
