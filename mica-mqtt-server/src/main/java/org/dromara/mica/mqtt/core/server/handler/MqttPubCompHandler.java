@@ -19,8 +19,10 @@ package org.dromara.mica.mqtt.core.server.handler;
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
+import org.dromara.mica.mqtt.codec.codes.MqttPubCompReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttPubReplyMessageVariableHeader;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
@@ -53,13 +55,25 @@ public class MqttPubCompHandler extends AbstractMqttMessageHandler {
 
 	@Override
 	public void handle(ChannelContext context, MqttMessage rawMessage) {
-		int packetId = ((MqttMessageIdVariableHeader) rawMessage.variableHeader()).messageId();
+		MqttMessageIdVariableHeader variableHeader = (MqttMessageIdVariableHeader) rawMessage.variableHeader();
+		int packetId = variableHeader.messageId();
 		String clientId = context.getBsId();
-		logger.debug("PubComp - clientId:{}, packetId:{}", clientId, packetId);
+		byte reasonCode = getReasonCode(variableHeader);
+		logger.debug("PubComp - clientId:{} packetId:{} reasonCode:0x{}", clientId, packetId, Integer.toHexString(reasonCode & 0xFF));
 		MqttPendingPublish pendingPublish = sessionManager.getPendingPublish(clientId, packetId);
 		if (pendingPublish != null) {
+			if (reasonCode != MqttPubCompReasonCode.SUCCESS.value()) {
+				logger.warn("PubComp failure - clientId:{} packetId:{} reasonCode:0x{}", clientId, packetId, Integer.toHexString(reasonCode & 0xFF));
+			}
 			pendingPublish.onPubCompReceived();
 			sessionManager.removePendingPublish(clientId, packetId);
 		}
+	}
+
+	private byte getReasonCode(MqttMessageIdVariableHeader variableHeader) {
+		if (variableHeader instanceof MqttPubReplyMessageVariableHeader) {
+			return ((MqttPubReplyMessageVariableHeader) variableHeader).reasonCode();
+		}
+		return MqttPubCompReasonCode.SUCCESS.value();
 	}
 }

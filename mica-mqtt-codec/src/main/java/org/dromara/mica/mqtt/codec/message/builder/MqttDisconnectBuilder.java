@@ -58,7 +58,8 @@ public final class MqttDisconnectBuilder {
 		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.DISCONNECT, false, MqttQoS.QOS0, false, 0);
 		MqttReasonCodeAndPropertiesVariableHeader mqttDisconnectVariableHeader =
-			new MqttReasonCodeAndPropertiesVariableHeader(reasonCode.value(), properties);
+			new MqttReasonCodeAndPropertiesVariableHeader(
+				reasonCode == null ? MqttDisconnectReasonCode.NORMAL.value() : reasonCode.value(), properties);
 
 		return new MqttMessage(mqttFixedHeader, mqttDisconnectVariableHeader);
 	}

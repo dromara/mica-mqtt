@@ -179,18 +179,18 @@ MqttServerAioHandler.handler(packet)
 
 | 特性 | codec | server | client | broker | HTTP API |
 |---|---|---|---|---|---|
-| PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code | ✅ | ❌ | ❌ | ❌ | n/a |
-| DISCONNECT Reason Code + Properties（双向） | ✅ | ❌ | ❌ | 🚧 | n/a |
-| SUBACK / UNSUBACK Reason Code | ✅ | ❌ | 🚧 | 🚧 | n/a |
+| PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code | ✅ | ✅ | ❌ | ❌ | n/a |
+| DISCONNECT Reason Code + Properties（双向） | ✅ | ✅ | ✅ | 🚧 | n/a |
+| SUBACK / UNSUBACK Reason Code | ✅ | ✅ | 🚧 | 🚧 | n/a |
 | Retain As Published / Retain Handling（运行时） | ✅ | ❌ | n/a | ❌ | n/a |
-| CONNACK Properties 完善（能力位告知） | ✅ | ❌ | ❌ | ❌ | n/a |
-| Server Keep Alive | ✅ | ❌ | ❌ | ❌ | n/a |
+| CONNACK Properties 完善（能力位告知） | ✅ | 🚧（基础能力位） | ❌ | ❌ | n/a |
+| Server Keep Alive | ✅ | ✅ | ❌ | ❌ | n/a |
 | Receive Maximum（运行时） | ✅ | ❌ | ❌ | ❌ | n/a |
 | Will Properties / Will Delay Interval（调度） | ✅ | 🚧（持久化） | ✅（透传） | ❌ | n/a |
 | Subscription Identifier（运行时） | ✅ | ❌ | ❌ | ❌ | n/a |
 | Topic Alias（运行时） | ✅ | ❌ | ❌ | ❌ | n/a |
-| Assigned Client Identifier | ✅ | ❌ | ❌ | ❌ | n/a |
-| Request Problem Information | ✅ | ❌ | ❌ | ❌ | n/a |
+| Assigned Client Identifier | ✅ | ✅ | ❌ | ❌ | n/a |
+| Request Problem Information | ✅ | ✅ | ❌ | ❌ | n/a |
 | Payload Format Indicator + Content Type | ✅ | 🚧（透传） | 🚧（透传） | 🚧 | ❌ |
 | Response Topic + Correlation Data | ✅ | 🚧（透传） | 🚧（透传） | 🚧 | ❌ |
 | AUTH 报文处理 + 扩展认证 | ✅ | ❌ | ❌ | ❌ | n/a |
@@ -204,18 +204,20 @@ MqttServerAioHandler.handler(packet)
 
 > 图例：✅ 已实现  🚧 部分实现（仅透传或仅框架）  ❌ 未实现  n/a 不适用
 
+> **2026-07-07 进度**：已完成服务端 ACK Reason Code 基础链路、SUBACK/UNSUBACK Reason Code、DISCONNECT 双向 Reason Code + Properties、Server Keep Alive 服务端下发、Assigned Client Identifier、Request Problem Information。CONNACK 能力位已具备基础下发能力，但 Receive Maximum / Maximum Packet Size 等运行时语义未完成，仍按部分实现跟踪。
+
 ### 4.2 优先级分层（按业务价值 × 实现复杂度）
 
 #### 🟢 第一梯队：高价值 / 低-中复杂度（1-2 周可全部完成）
 
 | # | 特性 | 复杂度 | 收益 | 关键模块 |
 |---|---|---|---|---|
-| 1 | PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code + Properties | ⭐ | 高 | `MqttPubAckHandler` / `MqttPubRecHandler` / `MqttPubRelHandler` / `MqttPubCompHandler` |
-| 2 | DISCONNECT Reason Code + Properties（双向） | ⭐⭐ | 高 | `MqttClient#disconnect` / `MqttDisConnectHandler` |
-| 3 | SUBACK / UNSUBACK Reason Code | ⭐ | 高 | `MqttSubscribeHandler` / `MqttUnSubscribeHandler` |
+| 1 | ✅ PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code + Properties | ⭐ | 高 | `MqttPubAckHandler` / `MqttPubRecHandler` / `MqttPubRelHandler` / `MqttPubCompHandler` |
+| 2 | ✅ DISCONNECT Reason Code + Properties（双向） | ⭐⭐ | 高 | `MqttClient#disconnect` / `MqttDisConnectHandler` |
+| 3 | ✅ SUBACK / UNSUBACK Reason Code | ⭐ | 高 | `MqttSubscribeHandler` / `MqttUnSubscribeHandler` |
 | 4 | Retain As Published / Retain Handling（运行时） | ⭐⭐ | 中 | `RetainMessageHandler` / `SubscriptionForwardHandler` |
-| 5 | CONNACK Properties 完善（能力位告知） | ⭐ | 中 | `MqttConnectHandler#connAckByReturnCode` |
-| 6 | Server Keep Alive | ⭐ | 中 | `MqttConnectHandler#handle` |
+| 5 | 🚧 CONNACK Properties 完善（能力位告知） | ⭐ | 中 | `MqttConnectHandler#connAckByReturnCode` |
+| 6 | ✅ Server Keep Alive | ⭐ | 中 | `MqttConnectHandler#handle` |
 | 7 | Receive Maximum（server → client 方向） | ⭐⭐ | 中 | `IMqttSessionManager` + 挂起队列 |
 | 8 | Will Properties / Will Delay Interval（调度） | ⭐⭐ | 中 | `MqttConnectHandler` 持久化已具备，需补 `TimerTaskService` 延迟调度 |
 
@@ -227,8 +229,8 @@ MqttServerAioHandler.handler(packet)
 |---|---|---|---|---|
 | 9 | Subscription Identifier（运行时） | ⭐⭐ | 中 | `IMqttSessionManager` 增加 subscribeId 字段 |
 | 10 | Topic Alias（运行时） | ⭐⭐ | 中 | 客户端维护 `Map<Integer,String>` |
-| 11 | Assigned Client Identifier | ⭐ | 中 | `MqttConnectHandler` 钩子 + CONNACK 回填 |
-| 12 | Request Problem Information | ⭐ | 低 | `MqttConnectProperties` 读取，全局开关 |
+| 11 | ✅ Assigned Client Identifier | ⭐ | 中 | `MqttConnectHandler` 钩子 + CONNACK 回填 |
+| 12 | ✅ Request Problem Information | ⭐ | 低 | `MqttConnectProperties` 读取，全局开关 |
 | 13 | Payload Format Indicator + Content Type（业务透传） | ⭐ | 低 | HTTP API + 示例 |
 | 14 | Response Topic + Correlation Data（HTTP API 透传） | ⭐⭐ | 中 | HTTP API 增加字段 |
 | 15 | AUTH 报文处理 + 扩展认证骨架 | ⭐⭐⭐ | 高 | 新增 `MqttAuthHandler` + `DefaultMqttServerProcessor.register` |
@@ -283,12 +285,12 @@ MqttServerAioHandler.handler(packet)
 
 | 任务 | 标题 | 工作量 | 依赖 | 风险 |
 |---|---|---|---|---|
-| **P1.1** | PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code + Properties | 2 天 | 无 | 低 |
-| **P1.2** | DISCONNECT Reason Code + Properties（双向） | 2 天 | 无 | 低 |
-| **P1.3** | SUBACK / UNSUBACK Reason Code | 1 天 | 无 | 低 |
-| **P1.4** | CONNACK Properties 完善（能力位告知） | 1 天 | 无 | 低 |
+| **P1.1** | ✅ PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code + Properties | 已完成 | 无 | 低 |
+| **P1.2** | ✅ DISCONNECT Reason Code + Properties（双向） | 已完成 | 无 | 低 |
+| **P1.3** | ✅ SUBACK / UNSUBACK Reason Code | 已完成 | 无 | 低 |
+| **P1.4** | 🚧 CONNACK Properties 完善（能力位告知） | 部分完成 | 无 | 低 |
 | **P1.5** | Retain As Published / Retain Handling（运行时） | 2 天 | 无 | 中 |
-| **P1.6** | Server Keep Alive | 0.5 天 | P1.4 | 低 |
+| **P1.6** | ✅ Server Keep Alive | 已完成 | P1.4 | 低 |
 | **P1.7** | Receive Maximum（server → client 方向） | 2 天 | 无 | 中 |
 | **P1.8** | Will Properties / Will Delay Interval | 2 天 | 无 | 中 |
 
@@ -298,8 +300,8 @@ MqttServerAioHandler.handler(packet)
 |---|---|---|---|---|
 | **P2.1** | Subscription Identifier（运行时） | 3 天 | P1.4 | 中 |
 | **P2.2** | Topic Alias（运行时） | 2 天 | P1.4 | 中 |
-| **P2.3** | Assigned Client Identifier | 1 天 | P1.4 | 低 |
-| **P2.4** | Request Problem Information | 0.5 天 | 无 | 低 |
+| **P2.3** | ✅ Assigned Client Identifier | 已完成 | P1.4 | 低 |
+| **P2.4** | ✅ Request Problem Information | 已完成 | 无 | 低 |
 | **P2.5** | Payload Format Indicator + Content Type（透传） | 1 天 | 无 | 低 |
 | **P2.6** | Response Topic + Correlation Data（HTTP API 透传） | 2 天 | P2.5 | 中 |
 | **P2.7** | AUTH 报文处理 + 扩展认证骨架 | 5 天 | P1.4 | 高 |
@@ -524,7 +526,13 @@ private void connAckByReturnCode(String clientId, String uniqueId,
 
 | 文档 | 版本 | 状态 | 更新日期 |
 |---|---|---|---|
-| **mqtt5-features.md** | v2.0 | 重构对齐 | 2026-07-06 |
+| **mqtt5-features.md** | v2.1 | P1/P2 部分能力已落地 | 2026-07-07 |
+
+### v2.1 变更摘要（相对 v2.0）
+
+- **标记已完成**：P1.1 PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code 基础链路、P1.2 DISCONNECT Reason Code + Properties（双向）、P1.3 SUBACK / UNSUBACK Reason Code、P1.6 Server Keep Alive、P2.3 Assigned Client Identifier、P2.4 Request Problem Information。
+- **标记部分完成**：P1.4 CONNACK Properties 基础能力位已下发，但 Receive Maximum / Maximum Packet Size 等运行时语义未完成，仍按 🚧 跟踪。
+- **剩余下次处理**：P1.5 Retain As Published / Retain Handling、P1.7 Receive Maximum、P1.8 Will Delay Interval，以及 P2/P3 中 Topic Alias、Subscription Identifier、AUTH、Clean Start / Session Expiry、集群同步等。
 
 ### v2.0 变更摘要（相对 v1.0）
 

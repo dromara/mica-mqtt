@@ -25,13 +25,16 @@ import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.utils.timer.TimerTask;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.builder.MqttDisconnectBuilder;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
+import org.dromara.mica.mqtt.codec.message.properties.MqttDisconnectProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
@@ -563,6 +566,29 @@ public final class MqttClient implements IMqttClient {
 			return false;
 		}
 		boolean result = Tio.bSend(channelContext, MqttMessage.DISCONNECT);
+		if (result) {
+			Tio.close(channelContext, null, "MqttClient disconnect.", true);
+		}
+		return result;
+	}
+
+	/**
+	 * 断开 mqtt 连接，支持 MQTT 5.0 Reason Code 和 Properties。
+	 *
+	 * @param reasonCode 断开原因码
+	 * @param properties MQTT 5.0 DISCONNECT properties
+	 * @return 是否成功
+	 */
+	public boolean disconnect(MqttDisconnectReasonCode reasonCode, MqttDisconnectProperties properties) {
+		ClientChannelContext channelContext = getContext();
+		if (channelContext == null) {
+			return false;
+		}
+		MqttMessage disconnectMessage = new MqttDisconnectBuilder()
+			.reasonCode(reasonCode)
+			.properties(properties == null ? MqttProperties.NO_PROPERTIES : properties.getProperties())
+			.build();
+		boolean result = Tio.bSend(channelContext, disconnectMessage);
 		if (result) {
 			Tio.close(channelContext, null, "MqttClient disconnect.", true);
 		}

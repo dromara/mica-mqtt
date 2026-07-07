@@ -199,6 +199,10 @@ public class MqttServerCreator {
 	private boolean proxyProtocolOn = false;
 
 	private MqttSerializer mqttSerializer;
+	/**
+	 * mqtt 5.0 服务端能力配置，用于在 CONNACK 中告知客户端
+	 */
+	private final MqttServerProperties properties = new MqttServerProperties();
 
 	public String getName() {
 		return name;
@@ -512,6 +516,15 @@ public class MqttServerCreator {
 
 	public MqttServerCreator mqttSerializer(MqttSerializer mqttSerializer) {
 		this.mqttSerializer = mqttSerializer;
+		return this;
+	}
+
+	public MqttServerProperties getMqttServerProperties() {
+		return properties;
+	}
+
+	public MqttServerCreator properties(Consumer<MqttServerProperties> consumer) {
+		consumer.accept(this.properties);
 		return this;
 	}
 

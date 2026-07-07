@@ -23,13 +23,17 @@ import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
+import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.MqttConnAckMessage;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
+import org.dromara.mica.mqtt.codec.message.properties.MqttConnectProperties;
+import org.dromara.mica.mqtt.codec.message.properties.MqttConnAckProperties;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
+import org.dromara.mica.mqtt.core.server.MqttServerProperties;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
@@ -41,6 +45,7 @@ import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -90,16 +95,24 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		String clientId = payload.clientIdentifier();
 		String userName = payload.username();
 		String password = payload.password();
+		MqttConnectVariableHeader variableHeader = mqttMessage.variableHeader();
+		boolean requestProblemInformation = isRequestProblemInformation(variableHeader);
+		boolean assignedClientId = StrUtil.isBlank(clientId);
 		// 1. 获取唯一 id
 		String uniqueId = uniqueIdService.getUniqueId(context, clientId, userName, password);
+		if (StrUtil.isBlank(uniqueId) && assignedClientId && MqttVersion.MQTT_5.protocolLevel() == variableHeader.version()) {
+			uniqueId = newAssignedClientId();
+		}
 		// 2. uniqueId 不能为空
 		if (StrUtil.isBlank(uniqueId)) {
-			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_IDENTIFIER_REJECTED);
+			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_IDENTIFIER_REJECTED,
+				0, false, requestProblemInformation);
 			return;
 		}
 		// 3. 认证
 		if (authHandler != null && !authHandler.verifyAuthenticate(context, uniqueId, clientId, userName, password)) {
-			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
+			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD,
+				0, false, requestProblemInformation);
 			return;
 		}
 		// 认证成功
@@ -121,11 +134,21 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			Tio.bindUser(context, userName);
 		}
 		// 6. 心跳超时
-		MqttConnectVariableHeader variableHeader = mqttMessage.variableHeader();
 		int keepAliveSeconds = variableHeader.keepAliveTimeSeconds();
+		// mqtt 5.0 Server Keep Alive：服务端可接管客户端心跳
+		int serverKeepAliveSeconds = 0;
+		int configuredKeepAlive = serverCreator.getMqttServerProperties().getServerKeepAlive();
+		if (configuredKeepAlive > 0) {
+			// Server Keep Alive 是服务端在 CONNACK 下发的覆盖值，客户端 CONNECT 中不会携带该属性。
+			serverKeepAliveSeconds = configuredKeepAlive;
+		}
 		long keepAliveTimeout = keepAliveSeconds * KEEP_ALIVE_UNIT;
 		if (keepAliveSeconds > 0 && heartbeatTimeout != keepAliveTimeout) {
 			context.setHeartbeatTimeout(keepAliveTimeout);
+		}
+		// mqtt 5.0 Server Keep Alive：当服务端实际接管心跳时，覆盖 heartbeatTimeout
+		if (serverKeepAliveSeconds > 0) {
+			context.setHeartbeatTimeout(serverKeepAliveSeconds * KEEP_ALIVE_UNIT);
 		}
 		// 7. session 处理，先默认全部连接关闭时清除，mqtt5 为 CleanStart，
 		// 按照 mqtt 协议的规则是下一次连接时清除，emq 是添加了全局 session 超时，关闭时激活 session 有效期倒计时
@@ -158,21 +181,25 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			messageStore.addWillMessage(uniqueId, willMessage);
 		}
 		// 9. 返回 ack
-		connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_ACCEPTED);
+		connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_ACCEPTED,
+			serverKeepAliveSeconds, assignedClientId, requestProblemInformation);
 		// 10. 在线通知
+		final String finalUniqueId = uniqueId;
 		executor.execute(() -> {
 			try {
-				connectStatusListener.online(context, uniqueId, userName);
+				connectStatusListener.online(context, finalUniqueId, userName);
 			} catch (Throwable e) {
-				logger.error("Mqtt server uniqueId:{} clientId:{} online notify error.", uniqueId, clientId, e);
+				logger.error("Mqtt server uniqueId:{} clientId:{} online notify error.", finalUniqueId, clientId, e);
 			}
 		});
 	}
 
-	private static void connAckByReturnCode(String clientId, String uniqueId, ChannelContext context, MqttConnectReasonCode returnCode) {
+	private void connAckByReturnCode(String clientId, String uniqueId, ChannelContext context, MqttConnectReasonCode returnCode,
+									 int serverKeepAlive, boolean assignedClientId, boolean requestProblemInformation) {
 		MqttConnAckMessage message = MqttConnAckMessage.builder()
 			.returnCode(returnCode)
 			.sessionPresent(false)
+			.properties(buildConnAckProperties(uniqueId, returnCode, serverKeepAlive, assignedClientId, requestProblemInformation).getProperties())
 			.build();
 		boolean result = Tio.send(context, message);
 		if (returnCode.isAccepted()) {
@@ -180,6 +207,47 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		} else {
 			logger.error("Connect error - clientId: {} uniqueId:{} returnCode:{} result:{}", clientId, uniqueId, returnCode, result);
 		}
+	}
+
+	private MqttConnAckProperties buildConnAckProperties(String uniqueId, MqttConnectReasonCode returnCode, int serverKeepAlive,
+														 boolean assignedClientId, boolean requestProblemInformation) {
+		if (!returnCode.isAccepted() && requestProblemInformation) {
+			return new MqttConnAckProperties().setReasonString(returnCode.toString());
+		}
+		MqttConnAckProperties connAckProperties = new MqttConnAckProperties();
+		if (!returnCode.isAccepted()) {
+			return connAckProperties;
+		}
+		MqttServerProperties properties = serverCreator.getMqttServerProperties();
+		connAckProperties
+			.setReceiveMaximum(properties.getReceiveMaximum())
+			.setMaximumQos(properties.getMaximumQos())
+			.setRetainAvailable(properties.isRetainAvailable())
+			.setMaximumPacketSize(Math.min(properties.getMaximumPacketSize(), serverCreator.getMaxBytesInMessage()))
+			.setTopicAliasMaximum(properties.getTopicAliasMaximum())
+			.setWildcardSubscriptionAvailable(properties.isWildcardSubscriptionAvailable())
+			.setSharedSubscriptionAvailable(properties.isSharedSubscriptionAvailable())
+			.setSubscriptionIdentifiersAvailable(properties.isSubscriptionIdentifierAvailable());
+		// 仅当 serverKeepAlive > 0 时才下发该字段，避免污染 3.x 客户端
+		if (serverKeepAlive > 0) {
+			connAckProperties.setServerKeepAlive(serverKeepAlive);
+		}
+		if (assignedClientId && StrUtil.isNotBlank(uniqueId)) {
+			connAckProperties.setAssignedClientIdentifier(uniqueId);
+		}
+		return connAckProperties;
+	}
+
+	private boolean isRequestProblemInformation(MqttConnectVariableHeader variableHeader) {
+		if (MqttVersion.MQTT_5.protocolLevel() != variableHeader.version()) {
+			return false;
+		}
+		Boolean requestProblemInformation = new MqttConnectProperties(variableHeader.properties()).getRequestProblemInformation();
+		return requestProblemInformation == null || requestProblemInformation;
+	}
+
+	private String newAssignedClientId() {
+		return "mica-" + UUID.randomUUID().toString().replace("-", "");
 	}
 
 	private void sendConnected(ChannelContext context, String uniqueId) {

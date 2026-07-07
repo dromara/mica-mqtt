@@ -20,7 +20,9 @@ import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
+import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
+import org.dromara.mica.mqtt.codec.message.header.MqttReasonCodeAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,8 +51,21 @@ public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 	@Override
 	public void handle(ChannelContext context, MqttMessage message) {
 		String clientId = context.getBsId();
-		logger.info("DisConnect - clientId:{} contextId:{}", clientId, context.getId());
+		byte reasonCode = getReasonCode(message);
+		if (reasonCode == MqttDisconnectReasonCode.NORMAL.value()) {
+			logger.info("DisConnect - clientId:{} contextId:{} reasonCode:0x{}", clientId, context.getId(), Integer.toHexString(reasonCode & 0xFF));
+		} else {
+			logger.warn("DisConnect - clientId:{} contextId:{} reasonCode:0x{}", clientId, context.getId(), Integer.toHexString(reasonCode & 0xFF));
+		}
 		context.setBizStatus(true);
 		Tio.remove(context, "Mqtt DisConnect");
+	}
+
+	private byte getReasonCode(MqttMessage message) {
+		Object variableHeader = message.variableHeader();
+		if (variableHeader instanceof MqttReasonCodeAndPropertiesVariableHeader) {
+			return ((MqttReasonCodeAndPropertiesVariableHeader) variableHeader).reasonCode();
+		}
+		return MqttDisconnectReasonCode.NORMAL.value();
 	}
 }

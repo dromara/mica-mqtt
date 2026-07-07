@@ -31,8 +31,11 @@ import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.MqttVersion;
+import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.message.builder.MqttDisconnectBuilder;
+import org.dromara.mica.mqtt.codec.message.properties.MqttDisconnectProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
@@ -305,7 +308,19 @@ public final class MqttServer {
 	 * @return 是否成功
 	 */
 	public boolean disconnect(String clientId) {
-		return disconnect(getChannelContext(clientId), clientId);
+		return disconnect(clientId, MqttDisconnectReasonCode.NORMAL, null);
+	}
+
+	/**
+	 * 服务端主动断开 mqtt 连接，mqtt5.0
+	 *
+	 * @param clientId clientId
+	 * @param reasonCode 断开原因码
+	 * @param properties MQTT 5.0 DISCONNECT properties
+	 * @return 是否成功
+	 */
+	public boolean disconnect(String clientId, MqttDisconnectReasonCode reasonCode, MqttDisconnectProperties properties) {
+		return disconnect(getChannelContext(clientId), clientId, reasonCode, properties);
 	}
 
 	/**
@@ -314,6 +329,10 @@ public final class MqttServer {
 	 * @return 是否成功
 	 */
 	private boolean disconnect(ChannelContext channelContext, String clientId) {
+		return disconnect(channelContext, clientId, MqttDisconnectReasonCode.NORMAL, null);
+	}
+
+	private boolean disconnect(ChannelContext channelContext, String clientId, MqttDisconnectReasonCode reasonCode, MqttDisconnectProperties properties) {
 		if (channelContext == null || clientId == null) {
 			logger.error("Mqtt server disconnect channelContext:{} or clientId:{} is null.", channelContext, clientId);
 			return false;
@@ -324,7 +343,11 @@ public final class MqttServer {
 			logger.error("Mqtt server disconnect clientId:{} mqtt version:{} not support.", clientId, mqttVersion);
 			return false;
 		}
-		boolean result = Tio.bSend(channelContext, MqttMessage.DISCONNECT);
+		MqttMessage disconnectMessage = new MqttDisconnectBuilder()
+			.reasonCode(reasonCode)
+			.properties(properties == null ? MqttProperties.NO_PROPERTIES : properties.getProperties())
+			.build();
+		boolean result = Tio.bSend(channelContext, disconnectMessage);
 		if (result) {
 			// 设置正常断开的标识
 			channelContext.setBizStatus(true);

@@ -21,9 +21,13 @@ import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttPubRecReasonCode;
+import org.dromara.mica.mqtt.codec.codes.MqttPubRelReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttPubReplyMessageVariableHeader;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
@@ -59,19 +63,35 @@ public class MqttPubRecHandler extends AbstractMqttMessageHandler {
 		MqttMessageIdVariableHeader variableHeader = (MqttMessageIdVariableHeader) rawMessage.variableHeader();
 		String clientId = context.getBsId();
 		int packetId = variableHeader.messageId();
-		logger.debug("PubRec - clientId:{}, packetId:{}", clientId, packetId);
+		byte reasonCode = getReasonCode(variableHeader);
+		logger.debug("PubRec - clientId:{} packetId:{} reasonCode:0x{}", clientId, packetId, Integer.toHexString(reasonCode & 0xFF));
 		MqttPendingPublish pendingPublish = sessionManager.getPendingPublish(clientId, packetId);
 		if (pendingPublish == null) {
 			return;
 		}
+		if (reasonCode != MqttPubRecReasonCode.SUCCESS.value()) {
+			logger.warn("PubRec failure - clientId:{} packetId:{} reasonCode:0x{}", clientId, packetId, Integer.toHexString(reasonCode & 0xFF));
+			pendingPublish.onPubAckReceived();
+			sessionManager.removePendingPublish(clientId, packetId);
+			return;
+		}
 		pendingPublish.onPubAckReceived();
 		MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBREL, false, MqttQoS.QOS1, false, 0);
-		MqttMessage pubRelMessage = new MqttMessage(fixedHeader, variableHeader);
+		MqttPubReplyMessageVariableHeader pubRelVariableHeader = new MqttPubReplyMessageVariableHeader(
+			packetId, MqttPubRelReasonCode.SUCCESS.value(), MqttProperties.NO_PROPERTIES);
+		MqttMessage pubRelMessage = new MqttMessage(fixedHeader, pubRelVariableHeader);
 
 		pendingPublish.setPubRelMessage(pubRelMessage);
 		pendingPublish.startPubRelRetransmissionTimer(taskService, context);
 
 		boolean result = Tio.send(context, pubRelMessage);
 		logger.debug("Publish - PubRel send clientId:{} packetId:{} result:{}", clientId, packetId, result);
+	}
+
+	private byte getReasonCode(MqttMessageIdVariableHeader variableHeader) {
+		if (variableHeader instanceof MqttPubReplyMessageVariableHeader) {
+			return ((MqttPubReplyMessageVariableHeader) variableHeader).reasonCode();
+		}
+		return MqttPubRecReasonCode.SUCCESS.value();
 	}
 }

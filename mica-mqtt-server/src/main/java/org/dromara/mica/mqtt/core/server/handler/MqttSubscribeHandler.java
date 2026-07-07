@@ -21,6 +21,7 @@ import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttSubAckReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubAckMessage;
@@ -75,27 +76,33 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 		String clientId = context.getBsId();
 		int packetId = message.variableHeader().messageId();
 		List<MqttTopicSubscription> topicSubscriptionList = message.payload().topicSubscriptions();
-		List<MqttQoS> grantedQosList = new ArrayList<>();
+		List<MqttSubAckReasonCode> reasonCodeList = new ArrayList<>();
 		List<String> subscribedTopicList = new ArrayList<>();
 		boolean enableSubscribeValidator = subscribeValidator != null;
 		for (MqttTopicSubscription subscription : topicSubscriptionList) {
 			String topicFilter = subscription.topicFilter();
-			TopicUtil.validateTopicFilter(topicFilter);
+			try {
+				TopicUtil.validateTopicFilter(topicFilter);
+			} catch (IllegalArgumentException e) {
+				reasonCodeList.add(MqttSubAckReasonCode.TOPIC_FILTER_INVALID);
+				logger.error("Subscribe - clientId:{} username:{} topicFilter:{} invalid packetId:{}", clientId, context.getUserId(), topicFilter, packetId, e);
+				continue;
+			}
 			MqttQoS mqttQoS = subscription.qualityOfService();
 			boolean noLocal = subscription.option().isNoLocal();
 			if (enableSubscribeValidator && !subscribeValidator.verifyTopicFilter(context, clientId, topicFilter, mqttQoS)) {
-				grantedQosList.add(MqttQoS.FAILURE);
+				reasonCodeList.add(MqttSubAckReasonCode.NOT_AUTHORIZED);
 				logger.error("Subscribe - clientId:{} username:{} topicFilter:{} mqttQoS:{} 没有订阅权限 packetId:{}", clientId, context.getUserId(), topicFilter, mqttQoS, packetId);
 			} else {
-				grantedQosList.add(mqttQoS);
+				reasonCodeList.add(MqttSubAckReasonCode.qosGranted(mqttQoS));
 				subscribedTopicList.add(topicFilter);
 				sessionManager.addSubscribe(new TopicFilter(topicFilter), clientId, mqttQoS.value(), noLocal);
 				logger.info("Subscribe - clientId:{} topicFilter:{} mqttQoS:{} noLocal:{} packetId:{}", clientId, topicFilter, mqttQoS, noLocal, packetId);
 				publishSubscribedEvent(context, clientId, topicFilter, mqttQoS);
 			}
 		}
-		MqttMessage subAckMessage = MqttSubAckMessage.builder()
-			.addGrantedQosList(grantedQosList)
+		MqttSubAckMessage subAckMessage = MqttSubAckMessage.builder()
+			.addReasonCodes(reasonCodeList.toArray(new MqttSubAckReasonCode[0]))
 			.packetId(packetId)
 			.build();
 		boolean result = Tio.send(context, subAckMessage);

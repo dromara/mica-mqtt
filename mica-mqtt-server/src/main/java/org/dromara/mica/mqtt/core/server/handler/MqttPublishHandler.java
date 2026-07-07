@@ -24,12 +24,16 @@ import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageFactory;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttPubAckReasonCode;
+import org.dromara.mica.mqtt.codec.codes.MqttPubRecReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPubAckMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttPubReplyMessageVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttPublishVariableHeader;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerPublishPermission;
@@ -76,12 +80,13 @@ public class MqttPublishHandler extends AbstractMqttMessageHandler {
 		MqttQoS mqttQoS = fixedHeader.qosLevel();
 		MqttPublishVariableHeader variableHeader = message.variableHeader();
 		String topicName = variableHeader.topicName();
+		int packetId = variableHeader.packetId();
 		// 1. 权限判断
 		if (publishPermission != null && !publishPermission.verifyPermission(context, clientId, topicName, mqttQoS, fixedHeader.isRetain())) {
 			logger.error("Mqtt clientId:{} username:{} topic:{} 没有发布权限。", clientId, context.getUserId(), topicName);
+			sendPublishNotAuthorized(context, clientId, mqttQoS, topicName, packetId);
 			return;
 		}
-		int packetId = variableHeader.packetId();
 		logger.debug("Publish - clientId:{} topicName:{} mqttQoS:{} packetId:{}", clientId, topicName, mqttQoS, packetId);
 		switch (mqttQoS) {
 			case QOS0:
@@ -92,6 +97,7 @@ public class MqttPublishHandler extends AbstractMqttMessageHandler {
 				if (packetId != -1) {
 					MqttMessage messageAck = MqttPubAckMessage.builder()
 						.packetId(packetId)
+						.reasonCode(MqttPubAckReasonCode.SUCCESS)
 						.build();
 					boolean resultPubAck = Tio.send(context, messageAck);
 					logger.debug("Publish - PubAck send clientId:{} topicName:{} mqttQoS:{} packetId:{} result:{}", clientId, topicName, mqttQoS, packetId, resultPubAck);
@@ -100,7 +106,9 @@ public class MqttPublishHandler extends AbstractMqttMessageHandler {
 			case QOS2:
 				if (packetId != -1) {
 					MqttFixedHeader pubRecFixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, MqttQoS.QOS0, false, 0);
-					MqttMessage pubRecMessage = new MqttMessage(pubRecFixedHeader, MqttMessageIdVariableHeader.from(packetId));
+					MqttPubReplyMessageVariableHeader pubRecVariableHeader = new MqttPubReplyMessageVariableHeader(
+						packetId, MqttPubRecReasonCode.SUCCESS.value(), MqttProperties.NO_PROPERTIES);
+					MqttMessage pubRecMessage = new MqttMessage(pubRecFixedHeader, pubRecVariableHeader);
 					MqttPendingQos2Publish pendingQos2Publish = new MqttPendingQos2Publish(message, pubRecMessage);
 					sessionManager.addPendingQos2Publish(clientId, packetId, pendingQos2Publish);
 					pendingQos2Publish.startPubRecRetransmitTimer(taskService, context);
@@ -111,6 +119,27 @@ public class MqttPublishHandler extends AbstractMqttMessageHandler {
 			case FAILURE:
 			default:
 				break;
+		}
+	}
+
+	private void sendPublishNotAuthorized(ChannelContext context, String clientId, MqttQoS mqttQoS, String topicName, int packetId) {
+		if (packetId == -1) {
+			return;
+		}
+		if (MqttQoS.QOS1 == mqttQoS) {
+			MqttMessage messageAck = MqttPubAckMessage.builder()
+				.packetId(packetId)
+				.reasonCode(MqttPubAckReasonCode.NOT_AUTHORIZED)
+				.build();
+			boolean result = Tio.send(context, messageAck);
+			logger.debug("Publish - PubAck rejected clientId:{} topicName:{} packetId:{} result:{}", clientId, topicName, packetId, result);
+		} else if (MqttQoS.QOS2 == mqttQoS) {
+			MqttFixedHeader pubRecFixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, MqttQoS.QOS0, false, 0);
+			MqttPubReplyMessageVariableHeader pubRecVariableHeader = new MqttPubReplyMessageVariableHeader(
+				packetId, MqttPubRecReasonCode.NOT_AUTHORIZED.value(), MqttProperties.NO_PROPERTIES);
+			MqttMessage pubRecMessage = new MqttMessage(pubRecFixedHeader, pubRecVariableHeader);
+			boolean result = Tio.send(context, pubRecMessage);
+			logger.debug("Publish - PubRec rejected clientId:{} topicName:{} packetId:{} result:{}", clientId, topicName, packetId, result);
 		}
 	}
 

@@ -20,9 +20,11 @@ import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
+import org.dromara.mica.mqtt.codec.codes.MqttUnSubAckReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttUnSubAckMessage;
 import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.builder.MqttUnSubAckBuilder;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
@@ -67,9 +69,12 @@ public class MqttUnSubscribeHandler extends AbstractMqttMessageHandler {
 			publishUnsubscribedEvent(context, clientId, topicFilter);
 		}
 		logger.info("UnSubscribe - clientId:{} Topic:{} packetId:{}", clientId, topicFilterList, packetId);
-		MqttMessage unSubMessage = MqttUnSubAckMessage.builder()
-			.packetId(packetId)
-			.build();
+		MqttUnSubAckBuilder builder = MqttUnSubAckMessage.builder()
+			.packetId(packetId);
+		for (int i = 0; i < topicFilterList.size(); i++) {
+			builder.addReasonCode(MqttUnSubAckReasonCode.SUCCESS);
+		}
+		MqttUnSubAckMessage unSubMessage = builder.build();
 		boolean result = Tio.send(context, unSubMessage);
 		logger.debug("UnSubscribe - UnSubAck send clientId:{} result:{}", clientId, result);
 	}
