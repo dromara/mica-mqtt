@@ -74,6 +74,7 @@ public class MqttPubRelHandler extends AbstractMqttMessageHandler {
 		if (reasonCode != MqttPubRelReasonCode.SUCCESS.value()) {
 			logger.warn("PubRel failure - clientId:{} packetId:{} reasonCode:0x{}", clientId, packetId, Integer.toHexString(reasonCode & 0xFF));
 			if (pendingQos2Publish != null) {
+				// 对端明确拒绝 PUBREL 时，不再投递业务消息，只关闭本地 QoS2 入站状态。
 				pendingQos2Publish.onPubRelReceived();
 				sessionManager.removePendingQos2Publish(clientId, packetId);
 			}
@@ -83,6 +84,7 @@ public class MqttPubRelHandler extends AbstractMqttMessageHandler {
 			pendingQos2Publish.onPubRelReceived();
 			sessionManager.removePendingQos2Publish(clientId, packetId);
 		}
+		// 即使本地找不到 pending，也回 PUBCOMP 结束对端状态机，避免对端持续重发 PUBREL。
 		MqttPubReplyMessageVariableHeader pubCompVariableHeader = new MqttPubReplyMessageVariableHeader(
 			packetId, MqttPubCompReasonCode.SUCCESS.value(), MqttProperties.NO_PROPERTIES);
 		MqttMessage message = MqttMessageFactory.newMessage(

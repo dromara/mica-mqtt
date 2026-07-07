@@ -84,6 +84,7 @@ public class MqttPublishHandler extends AbstractMqttMessageHandler {
 		// 1. 权限判断
 		if (publishPermission != null && !publishPermission.verifyPermission(context, clientId, topicName, mqttQoS, fixedHeader.isRetain())) {
 			logger.error("Mqtt clientId:{} username:{} topic:{} 没有发布权限。", clientId, context.getUserId(), topicName);
+			// MQTT 5.0 下 QoS1/2 发布被拒绝也要回 ACK，避免客户端等待重传直到超时。
 			sendPublishNotAuthorized(context, clientId, mqttQoS, topicName, packetId);
 			return;
 		}
@@ -106,6 +107,7 @@ public class MqttPublishHandler extends AbstractMqttMessageHandler {
 			case QOS2:
 				if (packetId != -1) {
 					MqttFixedHeader pubRecFixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, MqttQoS.QOS0, false, 0);
+					// 使用 MQTT 5.0 可扩展 variable header；encoder 会在 3.x 连接下自动压缩成 packetId-only。
 					MqttPubReplyMessageVariableHeader pubRecVariableHeader = new MqttPubReplyMessageVariableHeader(
 						packetId, MqttPubRecReasonCode.SUCCESS.value(), MqttProperties.NO_PROPERTIES);
 					MqttMessage pubRecMessage = new MqttMessage(pubRecFixedHeader, pubRecVariableHeader);
@@ -135,6 +137,7 @@ public class MqttPublishHandler extends AbstractMqttMessageHandler {
 			logger.debug("Publish - PubAck rejected clientId:{} topicName:{} packetId:{} result:{}", clientId, topicName, packetId, result);
 		} else if (MqttQoS.QOS2 == mqttQoS) {
 			MqttFixedHeader pubRecFixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, MqttQoS.QOS0, false, 0);
+			// QoS2 的拒绝在 PUBREC 阶段表达，客户端收到错误 reason code 后不应继续 PUBREL。
 			MqttPubReplyMessageVariableHeader pubRecVariableHeader = new MqttPubReplyMessageVariableHeader(
 				packetId, MqttPubRecReasonCode.NOT_AUTHORIZED.value(), MqttProperties.NO_PROPERTIES);
 			MqttMessage pubRecMessage = new MqttMessage(pubRecFixedHeader, pubRecVariableHeader);

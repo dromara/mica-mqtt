@@ -71,12 +71,14 @@ public class MqttPubRecHandler extends AbstractMqttMessageHandler {
 		}
 		if (reasonCode != MqttPubRecReasonCode.SUCCESS.value()) {
 			logger.warn("PubRec failure - clientId:{} packetId:{} reasonCode:0x{}", clientId, packetId, Integer.toHexString(reasonCode & 0xFF));
+			// 对端拒绝 QoS2 PUBLISH 后不会进入 PUBREL 阶段，本地 pending 要立即收敛。
 			pendingPublish.onPubAckReceived();
 			sessionManager.removePendingPublish(clientId, packetId);
 			return;
 		}
 		pendingPublish.onPubAckReceived();
 		MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBREL, false, MqttQoS.QOS1, false, 0);
+		// PUBREL 在 MQTT 5.0 中同样可以携带 reason code，3.x 连接由 encoder 保持兼容。
 		MqttPubReplyMessageVariableHeader pubRelVariableHeader = new MqttPubReplyMessageVariableHeader(
 			packetId, MqttPubRelReasonCode.SUCCESS.value(), MqttProperties.NO_PROPERTIES);
 		MqttMessage pubRelMessage = new MqttMessage(fixedHeader, pubRelVariableHeader);

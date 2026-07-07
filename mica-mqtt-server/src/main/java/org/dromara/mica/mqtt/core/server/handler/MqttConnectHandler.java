@@ -22,8 +22,8 @@ import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
+import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
-import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.MqttConnAckMessage;
@@ -45,7 +45,6 @@ import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -96,12 +95,13 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		String userName = payload.username();
 		String password = payload.password();
 		MqttConnectVariableHeader variableHeader = mqttMessage.variableHeader();
-		boolean requestProblemInformation = isRequestProblemInformation(variableHeader);
+		boolean requestProblemInformation = isRequestProblemInformation(context, variableHeader);
 		boolean assignedClientId = StrUtil.isBlank(clientId);
 		// 1. 获取唯一 id
 		String uniqueId = uniqueIdService.getUniqueId(context, clientId, userName, password);
-		if (StrUtil.isBlank(uniqueId) && assignedClientId && MqttVersion.MQTT_5.protocolLevel() == variableHeader.version()) {
-			uniqueId = newAssignedClientId();
+		// MQTT 5.0 允许客户端使用空 clientId；默认 uniqueIdService 返回空时由服务端兜底分配。
+		if (StrUtil.isBlank(uniqueId) && assignedClientId && MqttCodecUtil.isMqtt5(context)) {
+			uniqueId = StrUtil.getNanoId();
 		}
 		// 2. uniqueId 不能为空
 		if (StrUtil.isBlank(uniqueId)) {
@@ -211,6 +211,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 
 	private MqttConnAckProperties buildConnAckProperties(String uniqueId, MqttConnectReasonCode returnCode, int serverKeepAlive,
 														 boolean assignedClientId, boolean requestProblemInformation) {
+		// 失败 CONNACK 只返回诊断信息，避免把服务端能力位误宣告给未成功建立的连接。
 		if (!returnCode.isAccepted() && requestProblemInformation) {
 			return new MqttConnAckProperties().setReasonString(returnCode.toString());
 		}
@@ -223,6 +224,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			.setReceiveMaximum(properties.getReceiveMaximum())
 			.setMaximumQos(properties.getMaximumQos())
 			.setRetainAvailable(properties.isRetainAvailable())
+			// 协议宣告值不能大于实际解码上限，否则客户端会按错误上限发送大包。
 			.setMaximumPacketSize(Math.min(properties.getMaximumPacketSize(), serverCreator.getMaxBytesInMessage()))
 			.setTopicAliasMaximum(properties.getTopicAliasMaximum())
 			.setWildcardSubscriptionAvailable(properties.isWildcardSubscriptionAvailable())
@@ -238,16 +240,13 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		return connAckProperties;
 	}
 
-	private boolean isRequestProblemInformation(MqttConnectVariableHeader variableHeader) {
-		if (MqttVersion.MQTT_5.protocolLevel() != variableHeader.version()) {
+	private boolean isRequestProblemInformation(ChannelContext context, MqttConnectVariableHeader variableHeader) {
+		if (!MqttCodecUtil.isMqtt5(context)) {
 			return false;
 		}
+		// MQTT 5.0 默认允许返回问题信息；只有客户端显式 false 时才抑制 Reason String。
 		Boolean requestProblemInformation = new MqttConnectProperties(variableHeader.properties()).getRequestProblemInformation();
 		return requestProblemInformation == null || requestProblemInformation;
-	}
-
-	private String newAssignedClientId() {
-		return "mica-" + UUID.randomUUID().toString().replace("-", "");
 	}
 
 	private void sendConnected(ChannelContext context, String uniqueId) {

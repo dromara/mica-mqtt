@@ -71,6 +71,7 @@ public class MqttUnSubscribeHandler extends AbstractMqttMessageHandler {
 		logger.info("UnSubscribe - clientId:{} Topic:{} packetId:{}", clientId, topicFilterList, packetId);
 		MqttUnSubAckBuilder builder = MqttUnSubAckMessage.builder()
 			.packetId(packetId);
+		// MQTT 5.0 UNSUBACK payload 需要逐 topic 返回 reason code；当前删除操作保持幂等成功。
 		for (int i = 0; i < topicFilterList.size(); i++) {
 			builder.addReasonCode(MqttUnSubAckReasonCode.SUCCESS);
 		}

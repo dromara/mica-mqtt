@@ -38,6 +38,16 @@ public final class MqttCodecUtil {
 	}
 
 	/**
+	 * 判断是否 mqtt5.0 协议
+	 *
+	 * @param ctx ChannelContext
+	 * @return 是否 mqtt 5.0 协议
+	 */
+	public static boolean isMqtt5(ChannelContext ctx) {
+		return MqttVersion.MQTT_5 == getMqttVersion(ctx);
+	}
+
+	/**
 	 * mqtt 版本
 	 *
 	 * @param ctx ChannelContext
@@ -51,6 +61,12 @@ public final class MqttCodecUtil {
 		return version;
 	}
 
+	/**
+	 * 设置 mqtt 版本
+	 *
+	 * @param ctx     ChannelContext
+	 * @param version MqttVersion
+	 */
 	static void setMqttVersion(ChannelContext ctx, MqttVersion version) {
 		ctx.set(MQTT_VERSION_KEY, version);
 	}

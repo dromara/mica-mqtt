@@ -30,7 +30,6 @@ import net.dreamlu.mica.net.utils.timer.TimerTask;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
@@ -338,9 +337,8 @@ public final class MqttServer {
 			return false;
 		}
 		// 仅仅 mqtt5.0 支持服务端主动断开
-		MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(channelContext);
-		if (MqttVersion.MQTT_5 != mqttVersion) {
-			logger.error("Mqtt server disconnect clientId:{} mqtt version:{} not support.", clientId, mqttVersion);
+		if (!MqttCodecUtil.isMqtt5(channelContext)) {
+			logger.error("Mqtt server disconnect clientId:{} mqtt version:{} not support.", clientId, MqttCodecUtil.getMqttVersion(channelContext));
 			return false;
 		}
 		MqttMessage disconnectMessage = new MqttDisconnectBuilder()

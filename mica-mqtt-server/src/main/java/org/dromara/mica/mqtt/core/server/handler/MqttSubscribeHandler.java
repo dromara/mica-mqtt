@@ -84,6 +84,7 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 			try {
 				TopicUtil.validateTopicFilter(topicFilter);
 			} catch (IllegalArgumentException e) {
+				// SUBACK reason code 数量必须与 SUBSCRIBE topic filter 数量保持一致。
 				reasonCodeList.add(MqttSubAckReasonCode.TOPIC_FILTER_INVALID);
 				logger.error("Subscribe - clientId:{} username:{} topicFilter:{} invalid packetId:{}", clientId, context.getUserId(), topicFilter, packetId, e);
 				continue;
@@ -91,6 +92,7 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 			MqttQoS mqttQoS = subscription.qualityOfService();
 			boolean noLocal = subscription.option().isNoLocal();
 			if (enableSubscribeValidator && !subscribeValidator.verifyTopicFilter(context, clientId, topicFilter, mqttQoS)) {
+				// 仅拒绝当前 topic filter，其他合法订阅仍继续处理并在同一个 SUBACK 中逐项返回结果。
 				reasonCodeList.add(MqttSubAckReasonCode.NOT_AUTHORIZED);
 				logger.error("Subscribe - clientId:{} username:{} topicFilter:{} mqttQoS:{} 没有订阅权限 packetId:{}", clientId, context.getUserId(), topicFilter, mqttQoS, packetId);
 			} else {
@@ -108,6 +110,7 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 		boolean result = Tio.send(context, subAckMessage);
 		logger.info("Subscribe - SubAck send clientId:{} subscribedTopicList:{} packetId:{} result:{}", clientId, subscribedTopicList, packetId, result);
 		for (String topic : subscribedTopicList) {
+			// 只有成功写入 session 的订阅才触发保留消息补发，失败项不能收到 retained publish。
 			executor.submit(() -> sendRetainMessage(context, topic));
 		}
 	}

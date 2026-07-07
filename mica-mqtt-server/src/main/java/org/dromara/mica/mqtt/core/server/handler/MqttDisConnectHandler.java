@@ -66,6 +66,7 @@ public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 		if (variableHeader instanceof MqttReasonCodeAndPropertiesVariableHeader) {
 			return ((MqttReasonCodeAndPropertiesVariableHeader) variableHeader).reasonCode();
 		}
+		// MQTT 3.x DISCONNECT 只有固定头；统一按正常断开处理。
 		return MqttDisconnectReasonCode.NORMAL.value();
 	}
 }

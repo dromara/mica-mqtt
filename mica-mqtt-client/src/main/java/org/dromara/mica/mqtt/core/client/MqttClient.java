@@ -584,6 +584,7 @@ public final class MqttClient implements IMqttClient {
 		if (channelContext == null) {
 			return false;
 		}
+		// 对外暴露消息专用 properties 类型，避免调用方直接拼装通用 MqttProperties。
 		MqttMessage disconnectMessage = new MqttDisconnectBuilder()
 			.reasonCode(reasonCode)
 			.properties(properties == null ? MqttProperties.NO_PROPERTIES : properties.getProperties())
