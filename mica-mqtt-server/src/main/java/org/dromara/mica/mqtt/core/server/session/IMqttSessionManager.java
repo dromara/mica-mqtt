@@ -36,17 +36,6 @@ public interface IMqttSessionManager {
 	 * @param topicFilter topicFilter
 	 * @param clientId    客户端 Id
 	 * @param mqttQoS     MqttQoS
-	 */
-	default void addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS) {
-		this.addSubscribe(topicFilter, clientId, mqttQoS, false);
-	}
-
-	/**
-	 * 添加订阅存储
-	 *
-	 * @param topicFilter topicFilter
-	 * @param clientId    客户端 Id
-	 * @param mqttQoS     MqttQoS
 	 * @param noLocal     MQTT 5.0 No Local 标志
 	 */
 	void addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal);
