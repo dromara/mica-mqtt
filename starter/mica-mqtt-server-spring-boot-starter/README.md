@@ -41,6 +41,17 @@ mqtt:
     read-buffer-size: 8KB               # 接收数据的 buffer size，默认：8k
     max-bytes-in-message: 10MB          # 消息解析最大 bytes 长度，默认：10M
     max-client-id-length: 64            # 客户端 ID 最大长度，mqtt 3.1 规定 23，这里默认 64 以减少问题
+    # ------ MQTT 5.0 服务端能力属性（CONNACK Properties）------
+    properties:
+      receive-maximum: 65535            # 服务端允许客户端同时处理的 QoS1/QoS2 未确认报文上限，默认：65535（2.6.8 开始支持）
+      maximum-qos: 2                    # 服务端支持的最大 QoS，默认：2（2.6.8 开始支持）
+      retain-available: true            # 服务端是否支持保留消息，默认：true（2.6.8 开始支持）
+      maximum-packet-size: 268435456    # 服务端可处理的最大报文大小（字节），默认：268435456（2.6.8 开始支持）
+      topic-alias-maximum: 0            # 服务端支持的最大主题别名数，0 表示不启用，默认：0（2.6.8 开始支持）
+      wildcard-subscription-available: true # 服务端是否支持通配符订阅，默认：true（2.6.8 开始支持）
+      shared-subscription-available: true   # 服务端是否支持共享订阅，默认：true（2.6.8 开始支持）
+      subscription-identifier-available: false # 服务端是否支持订阅标识符，默认：false（2.6.8 开始支持）
+      server-keep-alive: 0              # 服务端下发给 MQTT 5.0 客户端的 Keep Alive，0 表示不接管，默认：0（2.6.8 开始支持）
     # ------ mqtt 认证 ------
     auth:
       enable: false                     # 是否开启 mqtt 认证，默认：false

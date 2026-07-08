@@ -78,8 +78,8 @@ public class MqttServerProperties {
 	/**
 	 * Server Keep Alive，服务端接管心跳（秒），0 表示不接管。
 	 * <p>
-	 * 最终生效值 = {@code min(clientKeepAlive, serverKeepAlive)}。
-	 * 仅在 CONNACK 实际接管时才下发该字段，避免污染 3.x 客户端。
+	 * 配置值会作为 CONNACK 的 Server Keep Alive 下发，客户端应使用该值替换 CONNECT 中的 Keep Alive。
+	 * 仅在实际接管时才下发该字段。
 	 */
 	private int serverKeepAlive = 0;
 

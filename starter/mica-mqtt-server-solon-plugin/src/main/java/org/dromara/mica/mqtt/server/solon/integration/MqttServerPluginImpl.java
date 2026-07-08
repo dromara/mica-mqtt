@@ -228,42 +228,54 @@ public class MqttServerPluginImpl implements Plugin {
 		return Optional.ofNullable(context.cfg().getByTmpl(value)).orElse(value);
 	}
 
-	private static MqttServerCreator getMqttServerCreator(AppContext context, MqttServerProperties properties) {
+	private static MqttServerCreator getMqttServerCreator(AppContext context, MqttServerProperties mqttServerProperties) {
 		MqttServerCreator serverCreator = MqttServer.create()
-			.name(properties.getName())
-			.heartbeatTimeout(properties.getHeartbeatTimeout())
-			.keepaliveBackoff(properties.getKeepaliveBackoff())
-			.readBufferSize((int) DataSize.parse(properties.getReadBufferSize()).getBytes())
-			.maxBytesInMessage((int) DataSize.parse(properties.getMaxBytesInMessage()).getBytes())
-			.maxClientIdLength(properties.getMaxClientIdLength())
-			.nodeName(properties.getNodeName())
-			.statEnable(properties.isStatEnable())
-			.proxyProtocolEnable(properties.isProxyProtocolOn());
-		if (properties.isDebug()) {
+			.name(mqttServerProperties.getName())
+			.heartbeatTimeout(mqttServerProperties.getHeartbeatTimeout())
+			.keepaliveBackoff(mqttServerProperties.getKeepaliveBackoff())
+			.readBufferSize((int) DataSize.parse(mqttServerProperties.getReadBufferSize()).getBytes())
+			.maxBytesInMessage((int) DataSize.parse(mqttServerProperties.getMaxBytesInMessage()).getBytes())
+			.maxClientIdLength(mqttServerProperties.getMaxClientIdLength())
+			.nodeName(mqttServerProperties.getNodeName())
+			.statEnable(mqttServerProperties.isStatEnable())
+			.proxyProtocolEnable(mqttServerProperties.isProxyProtocolOn())
+			.properties(properties -> {
+				MqttServerProperties.Properties serverProperties = mqttServerProperties.getProperties();
+				properties.receiveMaximum(serverProperties.getReceiveMaximum())
+					.maximumQos(serverProperties.getMaximumQos())
+					.retainAvailable(serverProperties.isRetainAvailable())
+					.maximumPacketSize(serverProperties.getMaximumPacketSize())
+					.topicAliasMaximum(serverProperties.getTopicAliasMaximum())
+					.wildcardSubscriptionAvailable(serverProperties.isWildcardSubscriptionAvailable())
+					.sharedSubscriptionAvailable(serverProperties.isSharedSubscriptionAvailable())
+					.subscriptionIdentifierAvailable(serverProperties.isSubscriptionIdentifierAvailable())
+					.serverKeepAlive(serverProperties.getServerKeepAlive());
+			});
+		if (mqttServerProperties.isDebug()) {
 			serverCreator.debug();
 		}
 		// tio 编解码等线程数
-		Integer tioExecutorSize = properties.getTioExecutorSize();
+		Integer tioExecutorSize = mqttServerProperties.getTioExecutorSize();
 		if (tioExecutorSize != null && tioExecutorSize > 0) {
 			serverCreator.tioExecutorSize(tioExecutorSize);
 		}
 		// AIO AsynchronousChannelGroup 的线程池
-		Integer groupExecutorSize = properties.getGroupExecutorSize();
+		Integer groupExecutorSize = mqttServerProperties.getGroupExecutorSize();
 		if (groupExecutorSize != null && groupExecutorSize > 0) {
 			serverCreator.groupExecutorSize(groupExecutorSize);
 		}
 		// mqtt 工作线程数
-		Integer mqttExecutorSize = properties.getMqttExecutorSize();
+		Integer mqttExecutorSize = mqttServerProperties.getMqttExecutorSize();
 		if (mqttExecutorSize != null && mqttExecutorSize > 0) {
 			serverCreator.mqttExecutorSize(mqttExecutorSize);
 		}
 		// mqtt 协议
-		MqttServerProperties.Listener mqttListener = properties.getMqttListener();
+		MqttServerProperties.Listener mqttListener = mqttServerProperties.getMqttListener();
 		if (mqttListener.isEnable()) {
 			serverCreator.enableMqtt(builder -> builder.serverNode(mqttListener.getServerNode()).build());
 		}
 		// mqtt ssl 协议
-		MqttServerProperties.SslListener mqttSslListener = properties.getMqttSslListener();
+		MqttServerProperties.SslListener mqttSslListener = mqttServerProperties.getMqttSslListener();
 		if (mqttSslListener.isEnable()) {
 			MqttServerProperties.Ssl ssl = mqttSslListener.getSsl();
 			serverCreator.enableMqttSsl(sslBuilder -> sslBuilder
@@ -272,11 +284,11 @@ public class MqttServerPluginImpl implements Plugin {
 				.build());
 		}
 		// mqtt websocket 协议
-		MqttServerProperties.Listener wsListener = properties.getWsListener();
+		MqttServerProperties.Listener wsListener = mqttServerProperties.getWsListener();
 		if (wsListener.isEnable()) {
 			serverCreator.enableMqttWs(builder -> builder.serverNode(wsListener.getServerNode()).build());
 		}
-		MqttServerProperties.SslListener wssListener = properties.getWssListener();
+		MqttServerProperties.SslListener wssListener = mqttServerProperties.getWssListener();
 		if (wssListener.isEnable()) {
 			MqttServerProperties.Ssl ssl = wssListener.getSsl();
 			serverCreator.enableMqttWss(sslBuilder -> sslBuilder
@@ -285,7 +297,7 @@ public class MqttServerPluginImpl implements Plugin {
 				.build());
 		}
 		// mqtt http api
-		MqttServerProperties.HttpListener httpListener = properties.getHttpListener();
+		MqttServerProperties.HttpListener httpListener = mqttServerProperties.getHttpListener();
 		if (httpListener.isEnable()) {
 			Node serverNode = httpListener.getServerNode();
 			MqttServerProperties.HttpBasicAuth basicAuth = httpListener.getBasicAuth();

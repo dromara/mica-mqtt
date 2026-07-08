@@ -20,7 +20,9 @@ import net.dreamlu.mica.net.client.ClientChannelContext;
 import net.dreamlu.mica.net.client.TioClient;
 import net.dreamlu.mica.net.client.TioClientConfig;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
+import org.dromara.mica.mqtt.codec.message.properties.MqttDisconnectProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.client.IMqttClientMessageListener;
 import org.dromara.mica.mqtt.core.client.MqttClient;
@@ -271,6 +273,20 @@ public class MqttClientKit {
 	/**
 	 * 发布消息
 	 *
+	 * @param topic      topic
+	 * @param payload    消息体
+	 * @param qos        MqttQoS
+	 * @param retain     是否在服务器上保留消息
+	 * @param properties MqttProperties
+	 * @return 是否发送成功
+	 */
+	public static boolean publish(String topic, Object payload, MqttQoS qos, boolean retain, MqttProperties properties) {
+		return client.publish(topic, payload, qos, retain, properties);
+	}
+
+	/**
+	 * 发布消息
+	 *
 	 * @param topic   topic
 	 * @param payload 消息体
 	 * @param qos     MqttQoS
@@ -295,6 +311,17 @@ public class MqttClientKit {
 	 */
 	public static boolean disconnect() {
 		return client.disconnect();
+	}
+
+	/**
+	 * 断开 mqtt 连接，支持 MQTT 5.0 Reason Code 和 Properties
+	 *
+	 * @param reasonCode 断开原因码
+	 * @param properties MQTT 5.0 DISCONNECT properties
+	 * @return 是否成功
+	 */
+	public static boolean disconnect(MqttDisconnectReasonCode reasonCode, MqttDisconnectProperties properties) {
+		return client.disconnect(reasonCode, properties);
 	}
 
 	/**

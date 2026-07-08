@@ -122,6 +122,10 @@ public class MqttServerProperties {
 	 * mqtt 工作线程数，默认：8或2倍CPU核心数（取较大值），如果消息量比较大，处理较慢，例如做 emqx 的转发消息处理，可以调大此参数
 	 */
 	private Integer mqttExecutorSize;
+	/**
+	 * MQTT 5.0 服务端能力配置，用于在 CONNACK 中告知客户端
+	 */
+	private Properties properties = new Properties();
 
 	@Getter
 	@Setter
@@ -265,5 +269,46 @@ public class MqttServerProperties {
 		 * message 端点
 		 */
 		private String sseMessageEndpoint = SseTransport.DEFAULT_MESSAGE_ENDPOINT;
+	}
+
+	@Getter
+	@Setter
+	public static class Properties {
+		/**
+		 * Receive Maximum，服务端允许客户端同时处理的 QoS1/QoS2 未确认报文上限
+		 */
+		private int receiveMaximum = 65535;
+		/**
+		 * Maximum QoS，服务端支持的最大 QoS
+		 */
+		private int maximumQos = 2;
+		/**
+		 * Retain Available，服务端是否支持保留消息
+		 */
+		private boolean retainAvailable = true;
+		/**
+		 * Maximum Packet Size，服务端可处理的最大报文大小（字节）
+		 */
+		private int maximumPacketSize = 268435456;
+		/**
+		 * Topic Alias Maximum，服务端支持的最大主题别名数（0 表示不启用）
+		 */
+		private int topicAliasMaximum = 0;
+		/**
+		 * Wildcard Subscription Available，服务端是否支持通配符订阅
+		 */
+		private boolean wildcardSubscriptionAvailable = true;
+		/**
+		 * Shared Subscription Available，服务端是否支持共享订阅
+		 */
+		private boolean sharedSubscriptionAvailable = true;
+		/**
+		 * Subscription Identifier Available，服务端是否支持订阅标识符
+		 */
+		private boolean subscriptionIdentifierAvailable = false;
+		/**
+		 * Server Keep Alive，服务端接管心跳（秒），0 表示不接管
+		 */
+		private int serverKeepAlive = 0;
 	}
 }

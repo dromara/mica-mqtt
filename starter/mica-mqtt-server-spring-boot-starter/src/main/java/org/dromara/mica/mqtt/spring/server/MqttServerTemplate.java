@@ -23,6 +23,8 @@ import net.dreamlu.mica.net.core.stat.vo.StatVo;
 import net.dreamlu.mica.net.utils.page.Page;
 import net.dreamlu.mica.net.utils.timer.TimerTask;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
+import org.dromara.mica.mqtt.codec.message.properties.MqttDisconnectProperties;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.model.ClientInfo;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
@@ -149,6 +151,18 @@ public class MqttServerTemplate {
 	 */
 	public boolean disconnect(String clientId) {
 		return mqttServer.disconnect(clientId);
+	}
+
+	/**
+	 * 服务端主动断开 mqtt 连接，支持 MQTT 5.0 Reason Code 和 Properties
+	 *
+	 * @param clientId clientId
+	 * @param reasonCode 断开原因码
+	 * @param properties MQTT 5.0 DISCONNECT properties
+	 * @return 是否成功
+	 */
+	public boolean disconnect(String clientId, MqttDisconnectReasonCode reasonCode, MqttDisconnectProperties properties) {
+		return mqttServer.disconnect(clientId, reasonCode, properties);
 	}
 
 	/**

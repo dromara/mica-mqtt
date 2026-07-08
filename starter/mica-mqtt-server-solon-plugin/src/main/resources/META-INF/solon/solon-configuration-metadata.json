@@ -190,6 +190,60 @@
       "description": "truststore 证书路径"
     },
     {
+      "name": "mqtt.server.properties.maximum-packet-size",
+      "type": "java.lang.Integer",
+      "description": "Maximum Packet Size，服务端可处理的最大报文大小（字节）",
+      "defaultValue": 268435456
+    },
+    {
+      "name": "mqtt.server.properties.maximum-qos",
+      "type": "java.lang.Integer",
+      "description": "Maximum QoS，服务端支持的最大 QoS",
+      "defaultValue": 2
+    },
+    {
+      "name": "mqtt.server.properties.receive-maximum",
+      "type": "java.lang.Integer",
+      "description": "Receive Maximum，服务端允许客户端同时处理的 QoS1/QoS2 未确认报文上限",
+      "defaultValue": 65535
+    },
+    {
+      "name": "mqtt.server.properties.retain-available",
+      "type": "java.lang.Boolean",
+      "description": "Retain Available，服务端是否支持保留消息",
+      "defaultValue": true
+    },
+    {
+      "name": "mqtt.server.properties.server-keep-alive",
+      "type": "java.lang.Integer",
+      "description": "Server Keep Alive，服务端接管心跳（秒），0 表示不接管",
+      "defaultValue": 0
+    },
+    {
+      "name": "mqtt.server.properties.shared-subscription-available",
+      "type": "java.lang.Boolean",
+      "description": "Shared Subscription Available，服务端是否支持共享订阅",
+      "defaultValue": true
+    },
+    {
+      "name": "mqtt.server.properties.subscription-identifier-available",
+      "type": "java.lang.Boolean",
+      "description": "Subscription Identifier Available，服务端是否支持订阅标识符",
+      "defaultValue": false
+    },
+    {
+      "name": "mqtt.server.properties.topic-alias-maximum",
+      "type": "java.lang.Integer",
+      "description": "Topic Alias Maximum，服务端支持的最大主题别名数（0 表示不启用）",
+      "defaultValue": 0
+    },
+    {
+      "name": "mqtt.server.properties.wildcard-subscription-available",
+      "type": "java.lang.Boolean",
+      "description": "Wildcard Subscription Available，服务端是否支持通配符订阅",
+      "defaultValue": true
+    },
+    {
       "name": "mqtt.server.name",
       "type": "java.lang.String",
       "description": "名称"

@@ -71,6 +71,9 @@ public class MqttPubRelHandler extends AbstractMqttMessageHandler {
 		byte reasonCode = getReasonCode(variableHeader);
 		logger.debug("PubRel - clientId:{} packetId:{} reasonCode:0x{}", clientId, packetId, Integer.toHexString(reasonCode & 0xFF));
 		MqttPendingQos2Publish pendingQos2Publish = sessionManager.getPendingQos2Publish(clientId, packetId);
+		MqttPubCompReasonCode pubCompReasonCode = pendingQos2Publish == null
+			? MqttPubCompReasonCode.PACKET_IDENTIFIER_NOT_FOUND
+			: MqttPubCompReasonCode.SUCCESS;
 		if (reasonCode != MqttPubRelReasonCode.SUCCESS.value()) {
 			logger.warn("PubRel failure - clientId:{} packetId:{} reasonCode:0x{}", clientId, packetId, Integer.toHexString(reasonCode & 0xFF));
 			if (pendingQos2Publish != null) {
@@ -84,9 +87,9 @@ public class MqttPubRelHandler extends AbstractMqttMessageHandler {
 			pendingQos2Publish.onPubRelReceived();
 			sessionManager.removePendingQos2Publish(clientId, packetId);
 		}
-		// 即使本地找不到 pending，也回 PUBCOMP 结束对端状态机，避免对端持续重发 PUBREL。
+		// 即使本地找不到 pending，也回 PUBCOMP 结束对端状态机；MQTT 5.0 会携带更精确的原因码。
 		MqttPubReplyMessageVariableHeader pubCompVariableHeader = new MqttPubReplyMessageVariableHeader(
-			packetId, MqttPubCompReasonCode.SUCCESS.value(), MqttProperties.NO_PROPERTIES);
+			packetId, pubCompReasonCode.value(), MqttProperties.NO_PROPERTIES);
 		MqttMessage message = MqttMessageFactory.newMessage(
 			new MqttFixedHeader(MqttMessageType.PUBCOMP, false, MqttQoS.QOS0, false, 0),
 			pubCompVariableHeader, null);

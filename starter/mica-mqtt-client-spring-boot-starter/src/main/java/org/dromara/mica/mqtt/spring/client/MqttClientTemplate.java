@@ -22,8 +22,10 @@ import net.dreamlu.mica.net.client.TioClient;
 import net.dreamlu.mica.net.client.TioClientConfig;
 import net.dreamlu.mica.net.utils.timer.TimerTask;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
+import org.dromara.mica.mqtt.codec.message.properties.MqttDisconnectProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.client.*;
 import org.springframework.beans.BeansException;
@@ -347,6 +349,17 @@ public class MqttClientTemplate implements ApplicationContextAware, SmartInitial
 	 */
 	public boolean disconnect() {
 		return client.disconnect();
+	}
+
+	/**
+	 * 断开 mqtt 连接，支持 MQTT 5.0 Reason Code 和 Properties
+	 *
+	 * @param reasonCode 断开原因码
+	 * @param properties MQTT 5.0 DISCONNECT properties
+	 * @return 是否成功
+	 */
+	public boolean disconnect(MqttDisconnectReasonCode reasonCode, MqttDisconnectProperties properties) {
+		return client.disconnect(reasonCode, properties);
 	}
 
 	/**
