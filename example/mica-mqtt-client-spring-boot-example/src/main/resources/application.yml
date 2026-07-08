@@ -46,5 +46,6 @@ logging:
   level:
     root: info
     server: info # t-io 服务端默认日志
-    org.tio: info # t-io 服务端默认日志
+    org.tio: info # mica-net 客户端默认日志（兼容老版本 t-io）
+    net.dreamlu.mica.net: info # mica-net 客户端默认日志
     org.dromara.mica.mqtt: info # mica-mqtt 日志

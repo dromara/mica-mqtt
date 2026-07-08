@@ -22,6 +22,7 @@ import net.dreamlu.mica.net.client.TioClientConfig;
 import net.dreamlu.mica.net.client.intf.TioClientHandler;
 import net.dreamlu.mica.net.client.intf.TioClientListener;
 import net.dreamlu.mica.net.client.task.HeartbeatTimeoutStrategy;
+import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Node;
 import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.core.ssl.SslConfig;
@@ -780,7 +781,7 @@ public final class MqttClientCreator {
 		// 5. 重连配置
 		ReconnConf reconnConf = null;
 		if (this.reconnect) {
-			reconnConf = new ReconnConf(this.reInterval, this.retryCount);
+			reconnConf = new ReconnConf(this.reInterval, this.retryCount, ChannelContext::isAccepted);
 		}
 		// 6. tioConfig
 		TioClientConfig clientConfig = new TioClientConfig(clientAioHandler, clientAioListener, reconnConf, tioExecutor, groupExecutor);

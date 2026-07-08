@@ -66,12 +66,12 @@
     },
     {
       "name": "mqtt.client.heartbeat-mode",
-      "type": "org.tio.core.task.HeartbeatMode",
+      "type": "net.dreamlu.mica.net.core.task.HeartbeatMode",
       "description": "心跳模式，支持最后发送或接收心跳时间来计算心跳，默认：最后发送心跳的时间"
     },
     {
       "name": "mqtt.client.heartbeat-timeout-strategy",
-      "type": "org.tio.client.task.HeartbeatTimeoutStrategy",
+      "type": "net.dreamlu.mica.net.client.task.HeartbeatTimeoutStrategy",
       "description": "心跳超时策略，支持发送 PING 和 CLOSE 断开连接，默认：最大努力发送 PING"
     },
     {
