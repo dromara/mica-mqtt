@@ -171,6 +171,18 @@ public final class MqttProperties {
 	}
 
 	/**
+	 * Get property by ID. If there are multiple properties of this type (can be with Subscription ID)
+	 * then return the first one.
+	 *
+	 * @param mqttPropertyType Type of the property
+	 * @return a property value if it is set, null otherwise
+	 */
+	public Boolean getBooleanPropertyValue(MqttPropertyType mqttPropertyType) {
+		Integer value = getPropertyValue(mqttPropertyType);
+		return value == null ? null : value != 0;
+	}
+
+	/**
 	 * Get properties by ID.
 	 * Some properties (Subscription ID and User Properties) may occur multiple times,
 	 * this method returns all their values in order.

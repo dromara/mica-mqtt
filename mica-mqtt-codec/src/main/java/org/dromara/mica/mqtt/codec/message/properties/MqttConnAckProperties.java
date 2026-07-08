@@ -249,7 +249,7 @@ public class MqttConnAckProperties {
 	 * @return 保留可用标志，如果未设置则返回null
 	 */
 	public Boolean getRetainAvailable() {
-		return properties.getPropertyValue(MqttPropertyType.RETAIN_AVAILABLE);
+		return properties.getBooleanPropertyValue(MqttPropertyType.RETAIN_AVAILABLE);
 	}
 
 	/**
@@ -289,7 +289,7 @@ public class MqttConnAckProperties {
 	 * @return 通配符订阅可用标志，如果未设置则返回null
 	 */
 	public Boolean getWildcardSubscriptionAvailable() {
-		return properties.getPropertyValue(MqttPropertyType.WILDCARD_SUBSCRIPTION_AVAILABLE);
+		return properties.getBooleanPropertyValue(MqttPropertyType.WILDCARD_SUBSCRIPTION_AVAILABLE);
 	}
 
 	/**
@@ -309,7 +309,7 @@ public class MqttConnAckProperties {
 	 * @return 订阅标识符可用标志，如果未设置则返回null
 	 */
 	public Boolean getSubscriptionIdentifiersAvailable() {
-		return properties.getPropertyValue(MqttPropertyType.SUBSCRIPTION_IDENTIFIER_AVAILABLE);
+		return properties.getBooleanPropertyValue(MqttPropertyType.SUBSCRIPTION_IDENTIFIER_AVAILABLE);
 	}
 
 	/**
@@ -329,7 +329,7 @@ public class MqttConnAckProperties {
 	 * @return 共享订阅可用标志，如果未设置则返回null
 	 */
 	public Boolean getSharedSubscriptionAvailable() {
-		return properties.getPropertyValue(MqttPropertyType.SHARED_SUBSCRIPTION_AVAILABLE);
+		return properties.getBooleanPropertyValue(MqttPropertyType.SHARED_SUBSCRIPTION_AVAILABLE);
 	}
 
 	/**

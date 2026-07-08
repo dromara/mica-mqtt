@@ -16,8 +16,7 @@
 
 package org.dromara.mica.mqtt.codec.properties;
 
-public final class BooleanProperty extends MqttProperty<Integer> {
-
+public final class BooleanProperty extends IntegerProperty {
 	public BooleanProperty(MqttPropertyType propertyType, boolean value) {
 		this(propertyType.value(), value);
 	}

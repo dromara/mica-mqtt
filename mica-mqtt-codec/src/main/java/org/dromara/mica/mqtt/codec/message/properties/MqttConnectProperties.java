@@ -109,7 +109,7 @@ public class MqttConnectProperties {
 	 * @return 请求问题信息，如果未设置则返回null
 	 */
 	public Boolean getRequestProblemInformation() {
-		return properties.getPropertyValue(MqttPropertyType.REQUEST_PROBLEM_INFORMATION);
+		return properties.getBooleanPropertyValue(MqttPropertyType.REQUEST_PROBLEM_INFORMATION);
 	}
 
 	/**
@@ -129,7 +129,7 @@ public class MqttConnectProperties {
 	 * @return 请求响应信息，如果未设置则返回null
 	 */
 	public Boolean getRequestResponseInformation() {
-		return properties.getPropertyValue(MqttPropertyType.REQUEST_RESPONSE_INFORMATION);
+		return properties.getBooleanPropertyValue(MqttPropertyType.REQUEST_RESPONSE_INFORMATION);
 	}
 
 	/**

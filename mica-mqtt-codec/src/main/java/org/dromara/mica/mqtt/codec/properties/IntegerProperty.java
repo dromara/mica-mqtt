@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.codec.properties;
 
-public final class IntegerProperty extends MqttProperty<Integer> {
+public class IntegerProperty extends MqttProperty<Integer> {
 
 	public IntegerProperty(MqttPropertyType propertyType, Integer value) {
 		super(propertyType.value(), value);
