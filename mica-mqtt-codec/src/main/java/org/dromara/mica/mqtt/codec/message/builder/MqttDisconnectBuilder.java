@@ -44,7 +44,7 @@ public final class MqttDisconnectBuilder {
 	}
 
 	public MqttDisconnectBuilder properties(MqttProperties properties) {
-		this.properties = properties;
+		this.properties = properties == null ? MqttProperties.NO_PROPERTIES : properties;
 		return this;
 	}
 

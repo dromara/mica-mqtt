@@ -87,5 +87,5 @@ mica:
       keystore-pass:            # 必选参数：ssl keystore 密码
       truststore-path:          # 可选参数：ssl 双向认证 truststore 目录，支持 classpath:/ 路径。
       truststore-pass:          # 可选参数：ssl 双向认证 truststore 密码
-      client-auth: none         # 是否需要客户端认证（双向认证），默认：NONE（不需要）
+      client-auth: NONE         # 是否需要客户端认证（双向认证），默认：NONE（不需要）
 ```

@@ -176,6 +176,7 @@ public class MqttServerConfiguration {
 					McpServer mcpServer = new McpServer();
 					mcpServer.useStreamableTransport(mcp.getEndpoint());
 					mcpServer.useSseTransport(mcp.getSseEndpoint(), mcp.getSseMessageEndpoint());
+					builder.mcpServer(mcpServer);
 				}
 				if (ssl.isEnable()) {
 					builder.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());

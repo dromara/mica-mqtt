@@ -45,7 +45,7 @@ public final class MqttAuthBuilder {
 	}
 
 	public MqttAuthBuilder properties(MqttProperties properties) {
-		this.properties = properties;
+		this.properties = properties == null ? MqttProperties.NO_PROPERTIES : properties;
 		return this;
 	}
 
@@ -64,7 +64,8 @@ public final class MqttAuthBuilder {
 		MqttFixedHeader mqttFixedHeader =
 			new MqttFixedHeader(MqttMessageType.AUTH, false, MqttQoS.QOS0, false, 0);
 		MqttReasonCodeAndPropertiesVariableHeader mqttAuthVariableHeader =
-			new MqttReasonCodeAndPropertiesVariableHeader(reasonCode.value(), properties);
+			new MqttReasonCodeAndPropertiesVariableHeader(
+				reasonCode == null ? MqttAuthReasonCode.SUCCESS.value() : reasonCode.value(), properties);
 		return new MqttMessage(mqttFixedHeader, mqttAuthVariableHeader);
 	}
 }

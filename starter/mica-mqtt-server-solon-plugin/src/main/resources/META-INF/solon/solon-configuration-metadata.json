@@ -61,7 +61,7 @@
       "description": "服务端 ip"
     },
     {
-      "name": "mqtt.server.http-listener.mcp-server.enable",
+      "name": "mqtt.server.http-listener.mcp.enable",
       "type": "java.lang.Boolean",
       "description": "是否启用，默认：关闭",
       "defaultValue": "false"
@@ -88,7 +88,7 @@
     },
     {
       "name": "mqtt.server.http-listener.ssl.client-auth",
-      "type": "org.tio.core.ssl.ClientAuth",
+      "type": "net.dreamlu.mica.net.core.ssl.ClientAuth",
       "description": "认证类型"
     },
     {
@@ -166,7 +166,7 @@
     },
     {
       "name": "mqtt.server.mqtt-ssl-listener.ssl.client-auth",
-      "type": "org.tio.core.ssl.ClientAuth",
+      "type": "net.dreamlu.mica.net.core.ssl.ClientAuth",
       "description": "认证类型"
     },
     {
@@ -301,7 +301,7 @@
     },
     {
       "name": "mqtt.server.wss-listener.ssl.client-auth",
-      "type": "org.tio.core.ssl.ClientAuth",
+      "type": "net.dreamlu.mica.net.core.ssl.ClientAuth",
       "description": "认证类型"
     },
     {
