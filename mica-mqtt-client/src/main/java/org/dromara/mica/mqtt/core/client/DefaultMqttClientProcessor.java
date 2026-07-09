@@ -198,7 +198,20 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		}
 		logger.info("MQTT flushing {} pending publish messages", pendingMessages.size());
 		for (MqttPublishMessage message : pendingMessages) {
+			MqttQoS qos = message.fixedHeader().qosLevel();
+			boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
+			int packetId = message.variableHeader().packetId();
+			MqttPendingPublish pendingPublish = null;
+			if (isHighLevelQoS && packetId > 0) {
+				pendingPublish = new MqttPendingPublish(message, qos);
+				clientSession.addPendingPublish(packetId, pendingPublish);
+				pendingPublish.startPublishRetransmissionTimer(taskService, context);
+			}
 			boolean result = Tio.send(context, message);
+			if (!result && pendingPublish != null) {
+				clientSession.removePendingPublish(packetId);
+				pendingPublish.cancelRetransmitTimer();
+			}
 			if (logger.isDebugEnabled()) {
 				String topicName = message.variableHeader().topicName();
 				logger.debug("MQTT pending publish message sent, topic:{} result:{}", topicName, result);

@@ -113,7 +113,9 @@ public final class MqttProperties {
 
 	public boolean isEmpty() {
 		Map<Integer, MqttProperty> props = this.props;
-		return props == null || props.isEmpty();
+		return (props == null || props.isEmpty())
+			&& (subscriptionIds == null || subscriptionIds.isEmpty())
+			&& (userProperties == null || userProperties.isEmpty());
 	}
 
 	/**

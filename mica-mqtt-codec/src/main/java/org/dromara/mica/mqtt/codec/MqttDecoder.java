@@ -309,6 +309,12 @@ public final class MqttDecoder {
 		final int willQos = (b1 & 0x18) >> 3;
 		final boolean willFlag = (b1 & 0x04) == 0x04;
 		final boolean cleanStart = (b1 & 0x02) == 0x02;
+		if (!willFlag && (willRetain || willQos != 0)) {
+			throw new DecoderException("Will QoS and Will Retain must be 0 when Will Flag is 0");
+		}
+		if (willFlag && willQos == 3) {
+			throw new DecoderException("Will QoS must not be 3");
+		}
 		if (version == MqttVersion.MQTT_3_1_1 || version == MqttVersion.MQTT_5) {
 			final boolean zeroReservedFlag = (b1 & 0x01) == 0x0;
 			if (!zeroReservedFlag) {
@@ -345,7 +351,11 @@ public final class MqttDecoder {
 	private static MqttConnAckVariableHeader decodeConnAckVariableHeader(
 		ChannelContext ctx, ByteBuffer buffer, IntValue bytesConsumed) {
 		final MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
-		final boolean sessionPresent = (ByteBufferUtil.readUnsignedByte(buffer) & 0x01) == 0x01;
+		final short connAckFlags = ByteBufferUtil.readUnsignedByte(buffer);
+		if ((connAckFlags & 0xFE) != 0) {
+			throw new DecoderException("CONNACK reserved flags must be 0");
+		}
+		final boolean sessionPresent = (connAckFlags & 0x01) == 0x01;
 		byte returnCode = buffer.get();
 		final MqttProperties properties;
 		if (mqttVersion == MqttVersion.MQTT_5) {
@@ -414,6 +424,9 @@ public final class MqttDecoder {
 				willProperties = MqttProperties.NO_PROPERTIES;
 			}
 			decodedWillTopic = decodeString(buffer, 0, 32767, tempBytesConsumed);
+			if (decodedWillTopic == null) {
+				throw new MqttIdentifierRejectedException("will topic length must be between 0 and 32767 bytes");
+			}
 			numberOfBytesConsumed += tempBytesConsumed.value;
 			decodedWillMessage = decodeByteArray(buffer);
 			numberOfBytesConsumed += decodedWillMessage.length + 2;
@@ -452,6 +465,9 @@ public final class MqttDecoder {
 			numberOfBytesConsumed += tempBytesConsumed.value;
 			//See 3.8.3.1 Subscription Options of MQTT 5.0 specification for optionByte details
 			final short optionByte = ByteBufferUtil.readUnsignedByte(buffer);
+			if ((optionByte & 0xC0) != 0) {
+				throw new DecoderException("SUBSCRIBE option reserved bits must be 0");
+			}
 
 			MqttQoS qos = MqttQoS.valueOf(optionByte & 0x03);
 			boolean noLocal = ((optionByte & 0x04) >> 2) == 1;
@@ -513,8 +529,7 @@ public final class MqttDecoder {
 			bytesConsumed.value = 2 + size;
 			return null;
 		}
-		String s = new String(buffer.array(), buffer.position(), size, StandardCharsets.UTF_8);
-		ByteBufferUtil.skipBytes(buffer, size);
+		String s = new String(ByteBufferUtil.readBytes(buffer, size), StandardCharsets.UTF_8);
 		bytesConsumed.value = 2 + size;
 		return s;
 	}

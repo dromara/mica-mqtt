@@ -20,14 +20,17 @@ import org.dromara.mica.mqtt.codec.MqttDecoder;
 import org.dromara.mica.mqtt.codec.MqttEncoder;
 import org.dromara.mica.mqtt.codec.message.properties.MqttConnAckProperties;
 import org.dromara.mica.mqtt.codec.message.properties.MqttConnectProperties;
+import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
+import org.dromara.mica.mqtt.codec.properties.UserProperty;
 import org.junit.jupiter.api.Test;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -145,6 +148,25 @@ class MqttSingleBytePropertyRoundTripTest {
 		assertNotNull(bytes);
 		MqttProperties decoded = MqttDecoder.decodeProperties(bytes);
 		assertNotNull(decoded);
+	}
+
+	@Test
+	void userPropertiesAreNotEmpty() {
+		MqttProperties properties = new MqttProperties();
+		properties.add(new UserProperty("key", "value"));
+
+		assertFalse(properties.isEmpty());
+	}
+
+	@Test
+	void subscriptionIdentifiersAreNotEmptyAndRoundTripAllValues() {
+		MqttProperties properties = new MqttProperties();
+		properties.add(new IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER, 1));
+		properties.add(new IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER, 2));
+
+		assertFalse(properties.isEmpty());
+		MqttProperties decoded = roundTrip(properties);
+		assertEquals(2, decoded.getProperties(MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value()).size());
 	}
 
 	private static MqttProperties roundTrip(MqttProperties source) {
