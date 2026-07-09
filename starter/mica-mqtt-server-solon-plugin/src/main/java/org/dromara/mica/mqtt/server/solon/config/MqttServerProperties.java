@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import net.dreamlu.mica.net.core.Node;
-import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.core.ssl.ClientAuth;
 import net.dreamlu.mica.net.http.mcp.server.transport.SseTransport;
 import net.dreamlu.mica.net.http.mcp.server.transport.StreamableHttpTransport;
@@ -116,13 +115,16 @@ public class MqttServerProperties {
 	 */
 	private Properties properties = new Properties();
 	/**
-	 * 线程池优雅关闭等待超时时间（秒），默认 30s
+	 * 线程池优雅关闭等待超时时间（秒），默认 120s。
+	 * 服务端 stop 时会按连接逐个触发 IMqttConnectStatusListener.onDisconnect，
+	 * 这些任务由 groupExecutor（默认 8~16 线程）串行处理；30s 在多设备 / 重 onDisconnect 场景下会被强制 shutdownNow。
+	 * 请同步将部署环境终止宽限期（如 k8s terminationGracePeriodSeconds）调到不小于此值。
 	 */
-	private int gracefulTimeoutSec = TioConfig.DEFAULT_GRACEFUL_TIMEOUT_SEC;
+	private int gracefulTimeoutSec = 120;
 	/**
 	 * shutdownNow 后的二次等待超时时间（秒），默认 5s
 	 */
-	private int forceTimeoutSec = TioConfig.DEFAULT_FORCE_TIMEOUT_SEC;
+	private int forceTimeoutSec = 5;
 
 	@Getter
 	@Setter

@@ -226,14 +226,14 @@ public final class MqttClientCreator {
 	private int pendingPublishQueueSize = 10;
 	/**
 	 * 线程池优雅关闭等待超时时间（秒），默认 30s。
-	 * 超时后会调用 shutdownNow() 强制中断未完成任务。
+	 * 客户端最多只持有一个连接，disconnect 处理通常毫秒级完成，30s 已足够。
 	 */
-	private int gracefulTimeoutSec = TioConfig.DEFAULT_GRACEFUL_TIMEOUT_SEC;
+	private int gracefulTimeoutSec = 30;
 	/**
 	 * shutdownNow 后的二次等待超时时间（秒），默认 5s。
 	 * 用于回收被中断的 worker 线程，通常 5~10s 足够。
 	 */
-	private int forceTimeoutSec = TioConfig.DEFAULT_FORCE_TIMEOUT_SEC;
+	private int forceTimeoutSec = 5;
 
 	public String getName() {
 		return name;

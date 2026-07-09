@@ -37,8 +37,8 @@
     {
       "name": "mqtt.server.graceful-timeout-sec",
       "type": "java.lang.Integer",
-      "description": "mqtt 工作线程池优雅关闭等待超时时间，单位：秒，默认：30（2.6.8 开始支持）。超过该时间后会调用 shutdownNow() 强制中断未完成任务。",
-      "defaultValue": 30
+      "description": "mqtt 工作线程池优雅关闭等待超时时间，单位：秒，默认：120（2.6.8 开始支持）。服务端 stop 时会按连接逐个触发 IMqttConnectStatusListener.onDisconnect，这些任务由 groupExecutor（默认 8~16 线程）串行处理，30s 不足以排空多设备的离线回调队列；如挂载更多设备或 onDisconnect 包含数据库/接口调用，请同步调大此值，并将部署环境的终止宽限期（如 k8s terminationGracePeriodSeconds）调到不小于此值。",
+      "defaultValue": 120
     },
     {
       "name": "mqtt.server.heartbeat-timeout",

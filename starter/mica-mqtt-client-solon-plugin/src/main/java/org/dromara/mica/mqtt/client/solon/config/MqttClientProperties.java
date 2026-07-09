@@ -19,7 +19,6 @@ package org.dromara.mica.mqtt.client.solon.config;
 import lombok.Getter;
 import lombok.Setter;
 import net.dreamlu.mica.net.client.task.HeartbeatTimeoutStrategy;
-import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.core.task.HeartbeatMode;
 import org.dromara.mica.mqtt.codec.MqttConstant;
 import org.dromara.mica.mqtt.codec.MqttQoS;
@@ -188,13 +187,14 @@ public class MqttClientProperties {
 	 */
 	private Ssl ssl = new Ssl();
 	/**
-	 * 线程池优雅关闭等待超时时间（秒），默认 30s
+	 * 线程池优雅关闭等待超时时间（秒），默认 30s。
+	 * 客户端只有一个连接，断连处理通常毫秒级完成，30s 已足够。
 	 */
-	private int gracefulTimeoutSec = TioConfig.DEFAULT_GRACEFUL_TIMEOUT_SEC;
+	private int gracefulTimeoutSec = 30;
 	/**
 	 * shutdownNow 后的二次等待超时时间（秒），默认 5s
 	 */
-	private int forceTimeoutSec = TioConfig.DEFAULT_FORCE_TIMEOUT_SEC;
+	private int forceTimeoutSec = 5;
 
 	@Getter
 	@Setter

@@ -35,7 +35,11 @@ mqtt:
     tio-executor-size:                  # tio 编解码等线程数
     group-executor-size:                # AIO AsynchronousChannelGroup 的线程池
     mqtt-executor-size:                 # mqtt 工作线程数，默认：8或2倍CPU核心数（取较大值），消息量大时调大此参数
-    graceful-timeout-sec: 30           # mqtt 工作线程池优雅关闭等待超时时间，单位：秒，默认：30（2.6.8 开始支持）。超过该时间后会调用 shutdownNow() 强制中断未完成任务。
+    graceful-timeout-sec: 120          # mqtt 工作线程池优雅关闭等待超时时间，单位：秒，默认：120（2.6.8 开始支持）。
+                                       # 服务端 stop 时会按连接逐个触发 IMqttConnectStatusListener.onDisconnect，
+                                       # 这些任务由 groupExecutor（默认 8~16 线程）串行处理，30s 不足以排空多设备的离线回调队列。
+                                       # 如果挂载的设备更多、或 onDisconnect 中包含数据库/接口调用，请同步调大此值；
+                                       # 同时务必把部署环境的终止宽限期（如 k8s terminationGracePeriodSeconds）调到不小于此值，否则进程会被 SIGKILL 强杀。
     force-timeout-sec: 5               # shutdownNow 后的二次等待超时时间，单位：秒，默认：5（2.6.8 开始支持）。用于回收被中断的 worker 线程，通常 5~10s 足够。
     # ------ mqtt 协议参数 ------
     heartbeat-timeout: 120000           # 心跳超时时间（单位：毫秒，默认：1000 * 120），设为 0 或负数表示禁用
