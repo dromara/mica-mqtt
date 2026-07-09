@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.server;
 
 import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.core.task.HeartbeatMode;
 import net.dreamlu.mica.net.server.TioServerConfig;
 import net.dreamlu.mica.net.server.intf.TioServerHandler;
@@ -203,6 +204,16 @@ public class MqttServerCreator {
 	 * mqtt 5.0 服务端能力配置，用于在 CONNACK 中告知客户端
 	 */
 	private final MqttServerProperties properties = new MqttServerProperties();
+	/**
+	 * 线程池优雅关闭等待超时时间（秒），默认 30s。
+	 * 超时后会调用 shutdownNow() 强制中断未完成任务。
+	 */
+	private int gracefulTimeoutSec = net.dreamlu.mica.net.core.TioConfig.DEFAULT_GRACEFUL_TIMEOUT_SEC;
+	/**
+	 * shutdownNow 后的二次等待超时时间（秒），默认 5s。
+	 * 用于回收被中断的 worker 线程，通常 5~10s 足够。
+	 */
+	private int forceTimeoutSec = net.dreamlu.mica.net.core.TioConfig.DEFAULT_FORCE_TIMEOUT_SEC;
 
 	public String getName() {
 		return name;
@@ -528,6 +539,42 @@ public class MqttServerCreator {
 		return this;
 	}
 
+	public int getGracefulTimeoutSec() {
+		return gracefulTimeoutSec;
+	}
+
+	/**
+	 * 设置线程池优雅关闭等待超时时间（秒），默认 30s。
+	 *
+	 * @param gracefulTimeoutSec 关闭超时（秒），必须大于 0
+	 * @return MqttServerCreator
+	 */
+	public MqttServerCreator gracefulTimeoutSec(int gracefulTimeoutSec) {
+		if (gracefulTimeoutSec <= 0) {
+			throw new IllegalArgumentException("gracefulTimeoutSec must be greater than 0");
+		}
+		this.gracefulTimeoutSec = gracefulTimeoutSec;
+		return this;
+	}
+
+	public int getForceTimeoutSec() {
+		return forceTimeoutSec;
+	}
+
+	/**
+	 * 设置 shutdownNow 后的二次等待超时时间（秒），默认 5s。
+	 *
+	 * @param forceTimeoutSec 二次等待超时（秒），必须大于 0
+	 * @return MqttServerCreator
+	 */
+	public MqttServerCreator forceTimeoutSec(int forceTimeoutSec) {
+		if (forceTimeoutSec <= 0) {
+			throw new IllegalArgumentException("forceTimeoutSec must be greater than 0");
+		}
+		this.forceTimeoutSec = forceTimeoutSec;
+		return this;
+	}
+
 	public MqttServerCreator enableMqtt() {
 		return enableMqtt(MqttProtocolListener.Builder::build);
 	}
@@ -635,6 +682,8 @@ public class MqttServerCreator {
 		tioConfig.setUseQueueDecode(this.useQueueDecode);
 		tioConfig.setUseQueueSend(this.useQueueSend);
 		tioConfig.setTaskService(this.taskService);
+		tioConfig.setGracefulTimeoutSec(this.gracefulTimeoutSec);
+		tioConfig.setForceTimeoutSec(this.forceTimeoutSec);
 		tioConfig.statOn = this.statEnable;
 		// 4. mqtt 消息最大长度，小于 1 则使用默认的，可通过 property tio.default.read.buffer.size 设置默认大小
 		if (this.readBufferSize > 0) {

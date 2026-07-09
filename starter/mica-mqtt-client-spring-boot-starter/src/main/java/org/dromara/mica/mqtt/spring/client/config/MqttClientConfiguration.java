@@ -100,7 +100,9 @@ public class MqttClientConfiguration {
 			.debug(properties.isDebug())
 			.disconnectBeforeStop(properties.isDisconnectBeforeStop())
 			.pendingPublishQueueEnabled(properties.isPendingPublishQueueEnabled())
-			.pendingPublishQueueSize(properties.getPendingPublishQueueSize());
+			.pendingPublishQueueSize(properties.getPendingPublishQueueSize())
+			.gracefulTimeoutSec(properties.getGracefulTimeoutSec())
+			.forceTimeoutSec(properties.getForceTimeoutSec());
 		Integer timeout = properties.getTimeout();
 		if (timeout != null && timeout > 0) {
 			clientCreator.timeout(timeout);

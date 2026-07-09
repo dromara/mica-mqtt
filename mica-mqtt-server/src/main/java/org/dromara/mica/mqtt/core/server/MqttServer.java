@@ -24,6 +24,7 @@ import net.dreamlu.mica.net.server.TioServerConfig;
 import net.dreamlu.mica.net.server.task.ServerHeartbeatTask;
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import net.dreamlu.mica.net.utils.mica.IntPair;
+import net.dreamlu.mica.net.utils.thread.ThreadUtils;
 import net.dreamlu.mica.net.utils.page.Page;
 import net.dreamlu.mica.net.utils.page.PageUtils;
 import net.dreamlu.mica.net.utils.timer.TimerTask;
@@ -602,20 +603,9 @@ public final class MqttServer {
 	public boolean stop() {
 		// 停止服务
 		boolean result = listeners.stop();
-		// 停止工作线程
+		// 优雅停止 mqtt 工作线程
 		ExecutorService mqttExecutor = serverCreator.getMqttExecutor();
-		try {
-			mqttExecutor.shutdown();
-		} catch (Exception e1) {
-			logger.error(e1.getMessage(), e1);
-		}
-		try {
-			// 等待线程池中的任务结束，等待 10 分钟
-			result &= mqttExecutor.awaitTermination(10, TimeUnit.MINUTES);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			logger.error(e.getMessage(), e);
-		}
+		result &= ThreadUtils.shutdownExecutor(mqttExecutor, serverCreator.getGracefulTimeoutSec(), serverCreator.getForceTimeoutSec(), "mqttExecutor");
 		try {
 			sessionManager.clean();
 		} catch (Throwable e) {

@@ -239,6 +239,8 @@ public class MqttServerPluginImpl implements Plugin {
 			.nodeName(mqttServerProperties.getNodeName())
 			.statEnable(mqttServerProperties.isStatEnable())
 			.proxyProtocolEnable(mqttServerProperties.isProxyProtocolOn())
+			.gracefulTimeoutSec(mqttServerProperties.getGracefulTimeoutSec())
+			.forceTimeoutSec(mqttServerProperties.getForceTimeoutSec())
 			.properties(properties -> {
 				MqttServerProperties.Properties serverProperties = mqttServerProperties.getProperties();
 				properties.receiveMaximum(serverProperties.getReceiveMaximum())

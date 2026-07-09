@@ -19,6 +19,7 @@ package org.dromara.mica.mqtt.spring.server.config;
 import lombok.Getter;
 import lombok.Setter;
 import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.core.ssl.ClientAuth;
 import net.dreamlu.mica.net.http.mcp.server.transport.SseTransport;
 import net.dreamlu.mica.net.http.mcp.server.transport.StreamableHttpTransport;
@@ -126,6 +127,14 @@ public class MqttServerProperties {
 	 * MQTT 5.0 服务端能力配置，用于在 CONNACK 中告知客户端
 	 */
 	private Properties properties = new Properties();
+	/**
+	 * 线程池优雅关闭等待超时时间（秒），默认 30s
+	 */
+	private int gracefulTimeoutSec = TioConfig.DEFAULT_GRACEFUL_TIMEOUT_SEC;
+	/**
+	 * shutdownNow 后的二次等待超时时间（秒），默认 5s
+	 */
+	private int forceTimeoutSec = TioConfig.DEFAULT_FORCE_TIMEOUT_SEC;
 
 	@Getter
 	@Setter

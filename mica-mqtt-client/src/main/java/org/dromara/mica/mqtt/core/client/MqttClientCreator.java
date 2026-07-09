@@ -224,6 +224,16 @@ public final class MqttClientCreator {
 	 * MQTT 连接成功前的发布消息队列大小，默认：10
 	 */
 	private int pendingPublishQueueSize = 10;
+	/**
+	 * 线程池优雅关闭等待超时时间（秒），默认 30s。
+	 * 超时后会调用 shutdownNow() 强制中断未完成任务。
+	 */
+	private int gracefulTimeoutSec = TioConfig.DEFAULT_GRACEFUL_TIMEOUT_SEC;
+	/**
+	 * shutdownNow 后的二次等待超时时间（秒），默认 5s。
+	 * 用于回收被中断的 worker 线程，通常 5~10s 足够。
+	 */
+	private int forceTimeoutSec = TioConfig.DEFAULT_FORCE_TIMEOUT_SEC;
 
 	public String getName() {
 		return name;
@@ -694,6 +704,42 @@ public final class MqttClientCreator {
 		return this;
 	}
 
+	public int getGracefulTimeoutSec() {
+		return gracefulTimeoutSec;
+	}
+
+	/**
+	 * 设置线程池优雅关闭等待超时时间（秒），默认 30s。
+	 *
+	 * @param gracefulTimeoutSec 关闭超时（秒），必须大于 0
+	 * @return MqttClientCreator
+	 */
+	public MqttClientCreator gracefulTimeoutSec(int gracefulTimeoutSec) {
+		if (gracefulTimeoutSec <= 0) {
+			throw new IllegalArgumentException("gracefulTimeoutSec must be greater than 0");
+		}
+		this.gracefulTimeoutSec = gracefulTimeoutSec;
+		return this;
+	}
+
+	public int getForceTimeoutSec() {
+		return forceTimeoutSec;
+	}
+
+	/**
+	 * 设置 shutdownNow 后的二次等待超时时间（秒），默认 5s。
+	 *
+	 * @param forceTimeoutSec 二次等待超时（秒），必须大于 0
+	 * @return MqttClientCreator
+	 */
+	public MqttClientCreator forceTimeoutSec(int forceTimeoutSec) {
+		if (forceTimeoutSec <= 0) {
+			throw new IllegalArgumentException("forceTimeoutSec must be greater than 0");
+		}
+		this.forceTimeoutSec = forceTimeoutSec;
+		return this;
+	}
+
 	/**
 	 * 构建一个新的 MqttClientCreator
 	 *
@@ -786,6 +832,8 @@ public final class MqttClientCreator {
 		// 6. tioConfig
 		TioClientConfig clientConfig = new TioClientConfig(clientAioHandler, clientAioListener, reconnConf, tioExecutor, groupExecutor);
 		clientConfig.setName(this.name);
+		clientConfig.setGracefulTimeoutSec(this.gracefulTimeoutSec);
+		clientConfig.setForceTimeoutSec(this.forceTimeoutSec);
 		// 7. 心跳超时时间
 		clientConfig.setHeartbeatTimeout(TimeUnit.SECONDS.toMillis(this.keepAliveSecs));
 		// 设置心跳检测模式为 LAST_REQ，keepAliveSecs 周期内，最后发送的时间差

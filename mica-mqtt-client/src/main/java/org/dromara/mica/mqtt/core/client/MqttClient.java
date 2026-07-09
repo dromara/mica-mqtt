@@ -22,6 +22,7 @@ import net.dreamlu.mica.net.client.TioClientConfig;
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Node;
 import net.dreamlu.mica.net.core.Tio;
+import net.dreamlu.mica.net.utils.thread.ThreadUtils;
 import net.dreamlu.mica.net.utils.timer.TimerTask;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttQoS;
@@ -45,7 +46,6 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -608,19 +608,8 @@ public final class MqttClient implements IMqttClient {
 		}
 		// 2. 停止 tio
 		boolean result = tioClient.stop();
-		// 3. 停止工作线程
-		try {
-			mqttExecutor.shutdown();
-		} catch (Exception e1) {
-			logger.error(e1.getMessage(), e1);
-		}
-		try {
-			// 等待线程池中的任务结束，客户端等待 1钟钟，基本上足够了
-			result &= mqttExecutor.awaitTermination(1, TimeUnit.MINUTES);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			logger.error(e.getMessage(), e);
-		}
+		// 3. 优雅停止 mqtt 工作线程
+		result &= ThreadUtils.shutdownExecutor(mqttExecutor, config.getGracefulTimeoutSec(), config.getForceTimeoutSec(), "mqttExecutor");
 		logger.info("MqttClient stop result:{}", result);
 		// 4. 清理 session
 		this.clientSession.clean();
