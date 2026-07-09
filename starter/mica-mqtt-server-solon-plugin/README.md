@@ -47,6 +47,8 @@ mqtt:
       password: mica            # mqtt 认证密码
     debug: true                 # 如果开启 prometheus 指标收集建议关闭
     stat-enable: true           # 开启指标收集，debug 和 prometheus 开启时需要打开，默认开启，关闭节省内存
+    graceful-timeout-sec: 30    # mqtt 工作线程池优雅关闭等待超时时间，单位：秒，默认：30（2.6.8 开始支持）。超过该时间后会调用 shutdownNow() 强制中断未完成任务。
+    force-timeout-sec: 5        # shutdownNow 后的二次等待超时时间，单位：秒，默认：5（2.6.8 开始支持）。用于回收被中断的 worker 线程，通常 5~10s 足够。
     mqtt-listener:              # mqtt 监听器
       enable: true              # 是否开启，默认：false
 #      ip: "0.0.0.0"            # 服务端 ip 默认为空，0.0.0.0，建议不要设置

@@ -29,6 +29,18 @@
       "defaultValue": "true"
     },
     {
+      "name": "mqtt.server.force-timeout-sec",
+      "type": "java.lang.Integer",
+      "description": "shutdownNow 后的二次等待超时时间，单位：秒，默认：5（2.6.8 开始支持）。用于回收被中断的 worker 线程，通常 5~10s 足够。",
+      "defaultValue": 5
+    },
+    {
+      "name": "mqtt.server.graceful-timeout-sec",
+      "type": "java.lang.Integer",
+      "description": "mqtt 工作线程池优雅关闭等待超时时间，单位：秒，默认：30（2.6.8 开始支持）。超过该时间后会调用 shutdownNow() 强制中断未完成任务。",
+      "defaultValue": 30
+    },
+    {
       "name": "mqtt.server.heartbeat-timeout",
       "type": "java.lang.Long",
       "description": "心跳超时时间(单位: 毫秒 默认: 1000 * 120)，如果用户不希望框架层面做心跳相关工作，请把此值设为0或负数"
