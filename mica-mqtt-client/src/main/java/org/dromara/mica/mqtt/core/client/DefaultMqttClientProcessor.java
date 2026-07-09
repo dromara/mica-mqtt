@@ -200,18 +200,14 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		for (MqttPublishMessage message : pendingMessages) {
 			MqttQoS qos = message.fixedHeader().qosLevel();
 			boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
-			int packetId = message.variableHeader().packetId();
-			MqttPendingPublish pendingPublish = null;
-			if (isHighLevelQoS && packetId > 0) {
-				pendingPublish = new MqttPendingPublish(message, qos);
+			// 如果是高版本的 qos
+			if (isHighLevelQoS) {
+				MqttPendingPublish pendingPublish = new MqttPendingPublish(message, qos);
+				int packetId = message.variableHeader().packetId();
 				clientSession.addPendingPublish(packetId, pendingPublish);
 				pendingPublish.startPublishRetransmissionTimer(taskService, context);
 			}
 			boolean result = Tio.send(context, message);
-			if (!result && pendingPublish != null) {
-				clientSession.removePendingPublish(packetId);
-				pendingPublish.cancelRetransmitTimer();
-			}
 			if (logger.isDebugEnabled()) {
 				String topicName = message.variableHeader().topicName();
 				logger.debug("MQTT pending publish message sent, topic:{} result:{}", topicName, result);
