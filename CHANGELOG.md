@@ -2,11 +2,25 @@
 
 ## 发行版本
 
-### v2.6.8 - 2026-07-07
-- refactor(session): 优化 `TrieTopicManager` 订阅管理结构，降低内存占用。
-- fix(mqtt-codec): 修正 `MqttUnSubAckBuilder` 中原因码的处理逻辑。
-- fix(mqtt): 修正 `WSS监听器` 启用逻辑判断 github #193 感谢 `@laoLiangLoveProgram` 反馈。
-- test(session): 完善 `InMemoryMqttSessionManager` 单元测试覆盖。
+### v2.6.8 - 2026-08-01
+- ✨ mqtt-server 支持 MQTT 5.0 服务端能力属性及断开连接扩展配置，包括 Receive Maximum、Maximum QoS、Retain Available、最大报文大小等。
+- ✨ mqtt-server 优化 MQTT 5.0 协议支持及消息处理逻辑，支持空 `clientId` 自动分配、QoS1/2 发布被拒发送 ACK、订阅原因码细化等。
+- ✨ mqtt 完成 MQTT5 多个报文 Reason Code 及 Server Keep Alive 功能（PUBACK/PUBREC/PUBREL/PUBCOMP/DISCONNECT/SUBACK/UNSUBACK）。
+- ♻️ 重构 mqtt-server 消息处理架构，按消息类型拆分 Handler 并抽象基类，统一分发流程。
+- ♻️ session 优化 `TrieTopicManager` 订阅管理结构，享元模式复用订阅数据、区分精确订阅与通配订阅，提升内存与发布匹配效率。
+- ♻️ mqtt-codec 优化 `StringPair` 与 `BooleanProperty` 相关方法，统一基于 `Objects` 工具类实现。
+- 🐛 mqtt 修复高版本 QoS 消息发送逻辑。
+- 🐛 mqtt-codec 加强协议解码器校验与错误处理（连接标志位、遗嘱标志、订阅选项保留位等）。
+- 🐛 mqtt 修复 `MqttProperty` 的 `hashCode` 和 `equals` 实现，避免空指针异常。
+- 🐛 mqtt-codec 修正 `MqttUnSubAckBuilder` 中原因码的处理逻辑，新增 `valueOf(byte)` 优化查找。
+- 🐛 mqtt 修正 `WSS监听器` 启用逻辑判断 github #193 感谢 `@laoLiangLoveProgram` 反馈。
+- 🔧 修正配置中 `client-auth` 枚举大小写与键名（统一为 NONE），`mcp-server` 键改名为 `mcp`。
+- 📝 重构 `mqtt5-features` 文档至 v2.0，完善服务端架构与特性说明。
+- ⬆️ Bump solon.version from 4.0.2 to 4.0.3 (github #192)。
+- ⬆️ 升级到 mica-net 2.0.10 正式版。
+- 🧪 添加 MQTT 5.0 单字节布尔属性往返测试用例，覆盖 REQUEST_PROBLEM_INFORMATION、RETAIN_AVAILABLE 等属性。
+- 🧪 添加客户端重连混沌测试用例（FakeBroker 模拟），覆盖服务端重启与异常握边界。
+- 🧪 完善 `InMemoryMqttSessionManager` 单元测试覆盖（含订阅、packetId 分配、QoS/共享订阅、待发送消息等）。
 
 ### v2.6.7 - 2026-07-01
 - 🐛 mqtt-server 优化客户端互踢时的会话清理逻辑，感谢 `@十年` 反馈。
