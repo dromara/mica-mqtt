@@ -112,9 +112,9 @@ class MqttClientReconnectChaosTest {
 	@Test
 	void shouldPublishSuccessfullyAfterBrokerRestartReconnect() throws Exception {
 		// 可通过 JVM 参数放大复现概率:
-		//   -Drounds=N   每轮重启 broker 并断言 publish 成功，跑 N 轮（默认 1）
+		//   -Drounds=N   每轮重启 broker 并断言 publish 成功，跑 N 轮（默认 10）
 		//   -Dchaos.threads=N   在断开到重连窗口内注入 N 个并发 publish 线程（默认 4，<=0 关闭）
-		int rounds = readIntProperty("rounds", 1);
+		int rounds = readIntProperty("rounds", 10);
 		int concurrentThreads = readIntProperty("chaos.threads", 4);
 		for (int round = 1; round <= rounds; round++) {
 			runRestartReconnectRound(round, concurrentThreads);
