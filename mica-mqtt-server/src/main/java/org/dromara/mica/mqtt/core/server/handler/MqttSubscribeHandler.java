@@ -27,6 +27,7 @@ import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubAckMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
+import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
@@ -133,7 +134,14 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 				.messageId(messageId)
 				.properties(retainMessage.getProperties())
 				.build();
-			Tio.send(context, publishMessage);
+			if (isHighLevelQoS) {
+				MqttPendingPublish pendingPublish = new MqttPendingPublish(publishMessage, mqttQoS);
+				sessionManager.addPendingPublish(clientId, messageId, pendingPublish);
+				pendingPublish.startPublishRetransmissionTimer(taskService, context);
+			}
+			boolean result = Tio.send(context, publishMessage);
+			logger.debug("Subscribe - RetainMessage send clientId:{} topic:{} qos:{} messageId:{} result:{}",
+				clientId, retainMessage.getTopic(), mqttQoS, messageId, result);
 		}
 	}
 
