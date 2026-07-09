@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -47,8 +48,9 @@ class MqttClientReconnectChaosTest {
 		CountDownLatch connectReadLatch = new CountDownLatch(1);
 		CountingConnectListener listener = new CountingConnectListener();
 		MqttClient client = null;
-		try (FakeBroker broker = FakeBroker.create()
-			.next(new HoldAfterConnectHandler(connectReadLatch))) {
+		FakeBroker broker = FakeBroker.create()
+			.next(new HoldAfterConnectHandler(connectReadLatch));
+		try {
 			client = newClient(broker.getPort(), listener);
 
 			Assertions.assertTrue(connectReadLatch.await(3, TimeUnit.SECONDS), "broker should receive MQTT CONNECT");
@@ -57,6 +59,7 @@ class MqttClientReconnectChaosTest {
 			Assertions.assertEquals(1, broker.getConnectPackets());
 		} finally {
 			stop(client);
+			broker.close();
 		}
 	}
 
@@ -64,9 +67,10 @@ class MqttClientReconnectChaosTest {
 	void shouldReconnectAfterBrokerResetsAcceptedConnection() throws Exception {
 		CountingConnectListener listener = new CountingConnectListener();
 		MqttClient client = null;
-		try (FakeBroker broker = FakeBroker.create()
+		FakeBroker broker = FakeBroker.create()
 			.next(new ConnAckThenResetHandler(100))
-			.next(new ConnAckAndHoldHandler())) {
+			.next(new ConnAckAndHoldHandler());
+		try {
 			client = newClient(broker.getPort(), listener);
 
 			Assertions.assertTrue(listener.awaitConnected(3_000), "first MQTT connection should succeed");
@@ -76,6 +80,7 @@ class MqttClientReconnectChaosTest {
 			Assertions.assertTrue(broker.getConnectPackets() >= 2, "broker should receive CONNECT for reconnect");
 		} finally {
 			stop(client);
+			broker.close();
 		}
 	}
 
@@ -84,9 +89,10 @@ class MqttClientReconnectChaosTest {
 		CountDownLatch secondConnectReadLatch = new CountDownLatch(1);
 		CountingConnectListener listener = new CountingConnectListener();
 		MqttClient client = null;
-		try (FakeBroker broker = FakeBroker.create()
+		FakeBroker broker = FakeBroker.create()
 			.next(new ConnAckThenResetHandler(100))
-			.next(new HoldAfterConnectHandler(secondConnectReadLatch))) {
+			.next(new HoldAfterConnectHandler(secondConnectReadLatch));
+		try {
 			client = newClient(broker.getPort(), listener);
 
 			Assertions.assertTrue(listener.awaitConnected(3_000), "first MQTT connection should succeed");
@@ -96,6 +102,7 @@ class MqttClientReconnectChaosTest {
 			Assertions.assertTrue(client.isDisconnected(), "client should remain MQTT-disconnected while reconnect CONNACK is missing");
 		} finally {
 			stop(client);
+			broker.close();
 		}
 	}
 
@@ -127,11 +134,14 @@ class MqttClientReconnectChaosTest {
 				.next(new ConnAckAndHoldHandler());
 			secondBroker.start();
 			try {
+				Assertions.assertTrue(secondBroker.awaitConnectPackets(1, 10_000), "broker should receive reconnect CONNECT after restart");
 				Assertions.assertTrue(listener.awaitConnectedCount(2, 10_000), "client should reconnect after broker restart");
 				Assertions.assertTrue(client.isConnected(), "client should be accepted after restart CONNACK");
 				// The key assertion: publish after broker restart must succeed.
 				Assertions.assertTrue(client.publish("/test/after-restart", "world".getBytes(StandardCharsets.UTF_8), MqttQoS.QOS0), "publish after broker restart should succeed");
 			} finally {
+				stop(client);
+				client = null;
 				secondBroker.close();
 			}
 		} finally {
@@ -172,7 +182,8 @@ class MqttClientReconnectChaosTest {
 	private static final class FakeBroker implements AutoCloseable {
 		private final ServerSocket serverSocket;
 		private final Queue<SocketHandler> handlers = new ArrayDeque<>();
-		private final Queue<Socket> activeSockets = new ArrayDeque<>();
+		private final Queue<Socket> activeSockets = new ConcurrentLinkedQueue<>();
+		private final CountDownLatch startedLatch = new CountDownLatch(1);
 		private final CountDownLatch stoppedLatch = new CountDownLatch(1);
 		private final AtomicInteger connectPackets = new AtomicInteger();
 		private volatile boolean running = true;
@@ -183,7 +194,7 @@ class MqttClientReconnectChaosTest {
 			this.serverSocket = serverSocket;
 		}
 
-		static FakeBroker create() throws IOException {
+		static FakeBroker create() throws IOException, InterruptedException {
 			FakeBroker broker = new FakeBroker(new ServerSocket(0));
 			broker.start();
 			return broker;
@@ -206,7 +217,18 @@ class MqttClientReconnectChaosTest {
 			return connectPackets.get();
 		}
 
-		private void start() {
+		boolean awaitConnectPackets(int expected, long timeoutMs) throws InterruptedException {
+			long deadline = System.currentTimeMillis() + timeoutMs;
+			while (System.currentTimeMillis() < deadline) {
+				if (connectPackets.get() >= expected) {
+					return true;
+				}
+				Thread.sleep(20);
+			}
+			return connectPackets.get() >= expected;
+		}
+
+		private void start() throws InterruptedException {
 			if (started) {
 				return;
 			}
@@ -218,6 +240,7 @@ class MqttClientReconnectChaosTest {
 			}
 			this.acceptThread = new Thread(() -> {
 				try {
+					startedLatch.countDown();
 					while (running) {
 						Socket socket = serverSocket.accept();
 						activeSockets.add(socket);
@@ -237,6 +260,8 @@ class MqttClientReconnectChaosTest {
 								}
 							} catch (Exception e) {
 								e.printStackTrace();
+							} finally {
+								activeSockets.remove(socket);
 							}
 						}, "fake-mqtt-broker-worker");
 						worker.setDaemon(true);
@@ -251,11 +276,13 @@ class MqttClientReconnectChaosTest {
 						e.printStackTrace();
 					}
 				} finally {
+					startedLatch.countDown();
 					stoppedLatch.countDown();
 				}
 			}, "fake-mqtt-broker-accept");
 			this.acceptThread.setDaemon(true);
 			this.acceptThread.start();
+			startedLatch.await(1, TimeUnit.SECONDS);
 		}
 
 		@Override
