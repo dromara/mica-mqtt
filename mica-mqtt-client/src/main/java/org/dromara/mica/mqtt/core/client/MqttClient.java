@@ -615,8 +615,8 @@ public final class MqttClient implements IMqttClient {
 			logger.error(e1.getMessage(), e1);
 		}
 		try {
-			// 等待线程池中的任务结束，客户端等待 6 秒基本上足够了
-			result &= mqttExecutor.awaitTermination(6, TimeUnit.SECONDS);
+			// 等待线程池中的任务结束，客户端等待 1钟钟，基本上足够了
+			result &= mqttExecutor.awaitTermination(1, TimeUnit.MINUTES);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			logger.error(e.getMessage(), e);

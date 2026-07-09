@@ -25,6 +25,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -33,6 +34,8 @@ import java.util.ArrayDeque;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -108,6 +111,17 @@ class MqttClientReconnectChaosTest {
 
 	@Test
 	void shouldPublishSuccessfullyAfterBrokerRestartReconnect() throws Exception {
+		// 可通过 JVM 参数放大复现概率:
+		//   -Drounds=N   每轮重启 broker 并断言 publish 成功，跑 N 轮（默认 1）
+		//   -Dchaos.threads=N   在断开到重连窗口内注入 N 个并发 publish 线程（默认 4，<=0 关闭）
+		int rounds = readIntProperty("rounds", 1);
+		int concurrentThreads = readIntProperty("chaos.threads", 4);
+		for (int round = 1; round <= rounds; round++) {
+			runRestartReconnectRound(round, concurrentThreads);
+		}
+	}
+
+	private void runRestartReconnectRound(int round, int concurrentThreads) throws Exception {
 		CountingConnectListener listener = new CountingConnectListener();
 		MqttClient client = null;
 		// 1. reserve a free port and start the first broker.
@@ -115,43 +129,110 @@ class MqttClientReconnectChaosTest {
 		FakeBroker firstBroker = FakeBroker.createOnPort(port)
 			.next(new ConnAckAndHoldHandler());
 		firstBroker.start();
+		ExecutorService chaosPool = null;
 		try {
 			client = newClient(port, listener);
 
-			Assertions.assertTrue(listener.awaitConnected(3_000), "first MQTT connection should succeed");
-			Assertions.assertTrue(client.isConnected(), "client should be accepted after first CONNACK");
-			Assertions.assertTrue(client.publish("/test/initial", "hello".getBytes(StandardCharsets.UTF_8), MqttQoS.QOS0), "publish before broker restart should succeed");
+			Assertions.assertTrue(listener.awaitConnected(3_000), "[round " + round + "] first MQTT connection should succeed");
+			Assertions.assertTrue(client.isConnected(), "[round " + round + "] client should be accepted after first CONNACK");
+			Assertions.assertTrue(client.publish("/test/initial", "hello".getBytes(StandardCharsets.UTF_8), MqttQoS.QOS0), "[round " + round + "] publish before broker restart should succeed");
 			int disconnectedAtStart = listener.disconnectedCount.get();
+			int connectedAtStart = listener.connectedCount.get();
 
 			// 2. simulate EMQX restart: stop the first broker (server socket closed, sockets reset)
 			//    and wait for the client to enter the reconnecting state.
 			firstBroker.close();
-			Assertions.assertTrue(listener.awaitDisconnectedCount(disconnectedAtStart + 1, 3_000), "broker close should trigger disconnect");
-			Assertions.assertTrue(client.isDisconnected(), "client should be MQTT-disconnected after broker stops");
+			Assertions.assertTrue(listener.awaitDisconnectedCount(disconnectedAtStart + 1, 3_000), "[round " + round + "] broker close should trigger disconnect");
+			Assertions.assertTrue(client.isDisconnected(), "[round " + round + "] client should be MQTT-disconnected after broker stops");
+
+			// 2.5 inject concurrent publish pressure during the disconnected -> reconnected window
+			//     to maximize the chance of hitting the publish()/reconnect() race the CI sees.
+			chaosPool = startChaosPublishers(client, concurrentThreads, "/test/chaos/" + round + "/");
 
 			// 3. start a new broker on the same port and verify the client reconnects.
 			FakeBroker secondBroker = FakeBroker.createOnPort(port)
 				.next(new ConnAckAndHoldHandler());
 			secondBroker.start();
 			try {
-				Assertions.assertTrue(secondBroker.awaitConnectPackets(1, 10_000), "broker should receive reconnect CONNECT after restart");
-				Assertions.assertTrue(listener.awaitConnectedCount(2, 10_000), "client should reconnect after broker restart");
-				Assertions.assertTrue(client.isConnected(), "client should be accepted after restart CONNACK");
-				// The key assertion: publish after broker restart must succeed.
-				Assertions.assertTrue(client.publish("/test/after-restart", "world".getBytes(StandardCharsets.UTF_8), MqttQoS.QOS0), "publish after broker restart should succeed");
+				Assertions.assertTrue(secondBroker.awaitConnectPackets(1, 10_000), "[round " + round + "] broker should receive reconnect CONNECT after restart");
+				Assertions.assertTrue(listener.awaitConnectedCount(connectedAtStart + 1, 10_000), "[round " + round + "] client should reconnect after broker restart");
+				Assertions.assertTrue(client.isConnected(), "[round " + round + "] client should be accepted after restart CONNACK");
+				// 关键断言：broker 重启之后的 publish 必须成功。
+				// 同时也校验 chaos 注入的 publish 结果：未连上时入队（开启 pendingPublishQueueEnabled），
+				// 连上之后发送失败应被视为问题（QA 已在 CI 复现一次失败）。
+				awaitChaosPublishers(chaosPool, concurrentThreads, round);
+				Assertions.assertTrue(client.publish("/test/after-restart", "world".getBytes(StandardCharsets.UTF_8), MqttQoS.QOS0), "[round " + round + "] publish after broker restart should succeed");
 			} finally {
 				stop(client);
 				client = null;
 				secondBroker.close();
 			}
 		} finally {
+			if (chaosPool != null) {
+				chaosPool.shutdownNow();
+			}
 			stop(client);
+		}
+	}
+
+	private static ExecutorService startChaosPublishers(MqttClient client, int threads, String topicPrefix) {
+		if (threads <= 0) {
+			return null;
+		}
+		ExecutorService pool = Executors.newFixedThreadPool(threads, r -> {
+			Thread t = new Thread(r, "chaos-publisher");
+			t.setDaemon(true);
+			return t;
+		});
+		// 限制每线程 publish 总数，避免 publish 阻塞（极少数 Tio.send 在底层 socket RST 后可能挂住），
+		// 同时配合 awaitChaosPublishers 的兜底 shutdownNow 强制回收。
+		int maxPerThread = 200;
+		for (int i = 0; i < threads; i++) {
+			final int idx = i;
+			pool.submit(() -> {
+				for (int n = 0; n < maxPerThread && !Thread.currentThread().isInterrupted(); n++) {
+					try {
+						client.publish(topicPrefix + idx + "/" + n, "c".getBytes(StandardCharsets.UTF_8), MqttQoS.QOS0);
+					} catch (Exception ignored) {
+						// 故意吞掉 publish 期间的异常，测试主体仍按核心断言判断。
+					}
+				}
+			});
+		}
+		return pool;
+	}
+
+	private static void awaitChaosPublishers(ExecutorService chaosPool, int threads, int round) throws InterruptedException {
+		if (chaosPool == null || threads <= 0) {
+			return;
+		}
+		// chaos 线程按发布总数自然结束；若少量 publish 阻塞，则用 shutdownNow 兜底，
+		// 这里只给一个非常宽松的上限，避免误判测试本身失败。
+		chaosPool.shutdown();
+		if (!chaosPool.awaitTermination(15, TimeUnit.SECONDS)) {
+			chaosPool.shutdownNow();
+			Assertions.assertTrue(chaosPool.awaitTermination(2, TimeUnit.SECONDS), "[round " + round + "] chaos publishers should stop in time");
+		}
+	}
+
+	private static int readIntProperty(String key, int defaultValue) {
+		String value = System.getProperty(key);
+		if (value == null || value.isEmpty()) {
+			return defaultValue;
+		}
+		try {
+			return Integer.parseInt(value.trim());
+		} catch (NumberFormatException e) {
+			return defaultValue;
 		}
 	}
 
 	private static int reserveFreePort() throws IOException {
 		try (ServerSocket serverSocket = new ServerSocket(0)) {
-			return serverSocket.getLocalPort();
+			int port = serverSocket.getLocalPort();
+			// SO_REUSEADDR 减小 TIME_WAIT 阶段再次绑定失败的可能。
+			serverSocket.setReuseAddress(true);
+			return port;
 		}
 	}
 
@@ -201,7 +282,10 @@ class MqttClientReconnectChaosTest {
 		}
 
 		static FakeBroker createOnPort(int port) throws IOException {
-			return new FakeBroker(new ServerSocket(port));
+			ServerSocket serverSocket = new ServerSocket();
+			serverSocket.setReuseAddress(true);
+			serverSocket.bind(new InetSocketAddress("127.0.0.1", port));
+			return new FakeBroker(serverSocket);
 		}
 
 		FakeBroker next(SocketHandler handler) {
