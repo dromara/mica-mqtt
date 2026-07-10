@@ -102,6 +102,17 @@ public final class MqttPublishBuilder {
 		return payload;
 	}
 
+	/**
+	 * 构建 PUBLISH 消息。
+	 * <p>
+	 * 注意：{@link MqttFixedHeader#remainingLength()} 在此处固定写 0，<strong>这不是 bug</strong>。
+	 * mica-mqtt 沿用 netty 的设计——Builder 仅做字段装配，<strong>所有字节布局（含 remainingLength 的 VBI 编码）由 {@code MqttEncoder.encodePublishMessage} 在编码时自行计算</strong>，
+	 * 该函数只读 fixedHeader 的 type/DUP/QoS/retain 字段，不读 remainingLength。
+	 * 重传路径（{@code RetryProcessor} → {@code Tio.send}）同样会经过 encoder，发出的字节流是正确的。
+	 * 不要在此处"修复"remainingLength 计算逻辑，否则会偏离上游且无实际收益。
+	 *
+	 * @return MqttPublishMessage
+	 */
 	public MqttPublishMessage build() {
 		MqttFixedHeader mqttFixedHeader = new MqttFixedHeader(MqttMessageType.PUBLISH, isDup, qos, retained, 0);
 		MqttPublishVariableHeader mqttVariableHeader =
