@@ -16,11 +16,10 @@
 - 🐛 mqtt 修正 `WSS监听器` 启用逻辑判断 github #193 感谢 `@laoLiangLoveProgram` 反馈。
 - 🔧 修正配置中 `client-auth` 枚举大小写与键名（统一为 NONE），`mcp-server` 键改名为 `mcp`。
 - 📝 重构 `mqtt5-features` 文档至 v2.0，完善服务端架构与特性说明。
-- ⬆️ Bump solon.version from 4.0.2 to 4.0.3 (github #192)。
-- ⬆️ 升级到 mica-net 2.0.10 正式版。
 - 🧪 添加 MQTT 5.0 单字节布尔属性往返测试用例，覆盖 REQUEST_PROBLEM_INFORMATION、RETAIN_AVAILABLE 等属性。
 - 🧪 添加客户端重连混沌测试用例（FakeBroker 模拟），覆盖服务端重启与异常握边界。
 - 🧪 完善 `InMemoryMqttSessionManager` 单元测试覆盖（含订阅、packetId 分配、QoS/共享订阅、待发送消息等）。
+- ⬆️ 升级到 mica-net 2.0.11 正式版，重连问题 #IJVOZ7 再次尝试修复，感谢 `@mydeoschina` 反馈。
 
 ### v2.6.7 - 2026-07-01
 - 🐛 mqtt-server 优化客户端互踢时的会话清理逻辑，感谢 `@十年` 反馈。
