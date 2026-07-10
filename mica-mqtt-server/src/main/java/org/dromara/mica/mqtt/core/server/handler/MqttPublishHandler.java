@@ -85,7 +85,7 @@ public class MqttPublishHandler extends AbstractMqttMessageHandler {
 		if (publishPermission != null && !publishPermission.verifyPermission(context, clientId, topicName, mqttQoS, fixedHeader.isRetain())) {
 			logger.error("Mqtt clientId:{} username:{} topic:{} 没有发布权限。", clientId, context.getUserId(), topicName);
 			// MQTT 5.0 下 QoS1/2 发布被拒绝也要回 ACK，避免客户端等待重传直到超时。
-			sendPublishNotAuthorized(context, clientId, mqttQoS, topicName, packetId);
+			sendPublishNotAuthorized(message, context, clientId, mqttQoS, topicName, packetId);
 			return;
 		}
 		logger.debug("Publish - clientId:{} topicName:{} mqttQoS:{} packetId:{}", clientId, topicName, mqttQoS, packetId);
@@ -124,7 +124,7 @@ public class MqttPublishHandler extends AbstractMqttMessageHandler {
 		}
 	}
 
-	private void sendPublishNotAuthorized(ChannelContext context, String clientId, MqttQoS mqttQoS, String topicName, int packetId) {
+	private void sendPublishNotAuthorized(MqttPublishMessage message, ChannelContext context, String clientId, MqttQoS mqttQoS, String topicName, int packetId) {
 		if (packetId == -1) {
 			return;
 		}
@@ -137,10 +137,14 @@ public class MqttPublishHandler extends AbstractMqttMessageHandler {
 			logger.debug("Publish - PubAck rejected clientId:{} topicName:{} packetId:{} result:{}", clientId, topicName, packetId, result);
 		} else if (MqttQoS.QOS2 == mqttQoS) {
 			MqttFixedHeader pubRecFixedHeader = new MqttFixedHeader(MqttMessageType.PUBREC, false, MqttQoS.QOS0, false, 0);
-			// QoS2 的拒绝在 PUBREC 阶段表达，客户端收到错误 reason code 后不应继续 PUBREL。
+			// QoS2 的拒绝在 PUBREC 阶段表达，客户端收到错误 reason code 后不应继续 PUBREL；
+			// 仍登记 pendingQos2Publish，避免严格实现的客户端补发 PUBREL 时找不到记录而误回 PUBCOMP PACKET_IDENTIFIER_NOT_FOUND。
 			MqttPubReplyMessageVariableHeader pubRecVariableHeader = new MqttPubReplyMessageVariableHeader(
 				packetId, MqttPubRecReasonCode.NOT_AUTHORIZED.value(), MqttProperties.NO_PROPERTIES);
 			MqttMessage pubRecMessage = new MqttMessage(pubRecFixedHeader, pubRecVariableHeader);
+			MqttPendingQos2Publish pendingQos2Publish = new MqttPendingQos2Publish(message, pubRecMessage);
+			sessionManager.addPendingQos2Publish(clientId, packetId, pendingQos2Publish);
+			pendingQos2Publish.startPubRecRetransmitTimer(taskService, context);
 			boolean result = Tio.send(context, pubRecMessage);
 			logger.debug("Publish - PubRec rejected clientId:{} topicName:{} packetId:{} result:{}", clientId, topicName, packetId, result);
 		}

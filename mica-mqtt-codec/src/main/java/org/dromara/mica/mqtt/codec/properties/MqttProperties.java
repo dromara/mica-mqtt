@@ -92,13 +92,13 @@ public final class MqttProperties {
 		if (props == null && userProperties == null) {
 			return subscriptionIds;
 		}
-		if (props == null && subscriptionIds == null) {
-			return userProperties;
-		}
 		if (subscriptionIds == null && userProperties == null) {
 			return props.values();
 		}
-		List<MqttProperty> propValues = new ArrayList<>(props != null ? props.size() : 1);
+		List<MqttProperty> propValues = new ArrayList<>(
+			(props != null ? props.size() : 0)
+				+ (subscriptionIds != null ? subscriptionIds.size() : 0)
+				+ (userProperties != null ? 1 : 0));
 		if (props != null) {
 			propValues.addAll(props.values());
 		}

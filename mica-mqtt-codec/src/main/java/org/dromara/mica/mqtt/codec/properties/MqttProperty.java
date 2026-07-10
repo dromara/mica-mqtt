@@ -52,7 +52,7 @@ public abstract class MqttProperty<T> {
 
 	@Override
 	public int hashCode() {
-		return propertyId + 31 * Objects.hashCode(value);
+		return Objects.hash(propertyId, value);
 	}
 
 	@Override
