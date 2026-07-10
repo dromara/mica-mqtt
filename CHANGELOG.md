@@ -2,7 +2,7 @@
 
 ## 发行版本
 
-### v2.6.8 - 2026-08-01
+### v2.6.8 - 2026-07-10
 - ✨ mqtt-server 支持 MQTT 5.0 服务端能力属性及断开连接扩展配置，包括 Receive Maximum、Maximum QoS、Retain Available、最大报文大小等。
 - ✨ mqtt-server 优化 MQTT 5.0 协议支持及消息处理逻辑，支持空 `clientId` 自动分配、QoS1/2 发布被拒发送 ACK、订阅原因码细化等。
 - ✨ mqtt 完成 MQTT5 多个报文 Reason Code 及 Server Keep Alive 功能（PUBACK/PUBREC/PUBREL/PUBCOMP/DISCONNECT/SUBACK/UNSUBACK）。
