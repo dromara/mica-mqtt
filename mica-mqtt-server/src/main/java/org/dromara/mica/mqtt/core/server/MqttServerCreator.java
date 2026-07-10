@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.server;
 
 import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.core.task.HeartbeatMode;
 import net.dreamlu.mica.net.server.TioServerConfig;
 import net.dreamlu.mica.net.server.intf.TioServerHandler;
@@ -204,20 +205,15 @@ public class MqttServerCreator {
 	 */
 	private final MqttServerProperties properties = new MqttServerProperties();
 	/**
-	 * 线程池优雅关闭等待超时时间（秒），默认 120s。
+	 * 线程池关闭等待超时时间（秒），默认 {@link TioConfig#DEFAULT_SHUTDOWN_TIMEOUT_SEC}。
 	 * <p>
-	 * 服务端在 stop 时会按连接逐个触发 {@link org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener#onDisconnect}，
-	 * 这些任务由 groupExecutor（默认 8~16 线程）串行处理。当 broker 上挂载的设备较多、或
-	 * onDisconnect 中包含较重逻辑（如数据库/接口调用）时，30s 不足以排空队列，会被强制 shutdownNow。
-	 * 120s 默认值在大多数中小 IoT 场景下可以保证优雅关闭；如设备量更大或 onDisconnect 更耗时，
-	 * 请同步调大此值到与部署环境终止宽限期（如 k8s terminationGracePeriodSeconds）匹配。
+	 * 服务端 stop 时会按连接逐个触发 {@link org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener#onDisconnect}，
+	 * 这些任务由 groupExecutor（默认 8~16 线程）串行处理。关闭时先 shutdown() 再 awaitTermination，
+	 * 超时即返回失败，不会调用 shutdownNow() 强制中断；仍在运行的任务会自然执行直到结束。
+	 * 如设备量较大或 onDisconnect 较耗时，请同步调大此值，并把部署环境的终止宽限期
+	 * （如 k8s terminationGracePeriodSeconds）调到不小于此值。
 	 */
-	private int gracefulTimeoutSec = 120;
-	/**
-	 * shutdownNow 后的二次等待超时时间（秒），默认 5s。
-	 * 用于回收被中断的 worker 线程，通常 5~10s 足够。
-	 */
-	private int forceTimeoutSec = 5;
+	private int shutdownTimeoutSec = TioConfig.DEFAULT_SHUTDOWN_TIMEOUT_SEC;
 
 	public String getName() {
 		return name;
@@ -543,39 +539,23 @@ public class MqttServerCreator {
 		return this;
 	}
 
-	public int getGracefulTimeoutSec() {
-		return gracefulTimeoutSec;
+	public int getShutdownTimeoutSec() {
+		return shutdownTimeoutSec;
 	}
 
 	/**
-	 * 设置线程池优雅关闭等待超时时间（秒），默认 30s。
+	 * 设置线程池关闭等待超时时间（秒），默认 {@link TioConfig#DEFAULT_SHUTDOWN_TIMEOUT_SEC}。
+	 * 注意：该值仅控制 awaitTermination 的阻塞时长，超时不会强制中断线程；
+	 * 超时后仍在运行的任务会继续执行直到自然结束。
 	 *
-	 * @param gracefulTimeoutSec 关闭超时（秒），必须大于 0
+	 * @param shutdownTimeoutSec 关闭超时（秒），必须大于 0
 	 * @return MqttServerCreator
 	 */
-	public MqttServerCreator gracefulTimeoutSec(int gracefulTimeoutSec) {
-		if (gracefulTimeoutSec <= 0) {
-			throw new IllegalArgumentException("gracefulTimeoutSec must be greater than 0");
+	public MqttServerCreator shutdownTimeoutSec(int shutdownTimeoutSec) {
+		if (shutdownTimeoutSec <= 0) {
+			throw new IllegalArgumentException("shutdownTimeoutSec must be greater than 0");
 		}
-		this.gracefulTimeoutSec = gracefulTimeoutSec;
-		return this;
-	}
-
-	public int getForceTimeoutSec() {
-		return forceTimeoutSec;
-	}
-
-	/**
-	 * 设置 shutdownNow 后的二次等待超时时间（秒），默认 5s。
-	 *
-	 * @param forceTimeoutSec 二次等待超时（秒），必须大于 0
-	 * @return MqttServerCreator
-	 */
-	public MqttServerCreator forceTimeoutSec(int forceTimeoutSec) {
-		if (forceTimeoutSec <= 0) {
-			throw new IllegalArgumentException("forceTimeoutSec must be greater than 0");
-		}
-		this.forceTimeoutSec = forceTimeoutSec;
+		this.shutdownTimeoutSec = shutdownTimeoutSec;
 		return this;
 	}
 
@@ -686,8 +666,7 @@ public class MqttServerCreator {
 		tioConfig.setUseQueueDecode(this.useQueueDecode);
 		tioConfig.setUseQueueSend(this.useQueueSend);
 		tioConfig.setTaskService(this.taskService);
-		tioConfig.setGracefulTimeoutSec(this.gracefulTimeoutSec);
-		tioConfig.setForceTimeoutSec(this.forceTimeoutSec);
+		tioConfig.setShutdownTimeoutSec(this.shutdownTimeoutSec);
 		tioConfig.statOn = this.statEnable;
 		// 4. mqtt 消息最大长度，小于 1 则使用默认的，可通过 property tio.default.read.buffer.size 设置默认大小
 		if (this.readBufferSize > 0) {

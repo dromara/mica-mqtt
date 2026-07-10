@@ -87,8 +87,7 @@ public class MqttProtocolListener implements IMqttProtocolListener {
 		serverConfig.setUseQueueDecode(mainServerConfig.useQueueDecode);
 		serverConfig.setUseQueueSend(mainServerConfig.useQueueSend);
 		serverConfig.setTaskService(mainServerConfig.getTaskService());
-		serverConfig.setGracefulTimeoutSec(mainServerConfig.getGracefulTimeoutSec());
-		serverConfig.setForceTimeoutSec(mainServerConfig.getForceTimeoutSec());
+		serverConfig.setShutdownTimeoutSec(mainServerConfig.getShutdownTimeoutSec());
 		// 2. 消息默认的心跳
 		serverConfig.setHeartbeatTimeout(0);
 		int readBufferSize = mainServerConfig.getReadBufferSize();

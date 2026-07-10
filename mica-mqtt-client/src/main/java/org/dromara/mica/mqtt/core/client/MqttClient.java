@@ -609,7 +609,7 @@ public final class MqttClient implements IMqttClient {
 		// 2. 停止 tio
 		boolean result = tioClient.stop();
 		// 3. 优雅停止 mqtt 工作线程
-		result &= ThreadUtils.shutdownExecutor(mqttExecutor, config.getGracefulTimeoutSec(), config.getForceTimeoutSec(), "mqttExecutor");
+		result &= ThreadUtils.shutdownExecutor(mqttExecutor, config.getShutdownTimeoutSec(), "mqttExecutor");
 		logger.info("MqttClient stop result:{}", result);
 		// 4. 清理 session
 		this.clientSession.clean();

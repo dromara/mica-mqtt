@@ -605,7 +605,7 @@ public final class MqttServer {
 		boolean result = listeners.stop();
 		// 优雅停止 mqtt 工作线程
 		ExecutorService mqttExecutor = serverCreator.getMqttExecutor();
-		result &= ThreadUtils.shutdownExecutor(mqttExecutor, serverCreator.getGracefulTimeoutSec(), serverCreator.getForceTimeoutSec(), "mqttExecutor");
+		result &= ThreadUtils.shutdownExecutor(mqttExecutor, serverCreator.getShutdownTimeoutSec(), "mqttExecutor");
 		try {
 			sessionManager.clean();
 		} catch (Throwable e) {

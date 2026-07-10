@@ -225,15 +225,12 @@ public final class MqttClientCreator {
 	 */
 	private int pendingPublishQueueSize = 10;
 	/**
-	 * 线程池优雅关闭等待超时时间（秒），默认 30s。
-	 * 客户端最多只持有一个连接，disconnect 处理通常毫秒级完成，30s 已足够。
+	 * 线程池关闭等待超时时间（秒），默认 {@link TioConfig#DEFAULT_SHUTDOWN_TIMEOUT_SEC}。
+	 * <p>
+	 * 客户端最多只持有一个连接，disconnect 处理通常毫秒级完成，默认值已经足够。
+	 * 关闭时先 shutdown() 再 awaitTermination，超时即返回失败，不会调用 shutdownNow() 强制中断。
 	 */
-	private int gracefulTimeoutSec = 30;
-	/**
-	 * shutdownNow 后的二次等待超时时间（秒），默认 5s。
-	 * 用于回收被中断的 worker 线程，通常 5~10s 足够。
-	 */
-	private int forceTimeoutSec = 5;
+	private int shutdownTimeoutSec = TioConfig.DEFAULT_SHUTDOWN_TIMEOUT_SEC;
 
 	public String getName() {
 		return name;
@@ -704,39 +701,23 @@ public final class MqttClientCreator {
 		return this;
 	}
 
-	public int getGracefulTimeoutSec() {
-		return gracefulTimeoutSec;
+	public int getShutdownTimeoutSec() {
+		return shutdownTimeoutSec;
 	}
 
 	/**
-	 * 设置线程池优雅关闭等待超时时间（秒），默认 30s。
+	 * 设置线程池关闭等待超时时间（秒），默认 {@link TioConfig#DEFAULT_SHUTDOWN_TIMEOUT_SEC}。
+	 * 注意：该值仅控制 awaitTermination 的阻塞时长，超时不会强制中断线程；
+	 * 超时后仍在运行的任务会继续执行直到自然结束。
 	 *
-	 * @param gracefulTimeoutSec 关闭超时（秒），必须大于 0
+	 * @param shutdownTimeoutSec 关闭超时（秒），必须大于 0
 	 * @return MqttClientCreator
 	 */
-	public MqttClientCreator gracefulTimeoutSec(int gracefulTimeoutSec) {
-		if (gracefulTimeoutSec <= 0) {
-			throw new IllegalArgumentException("gracefulTimeoutSec must be greater than 0");
+	public MqttClientCreator shutdownTimeoutSec(int shutdownTimeoutSec) {
+		if (shutdownTimeoutSec <= 0) {
+			throw new IllegalArgumentException("shutdownTimeoutSec must be greater than 0");
 		}
-		this.gracefulTimeoutSec = gracefulTimeoutSec;
-		return this;
-	}
-
-	public int getForceTimeoutSec() {
-		return forceTimeoutSec;
-	}
-
-	/**
-	 * 设置 shutdownNow 后的二次等待超时时间（秒），默认 5s。
-	 *
-	 * @param forceTimeoutSec 二次等待超时（秒），必须大于 0
-	 * @return MqttClientCreator
-	 */
-	public MqttClientCreator forceTimeoutSec(int forceTimeoutSec) {
-		if (forceTimeoutSec <= 0) {
-			throw new IllegalArgumentException("forceTimeoutSec must be greater than 0");
-		}
-		this.forceTimeoutSec = forceTimeoutSec;
+		this.shutdownTimeoutSec = shutdownTimeoutSec;
 		return this;
 	}
 
@@ -832,8 +813,7 @@ public final class MqttClientCreator {
 		// 6. tioConfig
 		TioClientConfig clientConfig = new TioClientConfig(clientAioHandler, clientAioListener, reconnConf, tioExecutor, groupExecutor);
 		clientConfig.setName(this.name);
-		clientConfig.setGracefulTimeoutSec(this.gracefulTimeoutSec);
-		clientConfig.setForceTimeoutSec(this.forceTimeoutSec);
+		clientConfig.setShutdownTimeoutSec(this.shutdownTimeoutSec);
 		// 7. 心跳超时时间
 		clientConfig.setHeartbeatTimeout(TimeUnit.SECONDS.toMillis(this.keepAliveSecs));
 		// 设置心跳检测模式为 LAST_REQ，keepAliveSecs 周期内，最后发送的时间差

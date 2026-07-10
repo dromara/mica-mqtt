@@ -47,8 +47,8 @@ mqtt:
     biz-thread-pool-size: 2     # 同 mqtt-executor-size（2.4.2 开始支持，2.5.12 已经弃用）
     pending-publish-queue-enabled: false # 是否开启 MQTT 连接前待发送消息队列，默认：false（2.6.4 开始支持，老版本默认丢弃数据，升级时保持兼容）
     pending-publish-queue-size: 10 # MQTT 连接成功前的发布消息队列大小，默认：10（2.6.3 开始支持，2.6.4 默认会启用，注意 2.6.4 受 pending-publish-queue-enabled 开关影响）
-    graceful-timeout-sec: 30       # mqtt 工作线程池优雅关闭等待超时时间，单位：秒，默认：30（2.6.8 开始支持）。客户端只有 1 个连接，30s 已足够。
-    force-timeout-sec: 5           # shutdownNow 后的二次等待超时时间，单位：秒，默认：5（2.6.8 开始支持）。用于回收被中断的 worker 线程，通常 5~10s 足够。
+    shutdown-timeout-sec: 6000     # mqtt 工作线程池关闭等待超时时间，单位：秒，默认：6000（约 100 分钟，沿用 mica-net 默认值，2.6.8 开始支持）。
+                                  # 该值仅控制 awaitTermination 的阻塞时长，超时不会强制中断线程；超时后仍在运行的任务会继续执行直到自然结束。
     ssl:
       enabled: false            # 是否开启 ssl 认证，2.1.0 开始支持双向认证
       keystore-path:            # 可选参数：ssl 双向认证 keystore 目录，支持 classpath:/ 路径。
