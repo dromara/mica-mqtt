@@ -208,8 +208,21 @@ public class TrieTopicManager {
 
 	private static boolean putSubscription(Map<String, Byte> subscriptions, String clientId, byte mqttQoS,
 										   boolean noLocal, boolean retainAsPublished, byte retainHandling) {
-		SubscribeData data = SubscribeData.of(mqttQoS, noLocal, retainAsPublished, retainHandling);
-		return subscriptions.put(clientId, data.encoded) == null;
+		Byte existingEncoded = subscriptions.get(clientId);
+		if (existingEncoded == null) {
+			SubscribeData data = SubscribeData.of(mqttQoS, noLocal, retainAsPublished, retainHandling);
+			subscriptions.put(clientId, data.encoded);
+			return true;
+		}
+		// 同一 client 重复订阅同一 topic 时按字段合并：
+		// QoS 取较大值、noLocal / retainAsPublished 取或、retainHandling 取较大值（更严格档位）
+		SubscribeData existing = SubscribeData.decode(existingEncoded);
+		byte maxQos = MAX_QOS.apply(existing.qos, mqttQoS);
+		boolean mergedNoLocal = existing.noLocal || noLocal;
+		boolean mergedRap = existing.retainAsPublished || retainAsPublished;
+		byte mergedRh = existing.retainHandling > retainHandling ? existing.retainHandling : retainHandling;
+		subscriptions.put(clientId, SubscribeData.of(maxQos, mergedNoLocal, mergedRap, mergedRh).encoded);
+		return false;
 	}
 
 	/**

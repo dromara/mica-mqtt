@@ -140,10 +140,11 @@ class TrieTopicManagerTest {
 		Assertions.assertTrue(topicManager.addSubscribe(topicFilter, "client1", 1, true, true, 1));
 		Assertions.assertFalse(topicManager.addSubscribe(topicFilter, "client1", 2, false, false, 2));
 
+		// 合并语义：QoS 取 max、noLocal/retainAsPublished 取或、retainHandling 取 max
 		Subscribe subscription = topicManager.getSubscriptions("client1").get(0);
 		Assertions.assertEquals(2, subscription.getMqttQoS());
-		Assertions.assertFalse(subscription.isNoLocal());
-		Assertions.assertFalse(subscription.isRetainAsPublished());
+		Assertions.assertTrue(subscription.isNoLocal());
+		Assertions.assertTrue(subscription.isRetainAsPublished());
 		Assertions.assertEquals(2, subscription.getRetainHandling());
 	}
 
