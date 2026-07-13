@@ -49,6 +49,10 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 	 * qos2 消息过程存储 clientId: {msgId: Object}
 	 */
 	private final ConcurrentMap<String, ConcurrentMap<Integer, MqttPendingQos2Publish>> pendingQos2PublishStore = new ConcurrentHashMap<>();
+	/**
+	 * 客户端 CONNECT Receive Maximum 声明值
+	 */
+	private final ConcurrentMap<String, Integer> clientReceiveMaximumStore = new ConcurrentHashMap<>();
 
 	@Override
 	public boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS,
@@ -127,6 +131,23 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 	}
 
 	@Override
+	public void setClientReceiveMaximum(String clientId, int receiveMaximum) {
+		clientReceiveMaximumStore.put(clientId, receiveMaximum);
+	}
+
+	@Override
+	public int getClientReceiveMaximum(String clientId) {
+		Integer receiveMaximum = clientReceiveMaximumStore.get(clientId);
+		return receiveMaximum == null ? 0xffff : receiveMaximum;
+	}
+
+	@Override
+	public int getPendingPublishCount(String clientId) {
+		Map<Integer, MqttPendingPublish> data = pendingPublishStore.get(clientId);
+		return data == null ? 0 : data.size();
+	}
+
+	@Override
 	public int getPacketId(String clientId) {
 		AtomicInteger packetIdGen = messageIdStore.computeIfAbsent(clientId, (key) -> new AtomicInteger(1));
 		return packetIdGen.getAndUpdate(current -> (current % 0xffff) == 0 ? 1 : current + 1);
@@ -155,6 +176,7 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 		removeSubscribe(clientId);
 		pendingPublishStore.remove(clientId);
 		pendingQos2PublishStore.remove(clientId);
+		clientReceiveMaximumStore.remove(clientId);
 		messageIdStore.remove(clientId);
 	}
 
@@ -163,6 +185,7 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 		topicManager.clear();
 		pendingPublishStore.clear();
 		pendingQos2PublishStore.clear();
+		clientReceiveMaximumStore.clear();
 		messageIdStore.clear();
 	}
 

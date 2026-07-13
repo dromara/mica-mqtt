@@ -133,6 +133,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		if (StrUtil.isNotBlank(userName)) {
 			Tio.bindUser(context, userName);
 		}
+		sessionManager.setClientReceiveMaximum(uniqueId, resolveClientReceiveMaximum(context, variableHeader, uniqueId));
 		// 6. 心跳超时
 		int keepAliveSeconds = variableHeader.keepAliveTimeSeconds();
 		// mqtt 5.0 Server Keep Alive：服务端可接管客户端心跳
@@ -247,6 +248,21 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		// MQTT 5.0 默认允许返回问题信息；只有客户端显式 false 时才抑制 Reason String。
 		Boolean requestProblemInformation = new MqttConnectProperties(variableHeader.properties()).getRequestProblemInformation();
 		return requestProblemInformation == null || requestProblemInformation;
+	}
+
+	private int resolveClientReceiveMaximum(ChannelContext context, MqttConnectVariableHeader variableHeader, String clientId) {
+		if (!MqttCodecUtil.isMqtt5(context)) {
+			return 0xffff;
+		}
+		Integer receiveMaximum = new MqttConnectProperties(variableHeader.properties()).getReceiveMaximum();
+		if (receiveMaximum == null) {
+			return 0xffff;
+		}
+		if (receiveMaximum > 0 && receiveMaximum <= 0xffff) {
+			return receiveMaximum;
+		}
+		logger.warn("Connect clientId:{} invalid receiveMaximum:{}, fallback to spec default 65535", clientId, receiveMaximum);
+		return 0xffff;
 	}
 
 	private void sendConnected(ChannelContext context, String uniqueId) {

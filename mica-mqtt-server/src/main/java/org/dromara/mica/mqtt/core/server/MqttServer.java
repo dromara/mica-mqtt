@@ -202,6 +202,11 @@ public final class MqttServer {
 		MqttQoS mqttQoS = qos.value() > subMqttQoS ? MqttQoS.valueOf(subMqttQoS) : qos;
 		// 判断是否高版本 qos
 		boolean isHighLevelQoS = MqttQoS.QOS1 == mqttQoS || MqttQoS.QOS2 == mqttQoS;
+		if (isHighLevelQoS && isReceiveMaximumExceeded(clientId)) {
+			logger.warn("MQTT Topic:{} qos:{} publish blocked by Receive Maximum clientId:{} pending:{} limit:{}",
+				topic, mqttQoS, clientId, sessionManager.getPendingPublishCount(clientId), sessionManager.getClientReceiveMaximum(clientId));
+			return false;
+		}
 		// 消息id
 		int messageId = isHighLevelQoS ? sessionManager.getPacketId(clientId) : -1;
 		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
@@ -223,6 +228,12 @@ public final class MqttServer {
 		boolean result = Tio.send(context, message);
 		logger.debug("MQTT Topic:{} qos:{} retain:{} publish clientId:{} result:{}", topic, qos, retain, clientId, result);
 		return result;
+	}
+
+	private boolean isReceiveMaximumExceeded(String clientId) {
+		int receiveMaximum = sessionManager.getClientReceiveMaximum(clientId);
+		int pendingCount = sessionManager.getPendingPublishCount(clientId);
+		return receiveMaximum > 0 && pendingCount >= receiveMaximum;
 	}
 
 	/**
