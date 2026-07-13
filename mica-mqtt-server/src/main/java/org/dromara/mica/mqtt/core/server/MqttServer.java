@@ -232,7 +232,8 @@ public final class MqttServer {
 
 	private boolean isReceiveMaximumExceeded(String clientId) {
 		int receiveMaximum = sessionManager.getClientReceiveMaximum(clientId);
-		if (receiveMaximum <= 0) {
+		if (receiveMaximum < 1) {
+			logger.warn("MQTT publish blocked due to invalid Receive Maximum clientId:{} receiveMaximum:{}", clientId, receiveMaximum);
 			return true;
 		}
 		int pendingCount = sessionManager.getPendingPublishCount(clientId);

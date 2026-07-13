@@ -115,6 +115,11 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 				0, false, requestProblemInformation);
 			return;
 		}
+		if (hasInvalidReceiveMaximum(context, variableHeader)) {
+			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_PROTOCOL_ERROR,
+				0, false, requestProblemInformation);
+			return;
+		}
 		// 认证成功
 		context.setAccepted(true);
 		// 4. 互踢逻辑
@@ -263,6 +268,14 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		}
 		logger.warn("Connect clientId:{} invalid receiveMaximum:{}, fallback to spec default 65535", clientId, receiveMaximum);
 		return IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM;
+	}
+
+	private boolean hasInvalidReceiveMaximum(ChannelContext context, MqttConnectVariableHeader variableHeader) {
+		if (!MqttCodecUtil.isMqtt5(context)) {
+			return false;
+		}
+		Integer receiveMaximum = new MqttConnectProperties(variableHeader.properties()).getReceiveMaximum();
+		return receiveMaximum != null && receiveMaximum < 1;
 	}
 
 	private void sendConnected(ChannelContext context, String uniqueId) {
