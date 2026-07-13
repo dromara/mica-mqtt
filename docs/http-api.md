@@ -309,7 +309,7 @@ $ curl -i --basic -u mica:mica -X POST "http://localhost:18083/api/v1/mqtt/unsub
 **Examples:**
 
 ```bash
-$ curl -i --basic -u mica:mica -X POST "http://localhost:18083/api/v1/clients/info?clientId=mqttx_5fe4cfcf"
+$ curl -i --basic -u mica:mica "http://localhost:18083/api/v1/clients/info?clientId=mqttx_5fe4cfcf"
 
 {"code":1,"data":{"clientId":"mqttx_5fe4cfcf","connected":true,"connectedAt":1681792417835,"createdAt":1681792417835,"ipAddress":"127.0.0.1","port":11852,"protoName":"MQTT","protoVer":5}}
 ```
@@ -348,7 +348,7 @@ $ curl -i --basic -u mica:mica -X POST "http://localhost:18083/api/v1/clients/in
 **Examples:**
 
 ```bash
-$ curl -i --basic -u mica:mica -X POST "http://localhost:18083/api/v1/clients?_page=1&_limit=100"
+$ curl -i --basic -u mica:mica "http://localhost:18083/api/v1/clients?_page=1&_limit=100"
 
 {"data":{"list":[{"clientId":"mqttx_5fe4cfcf","connected":true,"protoName":"MQTT","protoVer":5,"ipAddress":"127.0.0.1","port":11852,"connectedAt":1681792417835,"createdAt":1681792417835}],"pageNumber":1,"pageSize":1,"totalRow":1},"code":1}
 ```
@@ -406,7 +406,7 @@ $ curl -i --basic -u mica:mica -X POST "http://localhost:18083/api/v1/clients/de
 **Examples:**
 
 ```bash
-$ curl -i --basic -u mica:mica "http://127.0.0.1:8083/api/v1/client/subscriptions?clientId=123"
+$ curl -i --basic -u mica:mica "http://localhost:18083/api/v1/client/subscriptions?clientId=123"
 
 {
   "code": 1,
