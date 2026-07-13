@@ -16,12 +16,10 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline.message;
 
-import net.dreamlu.mica.net.core.ChannelContext;
+import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * 订阅消息处理器
@@ -29,35 +27,23 @@ import org.slf4j.LoggerFactory;
  * @author L.cm
  */
 public class SubscribeMessageHandler extends BaseMessageHandler {
-	private static final Logger logger = LoggerFactory.getLogger(SubscribeMessageHandler.class);
-
 	public SubscribeMessageHandler(MqttServer mqttServer) {
 		super(mqttServer);
 	}
 
 	@Override
-	public boolean handle(Message message) {
-		if (MessageType.SUBSCRIBE != message.getMessageType()) {
-			return true;
-		}
+	public MessageType[] messageTypes() {
+		return new MessageType[]{MessageType.SUBSCRIBE};
+	}
 
+	@Override
+	public boolean handle(Message message) {
 		String topic = message.getTopic();
 		String fromClientId = message.getFromClientId();
 		int qos = message.getQos();
 
-		// 添加订阅
+		// HTTP API / 内部消息没有 MQTT 5.0 订阅选项，使用协议默认值并按重订阅替换语义写入一次。
 		sessionManager.addSubscribe(topic, fromClientId, qos);
-
-		// 处理集群消息
-		ChannelContext context = mqttServer.getChannelContext(fromClientId);
-		if (context != null) {
-			// 如果是来自其他节点的订阅消息，本地也需要添加订阅
-			String node = message.getNode();
-			if (node != null && !node.equals(mqttServer.getServerCreator().getNodeName())) {
-				sessionManager.addSubscribe(topic, fromClientId, qos);
-			}
-		}
-
 		return true;
 	}
 

@@ -1,7 +1,7 @@
 package org.dromara.mica.mqtt.core.server.test;
 
+import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.server.session.TrieTopicManager;
-import org.openjdk.jol.info.ClassLayout;
 import org.openjdk.jol.info.GraphLayout;
 
 import java.lang.reflect.Field;
@@ -190,7 +190,7 @@ public class TrieTopicManagerDeepAnalysis {
         for (int batchSize = 100; batchSize <= 5000; batchSize += 100) {
             // 添加一批订阅
             for (int i = 0; i < batchSize; i++) {
-                topicManager.addSubscribe("/test/" + i + "/topic", "client" + i, i % 3);
+                addSubscribe(topicManager, "/test/" + i + "/topic", "client" + i, i % 3);
             }
 
             long currentSize = GraphLayout.parseInstance(topicManager).totalSize();
@@ -222,7 +222,7 @@ public class TrieTopicManagerDeepAnalysis {
 
             // 添加多个客户端订阅相同模式
             for (int i = 0; i < 100; i++) {
-                topicManager.addSubscribe(pattern, "client" + i, i % 3);
+                addSubscribe(topicManager, pattern, "client" + i, i % 3);
             }
 
             long memorySize = GraphLayout.parseInstance(topicManager).totalSize();
@@ -274,15 +274,22 @@ public class TrieTopicManagerDeepAnalysis {
         TrieTopicManager topicManager = new TrieTopicManager();
 
         // 添加各种类型的订阅
-        topicManager.addSubscribe("/sys/1/456/thing/model/down_raw", "client1", 1);
-        topicManager.addSubscribe("/sys/+/+/thing/model/down_raw", "client1", 0);
-        topicManager.addSubscribe("$share/group1/sys/123/456/thing/model/down_raw", "client1", 0);
-        topicManager.addSubscribe("$queue/sys/123/456/thing/model/down_raw", "client1", 1);
+        addSubscribe(topicManager, "/sys/1/456/thing/model/down_raw", "client1", 1);
+        addSubscribe(topicManager, "/sys/+/+/thing/model/down_raw", "client1", 0);
+        addSubscribe(topicManager, "$share/group1/sys/123/456/thing/model/down_raw", "client1", 0);
+        addSubscribe(topicManager, "$queue/sys/123/456/thing/model/down_raw", "client1", 1);
 
-        topicManager.addSubscribe("/sys/2/456/thing/model/down_raw", "client2", 1);
-        topicManager.addSubscribe("/sys/+/+/thing/model/down_raw", "client2", 0);
-        topicManager.addSubscribe("$share/group1/sys/123/456/thing/model/down_raw", "client2", 1);
+        addSubscribe(topicManager, "/sys/2/456/thing/model/down_raw", "client2", 1);
+        addSubscribe(topicManager, "/sys/+/+/thing/model/down_raw", "client2", 0);
+        addSubscribe(topicManager, "$share/group1/sys/123/456/thing/model/down_raw", "client2", 1);
 
         return topicManager;
+    }
+
+    /**
+     * 添加订阅的辅助方法
+     */
+    private static void addSubscribe(TrieTopicManager topicManager, String topic, String clientId, int qos) {
+        topicManager.addSubscribe(new TopicFilter(topic), clientId, qos, false, false, 0);
     }
 }

@@ -1,5 +1,6 @@
 package org.dromara.mica.mqtt.core.server.test;
 
+import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.server.session.TrieTopicManager;
 import org.openjdk.jol.info.ClassLayout;
 import org.openjdk.jol.info.GraphLayout;
@@ -77,10 +78,10 @@ public class TrieTopicManagerMemoryAnalysisTest {
         TrieTopicManager topicManager = new TrieTopicManager();
 
         // 添加一些订阅
-        topicManager.addSubscribe("/sys/1/456/thing/model/down_raw", "client1", 1);
-        topicManager.addSubscribe("/sys/2/456/thing/model/down_raw", "client1", 1);
-        topicManager.addSubscribe("/sys/+/+/thing/model/down_raw", "client1", 0);
-        topicManager.addSubscribe("/sys/1/456/thing/model/down_raw", "client2", 1);
+        addSubscribe(topicManager, "/sys/1/456/thing/model/down_raw", "client1", 1);
+        addSubscribe(topicManager, "/sys/2/456/thing/model/down_raw", "client1", 1);
+        addSubscribe(topicManager, "/sys/+/+/thing/model/down_raw", "client1", 0);
+        addSubscribe(topicManager, "/sys/1/456/thing/model/down_raw", "client2", 1);
 
         // 分析对象图
         System.out.println("添加订阅后的对象图:");
@@ -101,8 +102,8 @@ public class TrieTopicManagerMemoryAnalysisTest {
         // 添加大量订阅
         for (int i = 0; i < 1000; i++) {
             for (int j = 0; j < 10; j++) {
-                topicManager.addSubscribe("/sys/" + i + "/" + j + "/thing/model/down_raw",
-                                       "client" + i, j % 3);
+                addSubscribe(topicManager, "/sys/" + i + "/" + j + "/thing/model/down_raw",
+                    "client" + i, j % 3);
             }
         }
 
@@ -123,10 +124,10 @@ public class TrieTopicManagerMemoryAnalysisTest {
         TrieTopicManager topicManager = new TrieTopicManager();
 
         // 添加共享订阅
-        topicManager.addSubscribe("$share/group1/sys/123/456/thing/model/down_raw", "client1", 0);
-        topicManager.addSubscribe("$share/group1/sys/123/456/thing/model/down_raw", "client2", 1);
-        topicManager.addSubscribe("$share/group2/sys/123/456/thing/model/down_raw", "client3", 0);
-        topicManager.addSubscribe("$queue/sys/123/456/thing/model/down_raw", "client4", 1);
+        addSubscribe(topicManager, "$share/group1/sys/123/456/thing/model/down_raw", "client1", 0);
+        addSubscribe(topicManager, "$share/group1/sys/123/456/thing/model/down_raw", "client2", 1);
+        addSubscribe(topicManager, "$share/group2/sys/123/456/thing/model/down_raw", "client3", 0);
+        addSubscribe(topicManager, "$queue/sys/123/456/thing/model/down_raw", "client4", 1);
 
         // 获取总内存占用
         long totalSize = GraphLayout.parseInstance(topicManager).totalSize();
@@ -152,8 +153,8 @@ public class TrieTopicManagerMemoryAnalysisTest {
             if (subscriptionCount > 0) {
                 // 添加订阅
                 for (int i = 0; i < 1000; i++) {
-                    topicManager.addSubscribe("/sys/" + subscriptionCount + "/" + i + "/thing/model/down_raw",
-                                           "client" + subscriptionCount, i % 3);
+                    addSubscribe(topicManager, "/sys/" + subscriptionCount + "/" + i + "/thing/model/down_raw",
+                        "client" + subscriptionCount, i % 3);
                 }
             }
 
@@ -166,6 +167,16 @@ public class TrieTopicManagerMemoryAnalysisTest {
                             memoryIncrease / 1024.0,
                             memoryIncrease / (1024.0 * 1024.0));
         }
+    }
+
+    /**
+     * 格式化字节数
+     */
+    /**
+     * 添加订阅的辅助方法
+     */
+    private static void addSubscribe(TrieTopicManager topicManager, String topic, String clientId, int qos) {
+        topicManager.addSubscribe(new TopicFilter(topic), clientId, qos, false, false, 0);
     }
 
     /**
@@ -194,7 +205,7 @@ public class TrieTopicManagerMemoryAnalysisTest {
             // 添加订阅
             long startTime = System.nanoTime();
             for (int i = 0; i < subscriptionCount; i++) {
-                topicManager.addSubscribe("/sys/" + i + "/thing/model/down_raw", "client" + i, i % 3);
+                addSubscribe(topicManager, "/sys/" + i + "/thing/model/down_raw", "client" + i, i % 3);
             }
             long addTime = TimeUnit.NANOSECONDS.toMicros(System.nanoTime() - startTime);
 

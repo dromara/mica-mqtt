@@ -37,11 +37,12 @@ public class DisconnectMessageHandler extends BaseMessageHandler {
 	}
 
 	@Override
-	public boolean handle(Message message) {
-		if (MessageType.DISCONNECT != message.getMessageType()) {
-			return true;
-		}
+	public MessageType[] messageTypes() {
+		return new MessageType[]{MessageType.DISCONNECT};
+	}
 
+	@Override
+	public boolean handle(Message message) {
 		String clientId = message.getClientId();
 		ChannelContext context = mqttServer.getChannelContext(clientId);
 		if (context != null) {

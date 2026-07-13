@@ -80,6 +80,17 @@ MqttServerAioHandler.handler(packet)
 
 > 5.0 的 **Message Expiry 递减**、**Topic Alias / Subscription Identifier 移除** 都在 [SubscriptionForwardHandler#rewriteProperties](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L92-L132) 中按规范 3.3.2.3 实现。
 
+#### 1.2.5 协议 Handler 与内部消息 Pipeline Handler
+
+两套 Handler 已按输入模型和类型枚举明确区分：
+
+| 层级 | 接口 | 输入 | 路由键 | 注册结构 |
+|---|---|---|---|---|
+| MQTT 协议报文 | `IMqttMessageHandler` | codec `MqttMessage` | `MqttMessageType` | 单 Handler `EnumMap` |
+| 服务端内部消息流水线 | `MqttMessagePipelineHandler` | server model `Message` | `MessageType` | 多 Handler `EnumMap`，同类型按 `getOrder()` 串联 |
+
+内部消息 Handler 通过 `messageTypes()` 显式声明负责的类型，不再由全部 Handler 逐个判断消息类型。
+
 ---
 
 ## 2. MQTT 5.0 协议特性全景
@@ -168,7 +179,8 @@ MqttServerAioHandler.handler(packet)
 | **Shared Subscription** `$share/{group}/...` | [TrieTopicManager](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/session/TrieTopicManager.java) | 分组共享订阅（`$queue` + `$share`） |
 | **Session Expiry Interval**（客户端侧） | [MqttClientProperties](file:///e:/codes/gitee/mica-mqtt/starter/mica-mqtt-client-spring-boot-starter/src/main/java/org/dromara/mica/mqtt/spring/client/config/MqttClientProperties.java#L145) | CONNECT 时下发，服务端有 `IMqttSessionManager.expire` 接口签名但未启用（见 §6.4） |
 | **Topic Alias / Subscription Identifier 转发清理** | [SubscriptionForwardHandler#rewriteProperties](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L116-L122) | 服务端转发时不携带发布者的 Topic Alias 和 Subscription Identifier（规范 3.3.2.3 / 3.3.4） |
-| **Subscription Options 编解码** | [MqttEncoder](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttEncoder.java#L226-L240) | RetainAsPublished / RetainHandling / No Local / QoS 都能编解码，但运行时仅 No Local 生效 |
+| **Subscription Options 编解码** | [MqttEncoder](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttEncoder.java#L226-L240) | RetainAsPublished / RetainHandling / No Local / QoS 均能编解码，服务端运行时语义已生效 |
+| **Retain As Published / Retain Handling**（服务端运行时） | [MqttSubscribeHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java) + [SubscriptionForwardHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java) | 保存完整订阅选项；支持三种保留消息补发策略，实时转发按 RAP 保留 RETAIN 标志；重叠订阅会合并 No Local / RAP 语义 |
 | **Will Properties**（属性透传） | [MqttConnectHandler#handle 第 140-159 行](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L140-L159) | 遗嘱消息持久化时已绑定 WillProperties 字段（willDelay、payloadFormatIndicator 等），Will Delay Interval 调度尚未生效 |
 
 ---
@@ -182,7 +194,7 @@ MqttServerAioHandler.handler(packet)
 | PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code | ✅ | ✅ | ❌ | ❌ | n/a |
 | DISCONNECT Reason Code + Properties（双向） | ✅ | ✅ | ✅ | 🚧 | n/a |
 | SUBACK / UNSUBACK Reason Code | ✅ | ✅ | 🚧 | 🚧 | n/a |
-| Retain As Published / Retain Handling（运行时） | ✅ | ❌ | n/a | ❌ | n/a |
+| Retain As Published / Retain Handling（运行时） | ✅ | ✅ | n/a | 🚧（本地委托支持，节点协议待扩展） | n/a |
 | CONNACK Properties 完善（能力位告知） | ✅ | 🚧（基础能力位） | ❌ | ❌ | n/a |
 | Server Keep Alive | ✅ | ✅ | ❌ | ❌ | n/a |
 | Receive Maximum（运行时） | ✅ | ❌ | ❌ | ❌ | n/a |
@@ -215,7 +227,7 @@ MqttServerAioHandler.handler(packet)
 | 1 | ✅ PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code + Properties | ⭐ | 高 | `MqttPubAckHandler` / `MqttPubRecHandler` / `MqttPubRelHandler` / `MqttPubCompHandler` |
 | 2 | ✅ DISCONNECT Reason Code + Properties（双向） | ⭐⭐ | 高 | `MqttClient#disconnect` / `MqttDisConnectHandler` |
 | 3 | ✅ SUBACK / UNSUBACK Reason Code | ⭐ | 高 | `MqttSubscribeHandler` / `MqttUnSubscribeHandler` |
-| 4 | Retain As Published / Retain Handling（运行时） | ⭐⭐ | 中 | `RetainMessageHandler` / `SubscriptionForwardHandler` |
+| 4 | ✅ Retain As Published / Retain Handling（运行时） | ⭐⭐ | 中 | `MqttSubscribeHandler` / `SubscriptionForwardHandler` |
 | 5 | 🚧 CONNACK Properties 完善（能力位告知） | ⭐ | 中 | `MqttConnectHandler#connAckByReturnCode` |
 | 6 | ✅ Server Keep Alive | ⭐ | 中 | `MqttConnectHandler#handle` |
 | 7 | Receive Maximum（server → client 方向） | ⭐⭐ | 中 | `IMqttSessionManager` + 挂起队列 |
@@ -289,7 +301,7 @@ MqttServerAioHandler.handler(packet)
 | **P1.2** | ✅ DISCONNECT Reason Code + Properties（双向） | 已完成 | 无 | 低 |
 | **P1.3** | ✅ SUBACK / UNSUBACK Reason Code | 已完成 | 无 | 低 |
 | **P1.4** | 🚧 CONNACK Properties 完善（能力位告知） | 部分完成 | 无 | 低 |
-| **P1.5** | Retain As Published / Retain Handling（运行时） | 2 天 | 无 | 中 |
+| **P1.5** | ✅ Retain As Published / Retain Handling（服务端运行时） | 已完成 | 无 | 中 |
 | **P1.6** | ✅ Server Keep Alive | 已完成 | P1.4 | 低 |
 | **P1.7** | Receive Maximum（server → client 方向） | 2 天 | 无 | 中 |
 | **P1.8** | Will Properties / Will Delay Interval | 2 天 | 无 | 中 |
@@ -526,13 +538,23 @@ private void connAckByReturnCode(String clientId, String uniqueId,
 
 | 文档 | 版本 | 状态 | 更新日期 |
 |---|---|---|---|
-| **mqtt5-features.md** | v2.1 | P1/P2 部分能力已落地 | 2026-07-07 |
+| **mqtt5-features.md** | v2.2 | P1/P2 部分能力已落地 | 2026-07-13 |
+
+### v2.2 变更摘要（相对 v2.1）
+
+- **完成 P1.5 服务端运行时**：订阅状态保存 Retain As Published / Retain Handling，三种 Retain Handling 策略均已生效。
+- **实时转发支持 RAP**：RAP=1 时保留发布消息原始 RETAIN 标志，RAP=0 时清除。
+- **重订阅语义完善**：相同 clientId + topicFilter 会替换原订阅选项，Retain Handling=1 仅在首次订阅时补发保留消息。
+- **重叠订阅语义完善**：多个 topic filter 同时命中同一客户端时，正确合并 QoS、No Local 与 RAP。
+- **集群本地路径兼容**：`ClusterMqttSessionManager` 已委托完整订阅选项；节点间二进制协议与持久化格式仍待版本化扩展。
+- **统一订阅写入语义**：MQTT SUBSCRIBE、HTTP API 与内部消息均走完整选项重载；无 MQTT 5.0 选项的入口显式使用协议默认值。
+- **内部消息 Pipeline 按类型路由**：新增 `MqttMessagePipelineHandler`，使用 `MessageType` 注册多 Handler 有序链，并移除旧 `MqttMessageHandler`。
 
 ### v2.1 变更摘要（相对 v2.0）
 
 - **标记已完成**：P1.1 PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code 基础链路、P1.2 DISCONNECT Reason Code + Properties（双向）、P1.3 SUBACK / UNSUBACK Reason Code、P1.6 Server Keep Alive、P2.3 Assigned Client Identifier、P2.4 Request Problem Information。
 - **标记部分完成**：P1.4 CONNACK Properties 基础能力位已下发，但 Receive Maximum / Maximum Packet Size 等运行时语义未完成，仍按 🚧 跟踪。
-- **剩余下次处理**：P1.5 Retain As Published / Retain Handling、P1.7 Receive Maximum、P1.8 Will Delay Interval，以及 P2/P3 中 Topic Alias、Subscription Identifier、AUTH、Clean Start / Session Expiry、集群同步等。
+- **剩余下次处理**：P1.7 Receive Maximum、P1.8 Will Delay Interval，以及 P2/P3 中 Topic Alias、Subscription Identifier、AUTH、Clean Start / Session Expiry、集群同步等。
 
 ### v2.0 变更摘要（相对 v1.0）
 

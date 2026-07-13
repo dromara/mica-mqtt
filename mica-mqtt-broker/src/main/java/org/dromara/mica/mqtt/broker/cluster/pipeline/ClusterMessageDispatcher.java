@@ -109,11 +109,12 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 	}
 
 	@Override
-	public boolean handle(Message message) {
-		if (MessageType.UP_STREAM != message.getMessageType()) {
-			return true;
-		}
+	public MessageType[] messageTypes() {
+		return new MessageType[]{MessageType.UP_STREAM};
+	}
 
+	@Override
+	public boolean handle(Message message) {
 		String topic = message.getTopic();
 		String localNodeId = clusterManager.getLocalNodeId();
 
@@ -239,4 +240,3 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 		return 90;
 	}
 }
-

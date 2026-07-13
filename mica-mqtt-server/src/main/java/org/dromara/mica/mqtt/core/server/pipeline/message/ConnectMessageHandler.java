@@ -39,11 +39,12 @@ public class ConnectMessageHandler extends BaseMessageHandler {
 	}
 
 	@Override
-	public boolean handle(Message message) {
-		if (MessageType.CONNECT != message.getMessageType()) {
-			return true;
-		}
+	public MessageType[] messageTypes() {
+		return new MessageType[]{MessageType.CONNECT};
+	}
 
+	@Override
+	public boolean handle(Message message) {
 		// 1. 如果一个 clientId 在集群多个服务上连接时断开其他的
 		String node = message.getNode();
 		if (nodeName.equals(node)) {

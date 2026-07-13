@@ -51,8 +51,9 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 	private final ConcurrentMap<String, ConcurrentMap<Integer, MqttPendingQos2Publish>> pendingQos2PublishStore = new ConcurrentHashMap<>();
 
 	@Override
-	public void addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal) {
-		topicManager.addSubscribe(topicFilter, clientId, (short) mqttQoS, noLocal);
+	public boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS,
+								boolean noLocal, boolean retainAsPublished, int retainHandling) {
+		return topicManager.addSubscribe(topicFilter, clientId, (short) mqttQoS, noLocal, retainAsPublished, retainHandling);
 	}
 
 	@Override

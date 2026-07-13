@@ -35,11 +35,12 @@ public class DownStreamMessageHandler extends BaseMessageHandler {
 	}
 
 	@Override
+	public MessageType[] messageTypes() {
+		return new MessageType[]{MessageType.DOWN_STREAM};
+	}
+
+	@Override
 	public boolean handle(Message message) {
-		if (MessageType.DOWN_STREAM != message.getMessageType()) {
-			return true;
-		}
-		
 		String topic = message.getTopic();
 		
 		// 发送到客户端订阅者

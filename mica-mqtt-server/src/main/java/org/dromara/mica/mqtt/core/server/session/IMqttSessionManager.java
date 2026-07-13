@@ -31,14 +31,35 @@ import java.util.List;
 public interface IMqttSessionManager {
 
 	/**
-	 * 添加订阅存储
+	 * 添加订阅存储。
+	 * <p>
+	 * 委托给带完整 MQTT 5.0 订阅选项的 {@link #addSubscribe(TopicFilter, String, int, boolean, boolean, int)}，
+	 * {@code retainAsPublished} 取 {@code false}，{@code retainHandling} 取 {@code 0}，以保持向后兼容。
 	 *
 	 * @param topicFilter topicFilter
 	 * @param clientId    客户端 Id
 	 * @param mqttQoS     MqttQoS
 	 * @param noLocal     MQTT 5.0 No Local 标志
+	 * @return true 表示此前不存在相同 clientId 和 topicFilter 的订阅
 	 */
-	void addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal);
+	default boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal) {
+		return this.addSubscribe(topicFilter, clientId, mqttQoS, noLocal, false, 0);
+	}
+
+	/**
+	 * 添加包含完整 MQTT 5.0 订阅选项的订阅存储。
+	 * <p>
+	 * 默认实现用于兼容已有的自定义 SessionManager；实现方可重写以原子判断新订阅并持久化完整选项。
+	 *
+	 * @param topicFilter       topicFilter
+	 * @param clientId          客户端 Id
+	 * @param mqttQoS           MqttQoS
+	 * @param noLocal           No Local 标志
+	 * @param retainAsPublished Retain As Published 标志
+	 * @param retainHandling    Retain Handling，取值 0、1、2
+	 * @return true 表示此前不存在相同 clientId 和 topicFilter 的订阅
+	 */
+	boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal, boolean retainAsPublished, int retainHandling);
 
 	/**
 	 * 添加订阅存储
@@ -46,9 +67,10 @@ public interface IMqttSessionManager {
 	 * @param topicFilter topicFilter
 	 * @param clientId    客户端 Id
 	 * @param mqttQoS     MqttQoS
+	 * @return true 表示此前不存在相同 clientId 和 topicFilter 的订阅
 	 */
-	default void addSubscribe(String topicFilter, String clientId, int mqttQoS) {
-		this.addSubscribe(new TopicFilter(topicFilter), clientId, mqttQoS, false);
+	default boolean addSubscribe(String topicFilter, String clientId, int mqttQoS) {
+		return this.addSubscribe(new TopicFilter(topicFilter), clientId, mqttQoS, false);
 	}
 
 	/**

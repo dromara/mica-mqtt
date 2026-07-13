@@ -311,7 +311,7 @@ public class MqttServerCreator {
 		return messagePipeline;
 	}
 
-	public MqttServerCreator addMessagePipelineHandler(MqttMessageHandler handler) {
+	public MqttServerCreator addMessagePipelineHandler(MqttMessagePipelineHandler handler) {
 		this.messagePipeline.addHandler(handler);
 		return this;
 	}

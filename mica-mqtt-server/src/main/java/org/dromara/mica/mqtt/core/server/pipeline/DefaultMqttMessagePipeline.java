@@ -16,13 +16,16 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline;
 
+import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 默认 MQTT 消息处理管线实现
@@ -32,19 +35,31 @@ import java.util.List;
 public class DefaultMqttMessagePipeline implements IMqttMessagePipeline {
 	private static final Logger logger = LoggerFactory.getLogger(DefaultMqttMessagePipeline.class);
 	/**
-	 * 处理器列表
+	 * 按消息类型注册的处理器链
 	 */
-	private final List<MqttMessageHandler> handlers = new ArrayList<>();
+	private final Map<MessageType, List<MqttMessagePipelineHandler>> handlers = new EnumMap<>(MessageType.class);
 
 	public DefaultMqttMessagePipeline() {
 	}
 
 	@Override
-	public void addHandler(MqttMessageHandler handler) {
-		if (handler != null) {
-			this.handlers.add(handler);
-			// 按顺序排序
-			this.handlers.sort(Comparator.comparingInt(MqttMessageHandler::getOrder));
+	public void addHandler(MqttMessagePipelineHandler handler) {
+		if (handler == null) {
+			return;
+		}
+		MessageType[] messageTypes = handler.messageTypes();
+		if (messageTypes == null || messageTypes.length == 0) {
+			throw new IllegalArgumentException("handler " + handler.getClass().getName() + " must declare at least one MessageType");
+		}
+		for (MessageType messageType : messageTypes) {
+			if (messageType == null) {
+				throw new IllegalArgumentException("handler " + handler.getClass().getName() + " contains null MessageType");
+			}
+			List<MqttMessagePipelineHandler> typeHandlers = handlers.computeIfAbsent(messageType, key -> new ArrayList<>());
+			if (!typeHandlers.contains(handler)) {
+				typeHandlers.add(handler);
+				typeHandlers.sort(Comparator.comparingInt(MqttMessagePipelineHandler::getOrder));
+			}
 		}
 	}
 
@@ -53,8 +68,17 @@ public class DefaultMqttMessagePipeline implements IMqttMessagePipeline {
 		if (message == null) {
 			return false;
 		}
-		// 处理所有消息类型的处理器
-		processHandlers(handlers, message);
+		MessageType messageType = message.getMessageType();
+		if (messageType == null) {
+			logger.warn("Mqtt internal message type is null: {}", message);
+			return false;
+		}
+		List<MqttMessagePipelineHandler> typeHandlers = handlers.get(messageType);
+		if (typeHandlers == null || typeHandlers.isEmpty()) {
+			logger.debug("Mqtt internal message has no pipeline handler for type: {}", messageType);
+			return true;
+		}
+		processHandlers(typeHandlers, message);
 		return true;
 	}
 
@@ -64,8 +88,8 @@ public class DefaultMqttMessagePipeline implements IMqttMessagePipeline {
 	 * @param handlers 处理器列表
 	 * @param message 消息
 	 */
-	private void processHandlers(List<MqttMessageHandler> handlers, Message message) {
-		for (MqttMessageHandler handler : handlers) {
+	private void processHandlers(List<MqttMessagePipelineHandler> handlers, Message message) {
+		for (MqttMessagePipelineHandler handler : handlers) {
 			try {
 				boolean continueProcess = handler.handle(message);
 				if (!continueProcess) {

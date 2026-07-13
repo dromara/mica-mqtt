@@ -16,12 +16,9 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline.message;
 
-import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * 取消订阅消息处理器
@@ -29,33 +26,22 @@ import org.slf4j.LoggerFactory;
  * @author L.cm
  */
 public class UnsubscribeMessageHandler extends BaseMessageHandler {
-	private static final Logger logger = LoggerFactory.getLogger(UnsubscribeMessageHandler.class);
-
 	public UnsubscribeMessageHandler(MqttServer mqttServer) {
 		super(mqttServer);
 	}
 
 	@Override
-	public boolean handle(Message message) {
-		if (MessageType.UNSUBSCRIBE != message.getMessageType()) {
-			return true;
-		}
+	public MessageType[] messageTypes() {
+		return new MessageType[]{MessageType.UNSUBSCRIBE};
+	}
 
+	@Override
+	public boolean handle(Message message) {
 		String topic = message.getTopic();
 		String fromClientId = message.getFromClientId();
 
-		// 移除订阅
+		// 集群模式下由 ClusterMqttSessionManager 负责广播，本处理器只需写入一次。
 		sessionManager.removeSubscribe(topic, fromClientId);
-
-		// 处理集群消息
-		ChannelContext context = mqttServer.getChannelContext(fromClientId);
-		if (context != null) {
-			// 如果是来自其他节点的取消订阅消息，本地也需要移除订阅
-			String node = message.getNode();
-			if (node != null && !node.equals(mqttServer.getServerCreator().getNodeName())) {
-				sessionManager.removeSubscribe(topic, fromClientId);
-			}
-		}
 
 		return true;
 	}

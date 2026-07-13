@@ -156,8 +156,9 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 					continue;
 				}
 				// 发送消息
+				boolean retain = subscribe.isRetainAsPublished() && context.isRetain();
 				mqttServer.publish(clientContext, clientId, topic, context.getPayload(),
-					context.getQos(), subscribe.getMqttQoS(), false, properties);
+					context.getQos(), subscribe.getMqttQoS(), retain, properties);
 			}
 		} catch (Throwable e) {
 			logger.error("Subscription forward error", e);

@@ -16,31 +16,40 @@
 
 package org.dromara.mica.mqtt.core.server.pipeline;
 
+import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 
 /**
- * 消息处理器接口
- * 用于扩展消息处理流程的各个阶段
+ * 服务端内部消息流水线处理器。
+ * <p>
+ * 与处理 MQTT 协议报文的 {@code server.handler.IMqttMessageHandler} 不同，
+ * 本接口处理的是服务端内部 {@link Message}，并按 {@link MessageType} 注册到流水线。
  *
  * @author L.cm
  */
-public interface MqttMessageHandler {
+public interface MqttMessagePipelineHandler {
 
 	/**
-	 * 处理消息
+	 * 声明处理的内部消息类型。
 	 *
-	 * @param message 消息
-	 * @return 是否继续处理后续处理器，true 继续，false 中断
+	 * @return MessageType[]
+	 */
+	MessageType[] messageTypes();
+
+	/**
+	 * 处理内部消息。
+	 *
+	 * @param message 内部消息
+	 * @return 是否继续处理同类型的后续处理器
 	 */
 	boolean handle(Message message);
 
 	/**
-	 * 获取处理器顺序，数字越小越先执行
+	 * 获取处理器顺序，数字越小越先执行。
 	 *
 	 * @return 顺序值
 	 */
 	default int getOrder() {
 		return 0;
 	}
-
 }

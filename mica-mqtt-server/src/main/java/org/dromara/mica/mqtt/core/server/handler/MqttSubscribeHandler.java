@@ -26,6 +26,8 @@ import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubAckMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
+import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption.RetainedHandlingPolicy;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
@@ -79,6 +81,7 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 		List<MqttTopicSubscription> topicSubscriptionList = message.payload().topicSubscriptions();
 		List<MqttSubAckReasonCode> reasonCodeList = new ArrayList<>();
 		List<String> subscribedTopicList = new ArrayList<>();
+		List<String> retainTopicList = new ArrayList<>();
 		boolean enableSubscribeValidator = subscribeValidator != null;
 		for (MqttTopicSubscription subscription : topicSubscriptionList) {
 			String topicFilter = subscription.topicFilter();
@@ -91,7 +94,8 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 				continue;
 			}
 			MqttQoS mqttQoS = subscription.qualityOfService();
-			boolean noLocal = subscription.option().isNoLocal();
+			MqttSubscriptionOption option = subscription.option();
+			boolean noLocal = option.isNoLocal();
 			if (enableSubscribeValidator && !subscribeValidator.verifyTopicFilter(context, clientId, topicFilter, mqttQoS)) {
 				// 仅拒绝当前 topic filter，其他合法订阅仍继续处理并在同一个 SUBACK 中逐项返回结果。
 				reasonCodeList.add(MqttSubAckReasonCode.NOT_AUTHORIZED);
@@ -99,8 +103,13 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 			} else {
 				reasonCodeList.add(MqttSubAckReasonCode.qosGranted(mqttQoS));
 				subscribedTopicList.add(topicFilter);
-				sessionManager.addSubscribe(new TopicFilter(topicFilter), clientId, mqttQoS.value(), noLocal);
-				logger.info("Subscribe - clientId:{} topicFilter:{} mqttQoS:{} noLocal:{} packetId:{}", clientId, topicFilter, mqttQoS, noLocal, packetId);
+				boolean newSubscription = sessionManager.addSubscribe(new TopicFilter(topicFilter), clientId,
+					mqttQoS.value(), noLocal, option.isRetainAsPublished(), option.retainHandling().value());
+				if (shouldSendRetainedMessage(option.retainHandling(), newSubscription)) {
+					retainTopicList.add(topicFilter);
+				}
+				logger.info("Subscribe - clientId:{} topicFilter:{} mqttQoS:{} noLocal:{} retainAsPublished:{} retainHandling:{} packetId:{}",
+					clientId, topicFilter, mqttQoS, noLocal, option.isRetainAsPublished(), option.retainHandling(), packetId);
 				publishSubscribedEvent(context, clientId, topicFilter, mqttQoS);
 			}
 		}
@@ -110,10 +119,15 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 			.build();
 		boolean result = Tio.send(context, subAckMessage);
 		logger.info("Subscribe - SubAck send clientId:{} subscribedTopicList:{} packetId:{} result:{}", clientId, subscribedTopicList, packetId, result);
-		for (String topic : subscribedTopicList) {
+		for (String topic : retainTopicList) {
 			// 只有成功写入 session 的订阅才触发保留消息补发，失败项不能收到 retained publish。
 			executor.submit(() -> sendRetainMessage(context, topic));
 		}
+	}
+
+	static boolean shouldSendRetainedMessage(RetainedHandlingPolicy retainHandling, boolean newSubscription) {
+		return RetainedHandlingPolicy.SEND_AT_SUBSCRIBE == retainHandling
+			|| (RetainedHandlingPolicy.SEND_AT_SUBSCRIBE_IF_NOT_YET_EXISTS == retainHandling && newSubscription);
 	}
 
 	private void sendRetainMessage(ChannelContext context, String topic) {

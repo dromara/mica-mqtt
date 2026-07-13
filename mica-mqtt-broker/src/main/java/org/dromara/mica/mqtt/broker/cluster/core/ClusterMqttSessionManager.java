@@ -134,7 +134,8 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 			return;
 		}
 		for (Subscribe sub : subscriptions) {
-			delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), clientId, sub.getMqttQoS(), sub.isNoLocal());
+			delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), clientId, sub.getMqttQoS(), sub.isNoLocal(),
+				sub.isRetainAsPublished(), sub.getRetainHandling());
 			logger.debug("[Cluster] Synced remote subscription: client={}, topic={}, node={}",
 				clientId, sub.getTopicFilter(), nodeId);
 		}
@@ -154,11 +155,18 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	}
 
 	@Override
-	public void addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal) {
-		delegate.addSubscribe(topicFilter, clientId, mqttQoS, noLocal);
+	public boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal,
+								boolean retainAsPublished, int retainHandling) {
+		boolean newSubscription = delegate.addSubscribe(topicFilter, clientId, mqttQoS, noLocal,
+			retainAsPublished, retainHandling);
+		Subscribe subscribe = new Subscribe(topicFilter.getTopic(), clientId, mqttQoS, noLocal,
+			retainAsPublished, retainHandling);
+		afterSubscribe(topicFilter, clientId, subscribe);
+		return newSubscription;
+	}
 
+	private void afterSubscribe(TopicFilter topicFilter, String clientId, Subscribe subscribe) {
 		if (clusterManager.isClusterEnabled()) {
-			Subscribe subscribe = new Subscribe(topicFilter.getTopic(), clientId, mqttQoS, noLocal);
 			SubscribeNotifyMessage notifyMessage = new SubscribeNotifyMessage();
 			notifyMessage.setClientId(clientId);
 			notifyMessage.setNodeId(clusterManager.getLocalNodeId());
@@ -447,7 +455,8 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 				continue;
 			}
 			for (Subscribe sub : entry.getValue()) {
-				delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), entry.getKey(), sub.getMqttQoS(), sub.isNoLocal());
+				delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), entry.getKey(), sub.getMqttQoS(), sub.isNoLocal(),
+					sub.isRetainAsPublished(), sub.getRetainHandling());
 			}
 		}
 	}

@@ -17,8 +17,9 @@
 package org.dromara.mica.mqtt.core.server.pipeline.message;
 
 import org.dromara.mica.mqtt.core.server.MqttServer;
+import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
-import org.dromara.mica.mqtt.core.server.pipeline.MqttMessageHandler;
+import org.dromara.mica.mqtt.core.server.pipeline.MqttMessagePipelineHandler;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 
 /**
@@ -26,7 +27,7 @@ import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
  *
  * @author L.cm
  */
-public abstract class BaseMessageHandler implements MqttMessageHandler {
+public abstract class BaseMessageHandler implements MqttMessagePipelineHandler {
 	protected final MqttServer mqttServer;
 	protected final IMqttMessageListener messageListener;
 	protected final IMqttSessionManager sessionManager;
@@ -36,5 +37,8 @@ public abstract class BaseMessageHandler implements MqttMessageHandler {
 		this.messageListener = mqttServer.getServerCreator().getMessageListener();
 		this.sessionManager = mqttServer.getServerCreator().getSessionManager();
 	}
+
+	@Override
+	public abstract MessageType[] messageTypes();
 
 }

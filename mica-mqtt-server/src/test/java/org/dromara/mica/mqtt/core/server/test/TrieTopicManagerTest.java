@@ -1,5 +1,6 @@
 package org.dromara.mica.mqtt.core.server.test;
 
+import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.session.TrieTopicManager;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
@@ -38,11 +39,18 @@ class TrieTopicManagerTest {
 	private static boolean match(TrieTopicManager topicManager, String topicFilter, String topicName) {
 		String clientId = "client1";
 		int qos = 0;
-		topicManager.addSubscribe(topicFilter, clientId, qos);
+		topicManager.addSubscribe(new TopicFilter(topicFilter), clientId, qos, false, false, 0);
 		List<Subscribe> subscribeList = topicManager.searchSubscribe(topicName);
 		return subscribeList.stream().anyMatch(subscribe -> {
 			return subscribe.getClientId().equals(clientId) && subscribe.getMqttQoS() == qos;
 		});
+	}
+
+	/**
+	 * 简化订阅写入：HTTP API 等无 MQTT 5.0 订阅选项的路径默认 false/0。
+	 */
+	private static boolean addSubscribe(TrieTopicManager topicManager, String topicFilter, String clientId, int qos) {
+		return topicManager.addSubscribe(new TopicFilter(topicFilter), clientId, qos, false, false, 0);
 	}
 
 	@Test
@@ -117,20 +125,46 @@ class TrieTopicManagerTest {
 	@Test
 	void testAdd() {
 		TrieTopicManager topicManager = new TrieTopicManager();
-		topicManager.addSubscribe("test/+", "client1", 0);
-		topicManager.addSubscribe("test/123", "client1", 1);
-		topicManager.addSubscribe("$queue/test/123", "client1", 2);
-		topicManager.addSubscribe("$share/group1/test/123", "client1", 1);
+		addSubscribe(topicManager, "test/+", "client1", 0);
+		addSubscribe(topicManager, "test/123", "client1", 1);
+		addSubscribe(topicManager, "$queue/test/123", "client1", 2);
+		addSubscribe(topicManager, "$share/group1/test/123", "client1", 1);
 		List<Subscribe> subscribeList = topicManager.getSubscriptions("client1");
 		Assertions.assertEquals(4, subscribeList.size());
 	}
 
 	@Test
+	void testMqtt5SubscriptionOptions() {
+		TrieTopicManager topicManager = new TrieTopicManager();
+		TopicFilter topicFilter = new TopicFilter("test/+");
+		Assertions.assertTrue(topicManager.addSubscribe(topicFilter, "client1", 1, true, true, 1));
+		Assertions.assertFalse(topicManager.addSubscribe(topicFilter, "client1", 2, false, false, 2));
+
+		Subscribe subscription = topicManager.getSubscriptions("client1").get(0);
+		Assertions.assertEquals(2, subscription.getMqttQoS());
+		Assertions.assertFalse(subscription.isNoLocal());
+		Assertions.assertFalse(subscription.isRetainAsPublished());
+		Assertions.assertEquals(2, subscription.getRetainHandling());
+	}
+
+	@Test
+	void testMergeOverlappingMqtt5SubscriptionOptions() {
+		TrieTopicManager topicManager = new TrieTopicManager();
+		topicManager.addSubscribe(new TopicFilter("test/value"), "client1", 0, true, false, 0);
+		topicManager.addSubscribe(new TopicFilter("test/+"), "client1", 1, false, true, 0);
+
+		Subscribe subscription = topicManager.searchSubscribe("test/value").get(0);
+		Assertions.assertEquals(1, subscription.getMqttQoS());
+		Assertions.assertFalse(subscription.isNoLocal());
+		Assertions.assertTrue(subscription.isRetainAsPublished());
+	}
+
+	@Test
 	void testRemove() {
 		TrieTopicManager topicManager = new TrieTopicManager();
-		topicManager.addSubscribe("test/123", "client1", 0);
-		topicManager.addSubscribe("$queue/test/123", "client1", 0);
-		topicManager.addSubscribe("$share/group1/test/123", "client1", 0);
+		addSubscribe(topicManager, "test/123", "client1", 0);
+		addSubscribe(topicManager, "$queue/test/123", "client1", 0);
+		addSubscribe(topicManager, "$share/group1/test/123", "client1", 0);
 		topicManager.removeSubscribe("$queue/test/123", "client1");
 		List<Subscribe> subscribeList = topicManager.getSubscriptions("client1");
 		Assertions.assertEquals(2, subscribeList.size());
@@ -139,11 +173,11 @@ class TrieTopicManagerTest {
 	@Test
 	void testSearch() {
 		TrieTopicManager topicManager = new TrieTopicManager();
-		topicManager.addSubscribe("test/+", "client1", 0);
-		topicManager.addSubscribe("test/+/", "client2", 1);
-		topicManager.addSubscribe("test/+/1", "client3", 1);
-		topicManager.addSubscribe("$queue/test/#", "client4", 0);
-		topicManager.addSubscribe("$share/group1/test/123", "client5", 0);
+		addSubscribe(topicManager, "test/+", "client1", 0);
+		addSubscribe(topicManager, "test/+/", "client2", 1);
+		addSubscribe(topicManager, "test/+/1", "client3", 1);
+		addSubscribe(topicManager, "$queue/test/#", "client4", 0);
+		addSubscribe(topicManager, "$share/group1/test/123", "client5", 0);
 		List<Subscribe> subscribeList = topicManager.getSubscriptions("client1");
 		Assertions.assertEquals(1, subscribeList.size());
 		List<Subscribe> subscribes = topicManager.searchSubscribe("test/123");
@@ -153,15 +187,15 @@ class TrieTopicManagerTest {
 	@Test
 	void test() {
 		TrieTopicManager topicManager = new TrieTopicManager();
-		topicManager.addSubscribe("test/123", "client1", 1);
-		topicManager.addSubscribe("test/1234", "client1", 1);
-		topicManager.addSubscribe("test/1235", "client1", 1);
-		topicManager.addSubscribe("test1/123", "client1", 1);
-		topicManager.addSubscribe("+/123", "client1", 0);
-		topicManager.addSubscribe("test/#", "client1", 1);
-		topicManager.addSubscribe("/test/123", "client1", 0);
-		topicManager.addSubscribe("$share/group1/test/123", "client2", 0);
-		topicManager.addSubscribe("$queue/test/123", "client3", 0);
+		addSubscribe(topicManager, "test/123", "client1", 1);
+		addSubscribe(topicManager, "test/1234", "client1", 1);
+		addSubscribe(topicManager, "test/1235", "client1", 1);
+		addSubscribe(topicManager, "test1/123", "client1", 1);
+		addSubscribe(topicManager, "+/123", "client1", 0);
+		addSubscribe(topicManager, "test/#", "client1", 1);
+		addSubscribe(topicManager, "/test/123", "client1", 0);
+		addSubscribe(topicManager, "$share/group1/test/123", "client2", 0);
+		addSubscribe(topicManager, "$queue/test/123", "client3", 0);
 
 		List<Subscribe> subscribeList = topicManager.searchSubscribe("test/123");
 		Assertions.assertFalse(subscribeList.isEmpty());

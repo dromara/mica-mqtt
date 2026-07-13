@@ -29,6 +29,8 @@ public class Subscribe implements Serializable {
 	private String clientId;
 	private int mqttQoS;
 	private boolean noLocal;
+	private boolean retainAsPublished;
+	private int retainHandling;
 
 	public Subscribe() {
 	}
@@ -38,9 +40,15 @@ public class Subscribe implements Serializable {
 	}
 
 	public Subscribe(String clientId, int mqttQoS, boolean noLocal) {
+		this(clientId, mqttQoS, noLocal, false, 0);
+	}
+
+	public Subscribe(String clientId, int mqttQoS, boolean noLocal, boolean retainAsPublished, int retainHandling) {
 		this.clientId = clientId;
 		this.mqttQoS = mqttQoS;
 		this.noLocal = noLocal;
+		this.retainAsPublished = retainAsPublished;
+		this.retainHandling = retainHandling;
 	}
 
 	public Subscribe(String topicFilter, String clientId, int mqttQoS) {
@@ -48,10 +56,17 @@ public class Subscribe implements Serializable {
 	}
 
 	public Subscribe(String topicFilter, String clientId, int mqttQoS, boolean noLocal) {
+		this(topicFilter, clientId, mqttQoS, noLocal, false, 0);
+	}
+
+	public Subscribe(String topicFilter, String clientId, int mqttQoS, boolean noLocal,
+					 boolean retainAsPublished, int retainHandling) {
 		this.topicFilter = topicFilter;
 		this.clientId = clientId;
 		this.mqttQoS = mqttQoS;
 		this.noLocal = noLocal;
+		this.retainAsPublished = retainAsPublished;
+		this.retainHandling = retainHandling;
 	}
 
 	public String getTopicFilter() {
@@ -86,6 +101,22 @@ public class Subscribe implements Serializable {
 		this.noLocal = noLocal;
 	}
 
+	public boolean isRetainAsPublished() {
+		return retainAsPublished;
+	}
+
+	public void setRetainAsPublished(boolean retainAsPublished) {
+		this.retainAsPublished = retainAsPublished;
+	}
+
+	public int getRetainHandling() {
+		return retainHandling;
+	}
+
+	public void setRetainHandling(int retainHandling) {
+		this.retainHandling = retainHandling;
+	}
+
 	@Override
 	public boolean equals(Object o) {
 		if (this == o) {
@@ -111,6 +142,8 @@ public class Subscribe implements Serializable {
 			", clientId='" + clientId + '\'' +
 			", mqttQoS=" + mqttQoS +
 			", noLocal=" + noLocal +
+			", retainAsPublished=" + retainAsPublished +
+			", retainHandling=" + retainHandling +
 			'}';
 	}
 }

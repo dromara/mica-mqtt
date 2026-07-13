@@ -38,11 +38,12 @@ public class HttpApiMessageHandler extends BaseMessageHandler {
 	}
 
 	@Override
-	public boolean handle(Message message) {
-		if (MessageType.HTTP_API != message.getMessageType()) {
-			return true;
-		}
+	public MessageType[] messageTypes() {
+		return new MessageType[]{MessageType.HTTP_API};
+	}
 
+	@Override
+	public boolean handle(Message message) {
 		String topic = message.getTopic();
 		byte[] payload = message.getPayload();
 		MqttQoS mqttQoS = MqttQoS.valueOf(message.getQos());

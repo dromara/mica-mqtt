@@ -26,11 +26,11 @@ import org.dromara.mica.mqtt.core.server.model.Message;
 public interface IMqttMessagePipeline {
 
 	/**
-	 * 添加处理器到所有消息类型
+	 * 按处理器声明的消息类型添加处理器。
 	 *
 	 * @param handler 处理器
 	 */
-	void addHandler(MqttMessageHandler handler);
+	void addHandler(MqttMessagePipelineHandler handler);
 
 	/**
 	 * 处理消息
