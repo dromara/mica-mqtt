@@ -29,6 +29,10 @@ import java.util.List;
  * @author L.cm
  */
 public interface IMqttSessionManager {
+	/**
+	 * MQTT 5.0 Receive Maximum 默认值。
+	 */
+	int MQTT5_DEFAULT_RECEIVE_MAXIMUM = 0xffff;
 
 	/**
 	 * 添加订阅存储。
@@ -161,8 +165,8 @@ public interface IMqttSessionManager {
 	/**
 	 * 记录客户端在 CONNECT 中声明的 Receive Maximum。
 	 *
-	 * @param clientId        clientId
-	 * @param receiveMaximum  客户端接收上限
+	 * @param clientId       clientId
+	 * @param receiveMaximum 客户端接收上限，合法范围为 1-65535
 	 */
 	default void setClientReceiveMaximum(String clientId, int receiveMaximum) {
 		// default no-op for backward compatibility
@@ -177,7 +181,7 @@ public interface IMqttSessionManager {
 	 * @return receiveMaximum
 	 */
 	default int getClientReceiveMaximum(String clientId) {
-		return 0xffff;
+		return MQTT5_DEFAULT_RECEIVE_MAXIMUM;
 	}
 
 	/**

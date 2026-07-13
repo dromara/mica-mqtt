@@ -232,8 +232,11 @@ public final class MqttServer {
 
 	private boolean isReceiveMaximumExceeded(String clientId) {
 		int receiveMaximum = sessionManager.getClientReceiveMaximum(clientId);
+		if (receiveMaximum <= 0) {
+			return true;
+		}
 		int pendingCount = sessionManager.getPendingPublishCount(clientId);
-		return receiveMaximum > 0 && pendingCount >= receiveMaximum;
+		return pendingCount >= receiveMaximum;
 	}
 
 	/**

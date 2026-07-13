@@ -252,17 +252,17 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 
 	private int resolveClientReceiveMaximum(ChannelContext context, MqttConnectVariableHeader variableHeader, String clientId) {
 		if (!MqttCodecUtil.isMqtt5(context)) {
-			return 0xffff;
+			return IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM;
 		}
 		Integer receiveMaximum = new MqttConnectProperties(variableHeader.properties()).getReceiveMaximum();
 		if (receiveMaximum == null) {
-			return 0xffff;
+			return IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM;
 		}
-		if (receiveMaximum > 0 && receiveMaximum <= 0xffff) {
+		if (receiveMaximum > 0 && receiveMaximum <= IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM) {
 			return receiveMaximum;
 		}
 		logger.warn("Connect clientId:{} invalid receiveMaximum:{}, fallback to spec default 65535", clientId, receiveMaximum);
-		return 0xffff;
+		return IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM;
 	}
 
 	private void sendConnected(ChannelContext context, String uniqueId) {

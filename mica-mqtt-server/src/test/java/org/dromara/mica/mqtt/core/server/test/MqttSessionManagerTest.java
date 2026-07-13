@@ -487,11 +487,11 @@ class MqttSessionManagerTest {
 	@Test
 	void testClientReceiveMaximum() {
 		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
-		Assertions.assertEquals(0xffff, sessionManager.getClientReceiveMaximum("client1"));
+		Assertions.assertEquals(IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM, sessionManager.getClientReceiveMaximum("client1"));
 		sessionManager.setClientReceiveMaximum("client1", 10);
 		Assertions.assertEquals(10, sessionManager.getClientReceiveMaximum("client1"));
 		sessionManager.remove("client1");
-		Assertions.assertEquals(0xffff, sessionManager.getClientReceiveMaximum("client1"));
+		Assertions.assertEquals(IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM, sessionManager.getClientReceiveMaximum("client1"));
 	}
 
 	@Test

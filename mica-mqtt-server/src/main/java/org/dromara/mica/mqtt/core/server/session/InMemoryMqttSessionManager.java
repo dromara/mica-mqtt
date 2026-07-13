@@ -50,7 +50,7 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 	 */
 	private final ConcurrentMap<String, ConcurrentMap<Integer, MqttPendingQos2Publish>> pendingQos2PublishStore = new ConcurrentHashMap<>();
 	/**
-	 * 客户端 CONNECT Receive Maximum 声明值
+	 * 客户端在 CONNECT 中声明的 Receive Maximum（缺省视为 65535）
 	 */
 	private final ConcurrentMap<String, Integer> clientReceiveMaximumStore = new ConcurrentHashMap<>();
 
@@ -138,7 +138,7 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 	@Override
 	public int getClientReceiveMaximum(String clientId) {
 		Integer receiveMaximum = clientReceiveMaximumStore.get(clientId);
-		return receiveMaximum == null ? 0xffff : receiveMaximum;
+		return receiveMaximum == null ? MQTT5_DEFAULT_RECEIVE_MAXIMUM : receiveMaximum;
 	}
 
 	@Override
