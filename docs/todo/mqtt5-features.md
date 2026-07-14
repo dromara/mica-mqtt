@@ -303,7 +303,7 @@ MqttServerAioHandler.handler(packet)
 | **P1.4** | 🚧 CONNACK Properties 完善（能力位告知） | 部分完成 | 无 | 低 |
 | **P1.5** | ✅ Retain As Published / Retain Handling（服务端运行时） | 已完成 | 无 | 中 |
 | **P1.6** | ✅ Server Keep Alive | 已完成 | P1.4 | 低 |
-| **P1.7** | Receive Maximum（server → client 方向） | 2 天 | 无 | 中 |
+| **P1.7** | 🚧 Receive Maximum（server → client 方向，基础流控） | 部分完成 | 无 | 中 |
 | **P1.8** | Will Properties / Will Delay Interval | 2 天 | 无 | 中 |
 
 ### 5.3 P2 第二梯队（2-3 周）
@@ -538,7 +538,13 @@ private void connAckByReturnCode(String clientId, String uniqueId,
 
 | 文档 | 版本 | 状态 | 更新日期 |
 |---|---|---|---|
-| **mqtt5-features.md** | v2.2 | P1/P2 部分能力已落地 | 2026-07-13 |
+| **mqtt5-features.md** | v2.3 | P1/P2 部分能力已落地 | 2026-07-13 |
+
+### v2.3 变更摘要（相对 v2.2）
+
+- **P1.7 基础流控落地**：解析 CONNECT 的 `Receive Maximum`，按客户端会话保存并在服务端下行 QoS1/QoS2 发送前执行 in-flight 上限检查。
+- **会话能力补齐**：`IMqttSessionManager` 新增 `clientReceiveMaximum` 与 `pendingPublishCount` 访问能力，内存实现与集群装饰器已同步委托。
+- **当前范围说明**：本次仅实现“超过上限时阻塞新发送”的基础语义，挂起队列与 ACK 回补发送仍按后续子任务推进。
 
 ### v2.2 变更摘要（相对 v2.1）
 
@@ -554,7 +560,7 @@ private void connAckByReturnCode(String clientId, String uniqueId,
 
 - **标记已完成**：P1.1 PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code 基础链路、P1.2 DISCONNECT Reason Code + Properties（双向）、P1.3 SUBACK / UNSUBACK Reason Code、P1.6 Server Keep Alive、P2.3 Assigned Client Identifier、P2.4 Request Problem Information。
 - **标记部分完成**：P1.4 CONNACK Properties 基础能力位已下发，但 Receive Maximum / Maximum Packet Size 等运行时语义未完成，仍按 🚧 跟踪。
-- **剩余下次处理**：P1.7 Receive Maximum、P1.8 Will Delay Interval，以及 P2/P3 中 Topic Alias、Subscription Identifier、AUTH、Clean Start / Session Expiry、集群同步等。
+- **剩余下次处理**：P1.7 挂起队列与 ACK 回补发送、P1.8 Will Delay Interval，以及 P2/P3 中 Topic Alias、Subscription Identifier、AUTH、Clean Start / Session Expiry、集群同步等。
 
 ### v2.0 变更摘要（相对 v1.0）
 

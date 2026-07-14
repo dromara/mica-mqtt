@@ -29,6 +29,10 @@ import java.util.List;
  * @author L.cm
  */
 public interface IMqttSessionManager {
+	/**
+	 * MQTT 5.0 Receive Maximum 默认值。
+	 */
+	int MQTT5_DEFAULT_RECEIVE_MAXIMUM = 0xffff;
 
 	/**
 	 * 添加订阅存储。
@@ -157,6 +161,38 @@ public interface IMqttSessionManager {
 	 * @param messageId messageId
 	 */
 	void removePendingQos2Publish(String clientId, int messageId);
+
+	/**
+	 * 记录客户端在 CONNECT 中声明的 Receive Maximum。
+	 *
+	 * @param clientId       clientId
+	 * @param receiveMaximum 客户端接收上限，合法范围为 1-65535
+	 */
+	default void setClientReceiveMaximum(String clientId, int receiveMaximum) {
+		// default no-op for backward compatibility
+	}
+
+	/**
+	 * 获取客户端声明的 Receive Maximum。
+	 * <p>
+	 * 未声明时返回 MQTT 5.0 规范默认值 65535。
+	 *
+	 * @param clientId clientId
+	 * @return receiveMaximum
+	 */
+	default int getClientReceiveMaximum(String clientId) {
+		return MQTT5_DEFAULT_RECEIVE_MAXIMUM;
+	}
+
+	/**
+	 * 获取客户端当前 QoS1/QoS2 下行 in-flight 数量。
+	 *
+	 * @param clientId clientId
+	 * @return in-flight 数
+	 */
+	default int getPendingPublishCount(String clientId) {
+		return 0;
+	}
 
 	/**
 	 * 生成消息 Id

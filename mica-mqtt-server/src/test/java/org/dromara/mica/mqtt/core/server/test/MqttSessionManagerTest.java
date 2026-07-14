@@ -472,6 +472,29 @@ class MqttSessionManagerTest {
 	}
 
 	@Test
+	void testPendingPublishCount() {
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		Assertions.assertEquals(0, sessionManager.getPendingPublishCount("client1"));
+		sessionManager.addPendingPublish("client1", 1, new MqttPendingPublish(
+			createPublishMessage("/test/topic", 1, MqttQoS.QOS1), MqttQoS.QOS1));
+		sessionManager.addPendingPublish("client1", 2, new MqttPendingPublish(
+			createPublishMessage("/test/topic", 2, MqttQoS.QOS2), MqttQoS.QOS2));
+		Assertions.assertEquals(2, sessionManager.getPendingPublishCount("client1"));
+		sessionManager.removePendingPublish("client1", 1);
+		Assertions.assertEquals(1, sessionManager.getPendingPublishCount("client1"));
+	}
+
+	@Test
+	void testClientReceiveMaximum() {
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		Assertions.assertEquals(IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM, sessionManager.getClientReceiveMaximum("client1"));
+		sessionManager.setClientReceiveMaximum("client1", 10);
+		Assertions.assertEquals(10, sessionManager.getClientReceiveMaximum("client1"));
+		sessionManager.remove("client1");
+		Assertions.assertEquals(IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM, sessionManager.getClientReceiveMaximum("client1"));
+	}
+
+	@Test
 	void testPendingQos2Publish() {
 		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
 		MqttPublishMessage message = createPublishMessage("/test/topic", 1, MqttQoS.QOS2);

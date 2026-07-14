@@ -115,6 +115,11 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 				0, false, requestProblemInformation);
 			return;
 		}
+		if (hasInvalidReceiveMaximum(context, variableHeader)) {
+			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_PROTOCOL_ERROR,
+				0, false, requestProblemInformation);
+			return;
+		}
 		// 认证成功
 		context.setAccepted(true);
 		// 4. 互踢逻辑
@@ -133,6 +138,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		if (StrUtil.isNotBlank(userName)) {
 			Tio.bindUser(context, userName);
 		}
+		sessionManager.setClientReceiveMaximum(uniqueId, resolveClientReceiveMaximum(context, variableHeader, uniqueId));
 		// 6. 心跳超时
 		int keepAliveSeconds = variableHeader.keepAliveTimeSeconds();
 		// mqtt 5.0 Server Keep Alive：服务端可接管客户端心跳
@@ -247,6 +253,29 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		// MQTT 5.0 默认允许返回问题信息；只有客户端显式 false 时才抑制 Reason String。
 		Boolean requestProblemInformation = new MqttConnectProperties(variableHeader.properties()).getRequestProblemInformation();
 		return requestProblemInformation == null || requestProblemInformation;
+	}
+
+	private int resolveClientReceiveMaximum(ChannelContext context, MqttConnectVariableHeader variableHeader, String clientId) {
+		if (!MqttCodecUtil.isMqtt5(context)) {
+			return IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM;
+		}
+		Integer receiveMaximum = new MqttConnectProperties(variableHeader.properties()).getReceiveMaximum();
+		if (receiveMaximum == null) {
+			return IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM;
+		}
+		if (receiveMaximum > 0 && receiveMaximum <= IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM) {
+			return receiveMaximum;
+		}
+		logger.warn("Connect clientId:{} invalid receiveMaximum:{}, fallback to spec default 65535", clientId, receiveMaximum);
+		return IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM;
+	}
+
+	private boolean hasInvalidReceiveMaximum(ChannelContext context, MqttConnectVariableHeader variableHeader) {
+		if (!MqttCodecUtil.isMqtt5(context)) {
+			return false;
+		}
+		Integer receiveMaximum = new MqttConnectProperties(variableHeader.properties()).getReceiveMaximum();
+		return receiveMaximum != null && receiveMaximum < 1;
 	}
 
 	private void sendConnected(ChannelContext context, String uniqueId) {

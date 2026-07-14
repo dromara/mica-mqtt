@@ -502,6 +502,21 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	}
 
 	@Override
+	public void setClientReceiveMaximum(String clientId, int receiveMaximum) {
+		delegate.setClientReceiveMaximum(clientId, receiveMaximum);
+	}
+
+	@Override
+	public int getClientReceiveMaximum(String clientId) {
+		return delegate.getClientReceiveMaximum(clientId);
+	}
+
+	@Override
+	public int getPendingPublishCount(String clientId) {
+		return delegate.getPendingPublishCount(clientId);
+	}
+
+	@Override
 	public boolean hasSession(String clientId) {
 		return delegate.hasSession(clientId) || clientNodeMap.containsKey(clientId);
 	}
