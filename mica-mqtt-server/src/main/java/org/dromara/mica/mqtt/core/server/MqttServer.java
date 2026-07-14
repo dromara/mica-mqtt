@@ -203,8 +203,10 @@ public final class MqttServer {
 		// 判断是否高版本 qos
 		boolean isHighLevelQoS = MqttQoS.QOS1 == mqttQoS || MqttQoS.QOS2 == mqttQoS;
 		if (isHighLevelQoS && isReceiveMaximumExceeded(clientId)) {
-			logger.warn("MQTT Topic:{} qos:{} publish blocked by Receive Maximum clientId:{} pending:{} limit:{}",
-				topic, mqttQoS, clientId, sessionManager.getPendingPublishCount(clientId), sessionManager.getClientReceiveMaximum(clientId));
+			if (logger.isDebugEnabled()) {
+				logger.debug("MQTT Topic:{} qos:{} publish blocked by Receive Maximum clientId:{} pending:{} limit:{}",
+					topic, mqttQoS, clientId, sessionManager.getPendingPublishCount(clientId), sessionManager.getClientReceiveMaximum(clientId));
+			}
 			return false;
 		}
 		// 消息id

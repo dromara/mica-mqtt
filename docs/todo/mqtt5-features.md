@@ -13,7 +13,7 @@
 
 ## 1. 背景与现状
 
-mica-mqtt 默认连接协议为 `MQTT_5`（参见 [MqttClientProperties](file:///e:/codes/gitee/mica-mqtt/starter/mica-mqtt-client-spring-boot-starter/src/main/java/org/dromara/mica/mqtt/spring/client/config/MqttClientProperties.java#L131)），但 5.0 的**运行时语义**仅实现了一部分。下面按"协议层"和"运行时层"分别梳理。
+mica-mqtt 默认连接协议为 `MQTT_5`（参见 [MqttClientProperties](../../starter/mica-mqtt-client-spring-boot-starter/src/main/java/org/dromara/mica/mqtt/spring/client/config/MqttClientProperties.java#L131)），但 5.0 的**运行时语义**仅实现了一部分。下面按"协议层"和"运行时层"分别梳理。
 
 ### 1.1 现状速览
 
@@ -27,7 +27,7 @@ mica-mqtt 默认连接协议为 `MQTT_5`（参见 [MqttClientProperties](file://
 
 ### 1.2 服务端"按消息类型分发"架构（v2.0 新增）
 
-[DefaultMqttServerProcessor](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/support/DefaultMqttServerProcessor.java) 已从"几百行的巨型分发器"重构为**纯外观层（Facade）**：用 `EnumMap<MqttMessageType, IMqttMessageHandler>` 按消息类型路由，真正的业务实现已下沉到 [`handler/`](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler) 目录下各 `IMqttMessageHandler` 实现。
+[DefaultMqttServerProcessor](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/support/DefaultMqttServerProcessor.java) 已从"几百行的巨型分发器"重构为**纯外观层（Facade）**：用 `EnumMap<MqttMessageType, IMqttMessageHandler>` 按消息类型路由，真正的业务实现已下沉到 [`handler/`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler) 目录下各 `IMqttMessageHandler` 实现。
 
 #### 1.2.1 消息分发流程
 
@@ -46,25 +46,25 @@ MqttServerAioHandler.handler(packet)
 
 | 类 / 接口 | 角色 | 路径 |
 |---|---|---|
-| `MqttServerProcessor` | 服务端处理入口接口（`processConnect` + `processDispatch`） | [MqttServerProcessor](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/MqttServerProcessor.java) |
-| `DefaultMqttServerProcessor` | 外观层：`EnumMap<MqttMessageType, IMqttMessageHandler>` + 路由分发 + `register()` 扩展点 | [DefaultMqttServerProcessor](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/support/DefaultMqttServerProcessor.java) |
-| `IMqttMessageHandler` | 通用消息处理接口（按 `messageTypes()` 声明自己负责的类型，handler 内部自行 cast `MqttMessage` 子类） | [IMqttMessageHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/IMqttMessageHandler.java) |
-| `AbstractMqttMessageHandler` | 抽象基类，统一注入 `MqttServerCreator` / `ExecutorService` / `TimerTaskService` | [AbstractMqttMessageHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/AbstractMqttMessageHandler.java) |
+| `MqttServerProcessor` | 服务端处理入口接口（`processConnect` + `processDispatch`） | [MqttServerProcessor](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/MqttServerProcessor.java) |
+| `DefaultMqttServerProcessor` | 外观层：`EnumMap<MqttMessageType, IMqttMessageHandler>` + 路由分发 + `register()` 扩展点 | [DefaultMqttServerProcessor](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/support/DefaultMqttServerProcessor.java) |
+| `IMqttMessageHandler` | 通用消息处理接口（按 `messageTypes()` 声明自己负责的类型，handler 内部自行 cast `MqttMessage` 子类） | [IMqttMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/IMqttMessageHandler.java) |
+| `AbstractMqttMessageHandler` | 抽象基类，统一注入 `MqttServerCreator` / `ExecutorService` / `TimerTaskService` | [AbstractMqttMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/AbstractMqttMessageHandler.java) |
 
 #### 1.2.3 Handler 清单（与 `MqttMessageType` 一一对应）
 
 | Handler | `messageTypes()` | `handle(...)` 行 | 路径 |
 |---|---|---|---|
-| `MqttConnectHandler` | `{CONNECT}` | [L87](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L87) | [handler/MqttConnectHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java) |
-| `MqttPublishHandler` | `{PUBLISH}` | [L72](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPublishHandler.java#L72) | [handler/MqttPublishHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPublishHandler.java) |
-| `MqttPubAckHandler` | `{PUBACK}` | [L55](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubAckHandler.java#L55) | [handler/MqttPubAckHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubAckHandler.java) |
-| `MqttPubRecHandler` | `{PUBREC}` | [L58](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRecHandler.java#L58) | [handler/MqttPubRecHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRecHandler.java) |
-| `MqttPubRelHandler` | `{PUBREL}` | [L63](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRelHandler.java#L63) | [handler/MqttPubRelHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRelHandler.java) |
-| `MqttPubCompHandler` | `{PUBCOMP}` | [L55](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubCompHandler.java#L55) | [handler/MqttPubCompHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubCompHandler.java) |
-| `MqttSubscribeHandler` | `{SUBSCRIBE}` | [L73](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java#L73) | [handler/MqttSubscribeHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java) |
-| `MqttUnSubscribeHandler` | `{UNSUBSCRIBE}` | [L60](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttUnSubscribeHandler.java#L60) | [handler/MqttUnSubscribeHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttUnSubscribeHandler.java) |
-| `MqttPingReqHandler` | `{PINGREQ}` | [L50](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPingReqHandler.java#L50) | [handler/MqttPingReqHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPingReqHandler.java) |
-| `MqttDisConnectHandler` | `{DISCONNECT}` | [L50](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttDisConnectHandler.java#L50) | [handler/MqttDisConnectHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttDisConnectHandler.java) |
+| `MqttConnectHandler` | `{CONNECT}` | [L87](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L87) | [handler/MqttConnectHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java) |
+| `MqttPublishHandler` | `{PUBLISH}` | [L72](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPublishHandler.java#L72) | [handler/MqttPublishHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPublishHandler.java) |
+| `MqttPubAckHandler` | `{PUBACK}` | [L55](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubAckHandler.java#L55) | [handler/MqttPubAckHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubAckHandler.java) |
+| `MqttPubRecHandler` | `{PUBREC}` | [L58](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRecHandler.java#L58) | [handler/MqttPubRecHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRecHandler.java) |
+| `MqttPubRelHandler` | `{PUBREL}` | [L63](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRelHandler.java#L63) | [handler/MqttPubRelHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRelHandler.java) |
+| `MqttPubCompHandler` | `{PUBCOMP}` | [L55](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubCompHandler.java#L55) | [handler/MqttPubCompHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubCompHandler.java) |
+| `MqttSubscribeHandler` | `{SUBSCRIBE}` | [L73](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java#L73) | [handler/MqttSubscribeHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java) |
+| `MqttUnSubscribeHandler` | `{UNSUBSCRIBE}` | [L60](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttUnSubscribeHandler.java#L60) | [handler/MqttUnSubscribeHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttUnSubscribeHandler.java) |
+| `MqttPingReqHandler` | `{PINGREQ}` | [L50](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPingReqHandler.java#L50) | [handler/MqttPingReqHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPingReqHandler.java) |
+| `MqttDisConnectHandler` | `{DISCONNECT}` | [L50](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttDisConnectHandler.java#L50) | [handler/MqttDisConnectHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttDisConnectHandler.java) |
 | ❌ `MqttAuthHandler` | `{AUTH}` | — | **未实现**（见 §6.3） |
 
 > **架构意义**：后续 §5、§6 中"改造点"全部聚焦到具体 Handler，新增/修改 MQTT 5.0 特性时只需 `processor.register(new XxxHandler(...))` 一行接入，外观层和分发逻辑无需改动。
@@ -78,7 +78,12 @@ MqttServerAioHandler.handler(packet)
 | `IMqttMessagePipeline` | 业务事件流（CONNECT / SUBSCRIBE / PUBLISH / DISCONNECT） | 业务编排、集群广播 |
 | `IMqttPublishPipeline` | 消息发布流 | 保留消息 → 订阅转发 → 持久化 |
 
-> 5.0 的 **Message Expiry 递减**、**Topic Alias / Subscription Identifier 移除** 都在 [SubscriptionForwardHandler#rewriteProperties](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L92-L132) 中按规范 3.3.2.3 实现。
+> 5.0 的 **Message Expiry 递减**、**Topic Alias / Subscription Identifier 移除** 都在 [SubscriptionForwardHandler#rewriteProperties](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L92-L132) 中按规范 3.3.2.3 实现。
+>
+> Pipeline 包当前完整结构：
+> - 顶层：[`IMqttMessagePipeline`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/IMqttMessagePipeline.java) / [`IMqttPublishPipeline`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/IMqttPublishPipeline.java)（接口）；[`MqttMessagePipelineHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/MqttMessagePipelineHandler.java) / [`MqttPublishPipelineHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/MqttPublishPipelineHandler.java)（Handler 接口）；[`DefaultMqttMessagePipeline`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/DefaultMqttMessagePipeline.java) / [`DefaultMqttPublishPipeline`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/DefaultMqttPublishPipeline.java)（默认实现）；[`PublishContext`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/PublishContext.java)（发布消息上下文）
+> - 发布流 handler（实现 `MqttPublishPipelineHandler`）：[`SubscriptionForwardHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java) / [`RetainMessageHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/RetainMessageHandler.java) / [`MessageListenerHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/MessageListenerHandler.java)
+> - 内部消息 handler（实现 `MqttMessagePipelineHandler`，基类 [`BaseMessageHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/BaseMessageHandler.java)）：[`ConnectMessageHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/ConnectMessageHandler.java) / [`DisconnectMessageHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/DisconnectMessageHandler.java) / [`SubscribeMessageHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/SubscribeMessageHandler.java) / [`UnsubscribeMessageHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/UnsubscribeMessageHandler.java) / [`UpStreamMessageHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/UpStreamMessageHandler.java) / [`DownStreamMessageHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/DownStreamMessageHandler.java) / [`HttpApiMessageHandler`](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/HttpApiMessageHandler.java)
 
 #### 1.2.5 协议 Handler 与内部消息 Pipeline Handler
 
@@ -164,24 +169,24 @@ MqttServerAioHandler.handler(packet)
 
 | 特性 | 实现位置 | 备注 |
 |---|---|---|
-| 全部 27 类 Property 编解码 | [MqttPropertyType](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/properties/MqttPropertyType.java) / [MqttEncoder](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttEncoder.java#L463-L543) / [MqttDecoder](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttDecoder.java) | 单/双/四字节、变长整数、UTF-8 字符串、二进制均支持 |
+| 全部 27 类 Property 编解码 | [MqttPropertyType](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/properties/MqttPropertyType.java) / [MqttEncoder](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttEncoder.java#L463-L543) / [MqttDecoder](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttDecoder.java) | 单/双/四字节、变长整数、UTF-8 字符串、二进制均支持 |
 | 全部 10 类 Reason Code | `org.dromara.mica.mqtt.codec.codes.*` | Auth/Connect/ConnAck/Disconnect/PubAck/PubComp/PubRec/PubRel/SubAck/UnSubAck |
-| AUTH 报文类型 | [MqttAuthBuilder](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/message/builder/MqttAuthBuilder.java) + [MqttAuthReasonCode](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/codes/MqttAuthReasonCode.java) | 类型定义完整，待运行时处理（见 §6.3） |
-| Reason Code + Properties 条件编码 | [MqttEncoder](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttEncoder.java#L372-L383) | 仅在 Reason Code 非 0x00 或 Properties 非空时编码，对 MQTT 3.x 兼容良好 |
+| AUTH 报文类型 | [MqttAuthBuilder](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/message/builder/MqttAuthBuilder.java) + [MqttAuthReasonCode](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/codes/MqttAuthReasonCode.java) | 类型定义完整，待运行时处理（见 §6.3） |
+| Reason Code + Properties 条件编码 | [MqttEncoder](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttEncoder.java#L372-L383) | 仅在 Reason Code 非 0x00 或 Properties 非空时编码，对 MQTT 3.x 兼容良好 |
 | 各报文 Properties POJO | `org.dromara.mica.mqtt.codec.message.properties.*` | Connect/ConnAck/Publish/WillPublish/Subscribe/UnSubscribe 等 |
 
 ### 3.2 运行时层
 
 | 特性 | 实现位置 | 备注 |
 |---|---|---|
-| **No Local**（订阅选项） | [MqttSubscribeHandler#handle](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java#L85-L92) + [SubscriptionForwardHandler#forwardToSubscribers](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L141-L165) | 订阅时记录 noLocal，发布时过滤（规范 3.8.3.1） |
-| **Message Expiry Interval**（过期 + 递减） | [SubscriptionForwardHandler#rewriteProperties](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L92-L132) | 检查过期 + 剩余时间递减（规范 3.3.2.3） |
-| **Shared Subscription** `$share/{group}/...` | [TrieTopicManager](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/session/TrieTopicManager.java) | 分组共享订阅（`$queue` + `$share`） |
-| **Session Expiry Interval**（客户端侧） | [MqttClientProperties](file:///e:/codes/gitee/mica-mqtt/starter/mica-mqtt-client-spring-boot-starter/src/main/java/org/dromara/mica/mqtt/spring/client/config/MqttClientProperties.java#L145) | CONNECT 时下发，服务端有 `IMqttSessionManager.expire` 接口签名但未启用（见 §6.4） |
-| **Topic Alias / Subscription Identifier 转发清理** | [SubscriptionForwardHandler#rewriteProperties](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L116-L122) | 服务端转发时不携带发布者的 Topic Alias 和 Subscription Identifier（规范 3.3.2.3 / 3.3.4） |
-| **Subscription Options 编解码** | [MqttEncoder](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttEncoder.java#L226-L240) | RetainAsPublished / RetainHandling / No Local / QoS 均能编解码，服务端运行时语义已生效 |
-| **Retain As Published / Retain Handling**（服务端运行时） | [MqttSubscribeHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java) + [SubscriptionForwardHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java) | 保存完整订阅选项；支持三种保留消息补发策略，实时转发按 RAP 保留 RETAIN 标志；重叠订阅会合并 No Local / RAP 语义 |
-| **Will Properties**（属性透传） | [MqttConnectHandler#handle 第 140-159 行](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L140-L159) | 遗嘱消息持久化时已绑定 WillProperties 字段（willDelay、payloadFormatIndicator 等），Will Delay Interval 调度尚未生效 |
+| **No Local**（订阅选项） | [MqttSubscribeHandler#handle](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java#L85-L92) + [SubscriptionForwardHandler#forwardToSubscribers](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L141-L166) | 订阅时记录 noLocal，发布时过滤（规范 3.8.3.1） |
+| **Message Expiry Interval**（过期 + 递减） | [SubscriptionForwardHandler#rewriteProperties](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L92-L132) | 检查过期 + 剩余时间递减（规范 3.3.2.3） |
+| **Shared Subscription** `$share/{group}/...` | [TrieTopicManager](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/session/TrieTopicManager.java) | 分组共享订阅（`$queue` + `$share`） |
+| **Session Expiry Interval**（客户端侧） | [MqttClientProperties](../../starter/mica-mqtt-client-spring-boot-starter/src/main/java/org/dromara/mica/mqtt/spring/client/config/MqttClientProperties.java#L145) | CONNECT 时下发，服务端有 `IMqttSessionManager.expire` 接口签名但未启用（见 §6.4） |
+| **Topic Alias / Subscription Identifier 转发清理** | [SubscriptionForwardHandler#rewriteProperties](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L116-L122) | 服务端转发时不携带发布者的 Topic Alias 和 Subscription Identifier（规范 3.3.2.3 / 3.3.4） |
+| **Subscription Options 编解码** | [MqttEncoder](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttEncoder.java#L226-L240) | RetainAsPublished / RetainHandling / No Local / QoS 均能编解码，服务端运行时语义已生效 |
+| **Retain As Published / Retain Handling**（服务端运行时） | [MqttSubscribeHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java) + [SubscriptionForwardHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java) | 保存完整订阅选项；支持三种保留消息补发策略，实时转发按 RAP 保留 RETAIN 标志；重叠订阅会合并 No Local / RAP 语义 |
+| **Will Properties**（属性透传） | [MqttConnectHandler#handle 第 140-159 行](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L140-L159) | 遗嘱消息持久化时已绑定 WillProperties 字段（willDelay、payloadFormatIndicator 等），Will Delay Interval 调度尚未生效 |
 
 ---
 
@@ -396,17 +401,17 @@ if (packetId != -1) {
 
 | Handler | 当前实现 | 改造目标 |
 |---|---|---|
-| [MqttPubAckHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubAckHandler.java#L55) | cast 出 `MqttPubAckMessage` 后只取 packetId | 读取 `vh.reasonCode()`：失败时记录失败计数 / 告警 |
-| [MqttPubRecHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRecHandler.java#L58) | cast 出 `MqttPubRecMessage` 后只取 packetId | 读取 `vh.reasonCode()`；回复 PUBREL 时携带 Reason Code |
-| [MqttPubRelHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRelHandler.java#L63) | cast 出 `MqttPubRelMessage` 后只取 packetId | 读取 `vh.reasonCode()`；回复 PUBCOMP 时携带 Reason Code |
-| [MqttPubCompHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubCompHandler.java#L55) | cast 出 `MqttPubCompMessage` 后只取 packetId | 读取 `vh.reasonCode()`（失败时记录 / 告警） |
-| [MqttSubscribeHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java#L73) | `MqttQoS.FAILURE` 占位 | 改用 `MqttSubAckReasonCode.NOT_AUTHORIZED` 等；SUBACK 携带 reasonCodes 列表 |
-| [MqttUnSubscribeHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttUnSubscribeHandler.java#L60) | UNSUBACK 无 Reason Code | UNSUBACK 增加 Reason Code 列表 |
-| [MqttDisConnectHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttDisConnectHandler.java#L50) | 无视入参内容 | `instanceof MqttDisconnectMessage` 后读取 `vh.reasonCode()` 与 Session Expiry Interval |
+| [MqttPubAckHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubAckHandler.java#L55) | cast 出 `MqttPubAckMessage` 后只取 packetId | 读取 `vh.reasonCode()`：失败时记录失败计数 / 告警 |
+| [MqttPubRecHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRecHandler.java#L58) | cast 出 `MqttPubRecMessage` 后只取 packetId | 读取 `vh.reasonCode()`；回复 PUBREL 时携带 Reason Code |
+| [MqttPubRelHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRelHandler.java#L63) | cast 出 `MqttPubRelMessage` 后只取 packetId | 读取 `vh.reasonCode()`；回复 PUBCOMP 时携带 Reason Code |
+| [MqttPubCompHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubCompHandler.java#L55) | cast 出 `MqttPubCompMessage` 后只取 packetId | 读取 `vh.reasonCode()`（失败时记录 / 告警） |
+| [MqttSubscribeHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java#L73) | `MqttQoS.FAILURE` 占位 | 改用 `MqttSubAckReasonCode.NOT_AUTHORIZED` 等；SUBACK 携带 reasonCodes 列表 |
+| [MqttUnSubscribeHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttUnSubscribeHandler.java#L60) | UNSUBACK 无 Reason Code | UNSUBACK 增加 Reason Code 列表 |
+| [MqttDisConnectHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttDisConnectHandler.java#L50) | 无视入参内容 | `instanceof MqttDisconnectMessage` 后读取 `vh.reasonCode()` 与 Session Expiry Interval |
 
 ### 6.2 CONNACK Properties 完善 + Server Keep Alive（P1.4 / P1.6）
 
-**现状**：[MqttConnectHandler#connAckByReturnCode 第 172-183 行](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L172-L183) 仅设置 `returnCode` + `sessionPresent`，未下发任何 5.0 能力位。
+**现状**：[MqttConnectHandler#connAckByReturnCode 第 172-183 行](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L172-L183) 仅设置 `returnCode` + `sessionPresent`，未下发任何 5.0 能力位。
 
 **改造点**：构建 `MqttConnAckProperties`：
 
@@ -441,17 +446,17 @@ private void connAckByReturnCode(String clientId, String uniqueId,
 }
 ```
 
-**Server Keep Alive**：[MqttConnectHandler#handle 第 123-129 行](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L123-L129) 已读取客户端 keepAlive 但未下发 Server Keep Alive 覆盖值。需：
+**Server Keep Alive**：[MqttConnectHandler#handle 第 123-129 行](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L123-L129) 已读取客户端 keepAlive 但未下发 Server Keep Alive 覆盖值。需：
 1. `MqttConnectVariableHeader.properties()` 读取 `SERVER_KEEP_ALIVE`（若存在，用它覆盖 `context.setHeartbeatTimeout`）
 2. CONNACK 中带 `serverKeepAliveSeconds` 让客户端知情
 3. 当前 `KEEP_ALIVE_UNIT = 2000L` 是个固定 ms 单位（不是 2 倍系数），Server Keep Alive 路径下需明确 `serverKeepAlive * 1000L` 还是 `serverKeepAlive * 2000L`，建议统一为 `* 1000L`，并加 javadoc 说明
 
 ### 6.3 AUTH 报文 + 扩展认证（P2.7）
 
-**现状**：`MqttAuthBuilder` + `MqttAuthReasonCode` 已定义；[DefaultMqttServerProcessor#processDispatch](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/support/DefaultMqttServerProcessor.java#L86-L93) 当前在 `handlers.get(AUTH)` 时**找不到对应 handler**——外观层仅打 warn 日志后丢弃，所以 AUTH 报文到服务端实际是被静默忽略的。
+**现状**：`MqttAuthBuilder` + `MqttAuthReasonCode` 已定义；[DefaultMqttServerProcessor#processDispatch](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/support/DefaultMqttServerProcessor.java#L86-L93) 当前在 `handlers.get(AUTH)` 时**找不到对应 handler**——外观层仅打 warn 日志后丢弃，所以 AUTH 报文到服务端实际是被静默忽略的。
 
 **改造点**（沿用 §1.2 的外观层 + Handler 模式）：
-1. 新建 [MqttAuthHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttAuthHandler.java) 实现 `IMqttMessageHandler`，`messageTypes()` 返回 `{MqttMessageType.AUTH}`
+1. 新建 [MqttAuthHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttAuthHandler.java) 实现 `IMqttMessageHandler`，`messageTypes()` 返回 `{MqttMessageType.AUTH}`
 2. `DefaultMqttServerProcessor.register(new MqttAuthHandler(serverCreator, executor, taskService))` 一行接入
 3. `MqttServerCreator` 增加**多轮扩展认证接口**（与现有 `IMqttServerAuthHandler` 的 `verifyAuthenticate(...)` 区分命名，建议叫 `IMqttServerAuthenticateHandler` 或 `IMqttExtAuthHandler`）：
    ```java
@@ -467,8 +472,8 @@ private void connAckByReturnCode(String clientId, String uniqueId,
 ### 6.4 Clean Start + Session Expiry（P3.1）
 
 **现状**：
-- [IMqttSessionManager#expire](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/session/IMqttSessionManager.java#L173) 接口签名已有，但未在 CONNACK 配合
-- [MqttConnectHandler#handle 第 130-139 行](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L130-L139) 仍有 `cleanSession` 的注释占位（未启用）
+- [IMqttSessionManager#expire](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/session/IMqttSessionManager.java#L173) 接口签名已有，但未在 CONNACK 配合
+- [MqttConnectHandler#handle 第 130-139 行](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L130-L139) 仍有 `cleanSession` 的注释占位（未启用）
 
 **改造点**：
 1. `MqttConnectHandler` 读取 `cleanStart` + `sessionExpiryInterval`，写 `IMqttSessionManager.expire`
@@ -481,7 +486,7 @@ private void connAckByReturnCode(String clientId, String uniqueId,
 
 ### 6.5 HTTP API 升级
 
-**现状**：[mica-mqtt-server-spring-boot-starter](file:///e:/codes/gitee/mica-mqtt/starter/mica-mqtt-server-spring-boot-starter) 与 [mica-mqtt-server-solon-plugin](file:///e:/codes/gitee/mica-mqtt/starter/mica-mqtt-server-solon-plugin) 的 HTTP API 对 5.0 properties 透传能力弱。
+**现状**：[mica-mqtt-server-spring-boot-starter](../../starter/mica-mqtt-server-spring-boot-starter) 与 [mica-mqtt-server-solon-plugin](../../starter/mica-mqtt-server-solon-plugin) 的 HTTP API 对 5.0 properties 透传能力弱。
 
 **改造点**：所有 publish / subscribe 接口增加 `properties` JSON 参数（透传到 `MqttProperties`）。
 
@@ -568,7 +573,7 @@ private void connAckByReturnCode(String clientId, String uniqueId,
 - **§3.2 / §6.1 中所有源码路径已更新**：从原 `DefaultMqttServerProcessor#processXxx` 改为 `MqttXxxHandler.handle`
 - **新增 §6.1 末"逐 Handler 影响"表格**：明确每个 Handler 的改造前后差异
 - **§6.3 AUTH 改造点完全重写**：原 v1.0 "在 `MqttServerAioHandler.default` 加 case AUTH" 已不准确（重构后没有 default 分支），现改为"新建 `MqttAuthHandler` + `DefaultMqttServerProcessor.register`"
-- **§6.4 引用 `MqttConnectHandler#handle` 注释占位的行号**：从原 `第 153-162 行` 改为 [第 130-139 行](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L130-L139)
+- **§6.4 引用 `MqttConnectHandler#handle` 注释占位的行号**：从原 `第 153-162 行` 改为 [第 130-139 行](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L130-L139)
 - **新增 §8 / §9 末"Handler 注册 SPI"兼容性条目 / 风险条目**：与重构后的外观层联动
 - **新增文末"Handler 一览"导航区**：10 个 Handler 一键跳转
 
@@ -596,23 +601,52 @@ private void connAckByReturnCode(String clientId, String uniqueId,
 
 **相关源码导航**：
 
-- 编解码：[mica-mqtt-codec](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-codec)
-- 服务端：[mica-mqtt-server](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server)
-- 客户端：[mica-mqtt-client](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-client)
-- 集群：[mica-mqtt-broker](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-broker)
-- 启动器：[starter](file:///e:/codes/gitee/mica-mqtt/starter)
+- 编解码：[mica-mqtt-codec](../../mica-mqtt-codec)
+- 服务端：[mica-mqtt-server](../../mica-mqtt-server)
+- 客户端：[mica-mqtt-client](../../mica-mqtt-client)
+- 集群：[mica-mqtt-broker](../../mica-mqtt-broker)
+- 启动器：[starter](../../starter)
 
 **Handler 一览**（`mica-mqtt-server/.../core/server/handler/`）：
 
-- [MqttConnectHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java)
-- [MqttPublishHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPublishHandler.java)
-- [MqttPubAckHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubAckHandler.java)
-- [MqttPubRecHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRecHandler.java)
-- [MqttPubRelHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRelHandler.java)
-- [MqttPubCompHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubCompHandler.java)
-- [MqttSubscribeHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java)
-- [MqttUnSubscribeHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttUnSubscribeHandler.java)
-- [MqttPingReqHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPingReqHandler.java)
-- [MqttDisConnectHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttDisConnectHandler.java)
-- [IMqttMessageHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/IMqttMessageHandler.java)
-- [AbstractMqttMessageHandler](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/AbstractMqttMessageHandler.java)
+- [MqttConnectHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java)
+- [MqttPublishHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPublishHandler.java)
+- [MqttPubAckHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubAckHandler.java)
+- [MqttPubRecHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRecHandler.java)
+- [MqttPubRelHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRelHandler.java)
+- [MqttPubCompHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubCompHandler.java)
+- [MqttSubscribeHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java)
+- [MqttUnSubscribeHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttUnSubscribeHandler.java)
+- [MqttPingReqHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPingReqHandler.java)
+- [MqttDisConnectHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttDisConnectHandler.java)
+- [IMqttMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/IMqttMessageHandler.java)
+- [AbstractMqttMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/AbstractMqttMessageHandler.java)
+
+**Pipeline 一览**（`mica-mqtt-server/.../core/server/pipeline/`）：
+
+顶层接口与默认实现：
+
+- [IMqttMessagePipeline](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/IMqttMessagePipeline.java)
+- [IMqttPublishPipeline](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/IMqttPublishPipeline.java)
+- [MqttMessagePipelineHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/MqttMessagePipelineHandler.java)
+- [MqttPublishPipelineHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/MqttPublishPipelineHandler.java)
+- [DefaultMqttMessagePipeline](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/DefaultMqttMessagePipeline.java)
+- [DefaultMqttPublishPipeline](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/DefaultMqttPublishPipeline.java)
+- [PublishContext](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/PublishContext.java)
+
+发布流 handler（`pipeline/handler/`，实现 `MqttPublishPipelineHandler`）：
+
+- [SubscriptionForwardHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java)
+- [RetainMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/RetainMessageHandler.java)
+- [MessageListenerHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/MessageListenerHandler.java)
+
+内部消息 handler（`pipeline/message/`，基类 `BaseMessageHandler`，实现 `MqttMessagePipelineHandler`）：
+
+- [BaseMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/BaseMessageHandler.java)
+- [ConnectMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/ConnectMessageHandler.java)
+- [DisconnectMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/DisconnectMessageHandler.java)
+- [SubscribeMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/SubscribeMessageHandler.java)
+- [UnsubscribeMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/UnsubscribeMessageHandler.java)
+- [UpStreamMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/UpStreamMessageHandler.java)
+- [DownStreamMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/DownStreamMessageHandler.java)
+- [HttpApiMessageHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/message/HttpApiMessageHandler.java)

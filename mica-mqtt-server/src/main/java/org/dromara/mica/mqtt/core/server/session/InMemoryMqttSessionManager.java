@@ -132,7 +132,11 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void setClientReceiveMaximum(String clientId, int receiveMaximum) {
-		clientReceiveMaximumStore.put(clientId, receiveMaximum);
+		if (receiveMaximum == MQTT5_DEFAULT_RECEIVE_MAXIMUM) {
+			clientReceiveMaximumStore.remove(clientId);
+		} else {
+			clientReceiveMaximumStore.put(clientId, receiveMaximum);
+		}
 	}
 
 	@Override
