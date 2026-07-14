@@ -69,6 +69,10 @@ public class MqttPubAckHandler extends AbstractMqttMessageHandler {
 		}
 		pendingPublish.onPubAckReceived();
 		sessionManager.removePendingPublish(clientId, packetId);
+		// PR7（P1.7）：释放 in-flight 配额后尝试从 backlog 取一条发送
+		if (mqttServer != null) {
+			mqttServer.drainPublishBacklog(context, clientId);
+		}
 	}
 
 	private byte getReasonCode(MqttMessageIdVariableHeader variableHeader) {

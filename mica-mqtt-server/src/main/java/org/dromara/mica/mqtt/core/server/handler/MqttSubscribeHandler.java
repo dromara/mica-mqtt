@@ -27,6 +27,7 @@ import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubAckMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
+import org.dromara.mica.mqtt.codec.message.properties.MqttSubscribeProperties;
 import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption.RetainedHandlingPolicy;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
@@ -78,6 +79,9 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 		MqttSubscribeMessage message = (MqttSubscribeMessage) rawMessage;
 		String clientId = context.getBsId();
 		int packetId = message.variableHeader().messageId();
+		// MQTT 5.0 Subscription Identifier：spec 3.8.4 / 3.3.2.3.5 允许在 SUBSCRIBE 一级
+		// properties 中携带 varint（1 ~ 268,435,455）。该 id 关联到本次 SUBSCRIBE 的所有 topic filter。
+		Integer subscribeSubscriptionId = extractSubscribeSubscriptionId(context, message);
 		List<MqttTopicSubscription> topicSubscriptionList = message.payload().topicSubscriptions();
 		List<MqttSubAckReasonCode> reasonCodeList = new ArrayList<>();
 		List<String> subscribedTopicList = new ArrayList<>();
@@ -104,12 +108,13 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 				reasonCodeList.add(MqttSubAckReasonCode.qosGranted(mqttQoS));
 				subscribedTopicList.add(topicFilter);
 				boolean newSubscription = sessionManager.addSubscribe(new TopicFilter(topicFilter), clientId,
-					mqttQoS.value(), noLocal, option.isRetainAsPublished(), option.retainHandling().value());
+					mqttQoS.value(), noLocal, option.isRetainAsPublished(), option.retainHandling().value(),
+					subscribeSubscriptionId);
 				if (shouldSendRetainedMessage(option.retainHandling(), newSubscription)) {
 					retainTopicList.add(topicFilter);
 				}
-				logger.info("Subscribe - clientId:{} topicFilter:{} mqttQoS:{} noLocal:{} retainAsPublished:{} retainHandling:{} packetId:{}",
-					clientId, topicFilter, mqttQoS, noLocal, option.isRetainAsPublished(), option.retainHandling(), packetId);
+				logger.info("Subscribe - clientId:{} topicFilter:{} mqttQoS:{} noLocal:{} retainAsPublished:{} retainHandling:{} subscriptionId:{} packetId:{}",
+					clientId, topicFilter, mqttQoS, noLocal, option.isRetainAsPublished(), option.retainHandling(), subscribeSubscriptionId, packetId);
 				publishSubscribedEvent(context, clientId, topicFilter, mqttQoS);
 			}
 		}
@@ -128,6 +133,33 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 	static boolean shouldSendRetainedMessage(RetainedHandlingPolicy retainHandling, boolean newSubscription) {
 		return RetainedHandlingPolicy.SEND_AT_SUBSCRIBE == retainHandling
 			|| (RetainedHandlingPolicy.SEND_AT_SUBSCRIBE_IF_NOT_YET_EXISTS == retainHandling && newSubscription);
+	}
+
+	/**
+	 * 提取 SUBSCRIBE 报文级别的 Subscription Identifier。
+	 * <p>
+	 * spec 3.8.4：客户端在 SUBSCRIBE 报文 properties 中携带 varint，关联到本次所有 topic filter。
+	 * spec 3.3.2.3.5：合法范围 1 ~ 268,435,455（varint 4 字节正数上限），0 由服务端视为"未设置"。
+	 * 仅对 MQTT 5 客户端解析；3.x 客户端无该字段。
+	 *
+	 * @param context ChannelContext（用于判定 MQTT 版本）
+	 * @param message SUBSCRIBE 报文
+	 * @return Subscription Identifier；0 表示未设置
+	 */
+	private static int extractSubscribeSubscriptionId(ChannelContext context, MqttSubscribeMessage message) {
+		if (!org.dromara.mica.mqtt.codec.MqttCodecUtil.isMqtt5(context)) {
+			return 0;
+		}
+		Integer subscriptionId = new MqttSubscribeProperties(message.variableHeader().properties()).getSubscriptionIdentifier();
+		if (subscriptionId == null) {
+			return 0;
+		}
+		int value = subscriptionId;
+		// 防御性校验：超过 varint 上限（268,435,455）或 <= 0 时忽略，避免与 codec 层 varint 解码冲突
+		if (value < 1 || value > 0x0FFFFFFF) {
+			return 0;
+		}
+		return value;
 	}
 
 	private void sendRetainMessage(ChannelContext context, String topic) {

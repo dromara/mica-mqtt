@@ -57,8 +57,21 @@ public class DefaultMqttServerProcessor implements MqttServerProcessor {
 			.register(new MqttPubCompHandler(serverCreator, executor, taskService))
 			.register(new MqttSubscribeHandler(serverCreator, executor, taskService))
 			.register(new MqttUnSubscribeHandler(serverCreator, executor, taskService))
+			.register(new MqttAuthHandler(serverCreator, executor, taskService))
 			.register(new MqttPingReqHandler(serverCreator, executor, taskService))
 			.register(new MqttDisConnectHandler(serverCreator, executor, taskService));
+	}
+
+	/**
+	 * PR7：在 {@link org.dromara.mica.mqtt.core.server.MqttServer} 构建完成后回填。
+	 * 让 ACK 处理器可以调用 {@code mqttServer.drainPublishBacklog} 触发 backlog 出队。
+	 */
+	public void setMqttServer(org.dromara.mica.mqtt.core.server.MqttServer mqttServer) {
+		handlers.values().forEach(handler -> {
+			if (handler instanceof org.dromara.mica.mqtt.core.server.handler.AbstractMqttMessageHandler) {
+				((org.dromara.mica.mqtt.core.server.handler.AbstractMqttMessageHandler) handler).setMqttServer(mqttServer);
+			}
+		});
 	}
 
 	/**

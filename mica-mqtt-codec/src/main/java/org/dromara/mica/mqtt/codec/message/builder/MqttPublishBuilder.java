@@ -80,6 +80,15 @@ public final class MqttPublishBuilder {
 		return this;
 	}
 
+	/**
+	 * PR10：获取当前 properties（用于 topic alias 等需要在 build 之前注入的场景）。
+	 *
+	 * @return properties（永远非空；可能为 {@link MqttProperties#NO_PROPERTIES}）
+	 */
+	public MqttProperties getProperties() {
+		return properties;
+	}
+
 	public MqttPublishBuilder properties(Consumer<MqttPublishProperties> consumer) {
 		MqttPublishProperties publishProperties = new MqttPublishProperties();
 		consumer.accept(publishProperties);

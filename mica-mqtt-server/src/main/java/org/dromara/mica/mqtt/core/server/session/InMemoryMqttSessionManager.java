@@ -53,11 +53,35 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 	 * 客户端在 CONNECT 中声明的 Receive Maximum（缺省视为 65535）
 	 */
 	private final ConcurrentMap<String, Integer> clientReceiveMaximumStore = new ConcurrentHashMap<>();
+	/**
+	 * PUBLISH 等待队列（PR7 / Receive Maximum 限流回补）。
+	 * <p>
+	 * 客户端维度的 FIFO 队列，存储"待发送"的 PUBLISH 快照（{@link org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry}）。
+	 * 当 in-flight 数达到 Receive Maximum 上限时，QoS>0 的 PUBLISH 被缓存到这里，
+	 * 直到 PUBACK/PUBCOMP 释放 in-flight 配额后由 {@code MqttServer.drainPublishBacklog} 出队发送。
+	 * <p>
+	 * 用 ConcurrentLinkedQueue 而非 BlockingQueue：入队不需要阻塞（应用层只需在 publish 时尝试一次）；
+	 * 出队在 ACK 处理线程上调用，无消费者线程竞争。
+	 */
+	private final ConcurrentMap<String, java.util.concurrent.ConcurrentLinkedQueue<org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry>> pendingPublishBacklogStore = new ConcurrentHashMap<>();
+	/**
+	 * PR9（P2.8）会话状态：客户端维度存储 Clean Start 标志 + Session Expiry Interval。
+	 * <p>
+	 * Key 为 clientId；value 在每次 CONNECT 时刷新（同一 clientId 重新连接覆盖）。
+	 * 用于 DISCONNECT 决定是"立即清理"还是"调度过期"。
+	 */
+	private final ConcurrentMap<String, SessionState> sessionStates = new ConcurrentHashMap<>();
 
 	@Override
 	public boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS,
 								boolean noLocal, boolean retainAsPublished, int retainHandling) {
 		return topicManager.addSubscribe(topicFilter, clientId, (short) mqttQoS, noLocal, retainAsPublished, retainHandling);
+	}
+
+	@Override
+	public boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS,
+								boolean noLocal, boolean retainAsPublished, int retainHandling, int subscriptionId) {
+		return topicManager.addSubscribe(topicFilter, clientId, (short) mqttQoS, noLocal, retainAsPublished, retainHandling, subscriptionId);
 	}
 
 	@Override
@@ -105,6 +129,35 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 		if (data != null) {
 			data.remove(messageId);
 		}
+	}
+
+	@Override
+	public void addPendingPublishBacklog(String clientId, org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry entry) {
+		java.util.concurrent.ConcurrentLinkedQueue<org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry> queue =
+			pendingPublishBacklogStore.computeIfAbsent(clientId, key -> new java.util.concurrent.ConcurrentLinkedQueue<>());
+		queue.offer(entry);
+	}
+
+	@Override
+	public org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry pollPendingPublishBacklog(String clientId) {
+		java.util.concurrent.ConcurrentLinkedQueue<org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry> queue =
+			pendingPublishBacklogStore.get(clientId);
+		if (queue == null) {
+			return null;
+		}
+		org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry entry = queue.poll();
+		if (entry != null && queue.isEmpty()) {
+			// 队列空时安全删除，避免内存膨胀
+			pendingPublishBacklogStore.remove(clientId, queue);
+		}
+		return entry;
+	}
+
+	@Override
+	public int getPendingPublishBacklogSize(String clientId) {
+		java.util.concurrent.ConcurrentLinkedQueue<org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry> queue =
+			pendingPublishBacklogStore.get(clientId);
+		return queue == null ? 0 : queue.size();
 	}
 
 	@Override
@@ -182,6 +235,10 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 		pendingQos2PublishStore.remove(clientId);
 		clientReceiveMaximumStore.remove(clientId);
 		messageIdStore.remove(clientId);
+		// PR7：清理 PublishBacklog 队列，避免内存泄露
+		pendingPublishBacklogStore.remove(clientId);
+		// PR9：清理 session state
+		sessionStates.remove(clientId);
 	}
 
 	@Override
@@ -191,6 +248,46 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 		pendingQos2PublishStore.clear();
 		clientReceiveMaximumStore.clear();
 		messageIdStore.clear();
+		pendingPublishBacklogStore.clear();
+		sessionStates.clear();
+	}
+
+	// ----------------- PR9（P2.8）Session Expiry Interval -----------------
+
+	@Override
+	public void setSessionExpiryInterval(String clientId, int sessionExpirySeconds, boolean cleanStart) {
+		if (clientId == null || clientId.isEmpty()) {
+			return;
+		}
+		sessionStates.put(clientId, new SessionState(cleanStart, sessionExpirySeconds));
+	}
+
+	@Override
+	public int getSessionExpiryInterval(String clientId) {
+		SessionState state = sessionStates.get(clientId);
+		return state == null ? 0 : state.sessionExpirySeconds;
+	}
+
+	@Override
+	public boolean isCleanStart(String clientId) {
+		SessionState state = sessionStates.get(clientId);
+		// spec 3.1.2.4 / 3.1.2.11.4: 未声明时缺省值与协议版本相关
+		// 3.1.x 缺省 true（cleanSession = true）；5.0 缺省 true。
+		// 显式记录后以记录为准；未记录返回 true 保持 3.x 兼容。
+		return state == null ? true : state.cleanStart;
+	}
+
+	/**
+	 * 客户端维度会话状态：Clean Start + Session Expiry Interval。
+	 */
+	private static class SessionState {
+		final boolean cleanStart;
+		final int sessionExpirySeconds;
+
+		SessionState(boolean cleanStart, int sessionExpirySeconds) {
+			this.cleanStart = cleanStart;
+			this.sessionExpirySeconds = sessionExpirySeconds;
+		}
 	}
 
 }

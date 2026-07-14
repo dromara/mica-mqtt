@@ -66,6 +66,29 @@ public interface IMqttSessionManager {
 	boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal, boolean retainAsPublished, int retainHandling);
 
 	/**
+	 * 添加包含完整 MQTT 5.0 订阅选项 + Subscription Identifier 的订阅存储。
+	 * <p>
+	 * spec 3.8.4：客户端在 SUBSCRIBE 的 Subscription Identifier 属性中携带 varint，
+	 * 服务端需要把该 id 关联到该 (clientId, topicFilter) 订阅；当 PUBLISH 命中该订阅时，
+	 * 应在 PUBLISH 的 properties 中回带同一个 Subscription Identifier。
+	 * <p>
+	 * 默认实现走"无 subscriptionId"重载以保持向后兼容；实现方建议重写以持久化该字段。
+	 *
+	 * @param topicFilter       topicFilter
+	 * @param clientId          客户端 Id
+	 * @param mqttQoS           MqttQoS
+	 * @param noLocal           No Local 标志
+	 * @param retainAsPublished Retain As Published 标志
+	 * @param retainHandling    Retain Handling，取值 0、1、2
+	 * @param subscriptionId    Subscription Identifier（0 表示未设置）
+	 * @return true 表示此前不存在相同 clientId 和 topicFilter 的订阅
+	 */
+	default boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal,
+								 boolean retainAsPublished, int retainHandling, int subscriptionId) {
+		return this.addSubscribe(topicFilter, clientId, mqttQoS, noLocal, retainAsPublished, retainHandling);
+	}
+
+	/**
 	 * 添加订阅存储
 	 *
 	 * @param topicFilter topicFilter
@@ -137,6 +160,39 @@ public interface IMqttSessionManager {
 	void removePendingPublish(String clientId, int messageId);
 
 	/**
+	 * 将 PUBLISH 加入客户端维度的"待发送"队列（PR7 / spec 3.3.4 Receive Maximum）。
+	 * <p>
+	 * 当客户端当前的 in-flight 数达到 Receive Maximum 上限时，服务端应当缓存后续要发送的 QoS>0
+	 * PUBLISH，而不是直接丢弃；待 PUBACK/PUBCOMP 腾出位置后再出队。
+	 *
+	 * @param clientId clientId
+	 * @param entry    待发送快照
+	 */
+	default void addPendingPublishBacklog(String clientId, org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry entry) {
+		// 默认 no-op：自定义 SessionManager 升级后才有意义，InMemoryMqttSessionManager 已重写
+	}
+
+	/**
+	 * 从客户端维度的"待发送"队列头部取出一条（出队）。
+	 *
+	 * @param clientId clientId
+	 * @return 待发送快照；无则返回 {@code null}
+	 */
+	default org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry pollPendingPublishBacklog(String clientId) {
+		return null;
+	}
+
+	/**
+	 * 客户端维度的"待发送"队列长度。
+	 *
+	 * @param clientId clientId
+	 * @return backlog 大小
+	 */
+	default int getPendingPublishBacklogSize(String clientId) {
+		return 0;
+	}
+
+	/**
 	 * 添加发布过程存储
 	 *
 	 * @param clientId           clientId
@@ -192,6 +248,39 @@ public interface IMqttSessionManager {
 	 */
 	default int getPendingPublishCount(String clientId) {
 		return 0;
+	}
+
+	// ----------------- PR9（P2.8）Session Expiry Interval -----------------
+
+	/**
+	 * 记录客户端在 CONNECT 中声明的 Session Expiry Interval（秒，spec 3.1.2.11.4）。
+	 *
+	 * @param clientId             clientId
+	 * @param sessionExpirySeconds Session Expiry Interval，0 表示立即过期
+	 * @param cleanStart           CONNECT 中的 Clean Start 标志
+	 */
+	default void setSessionExpiryInterval(String clientId, int sessionExpirySeconds, boolean cleanStart) {
+		// 默认 no-op：InMemoryMqttSessionManager 已重写
+	}
+
+	/**
+	 * 获取 Session Expiry Interval（秒）。
+	 *
+	 * @param clientId clientId
+	 * @return Session Expiry Interval（秒），未设置返回 0
+	 */
+	default int getSessionExpiryInterval(String clientId) {
+		return 0;
+	}
+
+	/**
+	 * 获取 Clean Start 标志。
+	 *
+	 * @param clientId clientId
+	 * @return Clean Start 标志
+	 */
+	default boolean isCleanStart(String clientId) {
+		return true;
 	}
 
 	/**

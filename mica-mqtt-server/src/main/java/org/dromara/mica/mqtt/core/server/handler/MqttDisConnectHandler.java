@@ -38,12 +38,14 @@ import java.util.concurrent.ExecutorService;
 public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttDisConnectHandler.class);
 	private final WillDelayScheduler willDelayScheduler;
+	private final org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler sessionExpireScheduler;
 
 	public MqttDisConnectHandler(MqttServerCreator serverCreator,
 							 ExecutorService executor,
 							 TimerTaskService taskService) {
 		super(serverCreator, executor, taskService);
 		this.willDelayScheduler = serverCreator.getWillDelayScheduler();
+		this.sessionExpireScheduler = serverCreator.getSessionExpireScheduler();
 	}
 
 	@Override
@@ -65,8 +67,34 @@ public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 		if (reasonCode == MqttDisconnectReasonCode.NORMAL.value()) {
 			willDelayScheduler.cancel(clientId);
 		}
+		// PR9（P2.8）：正常断开且未声明 Clean Start、且 Session Expiry Interval > 0 时
+		// 调度会话过期任务；否则立即清理（保持 MQTT 3.x 与 MQTT 5 cleanStart=true 的"立即清理"语义）。
+		// DISCONNECT 一定走正常路径（由 MqttDisConnectHandler 兜底），业务方主动关闭的断开也会经过这里。
+		// 注意：本 handler 仅处理 DISCONNECT 报文级别的断开；底层 channel 异常断开由 MqttServerAioListener.onBeforeClose 处理。
+		// 实际场景中两种断开都会调用 sessionManager.remove(...) 或等待 SessionExpireScheduler 触发清理。
+		scheduleSessionExpiryOnNormalDisconnect(clientId);
 		context.setBizStatus(true);
 		Tio.remove(context, "Mqtt DisConnect");
+	}
+
+	/**
+	 * PR9：正常 DISCONNECT 时根据 session state 决定是立即清理还是调度过期。
+	 */
+	private void scheduleSessionExpiryOnNormalDisconnect(String clientId) {
+		// spec 3.2.2.4 DISCONNECT 中的 Session Expiry Interval（MQTT 5）允许客户端更新会话；
+		// PR9 简化：从 sessionManager 读取 CONNECT 时记录的 Session Expiry Interval。
+		int expirySeconds = serverCreator.getSessionManager().getSessionExpiryInterval(clientId);
+		boolean cleanStart = serverCreator.getSessionManager().isCleanStart(clientId);
+		if (cleanStart || expirySeconds <= 0) {
+			// cleanStart=true 或 expiry=0：立即清理。
+			// 底层 Tio.remove 会触发 MqttServerAioListener.onBeforeClose 的清理路径。
+			return;
+		}
+		// 调度过期任务。sessionExpireScheduler 内部已做旧任务取消与并发安全。
+		sessionExpireScheduler.scheduleExpire(clientId, expirySeconds);
+		if (logger.isDebugEnabled()) {
+			logger.debug("Session Expire scheduled - clientId:{} seconds:{}", clientId, expirySeconds);
+		}
 	}
 
 	private byte getReasonCode(MqttMessage message) {

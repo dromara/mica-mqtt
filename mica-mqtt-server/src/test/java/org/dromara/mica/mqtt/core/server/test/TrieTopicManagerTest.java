@@ -185,6 +185,83 @@ class TrieTopicManagerTest {
 		System.out.println(subscribes);
 	}
 
+	/**
+	 * MQTT 5.0 Subscription Identifier：精确订阅路径应回带 subscriptionId。
+	 */
+	@Test
+	void testSubscriptionIdentifierExactPath() {
+		TrieTopicManager topicManager = new TrieTopicManager();
+		String clientId = "clientA";
+		String topicFilter = "device/123/telemetry";
+		int subscriptionId = 42;
+		topicManager.addSubscribe(new TopicFilter(topicFilter), clientId, 1, false, false, 0, subscriptionId);
+		// getSubscriptions 应携带 subscriptionId
+		List<Subscribe> subs = topicManager.getSubscriptions(clientId);
+		Assertions.assertEquals(1, subs.size());
+		Assertions.assertEquals(subscriptionId, subs.get(0).getSubscriptionId());
+		// getSubscriptionId 直接查
+		Assertions.assertEquals(subscriptionId, topicManager.getSubscriptionId(topicFilter, clientId));
+	}
+
+	/**
+	 * 重复订阅时，subscriptionId 应被新值覆盖。
+	 */
+	@Test
+	void testSubscriptionIdentifierOverwrite() {
+		TrieTopicManager topicManager = new TrieTopicManager();
+		String clientId = "clientA";
+		String topicFilter = "device/123/telemetry";
+		topicManager.addSubscribe(new TopicFilter(topicFilter), clientId, 1, false, false, 0, 10);
+		Assertions.assertEquals(10, topicManager.getSubscriptionId(topicFilter, clientId));
+		// 客户端用新 subscriptionId 重新订阅
+		topicManager.addSubscribe(new TopicFilter(topicFilter), clientId, 1, false, false, 0, 99);
+		Assertions.assertEquals(99, topicManager.getSubscriptionId(topicFilter, clientId));
+	}
+
+	/**
+	 * 取消订阅时，subscriptionId 存储应被清理。
+	 */
+	@Test
+	void testSubscriptionIdentifierRemovedWithSubscription() {
+		TrieTopicManager topicManager = new TrieTopicManager();
+		String clientId = "clientA";
+		String topicFilter = "device/123/telemetry";
+		topicManager.addSubscribe(new TopicFilter(topicFilter), clientId, 1, false, false, 0, 7);
+		Assertions.assertEquals(7, topicManager.getSubscriptionId(topicFilter, clientId));
+		topicManager.removeSubscribe(topicFilter, clientId);
+		Assertions.assertEquals(0, topicManager.getSubscriptionId(topicFilter, clientId));
+	}
+
+	/**
+	 * 不带 subscriptionId 的旧版 6 参 addSubscribe 不应写入 subscriptionId 存储。
+	 */
+	@Test
+	void testSubscriptionIdentifierBackwardCompatible() {
+		TrieTopicManager topicManager = new TrieTopicManager();
+		String clientId = "clientA";
+		String topicFilter = "device/123/telemetry";
+		// 旧版 6 参 addSubscribe（subscriptionId 默认 0）
+		topicManager.addSubscribe(new TopicFilter(topicFilter), clientId, 1, false, false, 0);
+		Assertions.assertEquals(0, topicManager.getSubscriptionId(topicFilter, clientId));
+	}
+
+	/**
+	 * 按 clientId 批量清理订阅时，subscriptionId 存储应一并清理。
+	 */
+	@Test
+	void testSubscriptionIdentifierRemovedOnClientDisconnect() {
+		TrieTopicManager topicManager = new TrieTopicManager();
+		String clientId = "clientA";
+		topicManager.addSubscribe(new TopicFilter("a/b"), clientId, 0, false, false, 0, 1);
+		topicManager.addSubscribe(new TopicFilter("a/c"), clientId, 0, false, false, 0, 2);
+		Assertions.assertEquals(1, topicManager.getSubscriptionId("a/b", clientId));
+		Assertions.assertEquals(2, topicManager.getSubscriptionId("a/c", clientId));
+		// 断开连接：批量清理
+		topicManager.removeSubscribe(clientId);
+		Assertions.assertEquals(0, topicManager.getSubscriptionId("a/b", clientId));
+		Assertions.assertEquals(0, topicManager.getSubscriptionId("a/c", clientId));
+	}
+
 	@Test
 	void test() {
 		TrieTopicManager topicManager = new TrieTopicManager();

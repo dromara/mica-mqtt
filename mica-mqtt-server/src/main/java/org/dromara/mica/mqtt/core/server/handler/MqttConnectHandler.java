@@ -69,6 +69,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 	private final IMqttSessionManager sessionManager;
 	private final IMqttMessagePipeline messagePipeline;
 	private final WillDelayScheduler willDelayScheduler;
+	private final org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler sessionExpireScheduler;
 	private final long heartbeatTimeout;
 
 	public MqttConnectHandler(MqttServerCreator serverCreator,
@@ -82,6 +83,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		this.sessionManager = serverCreator.getSessionManager();
 		this.messagePipeline = serverCreator.getMessagePipeline();
 		this.willDelayScheduler = serverCreator.getWillDelayScheduler();
+		this.sessionExpireScheduler = serverCreator.getSessionExpireScheduler();
 		this.heartbeatTimeout = serverCreator.getHeartbeatTimeout() == null
 			? TioConfig.DEFAULT_HEARTBEAT_TIMEOUT
 			: serverCreator.getHeartbeatTimeout();
@@ -141,9 +143,30 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			String remark = String.format("uniqueId:[%s] clientId:[%s] 被踢出，请检查是否有相同 clientId 互踢，新 contextId:[%s]",
 				uniqueId, clientId, context.getId());
 			Tio.remove(otherContext, remark, ChannelContext.CloseCode.KICK_EACH_OTHER);
+		} else if (MqttCodecUtil.isMqtt5(context) && variableHeader.isCleanStart()) {
+			// PR9：MQTT 5 客户端声明 Clean Start=true 且无活跃连接 → 清理可能存在的旧 session 状态。
+			// MQTT 3.x 客户端保持原 cleanSession 行为（默认 true，已通过 cleanSession(uniqueId) 在原代码处理）。
+			// spec 3.1.2.4: MQTT 3.x 的 Clean Session 字段位置不同于 MQTT 5 的 Clean Start；本处理仅针对 5.0。
+			cleanSession(uniqueId);
 		}
 		// 4.5 广播上线消息
 		sendConnected(context, uniqueId);
+		// PR9（P2.8）：记录客户端的 Session Expiry Interval + Clean Start；重连接管时取消待发任务
+		if (MqttCodecUtil.isMqtt5(context)) {
+			// 重连覆盖：取消可能存在的旧 session expire 任务
+			sessionExpireScheduler.cancel(uniqueId);
+			MqttConnectProperties connectProps = new MqttConnectProperties(variableHeader.properties());
+			Integer sessionExpirySeconds = connectProps.getSessionExpiryInterval();
+			int sessionExpiryValue = sessionExpirySeconds == null ? 0 : sessionExpirySeconds;
+			boolean cleanStart = variableHeader.isCleanStart();
+			// spec 3.1.2.11.4: cleanStart = false 且 sessionExpiryInterval = 0 → 服务端按 0xFFFFFFFF 看待
+			if (!cleanStart && sessionExpiryValue == 0) {
+				// 在 mica-mqtt 默认 SessionExpireScheduler 行为下，0xFFFFFFFF 会调度到 ~136 年后，效果上视为"永不过期"。
+				// 业务方可通过自定义 SessionExpireScheduler 引入上限。
+				sessionExpiryValue = Integer.MAX_VALUE;
+			}
+			sessionManager.setSessionExpiryInterval(uniqueId, sessionExpiryValue, cleanStart);
+		}
 		// 5. 绑定 uniqueId / username
 		Tio.bindBsId(context, uniqueId);
 		if (StrUtil.isNotBlank(userName)) {

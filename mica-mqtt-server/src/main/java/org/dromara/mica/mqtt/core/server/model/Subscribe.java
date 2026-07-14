@@ -31,6 +31,13 @@ public class Subscribe implements Serializable {
 	private boolean noLocal;
 	private boolean retainAsPublished;
 	private int retainHandling;
+	/**
+	 * MQTT 5.0 Subscription Identifier（spec 3.8.4 / 3.3.2.3.5）。
+	 * <p>
+	 * varint 编码（spec 1.5.5），1 ~ 268,435,455（4 字节 varint 允许的 31 位正数最大值）。
+	 * 0 表示未设置（缺省），不应附加到 PUBLISH。
+	 */
+	private int subscriptionId;
 
 	public Subscribe() {
 	}
@@ -44,11 +51,16 @@ public class Subscribe implements Serializable {
 	}
 
 	public Subscribe(String clientId, int mqttQoS, boolean noLocal, boolean retainAsPublished, int retainHandling) {
+		this(clientId, mqttQoS, noLocal, retainAsPublished, retainHandling, 0);
+	}
+
+	public Subscribe(String clientId, int mqttQoS, boolean noLocal, boolean retainAsPublished, int retainHandling, int subscriptionId) {
 		this.clientId = clientId;
 		this.mqttQoS = mqttQoS;
 		this.noLocal = noLocal;
 		this.retainAsPublished = retainAsPublished;
 		this.retainHandling = retainHandling;
+		this.subscriptionId = subscriptionId;
 	}
 
 	public Subscribe(String topicFilter, String clientId, int mqttQoS) {
@@ -61,12 +73,18 @@ public class Subscribe implements Serializable {
 
 	public Subscribe(String topicFilter, String clientId, int mqttQoS, boolean noLocal,
 					 boolean retainAsPublished, int retainHandling) {
+		this(topicFilter, clientId, mqttQoS, noLocal, retainAsPublished, retainHandling, 0);
+	}
+
+	public Subscribe(String topicFilter, String clientId, int mqttQoS, boolean noLocal,
+					 boolean retainAsPublished, int retainHandling, int subscriptionId) {
 		this.topicFilter = topicFilter;
 		this.clientId = clientId;
 		this.mqttQoS = mqttQoS;
 		this.noLocal = noLocal;
 		this.retainAsPublished = retainAsPublished;
 		this.retainHandling = retainHandling;
+		this.subscriptionId = subscriptionId;
 	}
 
 	public String getTopicFilter() {
@@ -117,6 +135,14 @@ public class Subscribe implements Serializable {
 		this.retainHandling = retainHandling;
 	}
 
+	public int getSubscriptionId() {
+		return subscriptionId;
+	}
+
+	public void setSubscriptionId(int subscriptionId) {
+		this.subscriptionId = subscriptionId;
+	}
+
 	@Override
 	public boolean equals(Object o) {
 		if (this == o) {
@@ -144,6 +170,7 @@ public class Subscribe implements Serializable {
 			", noLocal=" + noLocal +
 			", retainAsPublished=" + retainAsPublished +
 			", retainHandling=" + retainHandling +
+			", subscriptionId=" + subscriptionId +
 			'}';
 	}
 }

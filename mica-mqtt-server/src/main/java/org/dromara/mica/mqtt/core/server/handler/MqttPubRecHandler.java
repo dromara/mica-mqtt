@@ -74,6 +74,10 @@ public class MqttPubRecHandler extends AbstractMqttMessageHandler {
 			// 对端拒绝 QoS2 PUBLISH 后不会进入 PUBREL 阶段，本地 pending 要立即收敛。
 			pendingPublish.onPubAckReceived();
 			sessionManager.removePendingPublish(clientId, packetId);
+			// PR7（P1.7）：释放 in-flight 配额后尝试从 backlog 取一条发送
+			if (mqttServer != null) {
+				mqttServer.drainPublishBacklog(context, clientId);
+			}
 			return;
 		}
 		pendingPublish.onPubAckReceived();
@@ -88,6 +92,9 @@ public class MqttPubRecHandler extends AbstractMqttMessageHandler {
 
 		boolean result = Tio.send(context, pubRelMessage);
 		logger.debug("Publish - PubRel send clientId:{} packetId:{} result:{}", clientId, packetId, result);
+		// PR7（P1.7）：QoS2 在 PUBREC 之后，in-flight 配额释放要等 PUBCOMP（spec 3.3.4.3）；
+		// 此处不要调用 drainPublishBacklog，避免在 QoS2 流程中误判 in-flight 已释放。
+		// drain 由 MqttPubCompHandler 在收到 PUBCOMP 后触发。
 	}
 
 	private byte getReasonCode(MqttMessageIdVariableHeader variableHeader) {

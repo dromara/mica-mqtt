@@ -68,6 +68,10 @@ public class MqttPubCompHandler extends AbstractMqttMessageHandler {
 			pendingPublish.onPubCompReceived();
 			sessionManager.removePendingPublish(clientId, packetId);
 		}
+		// PR7（P1.7）：PUBCOMP 是 QoS2 的最后一个 ACK，in-flight 配额此时真正释放。
+		if (mqttServer != null) {
+			mqttServer.drainPublishBacklog(context, clientId);
+		}
 	}
 
 	private byte getReasonCode(MqttMessageIdVariableHeader variableHeader) {

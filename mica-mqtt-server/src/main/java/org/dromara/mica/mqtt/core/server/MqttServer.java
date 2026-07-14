@@ -37,13 +37,16 @@ import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.builder.MqttDisconnectBuilder;
 import org.dromara.mica.mqtt.codec.message.properties.MqttDisconnectProperties;
+import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListeners;
 import org.dromara.mica.mqtt.core.server.model.ClientInfo;
 import org.dromara.mica.mqtt.core.server.model.Message;
+import org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
@@ -146,6 +149,27 @@ public final class MqttServer {
 	}
 
 	/**
+	 * 向客户端发送 AUTH 报文（MQTT 5.0 扩展认证，spec 3.15）。
+	 * <p>
+	 * 可在以下场景使用：
+	 * <ul>
+	 *     <li>CONNECT 后服务端发起 challenge：reason code = CONTINUE_AUTHENTICATION (0x18)；</li>
+	 *     <li>已建立会话后服务端发起 REAUTHENTICATE：reason code = RE_AUTHENTICATE (0x19)；</li>
+	 *     <li>响应客户端 AUTH：reason code 由 {@link org.dromara.mica.mqtt.core.server.handler.MqttAuthHandler} 内部处理。</li>
+	 * </ul>
+	 *
+	 * @param context     ChannelContext
+	 * @param authMessage 已构建的 AUTH 报文
+	 * @return 是否发送成功
+	 */
+	public boolean sendAuth(ChannelContext context, org.dromara.mica.mqtt.codec.message.MqttMessage authMessage) {
+		if (context == null || context.isClosed()) {
+			return false;
+		}
+		return Tio.send(context, authMessage);
+	}
+
+	/**
 	 * 发布消息
 	 *
 	 * @param clientId clientId
@@ -218,12 +242,21 @@ public final class MqttServer {
 		MqttQoS mqttQoS = qos.value() > subMqttQoS ? MqttQoS.valueOf(subMqttQoS) : qos;
 		// 判断是否高版本 qos
 		boolean isHighLevelQoS = MqttQoS.QOS1 == mqttQoS || MqttQoS.QOS2 == mqttQoS;
+		// PR7（P1.7）：Receive Maximum 限流时把 PUBLISH 缓存到 backlog 而非直接返回 false，
+		// 等 PUBACK/PUBCOMP 释放 in-flight 配额后再由 drainPublishBacklog 出队发送。
+		// QoS0 不占 in-flight 配额，按原路径直接发送。
 		if (isHighLevelQoS && isReceiveMaximumExceeded(clientId)) {
+			byte[] snapshot = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
+			PublishBacklogEntry entry = new PublishBacklogEntry(topic, snapshot, qos, subMqttQoS, retain, properties);
+			sessionManager.addPendingPublishBacklog(clientId, entry);
 			if (logger.isDebugEnabled()) {
-				logger.debug("MQTT Topic:{} qos:{} publish blocked by Receive Maximum clientId:{} pending:{} limit:{}",
-					topic, mqttQoS, clientId, sessionManager.getPendingPublishCount(clientId), sessionManager.getClientReceiveMaximum(clientId));
+				logger.debug("MQTT Topic:{} qos:{} publish backloged (Receive Maximum exceeded) clientId:{} pending:{} limit:{} backlog:{}",
+					topic, mqttQoS, clientId,
+					sessionManager.getPendingPublishCount(clientId),
+					sessionManager.getClientReceiveMaximum(clientId),
+					sessionManager.getPendingPublishBacklogSize(clientId));
 			}
-			return false;
+			return true;
 		}
 		// 消息id
 		int messageId = isHighLevelQoS ? sessionManager.getPacketId(clientId) : -1;
@@ -246,6 +279,43 @@ public final class MqttServer {
 		boolean result = Tio.send(context, message);
 		logger.debug("MQTT Topic:{} qos:{} retain:{} publish clientId:{} result:{}", topic, qos, retain, clientId, result);
 		return result;
+	}
+
+	/**
+	 * PR7（P1.7）：从 clientId 的 backlog 队列中取出一条待发送 PUBLISH 并重新走 {@link #publish} 路径。
+	 * <p>
+	 * 在 PUBACK/PUBCOMP 处理线程上调用：释放 in-flight 配额后，循环尝试发送 backlog 里的下一条
+	 * （可能正好空出多个配额，因此用 while 直到 Receive Maximum 重新填满或 backlog 空）。
+	 * 不会无限循环：每条新发出的 PUBLISH 会重新占用一个 in-flight 配额。
+	 *
+	 * @param context ChannelContext（用于在 publish 中重新构造 ChannelContext 路径）
+	 * @param clientId clientId
+	 */
+	public void drainPublishBacklog(ChannelContext context, String clientId) {
+		// 循环直到 Receive Maximum 满或 backlog 空。防御性设置上限避免极端情况下死循环。
+		int maxIterations = sessionManager.getClientReceiveMaximum(clientId);
+		if (maxIterations < 1) {
+			maxIterations = 1;
+		}
+		int sent = 0;
+		while (sent < maxIterations && !isReceiveMaximumExceeded(clientId)) {
+			PublishBacklogEntry entry = sessionManager.pollPendingPublishBacklog(clientId);
+			if (entry == null) {
+				break;
+			}
+			try {
+				publish(context, clientId,
+					entry.getTopic(), entry.getPayload(),
+					entry.getQos(), entry.getSubMqttQoS(), entry.isRetain(), entry.getProperties());
+			} catch (Throwable e) {
+				logger.error("Mqtt server drainPublishBacklog clientId:{} topic:{} error.", clientId, entry.getTopic(), e);
+			}
+			sent++;
+		}
+		if (logger.isDebugEnabled() && sent > 0) {
+			logger.debug("Mqtt server drainPublishBacklog clientId:{} sent:{} remaining:{}",
+				clientId, sent, sessionManager.getPendingPublishBacklogSize(clientId));
+		}
 	}
 
 	private boolean isReceiveMaximumExceeded(String clientId) {
@@ -343,9 +413,44 @@ public final class MqttServer {
 				logger.warn("Mqtt Topic:{} publish to clientId:{} channel is null may be disconnected.", topic, clientId);
 				continue;
 			}
-			publish(context, clientId, topic, payload, qos, subscribe.getMqttQoS(), false, properties);
+			// MQTT 5.0 Subscription Identifier（spec 3.3.2.3.5 / 3.8.4）：
+			// 当本次订阅携带了 subscriptionId（> 0）时，需要在 PUBLISH 的 properties 中回带该 id。
+			// 注意：每个 clientId 可能匹配多条订阅（多个 topic filter），仅当当前匹配的 subscribe
+			// 有 subscriptionId 时才回带；多条订阅同时命中时取第一条有 id 的即可。
+			MqttProperties effectiveProperties = resolveSubscriptionProperties(context, properties, subscribe.getSubscriptionId());
+			publish(context, clientId, topic, payload, qos, subscribe.getMqttQoS(), false, effectiveProperties);
 		}
 		return true;
+	}
+
+	/**
+	 * 合并 subscriptionId 到 properties。
+	 * <p>
+	 * 规则：
+	 * <ul>
+	 *     <li>若 {@code subscriptionId <= 0}，原样返回 properties；</li>
+	 *     <li>否则把 {@code Subscription Identifier} 属性附加到 properties 副本中，避免修改入参被其它 clientId 共享。</li>
+	 * </ul>
+	 *
+	 * @param context        ChannelContext
+	 * @param source         入参 properties（可能为 {@code null}）
+	 * @param subscriptionId 当前匹配的订阅关联的 Subscription Identifier
+	 * @return 合并后的 properties
+	 */
+	private MqttProperties resolveSubscriptionProperties(ChannelContext context, MqttProperties source, int subscriptionId) {
+		if (subscriptionId <= 0) {
+			return source;
+		}
+		// spec 3.3.2.3.5：subscriptionId 仅对 MQTT 5 客户端有意义
+		if (!MqttCodecUtil.isMqtt5(context)) {
+			return source;
+		}
+		MqttProperties merged = new MqttProperties();
+		if (source != null && !source.isEmpty()) {
+			source.listAll().forEach(merged::add);
+		}
+		merged.add(new IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER, subscriptionId));
+		return merged;
 	}
 
 	/**

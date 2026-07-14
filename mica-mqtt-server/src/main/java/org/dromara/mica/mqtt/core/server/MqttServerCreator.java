@@ -33,6 +33,7 @@ import org.dromara.mica.mqtt.codec.MqttConstant;
 import org.dromara.mica.mqtt.core.serializer.MqttJsonSerializer;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
+import org.dromara.mica.mqtt.core.server.auth.IMqttServerExtendedAuthHandler;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerPublishPermission;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
@@ -104,6 +105,12 @@ public class MqttServerCreator {
 	 */
 	private IMqttServerAuthHandler authHandler;
 	/**
+	 * MQTT 5.0 扩展认证 handler（P2.7）。
+	 * <p>
+	 * 可选；未配置时收到 AUTH 报文忽略。配置后启用 PR8 行为。
+	 */
+	private IMqttServerExtendedAuthHandler extendedAuthHandler;
+	/**
 	 * 唯一 id 服务
 	 */
 	private IMqttServerUniqueIdService uniqueIdService;
@@ -131,6 +138,10 @@ public class MqttServerCreator {
 	 * Will Delay Interval 调度器（MQTT 5.0 spec 3.1.3.5）
 	 */
 	private WillDelayScheduler willDelayScheduler;
+	/**
+	 * PR9（P2.8）Session Expiry Interval 调度器。
+	 */
+	private org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler sessionExpireScheduler;
 	/**
 	 * session 管理
 	 */
@@ -285,6 +296,15 @@ public class MqttServerCreator {
 		return authHandler(new DefaultMqttServerAuthHandler(username, password));
 	}
 
+	public IMqttServerExtendedAuthHandler getExtendedAuthHandler() {
+		return extendedAuthHandler;
+	}
+
+	public MqttServerCreator extendedAuthHandler(IMqttServerExtendedAuthHandler extendedAuthHandler) {
+		this.extendedAuthHandler = extendedAuthHandler;
+		return this;
+	}
+
 	public IMqttServerUniqueIdService getUniqueIdService() {
 		return uniqueIdService;
 	}
@@ -345,6 +365,15 @@ public class MqttServerCreator {
 
 	public MqttServerCreator willDelayScheduler(WillDelayScheduler willDelayScheduler) {
 		this.willDelayScheduler = willDelayScheduler;
+		return this;
+	}
+
+	public org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler getSessionExpireScheduler() {
+		return sessionExpireScheduler;
+	}
+
+	public MqttServerCreator sessionExpireScheduler(org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler sessionExpireScheduler) {
+		this.sessionExpireScheduler = sessionExpireScheduler;
 		return this;
 	}
 
@@ -672,6 +701,10 @@ public class MqttServerCreator {
 		if (this.listeners.isEmpty()) {
 			this.enableMqtt();
 		}
+		// PR9：初始化 Session Expire Scheduler（不依赖 mqttServer，注入操作延迟到 build 末尾）
+		if (this.sessionExpireScheduler == null) {
+			this.sessionExpireScheduler = new org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler(this.sessionManager);
+		}
 		// AckService
 		DefaultMqttServerProcessor serverProcessor = new DefaultMqttServerProcessor(this, this.taskService, mqttExecutor);
 		// 1. 处理消息
@@ -723,6 +756,8 @@ public class MqttServerCreator {
 		this.publishPipeline.addHandler(new MessageListenerHandler(this.messageListener));
 		// 3. 订阅转发（同步执行，避免二次 submit）
 		this.publishPipeline.addHandler(new SubscriptionForwardHandler(this, mqttServer));
+		// PR7：把 mqttServer 回填到所有 ACK 处理器，让它们可以调用 drainPublishBacklog。
+		serverProcessor.setMqttServer(mqttServer);
 		return mqttServer;
 	}
 

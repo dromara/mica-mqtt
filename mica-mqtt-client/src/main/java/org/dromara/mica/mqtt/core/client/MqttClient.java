@@ -25,6 +25,7 @@ import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.utils.thread.ThreadUtils;
 import net.dreamlu.mica.net.utils.timer.TimerTask;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
+import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
@@ -36,7 +37,9 @@ import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.codec.message.properties.MqttDisconnectProperties;
+import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
@@ -65,6 +68,16 @@ public final class MqttClient implements IMqttClient {
 	private final ExecutorService mqttExecutor;
 	private final MqttSerializer mqttSerializer;
 	private ClientChannelContext context;
+	/**
+	 * PR10：MQTT 5.0 Topic Alias 自动维护（client 端，spec 3.3.2.3.4）。
+	 * <p>可由业务方通过 {@link #setTopicAliasManager} 替换或设置 maxAlias。
+	 */
+	private MqttTopicAliasManager topicAliasManager = new MqttTopicAliasManager();
+	/**
+	 * PR10：MQTT 5.0 Subscription Identifier 自动分配（client 端，spec 3.3.2.3.6）。
+	 * <p>按 subscribe 调用顺序递增分配，0 表示未分配。
+	 */
+	private final MqttSubscriptionIdManager subscriptionIdManager = new MqttSubscriptionIdManager();
 
 	public static MqttClientCreator create() {
 		return new MqttClientCreator();
@@ -243,10 +256,12 @@ public final class MqttClient implements IMqttClient {
 			.collect(Collectors.toList());
 		// 3. 没有订阅过
 		int messageId = clientSession.getPacketId();
+		// PR10：MQTT 5 Subscription Identifier 自动分配（spec 3.3.2.3.6）
+		MqttProperties subscribeProperties = applySubscriptionIdentifier(properties);
 		MqttSubscribeMessage message = MqttSubscribeMessage.builder()
 			.addSubscriptions(topicSubscriptionList)
 			.messageId(messageId)
-			.properties(properties)
+			.properties(subscribeProperties)
 			.build();
 		// 4. 已经连接成功，直接订阅逻辑，未连接成功的添加到订阅列表，连接成功时会重连。
 		ClientChannelContext clientContext = getContext();
@@ -400,6 +415,8 @@ public final class MqttClient implements IMqttClient {
 		// qos 判断
 		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
 		int messageId = isHighLevelQoS ? clientSession.getPacketId() : -1;
+		// PR10：MQTT 5 Topic Alias 自动维护（在 build 前注入 alias）
+		applyTopicAlias(builder);
 		// 内置配置
 		MqttPublishMessage message = builder
 			.messageId(messageId)
@@ -485,6 +502,10 @@ public final class MqttClient implements IMqttClient {
 	 * @return TioClient
 	 */
 	MqttClient start(boolean sync) {
+		// PR10：每次新连接（重连）都需要重置 Topic Alias / Subscription Identifier 状态，
+		// spec 3.3.2.3.4 规定重连后 alias 映射必须重新建立。
+		this.topicAliasManager.clear();
+		this.subscriptionIdManager.reset();
 		// 启动 tio
 		Node node = new Node(config.getIp(), config.getPort());
 		try {
@@ -671,6 +692,76 @@ public final class MqttClient implements IMqttClient {
 	public boolean isConnected() {
 		ClientChannelContext channelContext = getContext();
 		return channelContext != null && channelContext.isAccepted();
+	}
+
+	/**
+	 * PR10：获取 Topic Alias 管理器（spec 3.3.2.3.4）。
+	 *
+	 * @return TopicAliasManager
+	 */
+	public MqttTopicAliasManager getTopicAliasManager() {
+		return topicAliasManager;
+	}
+
+	/**
+	 * PR10：替换 Topic Alias 管理器。
+	 * <p>业务方可自定义分配策略（覆盖 {@link MqttTopicAliasManager#allocateAlias}）。
+	 *
+	 * @param topicAliasManager 自定义 TopicAliasManager
+	 */
+	public void setTopicAliasManager(MqttTopicAliasManager topicAliasManager) {
+		this.topicAliasManager = Objects.requireNonNull(topicAliasManager, "topicAliasManager is null");
+	}
+
+	/**
+	 * PR10：获取 Subscription Identifier 管理器（spec 3.3.2.3.6）。
+	 *
+	 * @return SubscriptionIdManager
+	 */
+	public MqttSubscriptionIdManager getSubscriptionIdManager() {
+		return subscriptionIdManager;
+	}
+
+	/**
+	 * PR10：MQTT 5 Topic Alias 注入（publish 前调用）。
+	 * <p>仅当协议版本为 MQTT 5 时启用，避免污染 MQTT 3.x 路径。
+	 */
+	private void applyTopicAlias(MqttPublishBuilder builder) {
+		if (!MqttCodecUtil.isMqtt5(this.context)) {
+			return;
+		}
+		MqttProperties properties = builder.getProperties();
+		if (properties == null) {
+			properties = new MqttProperties();
+			builder.properties(properties);
+		}
+		topicAliasManager.apply(builder, properties);
+	}
+
+	/**
+	 * PR10：MQTT 5 Subscription Identifier 自动附加（subscribe 前调用，spec 3.3.2.3.6）。
+	 * <p>仅当协议版本为 MQTT 5 时启用；用户显式传入的 properties 中的 Subscription Identifier 优先。
+	 * <p>分配规则：
+	 * <ol>
+	 *     <li>用户已设置 Subscription Identifier → 尊重之；</li>
+	 *     <li>用户未设置 → 分配下一个 ID 并追加到 properties。</li>
+	 * </ol>
+	 *
+	 * @param properties 原始 properties
+	 * @return 处理后的 properties（永远非空；可能与入参同一对象）
+	 */
+	private MqttProperties applySubscriptionIdentifier(MqttProperties properties) {
+		if (!MqttCodecUtil.isMqtt5(this.context)) {
+			return properties == null ? MqttProperties.NO_PROPERTIES : properties;
+		}
+		MqttProperties out = properties == null ? new MqttProperties() : properties;
+		Integer existing = out.getPropertyValue(MqttPropertyType.SUBSCRIPTION_IDENTIFIER);
+		if (existing == null) {
+			int newId = subscriptionIdManager.nextId();
+			out.add(new IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER, newId));
+			logger.debug("Subscription Identifier auto-allocated: {}", newId);
+		}
+		return out;
 	}
 
 	/**

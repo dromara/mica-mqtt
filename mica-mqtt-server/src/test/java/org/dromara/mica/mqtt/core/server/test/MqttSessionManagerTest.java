@@ -494,6 +494,106 @@ class MqttSessionManagerTest {
 		Assertions.assertEquals(IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM, sessionManager.getClientReceiveMaximum("client1"));
 	}
 
+	// ----------------- PR7（P1.7）PublishBacklog 行为 -----------------
+
+	@Test
+	void testPendingPublishBacklogEnqueueAndPoll() {
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		String clientId = "client1";
+		org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry e1 =
+			new org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry(
+				"a/b", "p1".getBytes(), MqttQoS.QOS1, 0, false, null);
+		org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry e2 =
+			new org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry(
+				"a/c", "p2".getBytes(), MqttQoS.QOS1, 0, false, null);
+		sessionManager.addPendingPublishBacklog(clientId, e1);
+		sessionManager.addPendingPublishBacklog(clientId, e2);
+		// FIFO 出队
+		Assertions.assertEquals(2, sessionManager.getPendingPublishBacklogSize(clientId));
+		Assertions.assertEquals("a/b", sessionManager.pollPendingPublishBacklog(clientId).getTopic());
+		Assertions.assertEquals("a/c", sessionManager.pollPendingPublishBacklog(clientId).getTopic());
+		Assertions.assertNull(sessionManager.pollPendingPublishBacklog(clientId));
+		// 队列空时安全清除 map entry
+		Assertions.assertEquals(0, sessionManager.getPendingPublishBacklogSize(clientId));
+	}
+
+	@Test
+	void testPendingPublishBacklogRemovedOnClientRemove() {
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		String clientId = "client1";
+		sessionManager.addPendingPublishBacklog(clientId,
+			new org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry(
+				"a/b", new byte[0], MqttQoS.QOS1, 0, false, null));
+		Assertions.assertEquals(1, sessionManager.getPendingPublishBacklogSize(clientId));
+		sessionManager.remove(clientId);
+		Assertions.assertEquals(0, sessionManager.getPendingPublishBacklogSize(clientId));
+	}
+
+	@Test
+	void testPendingPublishBacklogEmptyDefaultBehavior() {
+		// 未注册时直接 poll 应返回 null 而不抛异常
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		Assertions.assertNull(sessionManager.pollPendingPublishBacklog("not-exist"));
+		Assertions.assertEquals(0, sessionManager.getPendingPublishBacklogSize("not-exist"));
+	}
+
+	// ----------------- PR9（P2.8）Session Expiry Interval 行为 -----------------
+
+	@Test
+	void testSessionExpiryIntervalDefaultValues() {
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		// 未设置时缺省为 0 / true
+		Assertions.assertEquals(0, sessionManager.getSessionExpiryInterval("client1"));
+		Assertions.assertTrue(sessionManager.isCleanStart("client1"));
+	}
+
+	@Test
+	void testSessionExpiryIntervalSetAndGet() {
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		sessionManager.setSessionExpiryInterval("client1", 3600, false);
+		Assertions.assertEquals(3600, sessionManager.getSessionExpiryInterval("client1"));
+		Assertions.assertFalse(sessionManager.isCleanStart("client1"));
+	}
+
+	@Test
+	void testSessionExpiryIntervalOverwrite() {
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		sessionManager.setSessionExpiryInterval("client1", 60, false);
+		// 客户端重新连接时覆盖
+		sessionManager.setSessionExpiryInterval("client1", 7200, true);
+		Assertions.assertEquals(7200, sessionManager.getSessionExpiryInterval("client1"));
+		Assertions.assertTrue(sessionManager.isCleanStart("client1"));
+	}
+
+	@Test
+	void testSessionExpiryIntervalClearedOnRemove() {
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		sessionManager.setSessionExpiryInterval("client1", 3600, false);
+		Assertions.assertEquals(3600, sessionManager.getSessionExpiryInterval("client1"));
+		sessionManager.remove("client1");
+		// remove 后回到缺省值
+		Assertions.assertEquals(0, sessionManager.getSessionExpiryInterval("client1"));
+		Assertions.assertTrue(sessionManager.isCleanStart("client1"));
+	}
+
+	@Test
+	void testSessionExpiryIntervalZeroMeansImmediate() {
+		// spec 3.1.2.11.4: sessionExpiryInterval == 0 表示立即过期
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		sessionManager.setSessionExpiryInterval("client1", 0, true);
+		Assertions.assertEquals(0, sessionManager.getSessionExpiryInterval("client1"));
+	}
+
+	@Test
+	void testSessionExpiryIntervalNullClientIdIsNoop() {
+		// 防御性：null clientId 不应抛 NPE
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		Assertions.assertDoesNotThrow(() ->
+			sessionManager.setSessionExpiryInterval(null, 60, false));
+		Assertions.assertDoesNotThrow(() ->
+			sessionManager.setSessionExpiryInterval("", 60, false));
+	}
+
 	@Test
 	void testPendingQos2Publish() {
 		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
@@ -604,6 +704,36 @@ class MqttSessionManagerTest {
 		List<Subscribe> subscribes = sessionManager.getSubscriptions("client1");
 		Assertions.assertEquals(1, subscribes.size());
 		Assertions.assertTrue(subscribes instanceof ArrayList);
+	}
+
+	// ----------------- PR10 回归：Subscription Identifier 透传 -----------------
+
+	@Test
+	void testSubscriptionIdentifierPropagatesThroughSessionManager() {
+		// 回归测试：InMemoryMqttSessionManager 7 参 addSubscribe 必须把 subscriptionId 透传到 topicManager
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		String clientId = "clientA";
+		String topicFilter = "device/123/telemetry";
+		int subscriptionId = 42;
+		// 7 参重载：MQTT 5 SUBSCRIBE 调用
+		sessionManager.addSubscribe(new TopicFilter(topicFilter), clientId, 1,
+			false, false, 0, subscriptionId);
+		// 通过 sessionManager.getSubscriptions 获取的 Subscribe 实体应包含 subscriptionId
+		List<Subscribe> subs = sessionManager.getSubscriptions(clientId);
+		Assertions.assertEquals(1, subs.size());
+		Assertions.assertEquals(subscriptionId, subs.get(0).getSubscriptionId(),
+			"subscriptionId must propagate from InMemoryMqttSessionManager to TrieTopicManager");
+	}
+
+	@Test
+	void testSubscriptionIdentifierZeroDoesNotRegister() {
+		// subscriptionId = 0 表示未设置，不应在 Subscribe 实体中出现
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		sessionManager.addSubscribe(new TopicFilter("a/b/c"), "client1", 1,
+			false, false, 0, 0);
+		List<Subscribe> subs = sessionManager.getSubscriptions("client1");
+		Assertions.assertEquals(1, subs.size());
+		Assertions.assertEquals(0, subs.get(0).getSubscriptionId());
 	}
 
 	// ----------------------------------------------------------------------------

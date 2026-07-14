@@ -71,6 +71,14 @@ public class TrieTopicManager {
 	 * $queue/ 无分组共享订阅前缀树
 	 */
 	private final Node queue = Node.getRoot();
+	/**
+	 * MQTT 5.0 Subscription Identifier 存储。
+	 * <p>
+	 * spec 3.3.2.3.5：1 ~ 268,435,455；0 表示未设置。
+	 * key 为 {@code topicFilter\u0000clientId}，与现有 subscribeMap 的 clientId 维度一一对应。
+	 * 设计为独立 ConcurrentMap 是因为 SubscribeData 是享元（仅 24 种组合），不适合把 varint 字段塞进去。
+	 */
+	private final Map<String, Integer> subscriptionIds = new ConcurrentHashMap<>();
 
 	private static class Node {
 		/**
@@ -151,35 +159,77 @@ public class TrieTopicManager {
 	 */
 	public boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal,
 								boolean retainAsPublished, int retainHandling) {
+		return addSubscribe(topicFilter, clientId, mqttQoS, noLocal, retainAsPublished, retainHandling, 0);
+	}
+
+	/**
+	 * 添加订阅（MQTT 5.0 完整选项 + Subscription Identifier）。
+	 * <p>
+	 * subscriptionId == 0 时与旧版 {@link #addSubscribe(TopicFilter, String, int, boolean, boolean, int)} 行为一致（不写入 subscriptionId 存储）。
+	 * subscriptionId > 0 时写入 {@code subscriptionIds}，供后续 {@link #searchSubscribe(String)} 时回带。
+	 *
+	 * @param subscriptionId Subscription Identifier，0 表示未设置
+	 * @return true 表示新增订阅，false 表示替换已有订阅
+	 */
+	public boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal,
+								boolean retainAsPublished, int retainHandling, int subscriptionId) {
 		String topic = topicFilter.getTopic();
 		TopicFilterType topicFilterType = topicFilter.getType();
+		boolean isNewSubscription;
 		if (TopicFilterType.NONE == topicFilterType) {
 			// 普通订阅按是否含通配符分流：精确 -> Map，通配 -> 前缀树
 			if (MqttCodecUtil.isTopicFilter(topic)) {
-				return addTrieSubscribe(wildcardRoot, topic, clientId, (byte) mqttQoS, noLocal,
+				isNewSubscription = addTrieSubscribe(wildcardRoot, topic, clientId, (byte) mqttQoS, noLocal,
 					retainAsPublished, (byte) retainHandling, false);
+			} else {
+				Map<String, Byte> subscriptions = CollUtil.computeIfAbsent(this.exactSubscriptions, topic,
+					k -> new ConcurrentHashMap<>(CHILDREN_CAPACITY));
+				isNewSubscription = putSubscription(subscriptions, clientId, (byte) mqttQoS, noLocal,
+					retainAsPublished, (byte) retainHandling);
 			}
-			Map<String, Byte> subscriptions = CollUtil.computeIfAbsent(this.exactSubscriptions, topic,
-				k -> new ConcurrentHashMap<>(CHILDREN_CAPACITY));
-			return putSubscription(subscriptions, clientId, (byte) mqttQoS, noLocal,
-				retainAsPublished, (byte) retainHandling);
-		}
-		if (TopicFilterType.QUEUE == topicFilterType) {
+		} else if (TopicFilterType.QUEUE == topicFilterType) {
 			// 共享订阅（含精确后缀）统一走前缀树，便于组内随机负载均衡
 			int prefixLen = TopicFilterType.SHARE_QUEUE_PREFIX.length();
 			// 去掉 $queue/ 前缀后再写入前缀树
-			return addTrieSubscribe(queue, topic.substring(prefixLen), clientId, (byte) mqttQoS,
+			isNewSubscription = addTrieSubscribe(queue, topic.substring(prefixLen), clientId, (byte) mqttQoS,
 				noLocal, retainAsPublished, (byte) retainHandling, true);
-		}
-		if (TopicFilterType.SHARE == topicFilterType) {
+		} else if (TopicFilterType.SHARE == topicFilterType) {
 			String groupName = TopicFilterType.getShareGroupName(topic);
 			Node groupNode = share.computeIfAbsent(groupName, k -> Node.getRoot());
 			int prefixLen = TopicFilterType.SHARE_GROUP_PREFIX.length() + groupName.length() + 1;
 			// 去掉 $share/{group}/ 前缀后再写入该组的前缀树
-			return addTrieSubscribe(groupNode, topic.substring(prefixLen), clientId, (byte) mqttQoS,
+			isNewSubscription = addTrieSubscribe(groupNode, topic.substring(prefixLen), clientId, (byte) mqttQoS,
 				noLocal, retainAsPublished, (byte) retainHandling, true);
+		} else {
+			return false;
 		}
-		return false;
+		// 维护 subscriptionId 存储
+		if (subscriptionId > 0) {
+			subscriptionIds.put(buildSubscriptionIdKey(topic, clientId), subscriptionId);
+		} else {
+			subscriptionIds.remove(buildSubscriptionIdKey(topic, clientId));
+		}
+		return isNewSubscription;
+	}
+
+	/**
+	 * subscriptionIds 存储的 key：topicFilter + U+0000 + clientId。
+	 * U+0000 不会出现在 topic 字符串中（topic 必须 UTF-8 无 NUL），用其作分隔符零成本。
+	 */
+	private static String buildSubscriptionIdKey(String topicFilter, String clientId) {
+		return topicFilter + '\u0000' + clientId;
+	}
+
+	/**
+	 * 获取 (topicFilter, clientId) 对应的 Subscription Identifier；未设置返回 0。
+	 *
+	 * @param topicFilter topicFilter
+	 * @param clientId    clientId
+	 * @return Subscription Identifier，0 表示未设置
+	 */
+	public int getSubscriptionId(String topicFilter, String clientId) {
+		Integer id = subscriptionIds.get(buildSubscriptionIdKey(topicFilter, clientId));
+		return id == null ? 0 : id;
 	}
 
 	/**
@@ -232,6 +282,8 @@ public class TrieTopicManager {
 	 * @param clientId    clientId
 	 */
 	public void removeSubscribe(String topicFilter, String clientId) {
+		// 同步清理 subscriptionId 存储
+		subscriptionIds.remove(buildSubscriptionIdKey(topicFilter, clientId));
 		removeSubscribe(new TopicFilter(topicFilter), clientId);
 	}
 
@@ -316,6 +368,9 @@ public class TrieTopicManager {
 		for (Node node : share.values()) {
 			removeSubscribe(node, clientId);
 		}
+		// 批量清理 subscriptionId：key 格式为 topicFilter\u0000clientId
+		String suffix = "\u0000" + clientId;
+		subscriptionIds.keySet().removeIf(key -> key.endsWith(suffix));
 	}
 
 	/**
@@ -361,7 +416,7 @@ public class TrieTopicManager {
 			if (encoded != null) {
 				SubscribeData data = SubscribeData.decode(encoded);
 				subscribeList.add(new Subscribe(entry.getKey(), clientId, data.qos, data.noLocal,
-					data.retainAsPublished, data.retainHandling));
+					data.retainAsPublished, data.retainHandling, getSubscriptionId(entry.getKey(), clientId)));
 			}
 		}
 		subscribeList.addAll(getSubscriptions(wildcardRoot, null, clientId));

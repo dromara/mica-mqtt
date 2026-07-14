@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.server.handler;
 
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
+import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 
 import java.util.concurrent.ExecutorService;
@@ -31,6 +32,11 @@ public abstract class AbstractMqttMessageHandler implements IMqttMessageHandler 
 	protected final MqttServerCreator serverCreator;
 	protected final ExecutorService executor;
 	protected final TimerTaskService taskService;
+	/**
+	 * PR7：在 {@link MqttServerCreator#build()} 完成 MqttServer 构造后回填。
+	 * 用于 ACK 处理器触发 backlog 出队。
+	 */
+	protected MqttServer mqttServer;
 
 	protected AbstractMqttMessageHandler(MqttServerCreator serverCreator,
 										ExecutorService executor,
@@ -38,5 +44,13 @@ public abstract class AbstractMqttMessageHandler implements IMqttMessageHandler 
 		this.serverCreator = serverCreator;
 		this.executor = executor;
 		this.taskService = taskService;
+	}
+
+	/**
+	 * PR7：注入已构建的 {@link MqttServer}，让 ACK 处理器可以触发 {@code drainPublishBacklog}。
+	 * 由 {@code MqttServerCreator.build()} 阶段在 handler 注册完成后调用。
+	 */
+	public void setMqttServer(MqttServer mqttServer) {
+		this.mqttServer = mqttServer;
 	}
 }
