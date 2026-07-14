@@ -304,7 +304,7 @@ public class MqttServerProperties {
 		/**
 		 * Subscription Identifier Available，服务端是否支持订阅标识符
 		 */
-		private boolean subscriptionIdentifierAvailable = false;
+		private boolean subscriptionIdentifierAvailable = true;
 		/**
 		 * Server Keep Alive，服务端接管心跳（秒），0 表示不接管
 		 */

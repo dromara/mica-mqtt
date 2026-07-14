@@ -19,6 +19,7 @@ package org.dromara.mica.mqtt.core.server.handler;
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
+import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.codes.MqttSubAckReasonCode;
@@ -32,7 +33,9 @@ import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption.Retain
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
+import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
+import org.dromara.mica.mqtt.core.server.MqttServerProperties;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
 import org.dromara.mica.mqtt.core.server.model.Message;
@@ -55,6 +58,7 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttSubscribeHandler.class);
 
 	private final IMqttServerSubscribeValidator subscribeValidator;
+	private final MqttServerProperties serverProperties;
 	private final IMqttSessionManager sessionManager;
 	private final IMqttSessionListener sessionListener;
 	private final IMqttMessageStore messageStore;
@@ -64,6 +68,7 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 							TimerTaskService taskService) {
 		super(serverCreator, executor, taskService);
 		this.subscribeValidator = serverCreator.getSubscribeValidator();
+		this.serverProperties = serverCreator.getMqttServerProperties();
 		this.sessionManager = serverCreator.getSessionManager();
 		this.sessionListener = serverCreator.getSessionListener();
 		this.messageStore = serverCreator.getMessageStore();
@@ -87,6 +92,7 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 		List<String> subscribedTopicList = new ArrayList<>();
 		List<String> retainTopicList = new ArrayList<>();
 		boolean enableSubscribeValidator = subscribeValidator != null;
+		boolean isMqtt5 = MqttCodecUtil.isMqtt5(context);
 		for (MqttTopicSubscription subscription : topicSubscriptionList) {
 			String topicFilter = subscription.topicFilter();
 			try {
@@ -100,6 +106,14 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 			MqttQoS mqttQoS = subscription.qualityOfService();
 			MqttSubscriptionOption option = subscription.option();
 			boolean noLocal = option.isNoLocal();
+			MqttSubAckReasonCode capabilityReasonCode = resolveCapabilityReasonCode(serverProperties, topicFilter,
+				subscribeSubscriptionId, isMqtt5);
+			if (capabilityReasonCode != null) {
+				reasonCodeList.add(capabilityReasonCode);
+				logger.warn("Subscribe - clientId:{} topicFilter:{} rejected by server capability negotiation reasonCode:{} packetId:{}",
+					clientId, topicFilter, capabilityReasonCode, packetId);
+				continue;
+			}
 			if (enableSubscribeValidator && !subscribeValidator.verifyTopicFilter(context, clientId, topicFilter, mqttQoS)) {
 				// 仅拒绝当前 topic filter，其他合法订阅仍继续处理并在同一个 SUBACK 中逐项返回结果。
 				reasonCodeList.add(MqttSubAckReasonCode.NOT_AUTHORIZED);
@@ -135,6 +149,36 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 			|| (RetainedHandlingPolicy.SEND_AT_SUBSCRIBE_IF_NOT_YET_EXISTS == retainHandling && newSubscription);
 	}
 
+	static MqttSubAckReasonCode resolveCapabilityReasonCode(MqttServerProperties serverProperties, String topicFilter,
+															int subscriptionId, boolean isMqtt5) {
+		if (!isMqtt5) {
+			return null;
+		}
+		if (subscriptionId > 0 && !serverProperties.isSubscriptionIdentifierAvailable()) {
+			return MqttSubAckReasonCode.SUBSCRIPTION_IDENTIFIERS_NOT_SUPPORTED;
+		}
+		TopicFilterType topicFilterType = TopicFilterType.getType(topicFilter);
+		if (topicFilterType != TopicFilterType.NONE && !serverProperties.isSharedSubscriptionAvailable()) {
+			return MqttSubAckReasonCode.SHARED_SUBSCRIPTIONS_NOT_SUPPORTED;
+		}
+		String normalizedTopicFilter = stripSharedPrefix(topicFilter, topicFilterType);
+		if (hasWildcard(normalizedTopicFilter) && !serverProperties.isWildcardSubscriptionAvailable()) {
+			return MqttSubAckReasonCode.WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED;
+		}
+		return null;
+	}
+
+	static boolean hasWildcard(String topicFilter) {
+		return topicFilter.indexOf('+') >= 0 || topicFilter.indexOf('#') >= 0;
+	}
+
+	private static String stripSharedPrefix(String topicFilter, TopicFilterType topicFilterType) {
+		if (topicFilterType == TopicFilterType.NONE) {
+			return topicFilter;
+		}
+		return topicFilter.substring(topicFilterType.getPrefixLength(topicFilter));
+	}
+
 	/**
 	 * 提取 SUBSCRIBE 报文级别的 Subscription Identifier。
 	 * <p>
@@ -147,7 +191,7 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 	 * @return Subscription Identifier；0 表示未设置
 	 */
 	private static int extractSubscribeSubscriptionId(ChannelContext context, MqttSubscribeMessage message) {
-		if (!org.dromara.mica.mqtt.codec.MqttCodecUtil.isMqtt5(context)) {
+		if (!MqttCodecUtil.isMqtt5(context)) {
 			return 0;
 		}
 		Integer subscriptionId = new MqttSubscribeProperties(message.variableHeader().properties()).getSubscriptionIdentifier();
