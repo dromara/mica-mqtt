@@ -33,6 +33,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Decodes Mqtt messages from bytes, following
@@ -296,6 +297,8 @@ public final class MqttDecoder {
 
 		MqttVersion version = MqttVersion.fromProtocolNameAndLevel(protoString, protocolLevel);
 		MqttCodecUtil.setMqttVersion(ctx, version);
+		// 重连时清空 Topic Alias 别名表，避免上一会话的映射被新会话复用。
+		MqttCodecUtil.clearTopicAliasMaps(ctx);
 
 		final int b1 = ByteBufferUtil.readUnsignedByte(buffer);
 		numberOfBytesConsumed += 1;
@@ -334,6 +337,11 @@ public final class MqttDecoder {
 		}
 
 		bytesConsumed.value = numberOfBytesConsumed;
+		// MQTT 5.0: 读取客户端声明的 Maximum Packet Size，存储到 ChannelContext
+		if (version == MqttVersion.MQTT_5) {
+			Integer maxPacketSize = properties.getPropertyValue(MqttPropertyType.MAXIMUM_PACKET_SIZE);
+			MqttCodecUtil.setMaxPacketSize(ctx, maxPacketSize == null ? 0 : maxPacketSize);
+		}
 		return new MqttConnectVariableHeader(
 			version.protocolName(),
 			version.protocolLevel(),
@@ -362,6 +370,10 @@ public final class MqttDecoder {
 			IntValue tempBytesConsumed = new IntValue();
 			properties = decodeProperties(buffer, tempBytesConsumed);
 			bytesConsumed.value = 2 + tempBytesConsumed.value;
+			// 缓存服务端下发的 Topic Alias Maximum（spec 3.2.2.3.5），
+			// 供本端作为客户端在 PUBLISH 中校验 Topic Alias 范围。
+			Integer topicAliasMaximum = properties.getPropertyValue(MqttPropertyType.TOPIC_ALIAS_MAXIMUM);
+			MqttCodecUtil.setTopicAliasMaximum(ctx, topicAliasMaximum == null ? 0 : topicAliasMaximum);
 		} else {
 			properties = MqttProperties.NO_PROPERTIES;
 			bytesConsumed.value = 2;
@@ -783,12 +795,20 @@ public final class MqttDecoder {
 		MqttFixedHeader mqttFixedHeader, IntValue bytesConsumed) {
 		final MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
 		IntValue tempBytesConsumed = new IntValue();
-		final String decodedTopic = decodeString(buffer, tempBytesConsumed);
-		// 校验发布的 topic name，不能包含通配符
-		if (MqttCodecUtil.isTopicFilter(decodedTopic)) {
-			throw new DecoderException("invalid publish topic name: " + decodedTopic + " (contains wildcards)");
-		}
+		String decodedTopic = decodeString(buffer, tempBytesConsumed);
+		// MQTT 5.0 允许把 PUBLISH 的 topic 字符串省略，用 Topic Alias 反查；
+		// 本端作为"接收方"在 spec 3.3.2.3.4 中要求：若 topic 字符串为空，则必须存在
+		// 之前登记过该 alias 的非空 topic，否则视为协议错误。
+		boolean topicNameFromAlias = false;
 		int numberOfBytesConsumed = tempBytesConsumed.value;
+		// MQTT 5.0: 校验客户端声明的 Maximum Packet Size（仅对 MQTT 5 校验）
+		if (mqttVersion == MqttVersion.MQTT_5) {
+			int clientMaxPacketSize = MqttCodecUtil.getMaxPacketSize(ctx);
+			if (clientMaxPacketSize > 0 && mqttFixedHeader.getMessageLength() > clientMaxPacketSize) {
+				throw new DecoderException("PUBLISH packet size " + mqttFixedHeader.getMessageLength()
+					+ " exceeds client's Maximum Packet Size " + clientMaxPacketSize);
+			}
+		}
 
 		int packetId = -1;
 		if (mqttFixedHeader.qosLevel().value() > 0) {
@@ -802,6 +822,42 @@ public final class MqttDecoder {
 			numberOfBytesConsumed += tempBytesConsumed.value;
 		} else {
 			properties = MqttProperties.NO_PROPERTIES;
+		}
+
+		// MQTT 5.0 Topic Alias（spec 3.3.2.3.3 / 3.3.2.3.4）：
+		// 1) 若 PUBLISH 携带 Topic Alias 属性，且 topic 字符串非空，则建立/覆盖
+		//    alias → topic 映射（仅在 alias <= TopicAliasMaximum 范围内有效）；
+		// 2) 若 PUBLISH 携带 Topic Alias 属性，且 topic 字符串为空，则从已建立的映射中反查；
+		// 3) 反查失败时视为协议错误。
+		if (mqttVersion == MqttVersion.MQTT_5) {
+			Integer topicAlias = properties.getPropertyValue(MqttPropertyType.TOPIC_ALIAS);
+			if (topicAlias != null && topicAlias > 0) {
+				Integer topicAliasMaximum = MqttCodecUtil.getTopicAliasMaximum(ctx);
+				if (topicAliasMaximum > 0 && topicAlias > topicAliasMaximum) {
+					throw new DecoderException("Topic Alias " + topicAlias
+						+ " exceeds server's Topic Alias Maximum " + topicAliasMaximum);
+				}
+				if (decodedTopic.isEmpty()) {
+					Map<Integer, String> aliasMap = MqttCodecUtil.getClientTopicAliasMap(ctx);
+					String aliasTopic = aliasMap.get(topicAlias);
+					if (aliasTopic == null) {
+						throw new DecoderException("PUBLISH topic is empty and Topic Alias " + topicAlias
+							+ " has no existing mapping");
+					}
+					decodedTopic = aliasTopic;
+					topicNameFromAlias = true;
+				} else {
+					Map<Integer, String> aliasMap = MqttCodecUtil.getClientTopicAliasMap(ctx);
+					aliasMap.put(topicAlias, decodedTopic);
+				}
+			} else if (decodedTopic.isEmpty()) {
+				// MQTT 5.0 spec 3.3.2.3 / 3.3.2.3.3: topic name 不能为零长度（除非使用 Topic Alias）
+				throw new DecoderException("PUBLISH topic name is empty and no Topic Alias property is set");
+			}
+		}
+		// 校验发布的 topic name，不能包含通配符
+		if (!topicNameFromAlias && MqttCodecUtil.isTopicFilter(decodedTopic)) {
+			throw new DecoderException("invalid publish topic name: " + decodedTopic + " (contains wildcards)");
 		}
 
 		bytesConsumed.value = numberOfBytesConsumed;

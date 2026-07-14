@@ -203,18 +203,18 @@ MqttServerAioHandler.handler(packet)
 | CONNACK Properties 完善（能力位告知） | ✅ | 🚧（基础能力位） | ❌ | ❌ | n/a |
 | Server Keep Alive | ✅ | ✅ | ❌ | ❌ | n/a |
 | Receive Maximum（运行时） | ✅ | ❌ | ❌ | ❌ | n/a |
-| Will Properties / Will Delay Interval（调度） | ✅ | 🚧（持久化） | ✅（透传） | ❌ | n/a |
+| Will Properties / Will Delay Interval（调度） | ✅ | ✅（调度） | ✅（透传） | ❌ | n/a |
 | Subscription Identifier（运行时） | ✅ | ❌ | ❌ | ❌ | n/a |
-| Topic Alias（运行时） | ✅ | ❌ | ❌ | ❌ | n/a |
+| Topic Alias（运行时） | ✅ | ✅ | ❌ | ❌ | n/a |
 | Assigned Client Identifier | ✅ | ✅ | ❌ | ❌ | n/a |
 | Request Problem Information | ✅ | ✅ | ❌ | ❌ | n/a |
-| Payload Format Indicator + Content Type | ✅ | 🚧（透传） | 🚧（透传） | 🚧 | ❌ |
-| Response Topic + Correlation Data | ✅ | 🚧（透传） | 🚧（透传） | 🚧 | ❌ |
+| Payload Format Indicator + Content Type | ✅ | ✅（透传） | ✅（透传） | 🚧 | ❌ |
+| Response Topic + Correlation Data | ✅ | ✅（透传） | ✅（透传） | 🚧 | ❌ |
 | AUTH 报文处理 + 扩展认证 | ✅ | ❌ | ❌ | ❌ | n/a |
 | Server Reference（服务端重定向） | ✅ | ❌ | n/a | ❌ | n/a |
-| Response Information（请求/响应模式） | ✅ | ❌ | n/a | ❌ | n/a |
+| Response Information（请求/响应模式） | ✅ | ✅ | n/a | ❌ | n/a |
 | Clean Start + 完整 Session Expiry Interval | ✅ | 🚧（注释中） | 🚧 | 🚧 | n/a |
-| Maximum Packet Size 校验 | ✅ | ❌ | ❌ | ❌ | n/a |
+| Maximum Packet Size 校验 | ✅ | ✅ | ✅ | ❌ | n/a |
 | QoS2 完整 Reason Code（PUBACK/PUBREC/PUBREL/PUBCOMP） | ✅ | ❌ | ❌ | ❌ | n/a |
 | Shared Subscription Available 协商 | ✅ | ❌ | ❌ | 🚧 | n/a |
 | 集群节点间 Session Expiry / Subscriptions 同步 | n/a | n/a | n/a | 🚧 | n/a |
@@ -222,6 +222,14 @@ MqttServerAioHandler.handler(packet)
 > 图例：✅ 已实现  🚧 部分实现（仅透传或仅框架）  ❌ 未实现  n/a 不适用
 
 > **2026-07-07 进度**：已完成服务端 ACK Reason Code 基础链路、SUBACK/UNSUBACK Reason Code、DISCONNECT 双向 Reason Code + Properties、Server Keep Alive 服务端下发、Assigned Client Identifier、Request Problem Information。CONNACK 能力位已具备基础下发能力，但 Receive Maximum / Maximum Packet Size 等运行时语义未完成，仍按部分实现跟踪。
+>
+> **2026-07-14 进度**：本轮已完成 P3.3（Maximum Packet Size 校验）与 P2.5/P2.6（Payload Format Indicator / Content Type / Response Topic / Correlation Data 透传）。服务端与客户端两个端点的解码/编码已可完整保留上述四个 PUBLISH 属性；HTTP API 透传通道 (`HttpApiMessageHandler` / `MqttServer.sendToClient`) 在构建 `MqttPublishMessage` 时正确携带属性；保留消息 (`saveRetainMessage`) 也已支持持久化属性。`MqttPublishPropertiesRoundTripTest`（9 个用例）作为 codec 端回归保护。
+>
+> **2026-07-14 进度（PR3）**：完成 P2.9（Response Information 请求/响应模式）。`MqttServerProperties.responseInformation` 暴露配置入口；`MqttConnectHandler.isRequestResponseInformation` 按 spec 3.1.2.3.10 解析 CONNECT 端缺省为 false 的请求位；`buildConnAckProperties` 在客户端请求 + 服务端配置非空时才下发 `Response Information` 属性；`MqttResponseInformationRoundTripTest`（9 个用例）覆盖 codec 端 round-trip 行为。
+>
+> **2026-07-14 进度（PR4）**：完成 P2.2（Topic Alias 运行时）。`MqttCodecUtil` 暴露 `getClientTopicAliasMap` / `getServerTopicAliasMap` / `clearTopicAliasMaps` / `getTopicAliasMaximum` 四组能力；`MqttDecoder.decodePublishVariableHeader` 按 spec 3.3.2.3.3/3.3.2.3.4 在 PUBLISH 解码末尾处理 alias 注册/反查 + TopicAliasMaximum 越界校验 + 空 topic 协议错误；`decodeConnAckVariableHeader` 缓存服务端下发的 TopicAliasMaximum；CONNECT 解码时清空别名表避免重连残留。`MqttTopicAliasRoundTripTest`（10 个用例）覆盖 codec 端 round-trip 与别名表语义。注：客户端侧发送时的"业务方主动把常用 topic 维护进 server→client 别名表"以 ChannelContext 工具方法暴露，业务层按需调用，PR4 不做强制自动分配以避免隐式行为。
+>
+> **2026-07-14 进度（PR5）**：完成 P1.8（Will Properties / Will Delay Interval 调度）。新增 `WillDelayScheduler` 工具类维护 `clientId -> TimerTask` 映射；`MqttConnectHandler.scheduleWillDelayIfNeeded` 按 spec 3.1.3.5 仅在 `Session Expiry Interval >= Will Delay Interval` 时调用 `willDelayScheduler.schedule`；`MqttDisConnectHandler` 收到正常 DISCONNECT 时调用 `willDelayScheduler.cancel` 取消待发任务（spec 3.1.3.5.3 语义）；`MqttServerAioListener.onBeforeClose` 通过 `willDelayScheduler.isScheduled(clientId)` 决定是否跳过立即发送。任务到期后通过 `messageStore.getWillMessage(clientId)` 二次判定：若已被清理（说明客户端在延迟窗口内成功重连），不发 Will；否则发送并清理。`MqttServerCreator.willDelayScheduler` 暴露配置入口并默认初始化。`MqttWillDelayIntervalRoundTripTest`（9 个用例）覆盖 codec 端 round-trip 与 WillDelay/SessionExpiry 联合判定语义。
 
 ### 4.2 优先级分层（按业务价值 × 实现复杂度）
 
@@ -309,21 +317,21 @@ MqttServerAioHandler.handler(packet)
 | **P1.5** | ✅ Retain As Published / Retain Handling（服务端运行时） | 已完成 | 无 | 中 |
 | **P1.6** | ✅ Server Keep Alive | 已完成 | P1.4 | 低 |
 | **P1.7** | 🚧 Receive Maximum（server → client 方向，基础流控） | 部分完成 | 无 | 中 |
-| **P1.8** | Will Properties / Will Delay Interval | 2 天 | 无 | 中 |
+| **P1.8** | ✅ Will Properties / Will Delay Interval | 已完成 | 无 | 中 |
 
 ### 5.3 P2 第二梯队（2-3 周）
 
 | 任务 | 标题 | 工作量 | 依赖 | 风险 |
 |---|---|---|---|---|
 | **P2.1** | Subscription Identifier（运行时） | 3 天 | P1.4 | 中 |
-| **P2.2** | Topic Alias（运行时） | 2 天 | P1.4 | 中 |
+| **P2.2** | ✅ Topic Alias（运行时） | 已完成 | P1.4 | 中 |
 | **P2.3** | ✅ Assigned Client Identifier | 已完成 | P1.4 | 低 |
 | **P2.4** | ✅ Request Problem Information | 已完成 | 无 | 低 |
-| **P2.5** | Payload Format Indicator + Content Type（透传） | 1 天 | 无 | 低 |
-| **P2.6** | Response Topic + Correlation Data（HTTP API 透传） | 2 天 | P2.5 | 中 |
+| **P2.5** | ✅ Payload Format Indicator + Content Type（透传） | 已完成 | 无 | 低 |
+| **P2.6** | ✅ Response Topic + Correlation Data（HTTP API 透传） | 已完成 | P2.5 | 中 |
 | **P2.7** | AUTH 报文处理 + 扩展认证骨架 | 5 天 | P1.4 | 高 |
 | **P2.8** | Server Reference（服务端重定向） | 2 天 | P2.7 | 中 |
-| **P2.9** | Response Information（请求/响应模式） | 1 天 | P1.4 | 低 |
+| **P2.9** | ✅ Response Information（请求/响应模式） | 已完成 | P1.4 | 低 |
 
 ### 5.4 P3 第三梯队（2-3 周+）
 
@@ -331,7 +339,7 @@ MqttServerAioHandler.handler(packet)
 |---|---|---|---|---|
 | **P3.1** | Clean Start + 完整 Session Expiry Interval | 5 天 | P2.x | 高 |
 | **P3.2** | Receive Maximum（双向完整） | 3 天 | P1.7 + P3.1 | 中 |
-| **P3.3** | Maximum Packet Size 校验 | 2 天 | 无 | 低 |
+| **P3.3** | ✅ Maximum Packet Size 校验 | 已完成 | 无 | 低 |
 | **P3.4** | QoS2 完整 Reason Code（PUBACK/PUBREC/PUBREL/PUBCOMP） | 2 天 | P1.1 | 中 |
 | **P3.5** | Shared Subscription 负载均衡策略抽象 | 3 天 | 无 | 中 |
 | **P3.6** | TLS 1.3 + x509 属性提取 | 5 天 | 无 | 中 |

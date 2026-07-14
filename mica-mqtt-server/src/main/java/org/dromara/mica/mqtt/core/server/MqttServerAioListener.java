@@ -26,6 +26,7 @@ import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.pipeline.IMqttMessagePipeline;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
+import org.dromara.mica.mqtt.core.server.will.WillDelayScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +46,7 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 	private final IMqttMessagePipeline messagePipeline;
 	private final IMqttConnectStatusListener connectStatusListener;
 	private final MqttMessageInterceptors messageInterceptors;
+	private final WillDelayScheduler willDelayScheduler;
 
 	public MqttServerAioListener(MqttServerCreator serverCreator) {
 		this.executor = serverCreator.getMqttExecutor();
@@ -53,6 +55,7 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		this.messagePipeline = serverCreator.getMessagePipeline();
 		this.connectStatusListener = serverCreator.getConnectStatusListener();
 		this.messageInterceptors = serverCreator.getMessageInterceptors();
+		this.willDelayScheduler = serverCreator.getWillDelayScheduler();
 	}
 
 	@Override
@@ -91,7 +94,10 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 			return;
 		}
 		// 4. 对于异常断开连接，处理遗嘱消息
-		if (isNotNormalDisconnect) {
+		// MQTT 5.0 Will Delay Interval（spec 3.1.3.5）：若 clientId 上有"待触发"的 Will Delay 任务，
+		// 则跳过这里的立即发送；任务到期后由 WillDelayScheduler 调度处理。
+		// 取消判定按"是否已调度"决定——即使异常断开也允许延迟窗口（spec 允许）。
+		if (isNotNormalDisconnect && !willDelayScheduler.isScheduled(clientId)) {
 			sendWillMessage(clientId);
 		}
 		// 5. 会话清理，互踢已清，不用再清（避免误删刚订阅的 topic）

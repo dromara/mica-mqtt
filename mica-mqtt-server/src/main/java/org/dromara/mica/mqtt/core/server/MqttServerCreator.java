@@ -53,6 +53,7 @@ import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.server.store.InMemoryMqttMessageStore;
+import org.dromara.mica.mqtt.core.server.will.WillDelayScheduler;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.support.DefaultMqttServerProcessor;
@@ -126,6 +127,10 @@ public class MqttServerCreator {
 	 * 消息存储
 	 */
 	private IMqttMessageStore messageStore;
+	/**
+	 * Will Delay Interval 调度器（MQTT 5.0 spec 3.1.3.5）
+	 */
+	private WillDelayScheduler willDelayScheduler;
 	/**
 	 * session 管理
 	 */
@@ -331,6 +336,15 @@ public class MqttServerCreator {
 
 	public MqttServerCreator messageStore(IMqttMessageStore messageStore) {
 		this.messageStore = messageStore;
+		return this;
+	}
+
+	public WillDelayScheduler getWillDelayScheduler() {
+		return willDelayScheduler;
+	}
+
+	public MqttServerCreator willDelayScheduler(WillDelayScheduler willDelayScheduler) {
+		this.willDelayScheduler = willDelayScheduler;
 		return this;
 	}
 
@@ -627,6 +641,9 @@ public class MqttServerCreator {
 		}
 		if (this.messageStore == null) {
 			this.messageStore = new InMemoryMqttMessageStore();
+		}
+		if (this.willDelayScheduler == null) {
+			this.willDelayScheduler = new WillDelayScheduler();
 		}
 		if (this.connectStatusListener == null) {
 			this.connectStatusListener = new DefaultMqttConnectStatusListener();

@@ -24,6 +24,7 @@ import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttReasonCodeAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
+import org.dromara.mica.mqtt.core.server.will.WillDelayScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,11 +37,13 @@ import java.util.concurrent.ExecutorService;
  */
 public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttDisConnectHandler.class);
+	private final WillDelayScheduler willDelayScheduler;
 
 	public MqttDisConnectHandler(MqttServerCreator serverCreator,
 							 ExecutorService executor,
 							 TimerTaskService taskService) {
 		super(serverCreator, executor, taskService);
+		this.willDelayScheduler = serverCreator.getWillDelayScheduler();
 	}
 
 	@Override
@@ -56,6 +59,11 @@ public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 			logger.info("DisConnect - clientId:{} contextId:{} reasonCode:0x{}", clientId, context.getId(), Integer.toHexString(reasonCode & 0xFF));
 		} else {
 			logger.warn("DisConnect - clientId:{} contextId:{} reasonCode:0x{}", clientId, context.getId(), Integer.toHexString(reasonCode & 0xFF));
+		}
+		// MQTT 5.0 Will Delay Interval 取消（spec 3.1.3.5.3）：
+		// 正常断开（DISCONNECT reason code = 0）时，will 消息不应发送，需取消任何已调度的延迟任务。
+		if (reasonCode == MqttDisconnectReasonCode.NORMAL.value()) {
+			willDelayScheduler.cancel(clientId);
 		}
 		context.setBizStatus(true);
 		Tio.remove(context, "Mqtt DisConnect");

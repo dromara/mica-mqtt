@@ -30,6 +30,7 @@ import net.dreamlu.mica.net.utils.page.PageUtils;
 import net.dreamlu.mica.net.utils.timer.TimerTask;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
+import org.dromara.mica.mqtt.codec.MqttDecoder;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
@@ -155,6 +156,21 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos, boolean retain) {
+		return publish(clientId, topic, payload, qos, retain, null);
+	}
+
+	/**
+	 * 发布消息给指定客户端，支持传入 MQTT 5.0 属性
+	 *
+	 * @param clientId   clientId
+	 * @param topic      topic
+	 * @param payload    消息体
+	 * @param qos        MqttQoS
+	 * @param retain     是否在服务器上保留消息
+	 * @param properties MQTT 5.0 属性
+	 * @return 是否发送成功
+	 */
+	public boolean publish(String clientId, String topic, Object payload, MqttQoS qos, boolean retain, MqttProperties properties) {
 		// 校验 topic
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
@@ -179,7 +195,7 @@ public final class MqttServer {
 			logger.warn("Mqtt Topic:{} publish but clientId:{} not subscribed.", topic, clientId);
 			return false;
 		}
-		return publish(context, clientId, topic, payload, qos, subMqttQoS, retain, null);
+		return publish(context, clientId, topic, payload, qos, subMqttQoS, retain, properties);
 	}
 
 	/**
@@ -287,6 +303,20 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publishAll(String topic, Object payload, MqttQoS qos, boolean retain) {
+		return publishAll(topic, payload, qos, retain, null);
+	}
+
+	/**
+	 * 发布消息给所有订阅者，支持传入 MQTT 5.0 属性
+	 *
+	 * @param topic      topic
+	 * @param payload    消息体
+	 * @param qos        MqttQoS
+	 * @param retain     是否在服务器上保留消息
+	 * @param properties MQTT 5.0 属性
+	 * @return 是否发送成功
+	 */
+	public boolean publishAll(String topic, Object payload, MqttQoS qos, boolean retain, MqttProperties properties) {
 		// 校验 topic
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
@@ -298,7 +328,7 @@ public final class MqttServer {
 				return false;
 			}
 			topic = retainPair.getValue();
-			this.saveRetainMessage(topic, timeOut, qos, payload);
+			this.saveRetainMessage(topic, timeOut, qos, payload, properties);
 		}
 		// 查找订阅该 topic 的客户端
 		List<Subscribe> subscribeList = sessionManager.searchSubscribe(topic);
@@ -313,7 +343,7 @@ public final class MqttServer {
 				logger.warn("Mqtt Topic:{} publish to clientId:{} channel is null may be disconnected.", topic, clientId);
 				continue;
 			}
-			publish(context, clientId, topic, payload, qos, subscribe.getMqttQoS(), false, null);
+			publish(context, clientId, topic, payload, qos, subscribe.getMqttQoS(), false, properties);
 		}
 		return true;
 	}
@@ -385,11 +415,31 @@ public final class MqttServer {
 		// 客户端id
 		String clientId = message.getClientId();
 		MqttQoS mqttQoS = MqttQoS.valueOf(message.getQos());
+		MqttProperties properties = resolveProperties(message);
 		if (StrUtil.isBlank(clientId)) {
-			return publishAll(topic, message.getPayload(), mqttQoS, message.isRetain());
+			return publishAll(topic, message.getPayload(), mqttQoS, message.isRetain(), properties);
 		} else {
-			return publish(clientId, topic, message.getPayload(), mqttQoS, message.isRetain());
+			return publish(clientId, topic, message.getPayload(), mqttQoS, message.isRetain(), properties);
 		}
+	}
+
+	/**
+	 * 解析消息的 MQTT 5.0 属性，优先取 {@link Message#getProperties()}，
+	 * 集群传输场景下属性已被序列化为 {@link Message#getPropertiesBytes()}，需要按需反序列化。
+	 *
+	 * @param message Message
+	 * @return MQTT 5.0 属性，可能为 {@code null}
+	 */
+	private static MqttProperties resolveProperties(Message message) {
+		MqttProperties properties = message.getProperties();
+		if (properties != null && !properties.isEmpty()) {
+			return properties;
+		}
+		byte[] propertiesBytes = message.getPropertiesBytes();
+		if (propertiesBytes != null && propertiesBytes.length > 0) {
+			return MqttDecoder.decodeProperties(propertiesBytes);
+		}
+		return null;
 	}
 
 	/**
@@ -400,6 +450,18 @@ public final class MqttServer {
 	 * @param payload ByteBuffer
 	 */
 	private void saveRetainMessage(String topic, int timeout, MqttQoS mqttQoS, Object payload) {
+		saveRetainMessage(topic, timeout, mqttQoS, payload, null);
+	}
+
+	/**
+	 * 存储保留消息，附带 MQTT 5.0 属性
+	 *
+	 * @param topic      topic
+	 * @param mqttQoS    MqttQoS
+	 * @param payload    ByteBuffer
+	 * @param properties MQTT 5.0 属性
+	 */
+	private void saveRetainMessage(String topic, int timeout, MqttQoS mqttQoS, Object payload, MqttProperties properties) {
 		Message retainMessage = new Message();
 		retainMessage.setTopic(topic);
 		retainMessage.setQos(mqttQoS.value());
@@ -410,6 +472,9 @@ public final class MqttServer {
 		retainMessage.setDup(false);
 		retainMessage.setTimestamp(System.currentTimeMillis());
 		retainMessage.setNode(serverCreator.getNodeName());
+		if (properties != null && !properties.isEmpty()) {
+			retainMessage.setProperties(properties);
+		}
 		this.messageStore.addRetainMessage(topic, timeout, retainMessage);
 	}
 

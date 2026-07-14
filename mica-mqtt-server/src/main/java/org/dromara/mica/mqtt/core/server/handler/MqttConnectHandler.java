@@ -32,6 +32,8 @@ import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
 import org.dromara.mica.mqtt.codec.message.properties.MqttConnectProperties;
 import org.dromara.mica.mqtt.codec.message.properties.MqttConnAckProperties;
+import org.dromara.mica.mqtt.codec.message.properties.MqttWillPublishProperties;
+import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.MqttServerProperties;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
@@ -42,6 +44,7 @@ import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.pipeline.IMqttMessagePipeline;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
+import org.dromara.mica.mqtt.core.server.will.WillDelayScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +68,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 	private final IMqttMessageStore messageStore;
 	private final IMqttSessionManager sessionManager;
 	private final IMqttMessagePipeline messagePipeline;
+	private final WillDelayScheduler willDelayScheduler;
 	private final long heartbeatTimeout;
 
 	public MqttConnectHandler(MqttServerCreator serverCreator,
@@ -77,6 +81,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		this.messageStore = serverCreator.getMessageStore();
 		this.sessionManager = serverCreator.getSessionManager();
 		this.messagePipeline = serverCreator.getMessagePipeline();
+		this.willDelayScheduler = serverCreator.getWillDelayScheduler();
 		this.heartbeatTimeout = serverCreator.getHeartbeatTimeout() == null
 			? TioConfig.DEFAULT_HEARTBEAT_TIMEOUT
 			: serverCreator.getHeartbeatTimeout();
@@ -96,6 +101,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		String password = payload.password();
 		MqttConnectVariableHeader variableHeader = mqttMessage.variableHeader();
 		boolean requestProblemInformation = isRequestProblemInformation(context, variableHeader);
+		boolean requestResponseInformation = isRequestResponseInformation(context, variableHeader);
 		boolean assignedClientId = StrUtil.isBlank(clientId);
 		// 1. 获取唯一 id
 		String uniqueId = uniqueIdService.getUniqueId(context, clientId, userName, password);
@@ -106,18 +112,23 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		// 2. uniqueId 不能为空
 		if (StrUtil.isBlank(uniqueId)) {
 			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_IDENTIFIER_REJECTED,
-				0, false, requestProblemInformation);
+				0, false, requestProblemInformation, requestResponseInformation);
 			return;
 		}
 		// 3. 认证
 		if (authHandler != null && !authHandler.verifyAuthenticate(context, uniqueId, clientId, userName, password)) {
 			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD,
-				0, false, requestProblemInformation);
+				0, false, requestProblemInformation, requestResponseInformation);
 			return;
 		}
 		if (hasInvalidReceiveMaximum(context, variableHeader)) {
 			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_PROTOCOL_ERROR,
-				0, false, requestProblemInformation);
+				0, false, requestProblemInformation, requestResponseInformation);
+			return;
+		}
+		if (hasInvalidClientMaxPacketSize(context, variableHeader, clientId)) {
+			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_PACKET_TOO_LARGE,
+				0, false, requestProblemInformation, requestResponseInformation);
 			return;
 		}
 		// 认证成功
@@ -185,10 +196,14 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			willMessage.setPeerHost(clientNode.getPeerHost());
 			willMessage.setNode(serverCreator.getNodeName());
 			messageStore.addWillMessage(uniqueId, willMessage);
+			// MQTT 5.0 Will Delay Interval（spec 3.1.3.5）：仅当 Session Expiry Interval >= Will Delay Interval
+			// 时才延迟发送；否则按"立即 Will"流程处理。
+			// 仅对 MQTT 5 校验，3.x 客户端没有 WillDelayInterval 属性。
+			scheduleWillDelayIfNeeded(context, uniqueId, variableHeader, payload);
 		}
 		// 9. 返回 ack
 		connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_ACCEPTED,
-			serverKeepAliveSeconds, assignedClientId, requestProblemInformation);
+			serverKeepAliveSeconds, assignedClientId, requestProblemInformation, requestResponseInformation);
 		// 10. 在线通知
 		final String finalUniqueId = uniqueId;
 		executor.execute(() -> {
@@ -200,12 +215,71 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		});
 	}
 
+	/**
+	 * MQTT 5.0 Will Delay Interval 调度（spec 3.1.3.5）。
+	 * <p>
+	 * 规则：
+	 * <ol>
+	 *     <li>仅当 {@code Will Delay Interval > 0} 且 {@code Session Expiry Interval >= Will Delay Interval}
+	 *         时才调度延迟发送；否则走"立即 Will"流程（{@code MqttServerAioListener.onBeforeClose} 处理）。</li>
+	 *     <li>当 {@code Will Delay Interval} 大于本端最大允许延迟（4 字节 unsigned）时，截断到 0xFFFFFFFF。</li>
+	 *     <li>任务到期后：
+	 *         <ul>
+	 *             <li>若 {@code messageStore.getWillMessage(clientId)} 仍存在，发送 Will 并清理；</li>
+	 *             <li>若已被清理（说明客户端在延迟窗口内成功重连），跳过发送（spec 3.1.3.5.3）。</li>
+	 *         </ul>
+	 *     </li>
+	 * </ol>
+	 * 3.x 客户端没有 willDelayInterval 属性，会走到"立即 Will"路径，行为不变。
+	 */
+	private void scheduleWillDelayIfNeeded(ChannelContext context, String uniqueId,
+										  MqttConnectVariableHeader variableHeader, MqttConnectPayload payload) {
+		if (!MqttCodecUtil.isMqtt5(context)) {
+			return;
+		}
+		MqttWillPublishProperties willProperties = new MqttWillPublishProperties(payload.willProperties());
+		Integer willDelayInterval = willProperties.getWillDelayInterval();
+		if (willDelayInterval == null || willDelayInterval <= 0) {
+			return;
+		}
+		// Session Expiry Interval 在 CONNECT 级别 properties 中
+		Integer sessionExpiryInterval = variableHeader.properties().<Integer>getPropertyValue(MqttPropertyType.SESSION_EXPIRY_INTERVAL);
+		// spec 3.1.3.5: 仅当 sessionExpiry >= willDelayInterval 时延迟发送。
+		// 未声明 Session Expiry Interval 时按 0 处理，立即发送。
+		if (sessionExpiryInterval == null || sessionExpiryInterval < willDelayInterval) {
+			logger.debug("Will Delay Interval {} ignored: Session Expiry Interval {} < willDelayInterval",
+				willDelayInterval, sessionExpiryInterval);
+			return;
+		}
+		// 4 字节 unsigned 上限保护（虽然 spec 允许 0xFFFFFFFF，但保险起见用 long 防止溢出）
+		long delayMillis = willDelayInterval.longValue() & 0xFFFFFFFFL;
+		// 取消可能存在的旧任务（同 clientId 重连场景）
+		willDelayScheduler.cancel(uniqueId);
+		willDelayScheduler.schedule(uniqueId, delayMillis, () -> {
+			try {
+				Message willMessage = messageStore.getWillMessage(uniqueId);
+				if (willMessage == null) {
+					logger.debug("Will Delay Interval fired for clientId:{} but will message already cleared (likely reconnect)", uniqueId);
+					return;
+				}
+				boolean result = messagePipeline.handle(willMessage);
+				logger.debug("Mqtt server clientId:{} send delayed willMessage result:{}.", uniqueId, result);
+				messageStore.clearWillMessage(uniqueId);
+			} catch (Throwable e) {
+				logger.error("Mqtt server clientId:{} send delayed willMessage error.", uniqueId, e);
+			}
+		});
+		logger.debug("Will Delay Interval scheduled clientId:{} delayMillis:{}", uniqueId, delayMillis);
+	}
+
 	private void connAckByReturnCode(String clientId, String uniqueId, ChannelContext context, MqttConnectReasonCode returnCode,
-									 int serverKeepAlive, boolean assignedClientId, boolean requestProblemInformation) {
+									 int serverKeepAlive, boolean assignedClientId, boolean requestProblemInformation,
+									 boolean requestResponseInformation) {
 		MqttConnAckMessage message = MqttConnAckMessage.builder()
 			.returnCode(returnCode)
 			.sessionPresent(false)
-			.properties(buildConnAckProperties(uniqueId, returnCode, serverKeepAlive, assignedClientId, requestProblemInformation).getProperties())
+			.properties(buildConnAckProperties(uniqueId, returnCode, serverKeepAlive, assignedClientId,
+				requestProblemInformation, requestResponseInformation).getProperties())
 			.build();
 		boolean result = Tio.send(context, message);
 		if (returnCode.isAccepted()) {
@@ -216,7 +290,8 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 	}
 
 	private MqttConnAckProperties buildConnAckProperties(String uniqueId, MqttConnectReasonCode returnCode, int serverKeepAlive,
-														 boolean assignedClientId, boolean requestProblemInformation) {
+														 boolean assignedClientId, boolean requestProblemInformation,
+														 boolean requestResponseInformation) {
 		// 失败 CONNACK 只返回诊断信息，避免把服务端能力位误宣告给未成功建立的连接。
 		if (!returnCode.isAccepted() && requestProblemInformation) {
 			return new MqttConnAckProperties().setReasonString(returnCode.toString());
@@ -243,6 +318,14 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		if (assignedClientId && StrUtil.isNotBlank(uniqueId)) {
 			connAckProperties.setAssignedClientIdentifier(uniqueId);
 		}
+		// MQTT 5.0 规范 3.2.2.3.16：仅当客户端在 CONNECT 中通过
+		// Request Response Information 显式请求（值 = 1）且服务端配置了非空响应信息时才下发 Response Information。
+		if (requestResponseInformation) {
+			String responseInformation = properties.getResponseInformation();
+			if (StrUtil.isNotBlank(responseInformation)) {
+				connAckProperties.setResponseInformation(responseInformation);
+			}
+		}
 		return connAckProperties;
 	}
 
@@ -253,6 +336,23 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		// MQTT 5.0 默认允许返回问题信息；只有客户端显式 false 时才抑制 Reason String。
 		Boolean requestProblemInformation = new MqttConnectProperties(variableHeader.properties()).getRequestProblemInformation();
 		return requestProblemInformation == null || requestProblemInformation;
+	}
+
+	/**
+	 * 解析客户端在 CONNECT 中是否请求了 Response Information。
+	 * MQTT 5.0 规范 3.1.2.3.10：缺省值与 Request Problem Information 相反（缺省 false），
+	 * 客户端必须显式置 1 才会被服务端下发 Response Information。
+	 *
+	 * @param context        ChannelContext
+	 * @param variableHeader CONNECT variable header
+	 * @return 是否请求 Response Information
+	 */
+	private boolean isRequestResponseInformation(ChannelContext context, MqttConnectVariableHeader variableHeader) {
+		if (!MqttCodecUtil.isMqtt5(context)) {
+			return false;
+		}
+		Boolean requestResponseInformation = new MqttConnectProperties(variableHeader.properties()).getRequestResponseInformation();
+		return requestResponseInformation != null && requestResponseInformation;
 	}
 
 	private int resolveClientReceiveMaximum(ChannelContext context, MqttConnectVariableHeader variableHeader, String clientId) {
@@ -276,6 +376,34 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		}
 		Integer receiveMaximum = new MqttConnectProperties(variableHeader.properties()).getReceiveMaximum();
 		return receiveMaximum != null && receiveMaximum < 1;
+	}
+
+	/**
+	 * 校验客户端在 CONNECT 中声明的 Maximum Packet Size 是否在合法范围。
+	 * MQTT 5.0 规范 3.1.2.11.5：取值范围 [1, 4294967295]。
+	 * 同时应小于服务端在 CONNACK 下发的 Maximum Packet Size，否则客户端发送的包将永远无法被服务端接受。
+	 */
+	private boolean hasInvalidClientMaxPacketSize(ChannelContext context, MqttConnectVariableHeader variableHeader, String clientId) {
+		if (!MqttCodecUtil.isMqtt5(context)) {
+			return false;
+		}
+		Integer maxPacketSize = new MqttConnectProperties(variableHeader.properties()).getMaximumPacketSize();
+		if (maxPacketSize == null) {
+			return false;
+		}
+		if (maxPacketSize < 1) {
+			logger.warn("Connect clientId:{} invalid Maximum Packet Size:{}, must be >= 1", clientId, maxPacketSize);
+			return true;
+		}
+		int serverMaxPacketSize = serverCreator.getMqttServerProperties().getMaximumPacketSize();
+		int serverBytesLimit = serverCreator.getMaxBytesInMessage();
+		int effectiveServerMax = Math.min(serverMaxPacketSize, serverBytesLimit);
+		if (maxPacketSize > effectiveServerMax) {
+			logger.warn("Connect clientId:{} Maximum Packet Size:{} exceeds server limit:{}, rejecting.",
+				clientId, maxPacketSize, effectiveServerMax);
+			return true;
+		}
+		return false;
 	}
 
 	private void sendConnected(ChannelContext context, String uniqueId) {

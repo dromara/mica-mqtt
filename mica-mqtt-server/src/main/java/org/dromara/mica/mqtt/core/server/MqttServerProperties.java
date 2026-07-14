@@ -83,6 +83,17 @@ public class MqttServerProperties {
 	 */
 	private int serverKeepAlive = 0;
 
+	/**
+	 * Response Information，服务端下发的请求/响应模式信息。
+	 * <p>
+	 * MQTT 5.0 规范 3.2.2.3.16：仅当 CONNECT 中客户端通过
+	 * {@code Request Response Information} 显式请求（值 = 1）时，服务端才在 CONNACK 中下发该字段。
+	 * 客户端拿到该字符串后，会在后续发布 PUBLISH 时把它作为 {@code Response Topic} 属性携带。
+	 * <p>
+	 * 留空表示不启用请求/响应模式。
+	 */
+	private String responseInformation;
+
 	public int getReceiveMaximum() {
 		return receiveMaximum;
 	}
@@ -161,6 +172,15 @@ public class MqttServerProperties {
 
 	public MqttServerProperties serverKeepAlive(int serverKeepAlive) {
 		this.serverKeepAlive = serverKeepAlive;
+		return this;
+	}
+
+	public String getResponseInformation() {
+		return responseInformation;
+	}
+
+	public MqttServerProperties responseInformation(String responseInformation) {
+		this.responseInformation = responseInformation;
 		return this;
 	}
 }
