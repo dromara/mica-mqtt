@@ -161,7 +161,12 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 		if (topicFilterType != TopicFilterType.NONE && !serverProperties.isSharedSubscriptionAvailable()) {
 			return MqttSubAckReasonCode.SHARED_SUBSCRIPTIONS_NOT_SUPPORTED;
 		}
-		String normalizedTopicFilter = stripSharedPrefix(topicFilter, topicFilterType);
+		String normalizedTopicFilter;
+		try {
+			normalizedTopicFilter = stripSharedPrefix(topicFilter, topicFilterType);
+		} catch (IllegalArgumentException e) {
+			return MqttSubAckReasonCode.TOPIC_FILTER_INVALID;
+		}
 		if (hasWildcard(normalizedTopicFilter) && !serverProperties.isWildcardSubscriptionAvailable()) {
 			return MqttSubAckReasonCode.WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED;
 		}
