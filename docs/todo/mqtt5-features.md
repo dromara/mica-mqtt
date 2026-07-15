@@ -200,7 +200,7 @@ MqttServerAioHandler.handler(packet)
 | DISCONNECT Reason Code + Properties（双向） | ✅ | ✅ | ✅ | 🚧 | n/a |
 | SUBACK / UNSUBACK Reason Code | ✅ | ✅ | 🚧 | 🚧 | n/a |
 | Retain As Published / Retain Handling（运行时） | ✅ | ✅ | n/a | 🚧（本地委托支持，节点协议待扩展） | n/a |
-| CONNACK Properties 完善（能力位告知） | ✅ | 🚧（基础能力位） | ❌ | ❌ | n/a |
+| CONNACK Properties 完善（能力位告知） | ✅ | ✅ | ❌ | ❌ | n/a |
 | Server Keep Alive | ✅ | ✅ | ❌ | ❌ | n/a |
 | Receive Maximum（运行时） | ✅ | ❌ | ❌ | ❌ | n/a |
 | Will Properties / Will Delay Interval（调度） | ✅ | ✅（调度） | ✅（透传） | ❌ | n/a |
@@ -216,7 +216,7 @@ MqttServerAioHandler.handler(packet)
 | Clean Start + 完整 Session Expiry Interval | ✅ | 🚧（注释中） | 🚧 | 🚧 | n/a |
 | Maximum Packet Size 校验 | ✅ | ✅ | ✅ | ❌ | n/a |
 | QoS2 完整 Reason Code（PUBACK/PUBREC/PUBREL/PUBCOMP） | ✅ | ❌ | ❌ | ❌ | n/a |
-| Shared Subscription Available 协商 | ✅ | ❌ | ❌ | 🚧 | n/a |
+| Shared Subscription Available 协商 | ✅ | ✅ | ❌ | 🚧 | n/a |
 | 集群节点间 Session Expiry / Subscriptions 同步 | n/a | n/a | n/a | 🚧 | n/a |
 
 > 图例：✅ 已实现  🚧 部分实现（仅透传或仅框架）  ❌ 未实现  n/a 不适用
@@ -240,6 +240,8 @@ MqttServerAioHandler.handler(packet)
 > **2026-07-14 进度（PR9）**：完成 P2.8（Clean Start / Session Expiry Interval 运行时）。新增 `SessionExpireScheduler` 工具类维护 `clientId -> TimerTask` 映射，提供 `scheduleExpire(clientId, seconds)` / `cancel(clientId)` / `isScheduled(clientId)` / `clear()` 四个 API（基于 mica-net 的 `TimerTaskService` 与 PR5 引入的 `WillDelayScheduler` 同模式）；`IMqttSessionManager` 暴露 `setSessionExpiryInterval(clientId, seconds, cleanStart)` / `getSessionExpiryInterval(clientId)` / `isCleanStart(clientId)` 三个 default 重载；`InMemoryMqttSessionManager` 用 `ConcurrentMap<clientId, SessionState{cleanStart, expirySeconds}>` 持久化并接入 `remove` / `clean` 清理路径；`MqttConnectHandler` 在 MQTT 5 客户端 CONNECT 时解析 `Clean Start` 与 `Session Expiry Interval` 并存入 sessionManager，按 spec 3.1.2.11.4 处理 "cleanStart=false && expiry=0" → 视作 0xFFFFFFFF（永不过期）；`MqttDisConnectHandler` 正常断开时若 `!cleanStart && expiry>0` 调用 `sessionExpireScheduler.scheduleExpire` 调度过期；`MqttConnectHandler` 在 MQTT 5 + 无活跃连接 + cleanStart=true 时显式清理旧 session（与 PR5 引入的 `cleanSession` 互踢逻辑保持一致）；`MqttServerCreator` 在 `build()` 阶段初始化 `SessionExpireScheduler`（用 `setMqttServer` 注入解决循环依赖，与 PR7 的 ACK handler 注入同模式）。**未覆盖**（保持 PR9 范围）：离线消息持久化（queued QoS1/2 messages 跨 session expiry 仍需业务方自实现持久化存储）、DISCONNECT 阶段客户端更新 Session Expiry Interval（spec 3.2.2.4 允许 client 在 disconnect 时调整）。`MqttSessionExpiryCodecTest` 10 个 codec 用例（CONNECT/CONNACK/DISCONNECT 三端 round-trip + 0/0xFFFFFFFF 边界 + 0x11 propertyId + 与其它属性共存 + CleanStart 字段访问）+ `MqttSessionManagerTest` 6 个新用例（缺省值 / set+get / 重连覆盖 / remove 清理 / 0 立即过期 / null 防御）+ `SessionExpireSchedulerTest` 8 个新用例（schedule/cancel/isScheduled / 重连覆盖 / clear / setMqttServer 可选 / 并发 schedule+cancel）覆盖 PR9 全部行为。
 >
 > **2026-07-14 进度（PR10）**：完成 P2.9（客户端 Topic Alias / Subscription Identifier 自动维护）。**Topic Alias**（spec 3.3.2.3.4）：新增 `MqttTopicAliasManager` 工具类维护 `topic <-> alias` 双向 `ConcurrentMap` 映射，核心 API 是 `apply(MqttPublishBuilder, MqttProperties)` —— 在 `MqttClient.publish` 中自动调用，**仅当协议版本为 MQTT 5 时启用**，避免污染 MQTT 3.x 路径。**自动策略**：业务方未显式设置 alias 时，topic 首次发送保留 topic 字符串让服务端注册，第二次发送置 topic 为空串并复用已注册 alias；业务方显式设置 alias 时尊重之并同步映射；达到 `maxAlias` 上限（默认 16）时保留 topic 不替换。**并发安全**：`allocateAndReserve` 用 `ConcurrentMap.putIfAbsent` 原子地"先占位再 register"，`registerAlias` 用 `cleanStaleAliasesForTopic` 清理同 topic 旧 alias 残留。**Subscription Identifier**（spec 3.3.2.3.6）：新增 `MqttSubscriptionIdManager` 单调递增分配 varint ID（1 ~ 268,435,455），核心 API 是 `nextId()` / `reset()` / `peek()`，在 `MqttClient.subscribe` 中自动调用 `applySubscriptionIdentifier` 把 ID 写入 SUBSCRIBE properties（仅 MQTT 5），业务方已显式设置 ID 时尊重之。`MqttClient` 暴露 `getTopicAliasManager` / `setTopicAliasManager` / `getSubscriptionIdManager` 三个 getter/setter，业务方可在连接前后调整策略。**配套 codec 改动**：`MqttPublishBuilder.getProperties()` 新增 getter（让 manager 在 `build()` 之前注入 alias）。**未覆盖**（保持 PR10 范围）：服务端回发 PUBLISH 中的 `Subscription Identifier` 暴露给 `IMqttClientMessageListener`（当前 onMessage 签名只接收 topic + payload + QoS，留作 API 演进；业务方可读 `MqttPublishMessage.properties` 自行提取）。`MqttTopicAliasManagerTest` 15 个用例（首次/二次发送 / 显式 alias 0 与 >0 / registerAlias 覆盖旧映射 / unregister / clear / maxAlias 上限 / null/空 topic 防御 / maxAlias 负数校验 / 0 禁用 / 并发 8 线程 100 次 register+apply 不超 maxAlias）+ `MqttSubscriptionIdManagerTest` 8 个用例（nextId 单调 / reset / peek 不消费 / 上限抛 IllegalState / 8 线程 1000 次 ID 唯一性 / MAX_SUBSCRIPTION_ID 常量 / reset 后可继续分配）覆盖 PR10 全部行为。
+>
+> **2026-07-14 进度（PR11）**：完成 Shared / Wildcard / Subscription Identifier 三个 MQTT 5 订阅能力位的**服务端协商落地**。`MqttSubscribeHandler.resolveCapabilityReasonCode` 会在 MQTT 5 SUBSCRIBE 路径上基于 `MqttServerProperties` 判定并逐项返回 `SHARED_SUBSCRIPTIONS_NOT_SUPPORTED` / `WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED` / `SUBSCRIPTION_IDENTIFIERS_NOT_SUPPORTED`，从而把 `CONNACK` 中宣告的能力位真正落到运行时行为；`subscriptionIdentifierAvailable` 默认值同步调整为 `true`（core + Spring Boot starter + Solon starter），与已完成的 P2.1 运行时能力保持一致。`MqttSubscribeHandlerTest` 新增 5 个用例覆盖默认值与三类协商拒绝路径。
 
 
 ### 4.2 优先级分层（按业务价值 × 实现复杂度）
@@ -324,7 +326,7 @@ MqttServerAioHandler.handler(packet)
 | **P1.1** | ✅ PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code + Properties | 已完成 | 无 | 低 |
 | **P1.2** | ✅ DISCONNECT Reason Code + Properties（双向） | 已完成 | 无 | 低 |
 | **P1.3** | ✅ SUBACK / UNSUBACK Reason Code | 已完成 | 无 | 低 |
-| **P1.4** | 🚧 CONNACK Properties 完善（能力位告知） | 部分完成 | 无 | 低 |
+| **P1.4** | ✅ CONNACK Properties 完善（能力位告知） | 已完成 | 无 | 低 |
 | **P1.5** | ✅ Retain As Published / Retain Handling（服务端运行时） | 已完成 | 无 | 中 |
 | **P1.6** | ✅ Server Keep Alive | 已完成 | P1.4 | 低 |
 | **P1.7** | ✅ Receive Maximum（server → client 方向，基础流控 + 挂起队列 + ACK 回补） | 已完成 | 无 | 中 |
@@ -564,6 +566,11 @@ private void connAckByReturnCode(String clientId, String uniqueId,
 | 文档 | 版本 | 状态 | 更新日期 |
 |---|---|---|---|
 | **mqtt5-features.md** | v2.3 | P1/P2 部分能力已落地 | 2026-07-13 |
+
+### v2.4 变更摘要（相对 v2.3）
+
+- **P1.4 能力位协商补齐**：`Shared Subscription Available` / `Wildcard Subscription Available` / `Subscription Identifier Available` 已从单纯 CONNACK 宣告扩展到 SUBSCRIBE 运行时校验。
+- **订阅标识符默认值修正**：core 与 starter 层的 `subscriptionIdentifierAvailable` 缺省值统一改为 `true`，与已完成的 P2.1 运行时行为保持一致。
 
 ### v2.3 变更摘要（相对 v2.2）
 
