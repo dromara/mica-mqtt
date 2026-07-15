@@ -72,6 +72,12 @@ class MqttSubscribeHandlerTest {
 		Assertions.assertEquals(MqttSubAckReasonCode.WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED,
 			MqttSubscribeHandler.resolveCapabilityReasonCode(serverProperties, "$share/group/test/#", 0, true));
 	}
+	@Test
+	void testResolveCapabilityReasonCodeForMalformedSharedSubscription() {
+		MqttServerProperties serverProperties = new MqttServerProperties();
+		Assertions.assertEquals(MqttSubAckReasonCode.TOPIC_FILTER_INVALID,
+			MqttSubscribeHandler.resolveCapabilityReasonCode(serverProperties, "$share/group", 0, true));
+	}
 
 	@Test
 	void testResolveCapabilityReasonCodeForNonMqtt5Client() {
