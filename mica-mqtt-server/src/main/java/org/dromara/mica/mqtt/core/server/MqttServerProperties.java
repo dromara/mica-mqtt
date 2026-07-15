@@ -28,7 +28,7 @@ package org.dromara.mica.mqtt.core.server;
  *   <li>{@link #maximumPacketSize} = 268435456 (256MB，spec 默认)</li>
  *   <li>{@link #topicAliasMaximum} = 0 (spec 默认：不启用)</li>
  *   <li>{@link #maximumQos} = 2 (QoS2)</li>
- *   <li>{@link #subscriptionIdentifierAvailable} = false (运行时未回填订阅标识符前不宣告支持)</li>
+ *   <li>{@link #subscriptionIdentifierAvailable} = true (P2.1 已落地运行时回填；PR11 调整后的缺省值，与已实现的 SUBSCRIBE 协商逻辑保持一致)</li>
  *   <li>其余 boolean 默认 true</li>
  * </ul>
  *

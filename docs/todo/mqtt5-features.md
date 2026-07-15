@@ -55,17 +55,19 @@ MqttServerAioHandler.handler(packet)
 
 | Handler | `messageTypes()` | `handle(...)` 行 | 路径 |
 |---|---|---|---|
-| `MqttConnectHandler` | `{CONNECT}` | [L87](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L87) | [handler/MqttConnectHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java) |
-| `MqttPublishHandler` | `{PUBLISH}` | [L72](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPublishHandler.java#L72) | [handler/MqttPublishHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPublishHandler.java) |
+| `MqttConnectHandler` | `{CONNECT}` | [L97](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L97) | [handler/MqttConnectHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java) |
+| `MqttPublishHandler` | `{PUBLISH}` | [L71](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPublishHandler.java#L71) | [handler/MqttPublishHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPublishHandler.java) |
 | `MqttPubAckHandler` | `{PUBACK}` | [L55](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubAckHandler.java#L55) | [handler/MqttPubAckHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubAckHandler.java) |
 | `MqttPubRecHandler` | `{PUBREC}` | [L58](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRecHandler.java#L58) | [handler/MqttPubRecHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRecHandler.java) |
 | `MqttPubRelHandler` | `{PUBREL}` | [L63](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRelHandler.java#L63) | [handler/MqttPubRelHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubRelHandler.java) |
 | `MqttPubCompHandler` | `{PUBCOMP}` | [L55](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubCompHandler.java#L55) | [handler/MqttPubCompHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPubCompHandler.java) |
-| `MqttSubscribeHandler` | `{SUBSCRIBE}` | [L73](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java#L73) | [handler/MqttSubscribeHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java) |
+| `MqttSubscribeHandler` | `{SUBSCRIBE}` | [L77](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java#L77) | [handler/MqttSubscribeHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java) |
 | `MqttUnSubscribeHandler` | `{UNSUBSCRIBE}` | [L60](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttUnSubscribeHandler.java#L60) | [handler/MqttUnSubscribeHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttUnSubscribeHandler.java) |
 | `MqttPingReqHandler` | `{PINGREQ}` | [L50](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPingReqHandler.java#L50) | [handler/MqttPingReqHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPingReqHandler.java) |
 | `MqttDisConnectHandler` | `{DISCONNECT}` | [L50](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttDisConnectHandler.java#L50) | [handler/MqttDisConnectHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttDisConnectHandler.java) |
-| ❌ `MqttAuthHandler` | `{AUTH}` | — | **未实现**（见 §6.3） |
+| ✅ `MqttAuthHandler` | `{AUTH}` | [L65](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttAuthHandler.java#L65) | [handler/MqttAuthHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttAuthHandler.java) |
+
+> **关于行号**：表中 `handle(...)` 列行号仅为**近似锚点**，随 PR 演进会产生 ±5 行以内漂移；以方法签名/职责描述为准。
 
 > **架构意义**：后续 §5、§6 中"改造点"全部聚焦到具体 Handler，新增/修改 MQTT 5.0 特性时只需 `processor.register(new XxxHandler(...))` 一行接入，外观层和分发逻辑无需改动。
 >
@@ -179,14 +181,14 @@ MqttServerAioHandler.handler(packet)
 
 | 特性 | 实现位置 | 备注 |
 |---|---|---|
-| **No Local**（订阅选项） | [MqttSubscribeHandler#handle](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java#L85-L92) + [SubscriptionForwardHandler#forwardToSubscribers](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L141-L166) | 订阅时记录 noLocal，发布时过滤（规范 3.8.3.1） |
+| **No Local**（订阅选项） | [MqttSubscribeHandler#handle](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java#L106-L126)（订阅时读取 `option.isNoLocal()` 并写入 `IMqttSessionManager`）+ [SubscriptionForwardHandler#forwardToSubscribers](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L141-L149)（`forwardToSubscribers` 入口判断 `isNoLocal` 过滤） | 订阅时记录 noLocal，发布时过滤（规范 3.8.3.1） |
 | **Message Expiry Interval**（过期 + 递减） | [SubscriptionForwardHandler#rewriteProperties](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L92-L132) | 检查过期 + 剩余时间递减（规范 3.3.2.3） |
 | **Shared Subscription** `$share/{group}/...` | [TrieTopicManager](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/session/TrieTopicManager.java) | 分组共享订阅（`$queue` + `$share`） |
 | **Session Expiry Interval**（客户端侧） | [MqttClientProperties](../../starter/mica-mqtt-client-spring-boot-starter/src/main/java/org/dromara/mica/mqtt/spring/client/config/MqttClientProperties.java#L145) | CONNECT 时下发，服务端有 `IMqttSessionManager.expire` 接口签名但未启用（见 §6.4） |
 | **Topic Alias / Subscription Identifier 转发清理** | [SubscriptionForwardHandler#rewriteProperties](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java#L116-L122) | 服务端转发时不携带发布者的 Topic Alias 和 Subscription Identifier（规范 3.3.2.3 / 3.3.4） |
 | **Subscription Options 编解码** | [MqttEncoder](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttEncoder.java#L226-L240) | RetainAsPublished / RetainHandling / No Local / QoS 均能编解码，服务端运行时语义已生效 |
 | **Retain As Published / Retain Handling**（服务端运行时） | [MqttSubscribeHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java) + [SubscriptionForwardHandler](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/pipeline/handler/SubscriptionForwardHandler.java) | 保存完整订阅选项；支持三种保留消息补发策略，实时转发按 RAP 保留 RETAIN 标志；重叠订阅会合并 No Local / RAP 语义 |
-| **Will Properties**（属性透传） | [MqttConnectHandler#handle 第 140-159 行](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L140-L159) | 遗嘱消息持久化时已绑定 WillProperties 字段（willDelay、payloadFormatIndicator 等），Will Delay Interval 调度尚未生效 |
+| **Will Properties**（属性透传） | [MqttConnectHandler#handle](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L222-L296)（含 `scheduleWillDelayIfNeeded`） | 遗嘱消息持久化时已绑定 WillProperties 字段（willDelay、payloadFormatIndicator 等）；Will Delay Interval 调度按 spec 3.1.3.5 已生效（PR5），由 `WillDelayScheduler` 维护 `clientId -> TimerTask`（P1.8） |
 
 ---
 
@@ -194,32 +196,39 @@ MqttServerAioHandler.handler(packet)
 
 ### 4.1 状态矩阵
 
+> **矩阵覆盖范围**：codec（编解码层）/ server（单机服务端运行时）/ client（mica 自家客户端运行时）/ broker（集群节点间协议）/ HTTP API（starter 层 HTTP 接口）。
+> **关于 `client` 列的 `❌`**：除特殊说明（如 Topic Alias / Subscription Identifier 的客户端自动维护），`❌` 通常表示 mica 自家 `MqttClient` 解码后**未把该字段透传给业务方**，而非 codec 缺失。
+
 | 特性 | codec | server | client | broker | HTTP API |
 |---|---|---|---|---|---|
-| PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code | ✅ | ✅ | ❌ | ❌ | n/a |
+| PUBACK/PUBREC/PUBREL/PUBCOMP Reason Code | ✅ | ✅ | ❌（codec 透传；`MqttPubAckMessage.variableHeader().reasonCode()` 可读） | ❌ | n/a |
 | DISCONNECT Reason Code + Properties（双向） | ✅ | ✅ | ✅ | 🚧 | n/a |
 | SUBACK / UNSUBACK Reason Code | ✅ | ✅ | 🚧 | 🚧 | n/a |
 | Retain As Published / Retain Handling（运行时） | ✅ | ✅ | n/a | 🚧（本地委托支持，节点协议待扩展） | n/a |
 | CONNACK Properties 完善（能力位告知） | ✅ | ✅ | ❌ | ❌ | n/a |
 | Server Keep Alive | ✅ | ✅ | ❌ | ❌ | n/a |
-| Receive Maximum（运行时） | ✅ | ❌ | ❌ | ❌ | n/a |
-| Will Properties / Will Delay Interval（调度） | ✅ | ✅（调度） | ✅（透传） | ❌ | n/a |
-| Subscription Identifier（运行时） | ✅ | ✅ | ❌ | ❌ | n/a |
-| Topic Alias（运行时） | ✅ | ✅ | ❌ | ❌ | n/a |
+| Receive Maximum（运行时） | ✅ | ✅（PR7 in-flight + 挂起队列 + ACK 回补） | 🚧（下行解析 + broker 校验） | ❌ | n/a |
+| Will Properties / Will Delay Interval（调度） | ✅ | ✅（PR5） | ✅（透传） | ❌ | ❌ |
+| Subscription Identifier（运行时） | ✅ | ✅（PR6 精确 filter 已带；通配/共享订阅 `searchSubscribe` 不带） | ✅（PR10 自动分配） | ❌ | ❌ |
+| Topic Alias（运行时） | ✅ | ✅（PR4 `MqttCodecUtil` 别名表 + CONNACK 越界校验） | ✅（PR10 自动分配） | ❌ | ❌ |
 | Assigned Client Identifier | ✅ | ✅ | ❌ | ❌ | n/a |
 | Request Problem Information | ✅ | ✅ | ❌ | ❌ | n/a |
-| Payload Format Indicator + Content Type | ✅ | ✅（透传） | ✅（透传） | 🚧 | ❌ |
-| Response Topic + Correlation Data | ✅ | ✅（透传） | ✅（透传） | 🚧 | ❌ |
-| AUTH 报文处理 + 扩展认证 | ✅ | ❌ | ❌ | ❌ | n/a |
+| Payload Format Indicator + Content Type | ✅ | ✅（透传） | ✅（透传） | 🚧 | ✅（PR2.5 已透传） |
+| Response Topic + Correlation Data | ✅ | ✅（透传） | ✅（透传） | 🚧 | ✅（PR2.6 已透传） |
+| AUTH 报文处理 + 扩展认证 | ✅ | ✅（PR8：`MqttAuthHandler` + `IMqttServerExtendedAuthHandler`） | ❌ | ❌ | n/a |
 | Server Reference（服务端重定向） | ✅ | ❌ | n/a | ❌ | n/a |
 | Response Information（请求/响应模式） | ✅ | ✅ | n/a | ❌ | n/a |
-| Clean Start + 完整 Session Expiry Interval | ✅ | 🚧（注释中） | 🚧 | 🚧 | n/a |
-| Maximum Packet Size 校验 | ✅ | ✅ | ✅ | ❌ | n/a |
-| QoS2 完整 Reason Code（PUBACK/PUBREC/PUBREL/PUBCOMP） | ✅ | ❌ | ❌ | ❌ | n/a |
-| Shared Subscription Available 协商 | ✅ | ✅ | ❌ | 🚧 | n/a |
+| Clean Start + 完整 Session Expiry Interval | ✅ | ✅（PR9：CONNECT 解析 + SessionExpireScheduler；扩展项见 P3.1） | 🚧 | 🚧 | n/a |
+| Maximum Packet Size 校验 | ✅ | ✅（仅 CONNECT 阶段；其他报文链路见 P3.3 备注） | ✅ | ❌ | n/a |
+| QoS2 完整 Reason Code（PUBACK/PUBREC/PUBREL/PUBCOMP） | ✅ | 🚧（NOT_AUTHORIZED 已用于发布拒绝；其它 reason 见 P3.4） | ❌ | ❌ | n/a |
+| Shared Subscription Available 协商 | ✅ | ✅（PR11：runtime 校验 `randomStrategy`） | ❌ | ✅（本地支持；`ClusterMqttSessionManager` 委托） | n/a |
+| Reason String（人类可读失败原因） | ✅ | ✅（失败 CONNACK / 普通报文均按 `Request Problem Information` 协商下发） | ✅ | ❌ | n/a |
+| Server-side Receive Maximum 校验 CONNECT 上行包 | n/a | ✅（`MqttConnectHandler.hasInvalidClientMaxPacketSize`，0 拒连接） | n/a | ❌ | n/a |
 | 集群节点间 Session Expiry / Subscriptions 同步 | n/a | n/a | n/a | 🚧 | n/a |
 
 > 图例：✅ 已实现  🚧 部分实现（仅透传或仅框架）  ❌ 未实现  n/a 不适用
+>
+> **PR11 修订**：上一版文档把 Shared Subscription 的 broker 列标为 `🚧`，但实际上 `ClusterMqttSessionManager` 已对 `IMqttSessionManager` 做完整委托（含 `searchSubscribe`），单机运行时 `randomStrategy` 已在 `TrieTopicManager` 落地；真正缺的是集群节点间共享订阅匹配的协商策略（P3.5）。
 
 > **2026-07-07 进度**：已完成服务端 ACK Reason Code 基础链路、SUBACK/UNSUBACK Reason Code、DISCONNECT 双向 Reason Code + Properties、Server Keep Alive 服务端下发、Assigned Client Identifier、Request Problem Information。CONNACK 能力位已具备基础下发能力，但 Receive Maximum / Maximum Packet Size 等运行时语义未完成，仍按部分实现跟踪。
 >
@@ -306,18 +315,21 @@ MqttServerAioHandler.handler(packet)
    ├──► [4] Retain Options
    └──► [5] CONNACK Properties 完善
            ├──► [6] Server Keep Alive
-           └──► [7] Receive Maximum（单向）
-                  ├──► [8] Will Properties
-                  └──► [9] Subscription Identifier
-                         ├──► [10] Topic Alias
+           └──► [7] Receive Maximum（单向：服务端 in-flight + 挂起队列，PR7）
+                  ├──► [8] Will Properties（PR5）
+                  └──► [9] Subscription Identifier（PR6）
+                         ├──► [10] Topic Alias（PR4 + PR10）
                          └──► [11] Assigned Client Identifier
                                 └──► [12] Request Problem Information
-                                       └──► [13] AUTH 报文 + 扩展认证
-                                              ├──► [14] Clean Start + Session Expiry
-                                              └──► [15] Receive Maximum（双向）
-                                                     └──► [16] Maximum Packet Size
-                                                            └──► [17] 集群扩展
+                                       └──► [13] AUTH 报文 + 扩展认证（PR8）
+                                              ├──► [14] Clean Start + Session Expiry（PR9）
+                                              ├──► [15] Response Information（PR3）
+                                              └──► [16] Receive Maximum（双向：P3.2）
+                                                     └──► [17] Session Expiry 扩展：DISCONNECT 时更新 + 离线消息持久化（P3.1）
+                                                            └──► [18] 集群扩展（P3.7）
 ```
+
+> 实际 PR 顺序可能与依赖图略有差异，本图仅说明"技术上的依赖"而非"提交顺序"。编号映射见 §5.2 ~ §5.4。
 
 ### 5.2 P1 第一梯队（1-2 周）
 
@@ -351,13 +363,15 @@ MqttServerAioHandler.handler(packet)
 
 | 任务 | 标题 | 工作量 | 依赖 | 风险 |
 |---|---|---|---|---|
-| **P3.1** | Clean Start + 完整 Session Expiry Interval | 5 天 | P2.x | 高 |
-| **P3.2** | Receive Maximum（双向完整） | 3 天 | P1.7 + P3.1 | 中 |
-| **P3.3** | ✅ Maximum Packet Size 校验 | 已完成 | 无 | 低 |
-| **P3.4** | QoS2 完整 Reason Code（PUBACK/PUBREC/PUBREL/PUBCOMP） | 2 天 | P1.1 | 中 |
-| **P3.5** | Shared Subscription 负载均衡策略抽象 | 3 天 | 无 | 中 |
+| **P3.1** | Session Expiry Interval 扩展：DISCONNECT 时更新 + 离线消息（queued QoS1/2）持久化重投 | 5 天 | P2.8 | 高 |
+| **P3.2** | Receive Maximum（双向完整）：服务端上行 in-flight 计数 + 客户端反向 Receive Maximum 校验 | 3 天 | P1.7 | 中 |
+| **P3.3** | ✅ Maximum Packet Size 校验（仅 CONNECT 阶段） | 已完成 | 无 | 低 |
+| **P3.4** | QoS2 完整 Reason Code：业务侧按错误路径构造 PUBACK/PUBREC/PUBREL/PUBCOMP reasonCode（服务端侧的 NOT_AUTHORIZED 在 PR1.1 已部分实现） | 2 天 | P1.1 | 中 |
+| **P3.5** | Shared Subscription 负载均衡策略抽象：把 `TrieTopicManager.randomStrategy` 抽成 `ISubscribeDistributionStrategy` SPI，新增 RoundRobin / Pin 等策略 | 3 天 | 无 | 中 |
 | **P3.6** | TLS 1.3 + x509 属性提取 | 5 天 | 无 | 中 |
-| **P3.7** | 集群节点间 Session Expiry / Subscriptions 同步 | 1 周+ | P3.1 | 高 |
+| **P3.7** | 集群节点间 Session Expiry / Subscriptions 同步（与 [mqtt-server-cluster-storage.md] V3 持久化耦合） | 1 周+ | P2.8 + 集群 V3 | 高 |
+
+> **P3.1 与 P2.8 的边界**：P2.8（PR9）已落地的能力包括 CONNECT 时解析 Clean Start + Session Expiry Interval、SessionExpireScheduler 调度、`InMemoryMqttSessionManager` 持久化；P3.1 聚焦 spec 3.2.2.4 的"DISCONNECT 时更新 Session Expiry Interval"以及离线消息跨 session expiry 持久化重投（需 V3 存储配套）。
 
 ---
 
@@ -410,14 +424,26 @@ if (packetId != -1) {
 
 **关键 Reason Code 映射**：
 
-| 业务场景 | Reason Code | 值 |
-|---|---|---|
-| 发布权限拒绝 | `QUOTA_EXCEEDED` | 0x97 |
-| 主题无效 | `TOPIC_NAME_INVALID` | 0x90 |
-| 报文过大 | `PACKET_TOO_LARGE` | 0x95 |
-| 报文速率超限 | `PACKET_RATE_EXCEEDED` | 0x96 |
-| 客户端鉴权失败（订阅） | `NOT_AUTHORIZED` | 0x87 |
-| 订阅者接管 | `SESSION_TAKEN_OVER` | 0x8E |
+| 业务场景 | Reason Code | 值 | 适用报文（spec §4.x） | 服务端当前实现 |
+|---|---|---|---|---|
+| 发布权限拒绝（QoS1） | `NOT_AUTHORIZED` | 0x87 | PUBACK（4.7）/ PUBREC（4.7） | ✅ `MqttPublishHandler.sendPublishNotAuthorized` |
+| 主题无效（PUBLISH） | `TOPIC_NAME_INVALID` | 0x90 | PUBACK / PUBREC | ❌ 业务方按需构造 |
+| 报文过大（QoS1） | `PACKET_TOO_LARGE` | 0x95 | PUBACK / PUBREC / DISCONNECT | ❌ 业务方按需构造 |
+| 报文过大（QoS0 后台上报） | `QUOTA_EXCEEDED` | 0x97 | PUBACK / PUBREC / DISCONNECT | ❌ 业务方按需构造 |
+| 客户端鉴权失败（订阅） | `NOT_AUTHORIZED` | 0x87 | SUBACK（4.8） | ✅ `MqttSubscribeHandler` 已切换 |
+| 客户端鉴权失败（CONNECT） | `BAD_USER_NAME_OR_PASSWORD` / `NOT_AUTHORIZED` | 0x86 / 0x87 | CONNACK（4.4） | ✅（`IMqttServerAuthHandler` 失败路径） |
+| 服务端清场（重连） | `SESSION_TAKEN_OVER` | 0x8E | DISCONNECT（4.10） | ✅ `MqttConnectHandler` 互踢路径（t-io `KICK_EACH_OTHER` remark） |
+| 共享订阅拒绝 | `SHARED_SUBSCRIPTIONS_NOT_SUPPORTED` | 0x9E | SUBACK | ✅ PR11（`MqttSubscribeHandler.resolveCapabilityReasonCode`） |
+| 通配订阅拒绝 | `WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED` | 0xA2 | SUBACK | ✅ PR11 |
+| 订阅标识符拒绝 | `SUBSCRIPTION_IDENTIFIERS_NOT_SUPPORTED` | 0xA3 | SUBACK | ✅ PR11 |
+| 通用兜底 | `UNSPECIFIED_ERROR` | 0x80 | PUBACK / PUBREC / SUBACK / DISCONNECT | ❌ 业务方按需构造 |
+| 协议错误（解析失败） | `PROTOCOL_ERROR` / `MALFORMED_PACKET` | 0x82 / 0x81 | DISCONNECT | ❌ 业务方按需构造（P3.4 跟进） |
+
+> **注意 Reason Code 的"适用报文范围"**：
+> - `SESSION_TAKEN_OVER (0x8E)` 仅允许出现在 DISCONNECT 报文，不允许用在 SUBACK/PUBACK 等。
+> - `TOPIC_NAME_INVALID (0x90)` 仅允许出现在 PUBACK/PUBREC（PUBLISH 失败响应），SUBACK 用 `TOPIC_FILTER_INVALID (0x88)`。
+> - `QUOTA_EXCEEDED (0x97)` 可在 PUBACK/PUBREC 和 DISCONNECT 中使用。
+> - 完整 reason code 表见 [MqttPubAckReasonCode](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/codes/MqttPubAckReasonCode.java) / [MqttPubRecReasonCode](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/codes/MqttPubRecReasonCode.java) / [MqttSubAckReasonCode](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/codes/MqttSubAckReasonCode.java) / [MqttDisconnectReasonCode](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/codes/MqttDisconnectReasonCode.java) 等。
 
 **逐 Handler 影响**：
 
@@ -433,45 +459,63 @@ if (packetId != -1) {
 
 ### 6.2 CONNACK Properties 完善 + Server Keep Alive（P1.4 / P1.6）
 
-**现状**：[MqttConnectHandler#connAckByReturnCode 第 172-183 行](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L172-L183) 仅设置 `returnCode` + `sessionPresent`，未下发任何 5.0 能力位。
+> 本节为**历史设计决策记录**（PR8 ~ PR11 期间已落地），当前实现位于 [MqttConnectHandler#buildConnAckProperties](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L315-L353)。
 
-**改造点**：构建 `MqttConnAckProperties`：
+**实际实现要点**：
 
 ```java
-// MqttConnectHandler.java 新增私有方法
-private MqttConnAckProperties buildConnAckProperties(String clientId, String uniqueId) {
-    MqttServerConfig serverConfig = serverCreator.getServerConfig();
-    return new MqttConnAckProperties()
-        .setReceiveMaximum(serverConfig.getReceiveMaximum())     // P1.7
-        .setMaximumQos(MqttQoS.QOS2)                             // 服务端支持的最大 QoS
-        .setRetainAvailable(true)                                // 服务端支持保留消息
-        .setMaximumPacketSize(serverConfig.getMaxPacketSize())   // P3.3
-        .setAssignedClientIdentifier(StrUtil.isBlank(clientId) ? uniqueId : null) // P2.3
-        .setTopicAliasMaximum(serverConfig.getTopicAliasMax())   // P2.2
-        .setServerKeepAlive(serverConfig.getServerKeepAlive())   // P1.6
-        .setResponseInformation(responseInfo)                    // P2.9
-        .setWildcardSubscriptionAvailable(true)
-        .setSharedSubscriptionAvailable(true)                    // P3.5
-        .setSubscriptionIdentifierAvailable(true);               // P2.1
-}
-
-// connAckByReturnCode 改造
-private void connAckByReturnCode(String clientId, String uniqueId,
-                                  ChannelContext context, MqttConnectReasonCode returnCode) {
-    MqttConnAckMessage message = MqttConnAckMessage.builder()
-        .returnCode(returnCode)
-        .sessionPresent(false)
-        .properties(buildConnAckProperties(clientId, uniqueId).getProperties())   // 新增
-        .build();
-    Tio.send(context, message);
-    // ... 日志逻辑
+// MqttConnectHandler.java 当前签名（与 §1.2 重构后保持一致）
+private MqttConnAckProperties buildConnAckProperties(String uniqueId,
+                                                     MqttConnectReasonCode returnCode,
+                                                     int serverKeepAlive,
+                                                     boolean assignedClientId,
+                                                     boolean requestProblemInformation,
+                                                     boolean requestResponseInformation) {
+    // 1. 失败 CONNACK 只返回 ReasonString（避免把服务端能力位误宣告给未成功建立的连接）
+    if (!returnCode.isAccepted() && requestProblemInformation) {
+        return new MqttConnAckProperties().setReasonString(returnCode.toString());
+    }
+    MqttConnAckProperties connAckProperties = new MqttConnAckProperties();
+    if (!returnCode.isAccepted()) {
+        return connAckProperties;
+    }
+    MqttServerProperties properties = serverCreator.getMqttServerProperties();
+    connAckProperties
+        .setReceiveMaximum(properties.getReceiveMaximum())
+        .setMaximumQos(properties.getMaximumQos())
+        .setRetainAvailable(properties.isRetainAvailable())
+        // P3.3：服务端宣告值不能大于实际解码上限
+        .setMaximumPacketSize(Math.min(properties.getMaximumPacketSize(), serverCreator.getMaxBytesInMessage()))
+        .setTopicAliasMaximum(properties.getTopicAliasMaximum())
+        .setWildcardSubscriptionAvailable(properties.isWildcardSubscriptionAvailable())
+        .setSharedSubscriptionAvailable(properties.isSharedSubscriptionAvailable())
+        .setSubscriptionIdentifiersAvailable(properties.isSubscriptionIdentifierAvailable());
+    // P1.6：仅 serverKeepAlive > 0 才下发，避免污染 3.x 客户端
+    if (serverKeepAlive > 0) {
+        connAckProperties.setServerKeepAlive(serverKeepAlive);
+    }
+    // P2.3：仅在客户端没传 clientId 时回填
+    if (assignedClientId && StrUtil.isNotBlank(uniqueId)) {
+        connAckProperties.setAssignedClientIdentifier(uniqueId);
+    }
+    // P2.10：客户端显式请求 + 服务端配置非空 时才下发
+    if (requestResponseInformation) {
+        String responseInformation = properties.getResponseInformation();
+        if (StrUtil.isNotBlank(responseInformation)) {
+            connAckProperties.setResponseInformation(responseInformation);
+        }
+    }
+    return connAckProperties;
 }
 ```
 
-**Server Keep Alive**：[MqttConnectHandler#handle 第 123-129 行](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L123-L129) 已读取客户端 keepAlive 但未下发 Server Keep Alive 覆盖值。需：
-1. `MqttConnectVariableHeader.properties()` 读取 `SERVER_KEEP_ALIVE`（若存在，用它覆盖 `context.setHeartbeatTimeout`）
-2. CONNACK 中带 `serverKeepAliveSeconds` 让客户端知情
-3. 当前 `KEEP_ALIVE_UNIT = 2000L` 是个固定 ms 单位（不是 2 倍系数），Server Keep Alive 路径下需明确 `serverKeepAlive * 1000L` 还是 `serverKeepAlive * 2000L`，建议统一为 `* 1000L`，并加 javadoc 说明
+**关键边界条件**（与历史设计相比的差异）：
+
+1. **失败 CONNACK 简化**：未成功建立连接时（`!returnCode.isAccepted()`），仅在客户端请求 `Request Problem Information = 1` 时下发 `ReasonString`，不下发任何能力位（避免误导客户端）。
+2. **Server Keep Alive 条件下发**：仅当 `serverKeepAlive > 0` 时写入 `setServerKeepAlive`。`KEEP_ALIVE_UNIT = 2000L` 单位为 ms（即 1.5 倍 keepAlive 上限的容差），Server Keep Alive 字段下发的是**秒**值，与 keepAlive 单位保持一致。
+3. **Maximum Packet Size 取小**：`Math.min(properties.getMaximumPacketSize(), serverCreator.getMaxBytesInMessage())`——服务端宣告值不能超过 t-io 解码层的硬上限，否则客户端会按错误上限发送大包被丢弃。
+4. **Response Information 条件链**：客户端必须在 CONNECT 中声明 `Request Response Information = 1`，**且**服务端配置项非空时才下发；按 spec 3.2.2.3.16 严格顺序。
+5. **Assigned Client Identifier 仅在客户端空 clientId 时回填**：避免因 uniqueIdService 主动规范化覆盖客户端原值。
 
 ### 6.3 AUTH 报文 + 扩展认证（P2.7）
 
