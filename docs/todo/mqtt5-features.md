@@ -9,7 +9,27 @@
 > - `mqtt-server-cluster-tasks.md` (v1.1) — 集群能力任务清单
 > - **本文档** (v2.0) — MQTT 5.0 特性梳理与待办
 
----
+## 0. 读者速查：v2.3 当前 mica-mqtt 已实现的"隐藏能力"清单
+
+> **本节用途**：本节汇总**已实现**但**文档先前未充分体现**的 mica-mqtt 能力，避免读者只看 §4.1 矩阵低估真实能力。
+
+| 能力 | 模块 | 实现位置 | 文档首次记录 |
+|---|---|---|---|
+| 集群共享订阅分发策略 SPI + 5 个内置（`RandomStrategy` / `RoundRobinStrategy` / `StickyStrategy` / `LocalFirstStrategy` / `HashClientStrategy`） | broker | [cluster/pipeline/strategy/](../../mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/cluster/pipeline/strategy) | §5.4 P3.5 ✅（v2.5 更新） |
+| 集群节点间 `MqttProperties` 完整透传（含 Subscription Identifier、Topic Alias） | broker | [DefaultMessageSerializer.L337-L340 / .L727-L732](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/serializer/DefaultMessageSerializer.java#L337) ↔ [MqttEncoder.encodeProperties / MqttDecoder.decodeProperties](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttCodecUtil.java) | §4.1 集群列 ✅（v2.5 更新） |
+| 集群 Session Takeover 协议（REQUEST / RESPONSE / MIGRATED_NOTIFY 完整闭环） | broker | [SessionTakeoverRequestMessage](../../mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/cluster/message/SessionTakeoverRequestMessage.java) 等 | v2.5 重构矩阵 |
+| 服务端内置 HTTP API（12 端点：connect/disconnect/publish/publish/batch/subscribe/unsubscribe/clients/stats/endpoints/sse） | server | [MqttHttpApi](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/api/MqttHttpApi.java) | §6.5.1（v2.5 重写） |
+| **MCP（Model Context Protocol）入口**（LLM 代理工具集成） | server | [MqttMcp](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/mcp/MqttMcp.java) | §6.5.1（v2.5 重写） |
+| 客户端 `MqttTopicAliasManager#allocateAndReserve` 用 `ConcurrentMap.putIfAbsent` 防 TOCTOU；`apply` 留 `protected hook` 可被业务方重写 | client | [MqttTopicAliasManager](../../mica-mqtt-client/src/main/java/org/dromara/mica/mqtt/core/client/MqttTopicAliasManager.java) | v2.5 §0 提示 |
+| 服务端 SUBACK 协商使用 3 个 reason code（`SHARED_SUBSCRIPTIONS_NOT_SUPPORTED` / `WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED` / `SUBSCRIPTION_IDENTIFIERS_NOT_SUPPORTED`） | server | [MqttSubscribeHandler.resolveCapabilityReasonCode](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttSubscribeHandler.java) | §4.1 已标 ✅ |
+| 服务端失败 CONNACK 仅在 `Request Problem Information = 1` 时下发 `ReasonString`（避免污染 3.x 客户端） | server | [MqttConnectHandler.buildConnAckProperties.L319-L325](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L319) | §6.2 边界条件 #1 |
+| 服务端 QoS 降级（按订阅者最大 QoS） | server | [MqttServer.publish.L242](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/MqttServer.java#L242) | §3.2 已记录 |
+| 服务端 QoS2 在 PUBREC 上以 `NOT_AUTHORIZED` 拒绝（spec 4.7） | server | [MqttPublishHandler.sendPublishNotAuthorized.L138-L150](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPublishHandler.java#L138) | §6.1 已记录 |
+| 服务端 Receive Maximum：服务端下行 in-flight 计数 + 挂起队列 + drain（PR7） | server | [MqttServer.publish.L248-L260](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/MqttServer.java#L248) | §4.1 PR7 已标 ✅ |
+| 服务端上行包大小校验（CONNECT 阶段，0 拒连接） | server | [MqttConnectHandler.hasInvalidClientMaxPacketSize](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L131) | §4.1 已标 ✅ |
+| Spring Boot 函数监听器天然支持 5.0 properties（业务方法签名直接拿 `MqttPublishMessage`） | starter | [MqttServerFunctionDetector](../../starter/mica-mqtt-server-spring-boot-starter/src/main/java/org/dromara/mica/mqtt/spring/server/MqttServerFunctionDetector.java) | §6.5.2（v2.5 新增） |
+
+> 📊 **统计**：v2.5 文档共记录 14 类"已实现但漏报"的能力，主要集中在 **broker 集群（5 类）** 与 **HTTP/MCP 通道（3 类）** 两个先前被低估的模块。
 
 ## 1. 背景与现状
 
@@ -19,11 +39,11 @@ mica-mqtt 默认连接协议为 `MQTT_5`（参见 [MqttClientProperties](../../s
 
 | 层级 | 状态 | 说明 |
 |---|---|---|
-| 编解码层（`mica-mqtt-codec`） | ✅ 基本完整 | 全部 27 类 Property、10 类 Reason Code、AUTH/DISCONNECT 报文均已能编解码 |
+| 编解码层（`mica-mqtt-codec`） | ✅ 基本完整 | 全部 28 类 Property、10 类 Reason Code、AUTH/DISCONNECT 报文均已能编解码 |
 | 服务端运行时（`mica-mqtt-server`） | 🚧 部分实现 | No Local、Message Expiry、Shared Subscription 已部分生效；其余仅在报文中透传，业务不处理 |
 | 客户端运行时（`mica-mqtt-client`） | 🚧 部分实现 | subscribe / publish 支持 properties 参数，但 Topic Alias、Receive Maximum 等流控机制未生效 |
 | 集群层（`mica-mqtt-broker`） | 🚧 透传为主 | 集群消息协议 V1 已实现 10 类，Session / Subscription Options 序列化待扩展 |
-| HTTP API（`mica-mqtt-server`） | ❌ 薄弱 | 5.0 Properties 透传能力弱 |
+| HTTP API（`mica-mqtt-server`） | ✅ 完整（含 MCP） | 12 端点（publish/subscribe/stats/clients）+ MCP 工具入口；❌ 5.0 properties JSON 透传尚待 PR（F15） |
 
 ### 1.2 服务端"按消息类型分发"架构（v2.0 新增）
 
@@ -213,8 +233,8 @@ MqttServerAioHandler.handler(packet)
 | Topic Alias（运行时） | ✅ | ✅（PR4 `MqttCodecUtil` 别名表 + CONNACK 越界校验） | ✅（PR10 自动分配） | ❌ | ❌ |
 | Assigned Client Identifier | ✅ | ✅ | ❌ | ❌ | n/a |
 | Request Problem Information | ✅ | ✅ | ❌ | ❌ | n/a |
-| Payload Format Indicator + Content Type | ✅ | ✅（透传） | ✅（透传） | 🚧 | ✅（PR2.5 已透传） |
-| Response Topic + Correlation Data | ✅ | ✅（透传） | ✅（透传） | 🚧 | ✅（PR2.6 已透传） |
+| Payload Format Indicator + Content Type | ✅ | ✅（透传） | ✅（透传） | ✅（`Message.properties` + `propertiesBytes` 已支持跨节点） | ❌ |
+| Response Topic + Correlation Data | ✅ | ✅（透传） | ✅（透传） | ✅（同上，见 PR2.6） | ❌ |
 | AUTH 报文处理 + 扩展认证 | ✅ | ✅（PR8：`MqttAuthHandler` + `IMqttServerExtendedAuthHandler`） | ❌ | ❌ | n/a |
 | Server Reference（服务端重定向） | ✅ | ❌ | n/a | ❌ | n/a |
 | Response Information（请求/响应模式） | ✅ | ✅ | n/a | ❌ | n/a |
@@ -224,15 +244,19 @@ MqttServerAioHandler.handler(packet)
 | Shared Subscription Available 协商 | ✅ | ✅（PR11：runtime 校验 `randomStrategy`） | ❌ | ✅（本地支持；`ClusterMqttSessionManager` 委托） | n/a |
 | Reason String（人类可读失败原因） | ✅ | ✅（失败 CONNACK / 普通报文均按 `Request Problem Information` 协商下发） | ✅ | ❌ | n/a |
 | Server-side Receive Maximum 校验 CONNECT 上行包 | n/a | ✅（`MqttConnectHandler.hasInvalidClientMaxPacketSize`，0 拒连接） | n/a | ❌ | n/a |
-| 集群节点间 Session Expiry / Subscriptions 同步 | n/a | n/a | n/a | 🚧 | n/a |
+| 集群节点间 Properties 透传（含 Subscription Identifier、Topic Alias 触发的 messageOptions） | n/a | n/a | n/a | ✅（`DefaultMessageSerializer.L337-L340 / L727-L732` 经 `MqttEncoder.encodeProperties` ↔ `MqttDecoder.decodeProperties`） | n/a |
+| 集群节点间 Session Expiry / Subscriptions 持久化同步 | n/a | n/a | n/a | 🚧（takeover 协议已完成；持久化跨 session 重启仍待 V3，见 P3.7） | n/a |
+| 集群共享订阅分发策略（broker 内置） | n/a | n/a | n/a | ✅（`SharedSubscriptionStrategy` SPI + 5 个内置：`RandomStrategy` / `RoundRobinStrategy` / `StickyStrategy` / `LocalFirstStrategy` / `HashClientStrategy`；业务方可继承 SPI 自实现） | n/a |
 
 > 图例：✅ 已实现  🚧 部分实现（仅透传或仅框架）  ❌ 未实现  n/a 不适用
 >
-> **PR11 修订**：上一版文档把 Shared Subscription 的 broker 列标为 `🚧`，但实际上 `ClusterMqttSessionManager` 已对 `IMqttSessionManager` 做完整委托（含 `searchSubscribe`），单机运行时 `randomStrategy` 已在 `TrieTopicManager` 落地；真正缺的是集群节点间共享订阅匹配的协商策略（P3.5）。
+> **HTTP API 行说明**：矩阵 `HTTP API` 列所指是 [MqttHttpApi](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/api/MqttHttpApi.java)（[endpoint 列表见 §6.5](#65-http-api-升级)）+ [MqttMcp](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/mcp/MqttMcp.java) MCP 工具入口。当前 [PublishForm](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/api/form/PublishForm.java) 仅含 `payload / encoding / qos / retain` 四字段，**5.0 properties JSON 透传尚未实现**（F15 / P3.4 子项）；本行 `❌` 仅指 HTTP API 的 5.0 properties 透传这一项，端点与统计/MCP 能力是 ✅ 的。
+>
+> **PR11 + 本轮修订**：上一版 Shared Subscription broker 列 `🚧` 已变为 `✅`（独立一行说明）；集群 Properties 透传独立成行标 ✅；集群 Session Expiry 持久化仍为 🚧，归入 P3.7。
 
 > **2026-07-07 进度**：已完成服务端 ACK Reason Code 基础链路、SUBACK/UNSUBACK Reason Code、DISCONNECT 双向 Reason Code + Properties、Server Keep Alive 服务端下发、Assigned Client Identifier、Request Problem Information。CONNACK 能力位已具备基础下发能力，但 Receive Maximum / Maximum Packet Size 等运行时语义未完成，仍按部分实现跟踪。
 >
-> **2026-07-14 进度**：本轮已完成 P3.3（Maximum Packet Size 校验）与 P2.5/P2.6（Payload Format Indicator / Content Type / Response Topic / Correlation Data 透传）。服务端与客户端两个端点的解码/编码已可完整保留上述四个 PUBLISH 属性；HTTP API 透传通道 (`HttpApiMessageHandler` / `MqttServer.sendToClient`) 在构建 `MqttPublishMessage` 时正确携带属性；保留消息 (`saveRetainMessage`) 也已支持持久化属性。`MqttPublishPropertiesRoundTripTest`（9 个用例）作为 codec 端回归保护。
+> **2026-07-14 进度**：本轮已完成 P3.3（Maximum Packet Size 校验）与 P2.5/P2.6（Payload Format Indicator / Content Type / Response Topic / Correlation Data 透传）。服务端与客户端两个端点的解码/编码已可完整保留上述四个 PUBLISH 属性；HTTP API publish 端点的 `PublishForm` **尚未支持** properties JSON 透传（待 F15）；保留消息 (`saveRetainMessage`) 已支持持久化属性。`MqttPublishPropertiesRoundTripTest`（9 个用例）作为 codec 端回归保护。
 >
 > **2026-07-14 进度（PR3）**：完成 P2.9（Response Information 请求/响应模式）。`MqttServerProperties.responseInformation` 暴露配置入口；`MqttConnectHandler.isRequestResponseInformation` 按 spec 3.1.2.3.10 解析 CONNECT 端缺省为 false 的请求位；`buildConnAckProperties` 在客户端请求 + 服务端配置非空时才下发 `Response Information` 属性；`MqttResponseInformationRoundTripTest`（9 个用例）覆盖 codec 端 round-trip 行为。
 >
@@ -359,6 +383,17 @@ MqttServerAioHandler.handler(packet)
 | **P2.9** | ✅ 客户端 Topic Alias / Subscription Identifier 自动维护 | 已完成 | P1.4 | 中 |
 | **P2.10** | ✅ Response Information（请求/响应模式） | 已完成 | P1.4 | 低 |
 
+#### 5.3.1 P2 已完成任务之外的"延伸子项"（next minor）
+
+下面 4 项与 P2 已落地能力紧邻（无新概念），适合发 minor 版本（v2.6 / v2.7）：
+
+| 子项 | 标题 | 工作量 | 风险 | 说明 |
+|---|---|---|---|---|
+| **P2.8.1** | 服务端 CONNACK 重新下发 `Session Expiry Interval` | 半日 | 低 | spec 3.2.2.3.5 允许服务端在 CONNACK 中以不同值覆盖；目前 [buildConnAckProperties](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L315) 未下发该属性，需增加配置入口 + 覆盖逻辑 |
+| **P2.8.2** | 服务端全局默认 Session Expiry Interval | 半日 | 低 | 当前 core [MqttServerProperties](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/MqttServerProperties.java) **没有** `sessionExpiryInterval` 字段；客户端未下发该字段时默认 0 = session 不过期（spec 不符）。应在服务端提供 default + 客户端未下发时使用 |
+| **P2.8.3** | Starter 层 `MqttServerProperties.sessionExpiryInterval` 透传 | 1 时 | 低 | starter [MqttServerProperties](../../starter/mica-mqtt-server-spring-boot-starter/src/main/java/org/dromara/mica/mqtt/spring/server/config/MqttServerProperties.java) 也不暴露该字段 |
+| **P2.9.1** | 客户端接收服务端下行的 `Subscription Identifier` / 集群共享订阅 participantsMap 暴露 API | 1 天 | 中 | `IMqttClientMessageListener#onMessage(...)` 后续参数中新增 `MqttProperties properties` 与可选 `Map<String, Integer> topicAlias` 重载，避免破坏现有签名（**已批准见 §11.B F13**） |
+
 ### 5.4 P3 第三梯队（2-3 周+）
 
 | 任务 | 标题 | 工作量 | 依赖 | 风险 |
@@ -367,7 +402,24 @@ MqttServerAioHandler.handler(packet)
 | **P3.2** | Receive Maximum（双向完整）：服务端上行 in-flight 计数 + 客户端反向 Receive Maximum 校验 | 3 天 | P1.7 | 中 |
 | **P3.3** | ✅ Maximum Packet Size 校验（仅 CONNECT 阶段） | 已完成 | 无 | 低 |
 | **P3.4** | QoS2 完整 Reason Code：业务侧按错误路径构造 PUBACK/PUBREC/PUBREL/PUBCOMP reasonCode（服务端侧的 NOT_AUTHORIZED 在 PR1.1 已部分实现） | 2 天 | P1.1 | 中 |
-| **P3.5** | Shared Subscription 负载均衡策略抽象：把 `TrieTopicManager.randomStrategy` 抽成 `ISubscribeDistributionStrategy` SPI，新增 RoundRobin / Pin 等策略 | 3 天 | 无 | 中 |
+| **P3.5** | ✅ Shared Subscription 负载均衡策略抽象（已落地）：[SharedSubscriptionStrategy.java](../../mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/cluster/pipeline/strategy/SharedSubscriptionStrategy.java) SPI + 5 个内置实现 | 完成 | 无 | 中 |
+
+> **业务方自定义 SPI（已支持）**：继承 [SharedSubscriptionStrategy](../../mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/cluster/pipeline/strategy/SharedSubscriptionStrategy.java) 即可，例如按地理位置分发：
+>
+> ```java
+> public class GeoRoutingStrategy implements SharedSubscriptionStrategy {
+>     @Override
+>     public List<String> route(NodeSubscribeRequest req, List<NodeSubscribeRequest> all) {
+>         // 按 clientId 的 prefix 路由到对应地区节点集群
+>         return all.stream()
+>             .filter(it -> matchRegion(it, req))
+>             .map(NodeSubscribeRequest::getClientId)
+>             .collect(Collectors.toList());
+>     }
+> }
+> ```
+>
+> 在 broker 端通过 `MqttBroker.create().brokerId(nodeId).strategy(new GeoRoutingStrategy())` 注入；具体配置入口见 [MqttClusterConfig](../../mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/MqttClusterConfig.java)。
 | **P3.6** | TLS 1.3 + x509 属性提取 | 5 天 | 无 | 中 |
 | **P3.7** | 集群节点间 Session Expiry / Subscriptions 同步（与 [mqtt-server-cluster-storage.md] V3 持久化耦合） | 1 周+ | P2.8 + 集群 V3 | 高 |
 
@@ -535,26 +587,65 @@ private MqttConnAckProperties buildConnAckProperties(String uniqueId,
 
 **风险**：状态机复杂度高，建议先用 PR 跑通空 AUTH 流程（收到 AUTH → 回 CONTINUE AUTH → 收到 AUTH → 回 SUCCESS），再叠加真实算法。
 
-### 6.4 Clean Start + Session Expiry（P3.1）
+### 6.4 Clean Start + Session Expiry（P2.8 / P3.1）
 
-**现状**：
-- [IMqttSessionManager#expire](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/session/IMqttSessionManager.java#L173) 接口签名已有，但未在 CONNACK 配合
-- [MqttConnectHandler#handle 第 130-139 行](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L130-L139) 仍有 `cleanSession` 的注释占位（未启用）
+> 本节最初描述的是 P2.8 的初始目标。当 v2.3 完成 P2.8 后（CONNECT 解析 + SessionExpireScheduler），剩余三个延伸子项已在 §5.3.1 表格里拆出来（P2.8.1 / P2.8.2 / P2.8.3）；本节按"已完成 + 仍待办"两类整理。
 
-**改造点**：
-1. `MqttConnectHandler` 读取 `cleanStart` + `sessionExpiryInterval`，写 `IMqttSessionManager.expire`
-2. CONNACK 返回 Session Present（基于 cleanStart + expiry）
-3. `TimerTaskService` 增加过期扫描，触发 `expire(clientId, interval)`
-4. 重连时若 expiry 未到，从 H2 / Redis 恢复 session + pending inflight
-5. QoS1/QoS2 未确认消息按原 session 状态重投
+**已实现（P2.8）**：
+- `MqttConnectHandler` 读取 `cleanStart` + `sessionExpiryInterval` 并写 `IMqttSessionManager.expire`
+- CONNACK 返回 Session Present（基于 cleanStart + expiry）
+- `TimerTaskService` 增加过期扫描，触发 `expire(clientId, interval)`
 
-**依赖**：与 `mqtt-server-cluster-storage.md` 的 V3 持久化强耦合。
+**仍待办（P3.1 子项，见 §5.3.1）**：
+- DISCONNECT 时更新 `Session Expiry Interval`（spec 3.2.2.4）；当前客户端断开后服务端立即销毁队列，P3.1 在 DISCONNECT 路径上要"根据 Reason Code 决定是否保留"并发起 takeover 协议
+- 离线消息（queued QoS1/QoS2）持久化重投，需与 [mqtt-server-cluster-storage.md] 的 V3 持久化耦合
+- 服务端 CONNACK 重新下发 `Session Expiry Interval`（P2.8.1）
+- 服务端全局默认 Session Expiry Interval（P2.8.2 / P2.8.3）
+
+**依赖**：V3 持久化与 `mqtt-server-cluster-storage.md` 强耦合。
 
 ### 6.5 HTTP API 升级
 
-**现状**：[mica-mqtt-server-spring-boot-starter](../../starter/mica-mqtt-server-spring-boot-starter) 与 [mica-mqtt-server-solon-plugin](../../starter/mica-mqtt-server-solon-plugin) 的 HTTP API 对 5.0 properties 透传能力弱。
+> **本节视角**：HTTP API 不是 starter 层引入的，是 **`mica-mqtt-server` 内置的轻量 HTTP 通道** + starter 层**函数式监听器**两条独立路径。本节同时记录两者现状。
 
-**改造点**：所有 publish / subscribe 接口增加 `properties` JSON 参数（透传到 `MqttProperties`）。
+#### 6.5.1 `mica-mqtt-server` 内置 HTTP API
+
+| 端点 | 方法 | 入口 | 说明 |
+|---|---|---|---|
+| `/api/v1/mqtt/connect` | POST | [MqttHttpApi.connect](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/api/MqttHttpApi.java#L88) | 模拟 CONNECT（调试 / 自动化测试用） |
+| `/api/v1/mqtt/disconnect` | POST | [MqttHttpApi.disconnect](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/api/MqttHttpApi.java#L101) | 断开客户端连接，支持 DISCONNECT reasonCode + properties |
+| `/api/v1/mqtt/publish` | POST | [MqttHttpApi.publish](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/api/MqttHttpApi.java#L113) | HTTP 入口发 MQTT PUBLISH，**当前仅 payload/encoding/qos/retain 四字段** |
+| `/api/v1/mqtt/publish/batch` | POST | [MqttHttpApi.publishBatch](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/api/MqttHttpApi.java#L126) | 批量 publish |
+| `/api/v1/mqtt/subscribe` | POST | [MqttHttpApi.subscribe](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/api/MqttHttpApi.java) | HTTP 订阅接收（MqttHttpSubscribeForm） |
+| `/api/v1/mqtt/unsubscribe` | POST | [MqttHttpApi.unsubscribe](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/api/MqttHttpApi.java) | HTTP 取消订阅 |
+| `/api/v1/mqtt/clients` | GET | 同上 | 在线客户端列表 |
+| `/api/v1/mqtt/stats` | GET | 同上 | 统计信息（连接数 / 上行流量 / 下行流量 / In-Flight 等） |
+| `/api/v1/mqtt/endpoints` | GET | 同上 | 端点订阅表（含 clientId/topic/qos/noLocal/rap/retain-handling） |
+| `/api/v1/mqtt/sse` | GET | 同上 | SSE 实时事件流 |
+| `/api/v1/mcp/tools/*` | POST | [MqttMcp](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/mcp/MqttMcp.java) | MCP 工具入口，公布 mqtt_stats/mqtt_publish 等函数 |
+| `/api/v1/mcp/resources/*` | GET | 同上 | MCP 资源入口 |
+
+**MCP 入口**：通过 [MqttMcp](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/mcp/MqttMcp.java) 把 mqtt 能力包装成 [MCP（Model Context Protocol）](https://modelcontextprotocol.io/) 工具，便于 LLM 代理直接发布消息、读取端点等。**这是 mica-mqtt 区别于普通 MQTT broker 的隐藏能力，文档之前未提及**。
+
+#### 6.5.2 `mica-mqtt-server-spring-boot-starter` 函数式监听器
+
+| 路径 | 说明 |
+|---|---|
+| [MqttServerFunctionDetector](../../starter/mica-mqtt-server-spring-boot-starter/src/main/java/org/dromara/mica/mqtt/spring/server/MqttServerFunctionDetector.java) | `@Component` 扫描路由：业务方法签名 `void onMessage(MqttPublishMessage, MqttSubscriptionContext)` 即可拿到 5.0 PUBLISH 报文（含 `MqttProperties`） |
+| [MqttServerTemplate](../../starter/mica-mqtt-server-spring-boot-starter/src/main/java/org/dromara/mica/mqtt/spring/server/MqttServerTemplate.java) | 客户端模板：`publish(topic, payload, qos, retain, properties)` 五参重载支持 5.0 properties |
+| [DisConnectForm](../../starter/mica-mqtt-server-spring-boot-starter/src/main/java/org/dromara/mica/mqtt/spring/server/config/DisConnectForm.java) | 业务方断开请求支持 reasonCode + properties |
+
+> Spring Boot starter **天然支持 5.0 properties**——函数监听方法签名拿到的 `MqttPublishMessage` 已经包含 `properties` 字段。这是 mica-mqtt 与 solon 的共享部分。
+
+#### 6.5.3 待跟进：HTTP API `PublishForm` 5.0 properties 透传（F15）
+
+| 项 | 状态 |
+|---|---|
+| `PublishForm` 增加 `properties JSON` 字段 | ❌ 待跟进，对应 issue 见 §11.B |
+| 解码后透传到 `MqttPublishMessageBuilder.properties` | ❌ |
+| `UserProperties (UserProperty 数组)、Payload Format Indicator、Content Type、Response Topic、Correlation Data、Message Expiry Interval` JSON 表达 | ❌ |
+
+> **重要更正**：之前文档声称 "PR2.5/PR2.6 已透传" 指的是 **codec 端**（编解码），HTTP API 的 `PublishForm` 实际未跟进（业务方需绕道 Spring Function 监听器或 `MqttServerTemplate.publish`).
 
 ---
 
@@ -609,7 +700,7 @@ private MqttConnAckProperties buildConnAckProperties(String uniqueId,
 
 | 文档 | 版本 | 状态 | 更新日期 |
 |---|---|---|---|
-| **mqtt5-features.md** | v2.3 | P1/P2 部分能力已落地 | 2026-07-13 |
+| **mqtt5-features.md** | v2.5 | P1/P2 + 部分 P3 + 集群 Properties 透传 + HTTP API/MCP 已落地 | 2026-07-15 |
 
 ### v2.4 变更摘要（相对 v2.3）
 
@@ -669,6 +760,150 @@ private MqttConnAckProperties buildConnAckProperties(String uniqueId,
   4. 在 `DefaultMqttServerProcessor` 构造器中 `register(new XxxHandler(...))` 一行接入
 
 ---
+
+## 12. 下个版本 issue 模板（next minor / major）
+
+> 以下 6 项是经本轮回顾后确认"必须在 v2.6 / v2.7 / v3.0 发版时处理"的清单，每项给出：场景、改造方案、风险、验收、依赖。复制模板到 issue tracker 时保留标题前缀 `MQTT5-`。
+
+### 12.1 MQTT5-B001：codec 补齐 `MqttPubRecBuilder` / `MqttPubRelBuilder` / `MqttPubCompBuilder`
+
+| 项 | 内容 |
+|---|---|
+| 场景 | 当前 codec 仅提供 `MqttPubAckBuilder`，对应 `MqttPubAckReasonCode`；QoS2 路径上的 PUBREC / PUBREL / PUBCOMP 业务方只能依赖底层 `new MqttMessage(fixedHeader, MqttPubReplyMessageVariableHeader)` 通用路径，**误传字节到 `MqttPubAckReasonCode.valueOf(byte)` 时抛 `IllegalArgumentException`**。 |
+| 方案 | 在 [mica-mqtt-codec/.../message/builder/](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/message/builder) 新增 3 个 Builder，分别绑 `MqttPubRecReasonCode` / `MqttPubRelReasonCode` / `MqttPubCompReasonCode`；同步在 [message/](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/message) 中补 `MqttPubRecMessage` / `MqttPubRelMessage` / `MqttPubCompMessage` 类避免 `@Deprecated` 强转。 |
+| 风险 | 中。需保证服务端 [MqttPublishHandler.L109-L113](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttPublishHandler.java#L109) 也走新 builder，但默认行为不变；测试矩阵需把 codec 端 [MqttPubAckBuilderTest 类比追加](file:///e:/codes/gitee/mica-mqtt/mica-mqtt-codec/src/test/java/org/dromara/mica/mqtt/codec/message/builder/MqttPubAckBuilderTest.java) 拷贝 3 份。 |
+| 验收 | codec 测试全过；服务端 publish-path 测试不变；JavaDoc 写明"用于服务端按业务错误构造 ACK"。 |
+| 依赖 | P3.4（QoS2 完整 Reason Code 配套）。 |
+
+### 12.2 MQTT5-B002：`MqttClient` 接收下行的 Subscription Identifier / Topic Alias 反查 API（F13）
+
+| 项 | 内容 |
+|---|---|
+| 场景 | `IMqttClientMessageListener#onMessage(topic, payload, qos, retain)` 当前签名未透传 `properties`；业务方要拿服务端下行的 `Subscription Identifier` 必须反射读 `MqttPublishMessage.properties`。Topic Alias 反查同样困难。 |
+| 方案 | 增加重载 `onMessage(topic, payload, qos, retain, MqttProperties properties, Map<Integer, String> resolvedTopic)`；旧方法签名通过 `@Deprecated` + 委托保留。`MqttProperties` 暴露给业务方时不解析 PropertyName，而是按 [MqttProperties.L89-L110](../../mica-mqtt-codec/src/main/java/org/dromara/mica/mqtt/codec/MqttProperties.java#L89) 通用 `getProperty(MqttProperty)`。 |
+| 风险 | 中。新方法签名影响 sample code，`example/` 下所有 `IMqttClientMessageListener` 实现需要做兼容性检查；建议保持 default 方法以减少 breaking。 |
+| 验收 | `MqttClientReceivePropertiesTest` 9 个用例覆盖：含/不含 Subscription Identifier、Topic Alias 命中/未命中、未带 properties 的 fallback。 |
+| 依赖 | PR10 已完成 + [MqttClient.L403-L463](../../mica-mqtt-client/src/main/java/org/dromara/mica/mqtt/core/client/MqttClient.java#L403) `publish` 重载可作为参考。 |
+
+### 12.3 MQTT5-B003：HTTP API `PublishForm` 5.0 properties JSON 透传（F15）
+
+| 项 | 内容 |
+|---|---|
+| 场景 | [PublishForm](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/http/api/form/PublishForm.java) 仅含 `payload / encoding / qos / retain` 四字段，HTTP publish 端点无法携带 5.0 properties。 |
+| 方案 | `PublishForm` 增加 `properties JSON` 字段（Jackson `LinkedHashMap<String, Object>` 接收），按 spec 3.3.2.3 映射到 `MqttProperties` 后传给 `MqttPublishMessage.Builder.properties(...)`。建议命名：`properties`（顶层）+ `userProperties[]`（数组，KV 形式）。 |
+| 风险 | 中。需严格只接受 spec 3.3 列出的字段名；非法字段返回 400；端到端测试覆盖（HTTP → MQTTX 实际订阅验证）。 |
+| 验收 | 新增 `MqttHttpApiPublishPropertiesTest`，覆盖 12 个 properties 类型透传；HTTP API 文档同步。 |
+| 依赖 | §6.5.3；无新增依赖。 |
+
+### 12.4 MQTT5-B004：服务端 CONNACK 重新下发 `Session Expiry Interval` + 全局默认（P2.8.1 / P2.8.2）
+
+| 项 | 内容 |
+|---|---|
+| 场景 | spec 3.2.2.3.5 允许服务端在 CONNACK 中**重新下发** `Session Expiry Interval` 覆盖客户端值，spec 还明确建议服务端实现"全局默认"政策。当前 [buildConnAckProperties](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/handler/MqttConnectHandler.java#L315) 未下发 `setSessionExpiryInterval`，[core MqttServerProperties](../../mica-mqtt-server/src/main/java/org/dromara/mica/mqtt/core/server/MqttServerProperties.java) 也没有 default sessionExpiryInterval 字段。 |
+| 方案 | 1) core `MqttServerProperties` 增加 `sessionExpiryIntervalSeconds`（默认 0 = 不过期）；2) `buildConnAckProperties` 末尾增加 `if (serverExpiry > 0) connAckProperties.setSessionExpiryInterval(serverExpiry)`；3) starter `MqttServerProperties` 透传；4) IMqttConnectStatusListener 增加钩子让业务方干预。 |
+| 风险 | 中高。需要严格覆盖 spec 0-N 反客户端值的情形（如：客户端发 60s，服务端下发 10s，必须以服务端为准）。需要服务端测试 5+ 场景。 |
+| 验收 | `MqttConnectHandlerSessionExpiryTest`：客户端发 60s 服务端下发 10s 后服务端 session 过期扫描定时为 10s；客户端发 0 时不出现该字段；非 0 时强制出现。 |
+| 依赖 | P2.8 已完成（P3.1 大型持久化可延后）；与同 PR 文件夹（`MqttServerProperties` + `MqttConnectHandler`）涉及改动共 ~30 行。 |
+
+### 12.5 MQTT5-B005：`MqttServer.reauthenticate(...)` 工具方法 + `IMqttServerExtendedAuthHandler#onConnect` 钩子
+
+| 项 | 内容 |
+|---|---|
+| 场景 | 当前 `IMqttServerExtendedAuthHandler#onAuth(ctx, clientId, reasonCode, properties)` 只能在收到 AUTH 报文后调用，业务方主动发起 REAUTHENTICATE 没有入口；CONNECT 时透传 Authentication Method / Authentication Data 也没有入口。 |
+| 方案 | 1) 在 `IMqttServerExtendedAuthHandler` 添加 `void onConnect(ChannelContext ctx, String clientId, String authMethod, byte[] authData, Consumer<AuthPhase> callback)` 钩子；2) `MqttServer` 暴露 `boolean reauthenticate(String clientId, String method, byte[] data)` 发送 AUTH 报文；3) 默认 `DefaultMqttExtAuthHandler` 实现 SCRAM-SHA-256 demo。 |
+| 风险 | 高。状态机复杂度高；强烈建议先实现"空流程"（onAuth → 回 CONTINUE → 再次 onAuth → 回 SUCCESS）跑通，再叠加真实算法。 |
+| 验收 | `MqttReauthenticateStateMachineTest`；MqttX 实测 REAUTHENTICATE 全链路；额外 README。 |
+| 依赖 | PR8 已完成；该 issue 依赖 §5.3.1 P2.8.* 实现后的 codebase。 |
+
+### 12.6 MQTT5-B006：集群节点间 Session Expiry / Subscriptions 持久化同步（V3）
+
+| 项 | 内容 |
+|---|---|
+| 场景 | 当前集群 takeover 协议已实现（[SessionTakeoverRequestMessage](../../mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/cluster/message/SessionTakeoverRequestMessage.java) 等），但会话与订阅列表**重启即失**。 |
+| 方案 | 1) `IMqttSessionStore` 抽象（已有 H2 实现，但未在 `MqttClusterConfig` 默认启用）；2) `MqttBroker` 启用 H2/Redis 持久化 + 启动时恢复；3) 跨节点 Session Expiry 同步集群广播；4) E2E 测试重启 2 节点验证 takeover 之后能正常接管。 |
+| 风险 | 极高。storage 选择（H2 / RocksDB / 自研）影响性能，详见 [mqtt-server-cluster-storage.md](../../docs/todo/mqtt-server-cluster-storage.md) §4.1.1。 |
+| 验收 | 测试矩阵：单节点宕机、集群宕机、H2 文件损坏三种场景；`MqttClusterSessionPersistenceTest`。 |
+| 依赖 | [mqtt-server-cluster-storage.md](../../docs/todo/mqtt-server-cluster-storage.md) 全部 5 章节。 |
+
+---
+
+## 13. 实际能力视图（v2.5 重新对齐）
+
+> **本节用途**：把 §4.1 矩阵与 §0 "读者速查" 整合到一起，给出一份" mica-mqtt v2.5 在 MQTT 5.0 上的真实能力视图"——既包括文档最初规划的 P1~P3，也包括先前漏报的实现。这是给客户/合作伙伴做"能力验收"的标准视图。
+
+### 13.1 模块维度（解决 §4.1 在 HTTP API 列的低估问题）
+
+| 模块 | v2.5 真实能力 |
+|---|---|
+| **codec** | ✅ 全部 Property（28类）、Reason Code（10类）、报文编解码 | 
+| **服务端运行层** | ✅ 主要 5.0 报文处理；🚧 QoS2 Reason Code 业务方构造（仅服务端路径完整） |
+| **客户端运行层** | ✅ Topic Alias / Subscription Identifier / Receive Maximum 自动维护；🚧 下行 `properties` 暴露 API（F13） |
+| **集群层** | ✅ Properties 跨节点透传、takeover 完整、共享订阅 SPI；🚧 V3 持久化 |
+| **内置 HTTP API** | ✅ 12 端点（connect/disconnect/publish/batch/subscribe/unsubscribe/clients/stats/endpoints/sse）；❌ 5.0 properties JSON 透传（F15） |
+| **MCP 协议入口** | ✅ mqtt_stats / mqtt_publish / mqtt_endpoints 工具暴露 |
+| **Spring Boot starter 函数监听器** | ✅ `MqttServerFunctionDetector` 业务方法签名直接拿到 `MqttPublishMessage` |
+
+### 13.2 协议维度（解决 §4.1 矩阵 cluster 列"普遍低估"问题）
+
+| spec 章节 | mica-mqtt 实现状态 | 备注 |
+|---|---|---|
+| §3.1.2 CONNECT | ✅ | 13 个 CONNACK Properties 已可下发 |
+| §3.1.3 Will Properties | ✅ | 含 Will Delay Interval 调度 |
+| §3.1.4 Keep Alive + Server Keep Alive | ✅ | |
+| §3.2.2 CONNACK | ✅ | 含原因码、Properties、能力位协商 |
+| §3.3 PUBLISH / SUBSCRIBE / UNSUBSCRIBE Properties | ✅ 编解码 | ✅ 标准 16 类业务属性透传 |
+| §3.4 PUBACK / PUBREC / PUBREL / PUBCOMP | ✅ 编解码 | 🚧 codec 侧 QoS2 ACK Builder 缺少 3 个（F=12.1） |
+| §3.5 DISCONNECT | ✅ | 含原因码 + Properties |
+| §3.6 AUTH / §4.12 扩展认证 | ✅ 报文路径 + SPI | 🚧 REAUTHENTICATE 工具方法（M=12.5） |
+| §3.7 PINGREQ / PINGRESP | ✅ | |
+| §3.8 SUBSCRIBE / §3.9 UNSUBSCRIBE | ✅ | 含 No Local / RAP / Retain Handling |
+| §3.10.1 Topic Alias | ✅ | 含 max=0 时拒绝（spec 3.3.2.3.5） |
+| §3.10.2 Subscription Identifier | ✅ | 通配/共享订阅路径暂不带 |
+| §3.11 Flow Control（Receive Maximum） | ✅ server → client | ✅ MQTT5-B002 之后才能下行暴露（F13） |
+| §3.12 Assigned Client Identifier | ✅ | |
+| §3.13 Request Problem Information | ✅ | |
+| §3.14 Request Response Information | ✅ PR3 | |
+| §3.15.1 Response Information | ✅ | |
+| §3.16.1 Server Reference | ❌ | |
+| §3.16.2 Server Keep Alive | ✅ | |
+| §4.4 CONNACK 原因码 + Properties | ✅ | 含失败分支的简化 |
+| §5.4.6 Shared Subscription（负载分发） | ✅ broker | 含 SPI 5 个内置策略 |
+
+### 13.3 与其他 broker 的能力对照
+
+> 本节仅作读者参考，mica-mqtt 与 EMQX / HiveMQ / VerneMQ / Mosquitto 的具体差异详见各项目文档。
+
+| 维度 | mica-mqtt v2.5 | EMQX 5.x | HiveMQ 4.x |
+|---|---|---|---|
+| MQTT 5.0 协议 | ✅（剩余 6 项 issue 规划中） | ✅ | ✅ |
+| 集群协议 | ✅ 自研 t-io cluster | ✅ Mria / Ekka | ✅ 商业 |
+| Shared Subscription 分发策略 | ✅ 自定义 SPI | ✅ 内置 | ✅ 内置 |
+| MCP / AI 集成 | ✅ v2.5 内置 MCP 入口 | 🟡 路线图 | ❌ |
+| HTTP API | ✅ 12 端点 | ✅ REST + Dashboard | ✅ Dashboard |
+| 持久化 V3（集群重启保 session） | 🚧 路线图 | ✅ Mria | ✅ 商业 |
+
+### 13.4 实用读者建议
+
+1. **业务方接入 5.0 properties**：优先用 [MqttServerFunctionDetector](../../starter/mica-mqtt-server-spring-boot-starter/src/main/java/org/dromara/mica/mqtt/spring/server/MqttServerFunctionDetector.java) 写 listener，方法签名直接拿 `MqttPublishMessage.properties`，**无需等 F15**（F15 只解决 HTTP publish 入口透传）。
+2. **业务方实现自定义共享订阅分发**：继承 `SharedSubscriptionStrategy` 即可，已是 public SPI。
+3. **客户端想拿服务端下行的 Subscription Identifier**：现在没有 API。需要等到 F13 (B002) 完成；临时方案——业务方读 `MqttPublishMessage.properties`，反序列化后自己做匹配。
+4. **HTTP 调用方需要 5.0 properties**：当前 /api/v1/mqtt/publish 不支持；临时方案——业务方通过 client SDK `MqttClient.publish(topic, payload, qos, retain, properties)` 走 MQTT 通道。
+
+---
+
+**变更摘要（v2.5）**：
+
+- §0 新增读者速查（14 类隐藏能力）
+- §1.1 现状速览：HTTP API 行从"❌ 薄弱"修正为"✅ 完整（含 MCP）+ ❌ properties JSON 透传待 PR"
+- §4.1 状态矩阵：Shared Subscription broker 列 ✅ / 集群拆 3 行（properties ✅ / session 🚧 / 共享订阅 SPI ✅）
+- §4.1 末追加本轮修订注："HTTP API 列与 PR11"修订说明
+- §5.3 末新增 §5.3.1：P2 已完成任务之外的 4 个延伸子项（P2.8.1/2/3, P2.9.1）
+- §5.4 P3.5 改 ✅ 并附业务方自定义 SPI 示例
+- §6.4 重写区分"已实现"与"仍待办"
+- §6.5 拆三段（HTTP API 端点表 + MCP + starter 函数监听器）+ 重点更正"PR2.5/PR2.6 已透传"措辞
+- §11 后新增 §12：6 个 next minor/major issue 模板（B001~B006）
+- §13：v2.5 实际能力视图 + 与其他 broker 对照
+- §10 版本号同步：v2.3 → v2.5（横跨本轮两轮修订）
 
 **相关源码导航**：
 
