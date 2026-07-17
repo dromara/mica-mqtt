@@ -12,6 +12,8 @@
 
 ## 1. 总体路线图
 
+> **2026-07-16 实现校准**：P0 与 P2.0-P2.5 主链路已完成；P1 dispatcher 已接入真实 MQTT PUBLISH。3/5 独立 JVM 协议探活、kill -9、成员收敛、同端口重连和 H2 状态恢复已验收；10 万候选策略/Retain 微基线与部署侧 Prometheus 告警已完成。剩余工作集中在网络抖动和端到端 MQTT TPS/兼容性压测（P3）。
+
 ### 1.1 时间线（甘特图，团队 2 人并行）
 
 ```
@@ -198,9 +200,9 @@ public interface SharedSubscriptionStrategy {
 - 较复杂：RoundRobin（带计数器）— 1 天
 
 **验收测试**（routing v1.2 §7 阶段 2）：
-- [ ] 目标订阅者掉线 → Node 端重选
-- [ ] 空 group 跳过
-- [ ] 大量订阅者下的 strategy 性能（10w 订阅者 < 10ms pick）
+- [x] 目标订阅者掉线 → Node 端重选
+- [x] 空 group 跳过
+- [x] 大量订阅者下的 strategy 性能（10w 订阅者 < 10ms pick）
 
 ### P1.1 Dispatcher 重构
 
@@ -241,11 +243,11 @@ public interface SharedSubscriptionStrategy {
 | 涉及文件 | `cluster/pipeline/ClusterMessageDispatcher.java` 等 |
 
 **测试用例清单**：
-- [ ] 目标订阅者掉线 → dispatcher 节点重选
-- [ ] 订阅者跨节点迁移（client 断开重连到新节点）
-- [ ] 空 group 跳过（普通订阅的 group 为空）
-- [ ] group 成员全部离线 → 消息丢弃（不缓存）
-- [ ] strategy 切换：RoundRobin 切换到 HashClient
+- [x] 目标订阅者掉线 → dispatcher 节点重选
+- [x] 订阅者跨节点迁移（client 断开重连到新节点）
+- [x] 空 group 跳过（普通订阅的 group 为空）
+- [x] group 成员全部离线 → 消息丢弃（不缓存）
+- [x] strategy 切换：RoundRobin 切换到 HashClient
 - [ ] 网络抖动：dispatcher 消息丢失处理
 
 ### P1.3 性能压测
@@ -328,6 +330,8 @@ public interface SharedSubscriptionStrategy {
 
 ### P2.2 Shared Subscription 持久化（1 周）
 
+> 当前代码与最初 owner 单写模型有所收敛：V2 dispatcher 已是无中心全量路由，P2.2 因而复用订阅同步消息在所有 V3 节点保存全量 H2 副本，并确定性维护 owner/backup 元数据。协议 18/19 保留兼容位，不作为当前主链路；3/5 JVM kill -9 与 H2 恢复已验收。
+
 | 项 | 内容 |
 |---|---|
 | 工作量 | 5 天 |
@@ -370,13 +374,13 @@ public interface SharedSubscriptionStrategy {
 |---|---|---|
 | 2.3.1 `InflightStore` 接口 + `H2InflightStore` 实现 | 1 天 | 共用 P2.0 的 H2 文件，不同 Map |
 | 2.3.2 `InflightTtlCleaner` 后台线程（30s 周期） | 0.5 天 | `ScheduledExecutorService` |
-| 2.3.3 异步写线程池（不阻塞发送） | 0.5 天 | `Executors.newFixedThreadPool(2)` |
+| 2.3.3 异步有序写队列（不阻塞发送） | 0.5 天 | 单线程保证同 packet 的 put → PUBREL → ACK 删除不乱序 |
 | 2.3.4 滞后堆积告警（>10w 条告警） | 0.5 天 | 接 P0.4 metrics |
 
 **P2.3 验收**：
-- [ ] TTL 准确：30s 周期清理，滞后 < 60s
-- [ ] 重放正确：客户端重连后 inflight 全部重发
-- [ ] 不阻塞发送路径：put 异步执行
+- [x] TTL 准确：30s 周期清理，滞后 < 60s
+- [x] 重放正确：客户端重连后 inflight 全部重发
+- [x] 不阻塞发送路径：put 异步有序执行
 
 ### P2.4 Retain 持久化 + 内存索引（1 周）
 
@@ -544,10 +548,10 @@ public interface SharedSubscriptionStrategy {
 | W2 | P1.1.1~3 + P1.1.7 + P2.3 + P4.2 | dispatcher 基础 + 飞行消息持久化 + 文档 |
 
 **MVP 验收**：
-- [ ] 共享订阅无重复投递（3 节点测试）
-- [ ] QoS 1 飞行消息持久化（kill -9 重启后重放）
-- [ ] 单一 H2 引擎，无 RocksDB 依赖
-- [ ] 文档完整（用户视角）
+- [x] 共享订阅无重复投递（自动化分发测试；独立 JVM 验收覆盖协议与成员故障）
+- [x] QoS 1 飞行消息持久化（kill -9 重启后状态恢复；重放链路由单元测试覆盖）
+- [x] 单一 H2 引擎，无 RocksDB 依赖
+- [x] 文档完整（用户视角）
 
 **MVP 不做**：
 - Session 跨节点接管（P2.1）

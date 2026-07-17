@@ -23,6 +23,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Background thread that periodically removes expired QoS 1/2 inflight records.
@@ -72,6 +73,7 @@ public class InflightTtlCleaner {
 
 	private final InflightStore store;
 	private final long periodMs;
+	private final AtomicLong removedExpiredCount = new AtomicLong();
 	private ScheduledExecutorService scheduler;
 
 	/**
@@ -148,6 +150,7 @@ public class InflightTtlCleaner {
 			long nowMs = System.currentTimeMillis();
 			int removed = store.removeExpired(nowMs);
 			if (removed > 0) {
+				removedExpiredCount.addAndGet(removed);
 				logger.debug("[InflightTtlCleaner] Removed {} expired inflight records", removed);
 			}
 			long total = store.count();
@@ -158,5 +161,9 @@ public class InflightTtlCleaner {
 		} catch (Exception e) {
 			logger.error("[InflightTtlCleaner] Cleanup scan failed", e);
 		}
+	}
+
+	public long getRemovedExpiredCount() {
+		return removedExpiredCount.get();
 	}
 }

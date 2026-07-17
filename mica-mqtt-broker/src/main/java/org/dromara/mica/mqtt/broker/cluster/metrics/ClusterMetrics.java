@@ -77,6 +77,33 @@ public class ClusterMetrics {
 	/** Total CLIENT_DISCONNECT messages broadcast. */
 	private final AtomicLong clientDisconnectBroadcast = new AtomicLong();
 
+	/** Total durable inflight PUBLISH packets replayed after reconnect/takeover. */
+	private final AtomicLong inflightReplayed = new AtomicLong();
+
+	/** Total cross-node session takeover attempts started. */
+	private final AtomicLong sessionTakeoverStarted = new AtomicLong();
+	/** Total cross-node session takeovers completed successfully. */
+	private final AtomicLong sessionTakeoverSucceeded = new AtomicLong();
+	/** Total cross-node session takeover responses that could not be installed. */
+	private final AtomicLong sessionTakeoverFailed = new AtomicLong();
+	/** Total cross-node session takeover attempts that timed out. */
+	private final AtomicLong sessionTakeoverTimedOut = new AtomicLong();
+
+	// ---- Retain and membership counters -------------------------------------------
+
+	/** Total retained-message replica notifications received. */
+	private final AtomicLong retainReplicaReceived = new AtomicLong();
+	/** Total retained-message query requests initiated. */
+	private final AtomicLong retainQueryRequests = new AtomicLong();
+	/** Total retained-message queries that did not receive every expected response. */
+	private final AtomicLong retainQueryTimedOut = new AtomicLong();
+	/** Cumulative end-to-end retained-message replica latency in milliseconds. */
+	private final AtomicLong retainReplicaLatencyMillis = new AtomicLong();
+	/** Number of replica latency samples contributing to the cumulative value. */
+	private final AtomicLong retainReplicaLatencySamples = new AtomicLong();
+	/** Total remote-node departures detected by notification or membership polling. */
+	private final AtomicLong nodeDepartures = new AtomicLong();
+
 	// ---- Cluster-level counters ----------------------------------------------------
 
 	/** Total cluster messages successfully sent (any type). */
@@ -124,6 +151,48 @@ public class ClusterMetrics {
 
 	public void clientDisconnectBroadcastInc() {
 		clientDisconnectBroadcast.incrementAndGet();
+	}
+
+	public void inflightReplayedAdd(long count) {
+		if (count > 0) {
+			inflightReplayed.addAndGet(count);
+		}
+	}
+
+	public void sessionTakeoverStartedInc() {
+		sessionTakeoverStarted.incrementAndGet();
+	}
+
+	public void sessionTakeoverSucceededInc() {
+		sessionTakeoverSucceeded.incrementAndGet();
+	}
+
+	public void sessionTakeoverFailedInc() {
+		sessionTakeoverFailed.incrementAndGet();
+	}
+
+	public void sessionTakeoverTimedOutInc() {
+		sessionTakeoverTimedOut.incrementAndGet();
+	}
+
+	public void retainReplicaReceived(long latencyMillis) {
+		retainReplicaReceived.incrementAndGet();
+		if (latencyMillis >= 0L) {
+			retainReplicaLatencyMillis.addAndGet(latencyMillis);
+			retainReplicaLatencySamples.incrementAndGet();
+		}
+	}
+
+	public void retainQueryRequestsInc() {
+		retainQueryRequests.incrementAndGet();
+	}
+
+	public void retainQueryTimedOutInc() {
+		retainQueryTimedOut.incrementAndGet();
+	}
+
+	public void nodeDeparturesInc() {
+		nodeDepartures.incrementAndGet();
 	}
 
 	public void clusterMessagesSentInc() {
@@ -176,6 +245,50 @@ public class ClusterMetrics {
 		return clientDisconnectBroadcast.get();
 	}
 
+	public long getInflightReplayed() {
+		return inflightReplayed.get();
+	}
+
+	public long getSessionTakeoverStarted() {
+		return sessionTakeoverStarted.get();
+	}
+
+	public long getSessionTakeoverSucceeded() {
+		return sessionTakeoverSucceeded.get();
+	}
+
+	public long getSessionTakeoverFailed() {
+		return sessionTakeoverFailed.get();
+	}
+
+	public long getSessionTakeoverTimedOut() {
+		return sessionTakeoverTimedOut.get();
+	}
+
+	public long getRetainReplicaReceived() {
+		return retainReplicaReceived.get();
+	}
+
+	public long getRetainQueryRequests() {
+		return retainQueryRequests.get();
+	}
+
+	public long getRetainQueryTimedOut() {
+		return retainQueryTimedOut.get();
+	}
+
+	public long getRetainReplicaLatencyMillis() {
+		return retainReplicaLatencyMillis.get();
+	}
+
+	public long getRetainReplicaLatencySamples() {
+		return retainReplicaLatencySamples.get();
+	}
+
+	public long getNodeDepartures() {
+		return nodeDepartures.get();
+	}
+
 	public long getClusterMessagesSent() {
 		return clusterMessagesSent.get();
 	}
@@ -210,6 +323,17 @@ public class ClusterMetrics {
 		snap.put("stateSyncResponses", stateSyncResponses.get());
 		snap.put("clientConnectBroadcast", clientConnectBroadcast.get());
 		snap.put("clientDisconnectBroadcast", clientDisconnectBroadcast.get());
+		snap.put("inflightReplayed", inflightReplayed.get());
+		snap.put("sessionTakeoverStarted", sessionTakeoverStarted.get());
+		snap.put("sessionTakeoverSucceeded", sessionTakeoverSucceeded.get());
+		snap.put("sessionTakeoverFailed", sessionTakeoverFailed.get());
+		snap.put("sessionTakeoverTimedOut", sessionTakeoverTimedOut.get());
+		snap.put("retainReplicaReceived", retainReplicaReceived.get());
+		snap.put("retainQueryRequests", retainQueryRequests.get());
+		snap.put("retainQueryTimedOut", retainQueryTimedOut.get());
+		snap.put("retainReplicaLatencyMillis", retainReplicaLatencyMillis.get());
+		snap.put("retainReplicaLatencySamples", retainReplicaLatencySamples.get());
+		snap.put("nodeDepartures", nodeDepartures.get());
 		snap.put("clusterMessagesSent", clusterMessagesSent.get());
 		snap.put("clusterMessagesReceived", clusterMessagesReceived.get());
 		snap.put("clusterSendErrors", clusterSendErrors.get());
@@ -266,6 +390,17 @@ public class ClusterMetrics {
 			", sharedDispatchDropped=" + sharedDispatchDropped.get() +
 			", stateSyncRequests=" + stateSyncRequests.get() +
 			", stateSyncResponses=" + stateSyncResponses.get() +
+			", inflightReplayed=" + inflightReplayed.get() +
+			", sessionTakeoverStarted=" + sessionTakeoverStarted.get() +
+			", sessionTakeoverSucceeded=" + sessionTakeoverSucceeded.get() +
+			", sessionTakeoverFailed=" + sessionTakeoverFailed.get() +
+			", sessionTakeoverTimedOut=" + sessionTakeoverTimedOut.get() +
+			", retainReplicaReceived=" + retainReplicaReceived.get() +
+			", retainQueryRequests=" + retainQueryRequests.get() +
+			", retainQueryTimedOut=" + retainQueryTimedOut.get() +
+			", retainReplicaLatencyMillis=" + retainReplicaLatencyMillis.get() +
+			", retainReplicaLatencySamples=" + retainReplicaLatencySamples.get() +
+			", nodeDepartures=" + nodeDepartures.get() +
 			", clusterMessagesSent=" + clusterMessagesSent.get() +
 			", clusterMessagesReceived=" + clusterMessagesReceived.get() +
 			", clusterSendErrors=" + clusterSendErrors.get() +

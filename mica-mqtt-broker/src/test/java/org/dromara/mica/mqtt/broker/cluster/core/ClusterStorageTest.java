@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.broker.cluster.core;
 
 import org.dromara.mica.mqtt.broker.cluster.config.MqttStorageConfig;
+import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterConfig;
 import org.dromara.mica.mqtt.broker.cluster.store.SharedSubStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -84,6 +85,27 @@ class ClusterStorageTest {
 	}
 
 	@Test
+	void featureFlagsDisableOptionalStores() {
+		MqttStorageConfig config = new MqttStorageConfig()
+			.enabled(true)
+			.dataDir(tempDir.toString())
+			.persistSession(false)
+			.persistSharedSub(false)
+			.persistRetain(false);
+		ClusterStorage storage = new ClusterStorage(config);
+		assertTrue(storage.start());
+		try {
+			assertTrue(storage.isActive());
+			assertNotNull(storage.getInflightStore());
+			assertNull(storage.getSessionStore());
+			assertNull(storage.getSharedSubStore());
+			assertNull(storage.getRetainIndex());
+		} finally {
+			storage.stop();
+		}
+	}
+
+	@Test
 	void invalidDataDirFallsBackToInactive() {
 		MqttStorageConfig config = new MqttStorageConfig()
 			.enabled(true)
@@ -128,6 +150,35 @@ class ClusterStorageTest {
 			msg.setRetain(true);
 			assertTrue(storage.getRetainIndex().put("a", msg));
 			assertEquals(1, storage.getRetainIndex().match("a").size());
+		} finally {
+			storage.stop();
+		}
+	}
+
+	@Test
+	void managerPrometheusExportIncludesStorageGauges() {
+		MqttStorageConfig storageConfig = new MqttStorageConfig()
+			.enabled(true)
+			.dataDir(tempDir.toString());
+		ClusterStorage storage = new ClusterStorage(storageConfig);
+		assertTrue(storage.start());
+		try {
+			storage.getInflightStore().put("client-1", 7, System.currentTimeMillis() + 10_000L,
+				"topic/a", new byte[]{1}, 1);
+			long deadline = System.currentTimeMillis() + 2_000L;
+			while (storage.getInflightStore().count() != 1L && System.currentTimeMillis() < deadline) {
+				Thread.yield();
+			}
+			MqttClusterManager manager = new MqttClusterManager(
+				new MqttClusterConfig().enabled(false), "node-1");
+			manager.setClusterStorage(storage);
+			String metrics = manager.toPrometheus();
+			assertTrue(metrics.contains("mqtt_cluster_storage_healthy 1"));
+			assertTrue(metrics.contains("mqtt_cluster_storage_file_size_bytes"));
+			assertTrue(metrics.contains("mqtt_cluster_storage_write_operations_total"));
+			assertTrue(metrics.contains("mqtt_cluster_storage_startup_duration_millis"));
+			assertTrue(metrics.contains("mqtt_cluster_inflight_entries 1"));
+			assertTrue(metrics.contains("mqtt_cluster_inflight_expired_total 0"));
 		} finally {
 			storage.stop();
 		}

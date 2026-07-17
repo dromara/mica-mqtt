@@ -66,6 +66,13 @@ public interface SessionStore {
 	Session load(String clientId);
 
 	/**
+	 * Loads every persisted session during broker startup.
+	 *
+	 * @return persisted sessions, never {@code null}
+	 */
+	List<Session> loadAll();
+
+	/**
 	 * Returns the raw bytes for the session, suitable for sending as the
 	 * payload of a {@code SessionTakeoverResponseMessage}.
 	 *

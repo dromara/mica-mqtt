@@ -49,6 +49,8 @@ import java.util.List;
  * @see InflightTtlCleaner
  */
 public interface InflightStore {
+	int PHASE_PUBLISH = 0;
+	int PHASE_PUBREL = 1;
 
 	/**
 	 * Records an in-flight message for the given client.
@@ -61,6 +63,19 @@ public interface InflightStore {
 	 * @param qos       the QoS level (1 or 2)
 	 */
 	void put(String clientId, int packetId, long expireAt, String topic, byte[] payload, int qos);
+
+	/** Persists a transferred entry including its QoS delivery phase. */
+	default void put(InflightEntry entry) {
+		put(entry.getClientId(), entry.getPacketId(), entry.getExpireAt(),
+			entry.getTopic(), entry.getPayload(), entry.getQos());
+		if (entry.getPhase() != PHASE_PUBLISH) {
+			updatePhase(entry.getClientId(), entry.getPacketId(), entry.getPhase());
+		}
+	}
+
+	/** Updates an existing QoS 2 record after PUBREC moves it to PUBREL. */
+	default void updatePhase(String clientId, int packetId, int phase) {
+	}
 
 	/**
 	 * Removes the in-flight record for a specific client and packet.
@@ -115,15 +130,22 @@ public interface InflightStore {
 		private final String topic;
 		private final byte[] payload;
 		private final int qos;
+		private final int phase;
 
 		public InflightEntry(String clientId, int packetId, long expireAt,
 							 String topic, byte[] payload, int qos) {
+			this(clientId, packetId, expireAt, topic, payload, qos, PHASE_PUBLISH);
+		}
+
+		public InflightEntry(String clientId, int packetId, long expireAt,
+							 String topic, byte[] payload, int qos, int phase) {
 			this.clientId = clientId;
 			this.packetId = packetId;
 			this.expireAt = expireAt;
 			this.topic = topic;
 			this.payload = payload;
 			this.qos = qos;
+			this.phase = phase;
 		}
 
 		public String getClientId() {
@@ -148,6 +170,10 @@ public interface InflightStore {
 
 		public int getQos() {
 			return qos;
+		}
+
+		public int getPhase() {
+			return phase;
 		}
 	}
 }

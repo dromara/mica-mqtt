@@ -219,7 +219,10 @@ public enum ClusterMessageType {
 	 * not used and retain messages are replicated to all nodes.
 	 * </p>
 	 */
-	RETAIN_QUERY(20);
+	RETAIN_QUERY(20),
+
+	/** Application-level liveness probe used because mica-net keeps seed members after disconnect. */
+	HEARTBEAT(21);
 
 	private final int code;
 

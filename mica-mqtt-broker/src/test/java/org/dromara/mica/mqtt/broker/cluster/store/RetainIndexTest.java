@@ -134,4 +134,19 @@ class RetainIndexTest {
 		retainIndex.put("foo", msg("foo", "v", 0));
 		assertTrue(retainIndex.match("bar").isEmpty());
 	}
+
+	@Test
+	void timedRetainExpiresAndStaysDeletedAfterRestart() throws Exception {
+		retainIndex.put("timed/topic", msg("timed/topic", "value", 1), 1);
+		assertEquals(1, retainIndex.match("timed/topic").size());
+		Thread.sleep(1_100L);
+		assertTrue(retainIndex.match("timed/topic").isEmpty());
+
+		engine.close();
+		engine = new H2MvStoreImpl();
+		engine.open(tempDir);
+		retainIndex = new RetainIndex(engine);
+		retainIndex.loadFromStore();
+		assertTrue(retainIndex.match("timed/topic").isEmpty());
+	}
 }

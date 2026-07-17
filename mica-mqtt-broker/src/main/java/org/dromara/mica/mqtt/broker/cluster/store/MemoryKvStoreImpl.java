@@ -19,6 +19,7 @@ package org.dromara.mica.mqtt.broker.cluster.store;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
@@ -40,6 +41,8 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class MemoryKvStoreImpl implements LocalKvStore {
 
 	private final ConcurrentSkipListMap<String, byte[]> data = new ConcurrentSkipListMap<>();
+	private final AtomicLong readOperations = new AtomicLong();
+	private final AtomicLong writeOperations = new AtomicLong();
 	private volatile boolean open = false;
 
 	@Override
@@ -55,21 +58,25 @@ public class MemoryKvStoreImpl implements LocalKvStore {
 
 	@Override
 	public byte[] get(String key) {
+		readOperations.incrementAndGet();
 		return data.get(key);
 	}
 
 	@Override
 	public void put(String key, byte[] value) {
+		writeOperations.incrementAndGet();
 		data.put(key, value);
 	}
 
 	@Override
 	public void delete(String key) {
+		writeOperations.incrementAndGet();
 		data.remove(key);
 	}
 
 	@Override
 	public List<KeyValue> scan(String prefix) {
+		readOperations.incrementAndGet();
 		List<KeyValue> result = new ArrayList<>();
 		if (prefix == null || prefix.isEmpty()) {
 			for (java.util.Map.Entry<String, byte[]> entry : data.entrySet()) {
@@ -96,7 +103,8 @@ public class MemoryKvStoreImpl implements LocalKvStore {
 
 	@Override
 	public StoreStats stats() {
-		return new StoreStats(-1L, data.size(), open);
+		return new StoreStats(-1L, data.size(), open,
+			readOperations.get(), writeOperations.get());
 	}
 
 	/**

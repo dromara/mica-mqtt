@@ -81,7 +81,7 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
     │   └── ClusterStorage.java            # V3 持久化协调器
     ├── message/                           # 集群消息类型（V1 已实现 10 个，code 标注于行尾）
     │   ├── ClusterMessage.java            # 集群消息接口
-    │   ├── ClusterMessageType.java        # 消息类型枚举 (V1: 1-10, V2: 11-13, V3: 14-20)
+    │   ├── ClusterMessageType.java        # 消息类型枚举 (V1: 1-10, V2: 11-13, V3: 14-20, control: 21)
     │   ├── ClusterMessageSerializer.java  # 消息序列化器
     │   ├── ClientConnectMessage.java      # 客户端连接通知 (V1, code=1)
     │   ├── ClientDisconnectMessage.java   # 客户端断开通知 (V1, code=2)
@@ -97,7 +97,9 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
     │   ├── SessionTakeoverRequestMessage.java  # [V3] 会话接管请求 (code=14)
     │   ├── SessionTakeoverResponseMessage.java # [V3] 会话接管响应 (code=15)
     │   ├── SessionMigratedNotifyMessage.java   # [V3] 会话迁移通知 (code=16)
-    │   └── SessionDeleteNotifyMessage.java     # [V3] 会话删除通知 (code=17)
+    │   ├── SessionDeleteNotifyMessage.java     # [V3] 会话删除通知 (code=17)
+    │   ├── RetainQueryMessage.java             # [V3] Retain 远程查询 (code=20)
+    │   └── HeartbeatMessage.java               # [control] 业务层探活 (code=21)
     ├── pipeline/                          # 消息管道
     │   ├── ClusterMessageDispatcher.java   # V2 集群消息分发器 (dispatcher 模型)
     │   ├── ClusterPublishHandler.java      # 发布消息处理器
@@ -131,9 +133,10 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
 | 11-13 | `SHARED_DISPATCH_TO_CLIENT` / `SHARED_SUBSCRIBE_NOTIFY` / `SHARED_SUBSCRIBE_REMOVE` | routing 文档 | V2 已实现 |
 | 14-17 | `SESSION_TAKEOVER_REQUEST/RESPONSE` / `SESSION_MIGRATED_NOTIFY` / `SESSION_DELETE_NOTIFY` | storage 文档 | V3 已实现 |
 | 18-19 | `SHARED_SUB_STATE_SYNC` / `SHARED_SUB_TAKEOVER` | storage 文档 | V3 枚举已定义，消息类待实现 |
-| 20 | `RETAIN_QUERY` | storage 文档 | V3 枚举已定义，消息类待实现 |
+| 20 | `RETAIN_QUERY` | storage 文档 | V3 已实现 |
+| 21 | `HEARTBEAT` | cluster 文档 | 探活与故障收敛已实现 |
 
-> **v2.9 修正**：原 v2.8 把 V2/V3 编号放在 9-19，与 V1 已实现的 `WILL_MESSAGE(9)` / `RETAIN_MESSAGE(10)` 冲突。本版本起 V1 占 1-10，V2 从 11 起，V3 从 14 起。**v3.0 修正**：(1) 以代码实现为准统一编号——V2 实际编号为 SHARED_DISPATCH_TO_CLIENT(11) / SHARED_SUBSCRIBE_NOTIFY(12) / SHARED_SUBSCRIBE_REMOVE(13)，与 routing/storage 文档对齐；(2) 移除未实现的 `RETAIN_REPLICATE`（原 code=20，P2.5 可选分片未实现），`RETAIN_QUERY` 调整为 code=20，总计 20 个枚举值；(3) 目录树补充 `config/MqttStorageConfig.java`、`core/ClusterStorage.java`、`metrics/`、`pipeline/strategy/` 等已实现组件。**cluster 文档是协议号表的 canonical 来源**，routing/storage 文档必须以本表为准。
+> **v2.9 修正**：原 v2.8 把 V2/V3 编号放在 9-19，与 V1 已实现的 `WILL_MESSAGE(9)` / `RETAIN_MESSAGE(10)` 冲突。本版本起 V1 占 1-10，V2 从 11 起，V3 从 14 起。**v3.0 修正**：(1) 以代码实现为准统一编号——V2 实际编号为 SHARED_DISPATCH_TO_CLIENT(11) / SHARED_SUBSCRIBE_NOTIFY(12) / SHARED_SUBSCRIBE_REMOVE(13)，与 routing/storage 文档对齐；(2) 移除未实现的 `RETAIN_REPLICATE`，`RETAIN_QUERY` 为 code=20，探活 `HEARTBEAT` 为 code=21，总计 21 个枚举值；(3) 目录树补充已实现组件。**cluster 文档是协议号表的 canonical 来源**，routing/storage 文档必须以本表为准。
 
 ### 2.3 消息路由流程
 
@@ -225,9 +228,10 @@ public enum ClusterMessageType {
     SESSION_DELETE_NOTIFY(17),
     SHARED_SUB_STATE_SYNC(18),
     SHARED_SUB_TAKEOVER(19),
-    RETAIN_QUERY(20);
+    RETAIN_QUERY(20),
+    HEARTBEAT(21);
     // 注：原设计的 RETAIN_REPLICATE(20) 未实现（P2.5 Retain 分片复制为可选），
-    // RETAIN_QUERY 调整为 code=20，总计 20 个枚举值。
+    // RETAIN_QUERY 为 code=20，业务层探活 HEARTBEAT 为 code=21。
 }
 ```
 
@@ -459,9 +463,9 @@ mqtt:
 ### 6.2 客户端会话与状态同步
 - [x] V1: 客户端连接/断开事件的集群广播
 - [x] V1: Client ID 跨节点重连处理（基础）
-- [ ] V3: 集群级会话接管（Client Takeover）— `SESSION_TAKEOVER_REQUEST(14)` / `RESPONSE(15)` / `MIGRATED_NOTIFY(16)` / `DELETE_NOTIFY(17)` 协议
-- [ ] V3: 离线会话状态漫游 — H2 `mqtt_session` 持久化
-- [ ] V3: 飞行中消息同步（In-Flight Messages）— H2 `mqtt_inflight` + 30s TTL 清理
+- [x] V3: 集群级会话接管（Client Takeover）— `SESSION_TAKEOVER_REQUEST(14)` / `RESPONSE(15)` / `MIGRATED_NOTIFY(16)` / `DELETE_NOTIFY(17)` 协议
+- [x] V3: 离线会话状态漫游 — H2 Session、启动恢复、Clean Start/Expiry Interval 与 MQTT 5 订阅选项
+- [x] V3: 飞行中消息同步（In-Flight Messages）— H2 `mqtt_inflight` + TTL、ACK phase 与接管重放
 
 ### 6.3 消息路由与订阅分发
 - [x] V1: 订阅/取消订阅状态全网实时同步
@@ -472,35 +476,35 @@ mqtt:
 ### 6.4 遗嘱与保留消息
 - [x] V1: 保留消息的集群共享与存储 — `ClusterMqttMessageStore` 装饰器 + 广播
 - [x] V1: 遗嘱消息的集群备份 — WILL_MESSAGE(9) 同步到所有节点
-- [ ] V3: 节点失联后的 will 消息代发（其他节点检测到老节点 NODE_LEAVE 时代为触发）— 协议待规划
-- [ ] V3: 保留消息持久化 — H2 `mqtt_retain` + 内存 `RetainIndex` 通配查询
-- [ ] V3: 保留消息分片复制 — `RETAIN_QUERY(20)` 协议（P2.5 可选，未实现）
+- [x] V3: 节点失联后由存活节点中 nodeId 最小者代发 will；清理 tombstone 同步到全部副本
+- [x] V3: 保留消息持久化 — H2 `mqtt_retain` + 内存 `RetainIndex` 通配查询与 TTL
+- [x] V3: 保留消息分片复制 — Rendezvous Hash、RF 副本、`RETAIN_QUERY(20)` 与成员再平衡
 
 ### 6.5 持久化能力（V3 新增，参见 storage 文档）
-- [ ] H2 MVStore 统一引擎接入（~2MB 单 jar）
-- [ ] Session 元数据持久化 + ACID 事务
-- [ ] Retain 通配查询（内存 Skiplist 索引）
-- [ ] Shared Subscription owner 状态持久化
-- [ ] QoS 1/2 飞行消息持久化 + TTL 自动清理
-- [ ] 节点重启不依赖其他节点即可恢复
+- [x] H2 MVStore 统一引擎接入（~2MB 单 jar）
+- [x] Session 元数据持久化 + ACID 事务
+- [x] Retain 通配查询（内存 Skiplist 索引）
+- [x] Shared Subscription owner 状态持久化
+- [x] QoS 1/2 飞行消息持久化 + TTL 自动清理
+- [x] 节点重启从本地 H2 恢复 session/retain/shared-sub/inflight
 
 ### 6.6 可观测性与高级特性
-- [ ] 集群级别的统一指标监控 API
+- [x] 集群级别的统一指标监控 API（snapshot + Prometheus 文本）
 - [ ] 全局限流控制协调机制
-- [ ] 存储层 metrics（L2 文件大小、Inflight 滞后堆积、Retain 索引内存）
+- [x] 存储层 metrics（L2 文件大小/entry、累计读写、Inflight 重放、Retain 复制延迟）
 
 ---
 
 **文档版本：** v3.0
-**更新日期：** 2026-06-22
-**状态：** V1 已实现；V2 dispatcher 已实现；V3 部分实现（Session 接管、枚举定义）
+**更新日期：** 2026-07-16
+**状态：** V1/V2/V3 主链路已实现；3/5 独立 JVM 的协议、探活、强杀收敛、同端口重连与 H2 状态恢复已验收，剩余端到端 MQTT 容量压测
 
 **v3.0 变更摘要**（以代码实现为准全面对齐）：
 - **§2.2 目录树重写**：补充 `config/MqttStorageConfig.java`、`core/ClusterStorage.java`、`metrics/ClusterMetrics.java`、`pipeline/strategy/` 目录（5 个策略实现）、`store/` 下的 SessionStore/H2SessionStore/SharedSubStore/H2SharedSubStore/InflightStore/H2InflightStore/MemoryKvStoreImpl 等已实现文件
-- **§2.2 协议号表修正**：V2 实际编号 SHARED_DISPATCH_TO_CLIENT(11)/SHARED_SUBSCRIBE_NOTIFY(12)/SHARED_SUBSCRIBE_REMOVE(13)；移除未实现的 RETAIN_REPLICATE，RETAIN_QUERY 调整为 code=20；总计 20 个枚举值
+- **§2.2 协议号表修正**：V2 实际编号 SHARED_DISPATCH_TO_CLIENT(11)/SHARED_SUBSCRIBE_NOTIFY(12)/SHARED_SUBSCRIBE_REMOVE(13)；移除未实现的 RETAIN_REPLICATE，RETAIN_QUERY 为 code=20，HEARTBEAT 为 code=21；总计 21 个枚举值
 - **§3.2 枚举块更新**：与协议号表同步，V2 编号对齐，V3 去掉 RETAIN_REPLICATE
 - **§3.4 dispatcher 重写**：反映 V2 dispatcher 已实现（不再是"待演进"）
 - **§6.3 共享订阅**：从 🚧 改为 ✅ V2 dispatcher 已实现
 
-**更新日期：** 2026-06-22
-**状态：** V1 已实现；V2 dispatcher 已实现；V3 部分实现（Session 接管、枚举定义）
+**更新日期：** 2026-07-16
+**状态：** V1/V2/V3 主链路已实现；独立 JVM 成员故障验收、10 万条目微基线和部署告警已完成，端到端 MQTT 压测仍待完成

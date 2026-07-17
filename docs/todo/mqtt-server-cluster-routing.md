@@ -661,26 +661,26 @@ MqttClusterManager.updateGroupStrategy("g1", new RoundRobinStrategy());
 
 ### 阶段 0：基础设施（3 天）
 
-- [ ] 定义 `SharedSubscriptionStrategy` 接口
-- [ ] 实现 5 个内置策略
-- [ ] 增加 `SHARED_DISPATCH_TO_CLIENT` 消息类型
-- [ ] `ClusterMqttSessionManager.searchAllSubscribe(topic, sharedOnly)` 区分普通 vs 共享
+- [x] 定义 `SharedSubscriptionStrategy` 接口
+- [x] 实现 5 个内置策略
+- [x] 增加 `SHARED_DISPATCH_TO_CLIENT` 消息类型
+- [x] `ClusterMqttSessionManager` 维护未提前随机合并的全量原始路由表，区分普通 vs 共享
 
 ### 阶段 1：Dispatcher 重构（5 天）
 
-- [ ] `ClusterMessageDispatcher.handle()` 改造
-  - [ ] 分离普通投递 / 共享投递
-  - [ ] 实现 strategy 选择
-  - [ ] 跨节点 `SharedDispatchToClientMessage` 发送
-- [ ] 接收端 `ClusterMessageDispatcher.onClusterMessage()` 处理新消息
-- [ ] 单元测试（mock 候选列表）
+- [x] MQTT publish pipeline 与 `ClusterMessageDispatcher.handle()` 改造
+  - [x] 分离普通投递 / 共享投递
+  - [x] 实现 strategy 选择
+  - [x] 跨节点 `SharedDispatchToClientMessage` 发送
+- [x] 接收端处理 `SharedDispatchToClientMessage`
+- [x] 单元测试（原始路由表、单点共享转发、策略候选列表）
 
 ### 阶段 2：边界场景（3 天）
 
-- [ ] 目标订阅者掉线 -> Node 端重选
-- [ ] 订阅者跨节点迁移
-- [ ] 空 group 跳过
-- [ ] 大量订阅者下的 strategy 性能
+- [x] 目标订阅者掉线 -> Node 端重选
+- [x] 订阅者跨节点迁移
+- [x] 空 group 跳过
+- [x] 大量订阅者下的 strategy 性能（10 万候选 LocalFirst P99 2.100ms，本机 opt-in 基线）
 
 ### 阶段 3：集成测试（4 天）
 
@@ -691,7 +691,7 @@ MqttClusterManager.updateGroupStrategy("g1", new RoundRobinStrategy());
   - [ ] 不同 strategy 下的吞吐差异
   - [ ] subscriber 跨节点重连场景
 - [ ] 故障注入
-  - [ ] 节点宕机恢复
+  - [x] 节点宕机后的成员收敛与同端口重连（3/5 独立 JVM；MQTT 状态验收另列）
   - [ ] 网络抖动
 
 **总计 ~2 周**。
@@ -775,8 +775,8 @@ cluster_shared_sub_dispatch_latency_seconds               # 延迟分布
 
 ### 9.4 与 storage 层协同
 
-- [ ] 共享订阅 owner 状态持久化（H2 `mqtt_shared_sub` 表）— 详见 `mqtt-server-cluster-storage.md` (v1.2) §4.4
-- [ ] Shared Sub 故障切换：owner 宕机时 backup 升级（storage v1.2 §4.4.4，零消息真空）
+- [x] 共享订阅 owner 状态持久化（H2 `mqtt_shared_sub` 表）— 复合身份为 `(group, topicFilter)`
+- [x] Shared Sub 故障切换：成员节点离开时确定性重算 owner/backup；并发变更使用版本 CAS
 - [ ] 节点重启后策略计数器恢复（可选，RoundRobin/Sticky 需要状态恢复）
 - [ ] 共享订阅变更事件审计（H2 WAL，可选）
 
@@ -802,7 +802,7 @@ cluster_shared_sub_dispatch_latency_seconds               # 延迟分布
 
 **文档版本**：v1.2
 **更新日期**：2026-06-22
-**状态**：设计稿 + V2 dispatcher 已实现
+**状态**：V2 dispatcher 主链路、边界单元测试、10 万候选微基线和 3/5 独立 JVM 成员故障验收已完成；端到端 MQTT 验收、网络抖动和 TPS 压测待完成
 
 **v1.2 变更摘要**（以代码实现为准全面对齐 cluster v3.0）：
 - §1.5 协议号修正：SHARED_DISPATCH_TO_CLIENT 9→11，SHARED_SUBSCRIBE_NOTIFY 10→12，SHARED_SUBSCRIBE_REMOVE 11→13；移除不存在的 SHARED_SUBSCRIBE_FORWARD 和 SHARED_PUBLISH_FORWARD

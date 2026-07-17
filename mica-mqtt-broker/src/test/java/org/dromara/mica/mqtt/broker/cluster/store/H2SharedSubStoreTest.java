@@ -89,6 +89,22 @@ class H2SharedSubStoreTest {
 	}
 
 	@Test
+	void sameLogicalGroupKeepsIndependentTopicFilters() {
+		store.save(new SharedSubStore.SharedSubGroup(
+			"workers", "jobs/a/#", Arrays.asList("c1"), "node-1", "node-2", 1L, 1L));
+		store.save(new SharedSubStore.SharedSubGroup(
+			"workers", "jobs/b/#", Arrays.asList("c2"), "node-2", "node-1", 1L, 2L));
+
+		assertEquals("c1", store.get("workers", "jobs/a/#").getMembers().get(0));
+		assertEquals("c2", store.get("workers", "jobs/b/#").getMembers().get(0));
+		assertEquals(2, store.listAll().size());
+
+		store.delete("workers", "jobs/a/#");
+		assertNull(store.get("workers", "jobs/a/#"));
+		assertNotNull(store.get("workers", "jobs/b/#"));
+	}
+
+	@Test
 	void updateIfVersionSucceedsWhenVersionMatches() {
 		store.save(group("g", Arrays.asList("c1"), 1L));
 		SharedSubStore.SharedSubGroup updated = group("g", Arrays.asList("c1", "c2"), 2L);

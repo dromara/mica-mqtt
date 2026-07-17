@@ -1,0 +1,87 @@
+groups:
+  - name: mica-mqtt-cluster
+    rules:
+      - alert: MqttClusterStorageUnavailable
+        expr: mqtt_cluster_storage_healthy == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cluster storage is unavailable on {{ $labels.instance }}"
+
+      - alert: MqttClusterStorageFileLarge
+        expr: mqtt_cluster_storage_file_size_bytes > 1073741824
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cluster storage file exceeds 1 GiB on {{ $labels.instance }}"
+
+      - alert: MqttClusterInflightBacklog
+        expr: mqtt_cluster_inflight_entries > 100000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 100k MQTT packets are awaiting acknowledgement"
+
+      - alert: MqttClusterSessionTakeoverFailureRateHigh
+        expr: |
+          (
+            rate(mqtt_cluster_session_takeover_failed_total[10m])
+            + rate(mqtt_cluster_session_takeover_timed_out_total[10m])
+          )
+          / clamp_min(rate(mqtt_cluster_session_takeover_started_total[10m]), 0.001) > 0.01
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Session takeover failure rate exceeds 1%"
+
+      - alert: MqttClusterInflightExpiryRateHigh
+        expr: |
+          rate(mqtt_cluster_inflight_expired_total[10m])
+          / clamp_min(
+              rate(mqtt_cluster_inflight_replayed_total[10m])
+              + rate(mqtt_cluster_inflight_expired_total[10m]),
+              0.001
+            ) > 0.001
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Inflight expiry proxy exceeds 0.1%; inspect client ACK latency"
+
+      - alert: MqttClusterRetainReplicaLatencyHigh
+        expr: |
+          rate(mqtt_cluster_retain_replica_latency_millis_total[5m])
+          / clamp_min(rate(mqtt_cluster_retain_replica_latency_samples_total[5m]), 0.001) > 5000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Average retained-message replica latency exceeds 5 seconds"
+
+      - alert: MqttClusterStorageStartupSlow
+        expr: mqtt_cluster_storage_startup_duration_millis > 5000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cluster storage startup exceeded 5 seconds"
+
+      - alert: MqttClusterRetainQueryTimeouts
+        expr: rate(mqtt_cluster_retain_query_timed_out_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Remote retained-message queries are timing out"
+
+      - alert: MqttClusterSendErrorsHigh
+        expr: rate(mqtt_cluster_cluster_send_errors_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MQTT cluster send errors exceed 1/s"

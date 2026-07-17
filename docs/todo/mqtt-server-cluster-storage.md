@@ -137,7 +137,7 @@ docs/todo/
 |---|---|
 | Session 写入 | 必须在返回 CONNACK 前同步落 L2 |
 | Retain 写入 | L2 落盘后异步广播（不阻塞发布） |
-| QoS 1/2 飞行消息 | 异步写入 H2（executor 批量刷盘），后台 TTL 线程 30s 清理一次 |
+| QoS 1/2 飞行消息 | 有序异步写入 H2（每次变更 commit），后台 TTL 线程 30s 清理一次 |
 | 共享订阅状态变更 | L2 落盘 -> 广播 -> 收到 >=1 副本 ACK 后才回执客户端 |
 | 节点宕机 | 重启后 L1 必须从 L2 完整恢复，不依赖其他节点 |
 
@@ -535,7 +535,8 @@ public class RetainIndex {
 ```
 Table: mqtt_inflight  (key = "clientId:packetId")
 -------------------------------------------------
-Value 布局:  [expireAt: 8B][MqttPublishMessage 序列化: NB]
+Value 布局:  [expireAt: 8B][topic/payload/qos][phase: 1B]
+phase      = 0(PUBLISH) / 1(PUBREL)，旧记录缺省按 PUBLISH 读取
 expireAt   = System.currentTimeMillis() + session.keepalive * 3
 -------------------------------------------------
 ```
@@ -570,9 +571,9 @@ public void onPubAck(String clientId, int packetId) {
 ```
 
 **关键不变量**：
-- 发送路径只 `writeAndFlush`（不落盘），由 `asyncWriteExecutor` 异步落 H2
+- 发送路径由单线程 `asyncWriteExecutor` 有序落 H2，每次变更 commit，避免强杀后丢失已接受的状态
 - ACK 路径同样异步，避免阻塞 PUBACK 响应
-- H2 MVStore 采用 `autoCommitDisabled()` 模式，由 `executeInTransaction` 或显式 `commit()` 控制刷盘
+- H2 MVStore 采用 `autoCommitDisabled()` 模式；普通 KV 写入及 Inflight 每次变更均显式 `commit()`，优先保证强杀恢复
 
 #### 4.3.3 重连重放
 
@@ -741,7 +742,7 @@ SHARED_SUB_TAKEOVER(19),
 RETAIN_QUERY(20),
 ```
 
-> **v1.2 修正**：原 v1.1 使用 9-19 编号，与 V1 已实现的 WILL_MESSAGE(9)/RETAIN_MESSAGE(10) 冲突。本版起与 cluster v3.0 对齐，V2 占 11-13，V3 占 14-20。移除未实现的 `RETAIN_REPLICATE`（原 code=20，P2.5 可选分片未实现），RETAIN_QUERY 调整为 code=20，总计 20 个枚举值。
+> **v1.2 修正**：原 v1.1 使用 9-19 编号，与 V1 已实现的 WILL_MESSAGE(9)/RETAIN_MESSAGE(10) 冲突。本版起与 cluster v3.0 对齐，V2 占 11-13，V3 存储占 14-20。移除未实现的 `RETAIN_REPLICATE`，RETAIN_QUERY 为 code=20；cluster 另使用 HEARTBEAT(21)，全局总计 21 个枚举值。
 
 向后兼容：旧节点收到新消息类型时记录 warning 并忽略。
 
@@ -822,40 +823,44 @@ MqttServer server = MqttBroker.create()
 
 ### 阶段 0：H2 引入（1 周）
 
-- [ ] 定义 `LocalKvStore` 接口
-- [ ] 实现 `H2MvStoreImpl`
-- [ ] `ClusterMqttSessionManager` 接入
-- [ ] `ClusterMqttMessageStore` retain 接入
-- [ ] **兼容性**：保留内存模式开关，配置化切换
+- [x] 定义 `LocalKvStore` 接口
+- [x] 实现 `H2MvStoreImpl`
+- [x] `ClusterMqttSessionManager` 接入
+- [x] `ClusterMqttMessageStore` retain 接入
+- [x] **兼容性**：保留内存模式开关，配置化切换
 
 ### 阶段 1：Session 跨节点接管（1 周）
 
-- [ ] 新增 SESSION_TAKEOVER 协议
-- [ ] 接管时锁、幂等、超时
-- [ ] sticky 失败场景测试
+- [x] 新增 SESSION_TAKEOVER 协议
+- [x] 接管时租约锁、请求幂等、响应校验与超时清理
+- [x] sticky 失败触发接管及 session/inflight 恢复单元测试
 
 ### 阶段 2：Shared Subscription 持久化（1 周）
 
-- [ ] H2 持久化 owner 状态
-- [ ] backup 副本同步
-- [ ] 重启恢复测试
+> **当前实现说明（2026-07-16）**：V2 dispatcher 本身采用无中心全量路由，因此持久化层复用现有 SUBSCRIBE/UNSUBSCRIBE/STATE_SYNC 通知，在每个 V3 节点维护 `(group, topicFilter)` 全量 H2 副本；owner/backup 由成员所在节点集合确定性计算，节点离开后自动重算。预留协议 18/19 暂不进入主链路。
+
+- [x] H2 持久化 owner/backup 状态（复合键避免同 group 多 topic 覆盖）
+- [x] 副本同步（复用全量订阅通知，远程订阅、退订和节点离开均更新）
+- [x] H2 重启恢复与节点离开提升单元测试
+- [x] 4 个远端节点并发订阅、双节点同时离开后的副本收敛自动化测试
+- [x] 独立进程 3/5 节点 kill -9、成员摘除、同端口重启及 H2 状态恢复验收
 
 ### 阶段 3：H2 Inflight 存储 + TTL 清理（0.5 周）
 
 > **v1.1 变更**：原计划 1 周接入 RocksDB，现简化为 0.5 周实现 H2 + 后台清理线程。
 
-- [ ] `InflightStore` 抽象（接口定义）
-- [ ] `H2InflightStore` 实现（同文件不同 Map）
-- [ ] 后台 TTL 清理线程（30s 周期）
-- [ ] 异步写线程池（不阻塞发送路径）
-- [ ] 客户端重连重放 + 过期过滤
-- [ ] 滞后堆积告警 metrics
+- [x] `InflightStore` 抽象（接口定义）
+- [x] `H2InflightStore` 实现（同文件不同 Map）
+- [x] 后台 TTL 清理线程（30s 周期）
+- [x] 异步写线程池（不阻塞发送路径）
+- [x] 客户端重连重放 + 过期过滤（保留原 packetId、设置 DUP；QoS 2 按持久化 phase 恢复 PUBLISH/PUBREL）
+- [x] inflight 数量、重放计数及 L2 累计读写操作可导出（阈值告警由部署侧配置）
 
 ### 阶段 4：Retain 分片复制（1 周）
 
-- [ ] `RetainShardRouter`
-- [ ] 异步复制协议
-- [ ] 读路径优化
+- [x] `RetainShardRouter`（Rendezvous Hash，RF 可配置）
+- [x] 异步复制与成员变更再平衡
+- [x] 精确 topic 仅查询 replica，通配 topic 聚合远端并按 topic 去重
 
 **总计 ~5 周**。每阶段独立可发布、可回滚。
 
@@ -908,25 +913,25 @@ MqttServer server = MqttBroker.create()
 
 ### 9.1 持久化能力
 
-- [ ] Session 元数据持久化（H2）
-- [ ] Retain 消息持久化（H2）+ 内存 Skiplist 通配索引
-- [ ] Shared Subscription 状态持久化（H2）
-- [ ] QoS 1/2 飞行消息持久化（H2）+ 后台 TTL 清理
+- [x] Session 元数据持久化（H2）
+- [x] Retain 消息持久化（H2）+ 内存 Skiplist 通配索引 + TTL
+- [x] Shared Subscription 状态持久化（H2）
+- [x] QoS 1/2 飞行消息持久化（H2）+ 后台 TTL 清理
 
 ### 9.2 集群能力升级
 
-- [x] 集群级 Session 接管（Client Takeover）— SESSION_TAKEOVER 协议
-- [x] 离线会话状态漫游 — session 持久化 + 跨节点迁移
-- [x] 飞行中消息同步（In-Flight Messages）— H2 + 定时清理重放
-- [x] Retain 持久共享 — H2 持久 + 分片复制
-- [x] Shared Subscription 持久化 — owner 状态 H2 落盘
+- [x] 集群级 Session 接管（Client Takeover）— 协议、owner 侧租约锁、发起端幂等、响应校验、超时清理和运行时订阅恢复已实现；独立进程多节点验收列入 P3
+- [x] 离线会话状态漫游 — Session H2 持久化、跨节点传输、启动扫描恢复、Clean Start/Expiry Interval 与完整 MQTT 5 订阅选项已实现；Clean Session 在崩溃重启时不会误恢复
+- [x] 飞行中消息同步（In-Flight Messages）— H2、TTL、真实 clientId/packetId、QoS 2 PUBLISH/PUBREL phase、ACK 删除、同节点重连及接管时跨节点传输重放已实现；3/5 JVM 强杀持久化恢复已验收
+- [x] Retain 持久共享 — H2/内存索引、TTL、Rendezvous 分片、RF 副本、远程查询与成员变更再平衡已实现
+- [x] Shared Subscription 持久化 — `(group, topicFilter)` 全量 H2 副本、乐观锁重试、确定性 owner/backup、并发订阅及节点离开提升、3/5 JVM 强杀恢复已验收
 
 ### 9.3 可观测性
 
-- [ ] L2 存储大小、读写 QPS 指标
-- [ ] Session 接管次数、失败率
-- [ ] QoS 1/2 重放次数、丢消息率
-- [ ] Retain 消息复制延迟
+- [x] L2 文件大小、全 map entry 数与累计读写操作（周期采样差分得到 QPS）
+- [x] Session 接管次数、失败率 — started/succeeded/failed/timed-out 计数器与 1% 部署告警已实现
+- [x] QoS 1/2 重放次数、过期风险代理 — 重放/TTL 过期计数器与 0.1% 部署告警已实现；无法从 Broker 内部直接证明端到端丢消息率
+- [x] Retain 消息复制延迟累计值与样本数、查询次数/超时次数
 
 ### 9.4 待办（V4+）
 
@@ -949,14 +954,14 @@ MqttServer server = MqttBroker.create()
 ---
 
 **文档版本**：v1.2
-**更新日期**：2026-06-22
-**状态**：设计稿 + V3 部分实现
+**更新日期**：2026-07-16
+**状态**：V3 主链路、离线 Session 启动恢复、10 万 Retain 选择性通配查询基线（P99 1.606ms）、部署告警与带 H2 状态的 3/5 JVM kill -9 恢复均已验收
 **v1.2 变更摘要**（以代码实现为准全面对齐 cluster v3.0）：
 - §3.1 接口签名修正：`executeInTransaction` 改为 `void executeInTransaction(Runnable body)`，接口继承 `AutoCloseable`
 - §3.2 H2 配置修正：`autoCommitDisabled()` 替代原先描述的自动 commit 配置；文件名修正为 `mica-mqtt-store`；补充 `ReentrantReadWriteLock` 线程安全说明
 - §4.1.3 协议号修正：SESSION_TAKEOVER 12-15 → 14-17
 - §4.4.3 协议号修正：SHARED_SUB_STATE_SYNC 16→18，SHARED_SUB_TAKEOVER 17→19
-- §5 全量协议号修正：与 cluster v3.0 / routing v1.2 对齐，V1 占 1-10，V2 占 11-13，V3 占 14-20；移除不存在的 SHARED_SUBSCRIBE_FORWARD/SHARED_PUBLISH_FORWARD/RETAIN_REPLICATE
+- §5 全量协议号修正：与 cluster v3.0 / routing v1.2 对齐，V1 占 1-10，V2 占 11-13，V3 存储占 14-20，集群探活占 21；移除不存在的 SHARED_SUBSCRIBE_FORWARD/SHARED_PUBLISH_FORWARD/RETAIN_REPLICATE
 **配套文档**：
 - `docs/todo/mqtt-server-cluster.md`（基础集群）
 - `docs/todo/mqtt-server-cluster-routing.md`（路由 + 共享订阅）

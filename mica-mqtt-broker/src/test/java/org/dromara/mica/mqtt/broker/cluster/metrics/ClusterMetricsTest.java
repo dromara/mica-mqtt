@@ -35,11 +35,26 @@ class ClusterMetricsTest {
 		m.publishForwardSentInc();
 		m.publishForwardSentInc();
 		m.sharedDispatchSentInc();
+		m.inflightReplayedAdd(3);
+		m.sessionTakeoverStartedInc();
+		m.sessionTakeoverSucceededInc();
+		m.retainReplicaReceived(12L);
+		m.retainQueryRequestsInc();
+		m.retainQueryTimedOutInc();
+		m.nodeDeparturesInc();
 		Map<String, Long> snap = m.snapshot();
-		assertEquals(12, snap.size());
+		assertEquals(23, snap.size());
 		assertEquals(2L, snap.get("publishForwardSent"));
 		assertEquals(1L, snap.get("sharedDispatchSent"));
 		assertEquals(0L, snap.get("sharedDispatchDropped"));
+		assertEquals(3L, snap.get("inflightReplayed"));
+		assertEquals(1L, snap.get("sessionTakeoverStarted"));
+		assertEquals(1L, snap.get("sessionTakeoverSucceeded"));
+		assertEquals(1L, snap.get("retainReplicaReceived"));
+		assertEquals(12L, snap.get("retainReplicaLatencyMillis"));
+		assertEquals(1L, snap.get("retainReplicaLatencySamples"));
+		assertEquals(1L, snap.get("retainQueryTimedOut"));
+		assertEquals(1L, snap.get("nodeDepartures"));
 	}
 
 	@Test

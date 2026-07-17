@@ -21,11 +21,19 @@ import org.h2.mvstore.MVMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -33,8 +41,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>
  * Stores QoS 1/2 inflight messages in a dedicated {@code MVMap} named
  * {@value #MAP_NAME} within the shared {@link H2MvStoreImpl} engine.  Because
- * the inflight write path is in the hot send loop, puts are dispatched to a
- * small async thread pool so that H2 file I/O does not block t-io worker threads.
+ * the inflight write path is in the hot send loop, puts are dispatched to an
+ * ordered async writer so that H2 file I/O does not block t-io worker threads
+ * while preserving put → phase-update → remove ordering for each packet.
  * </p>
  *
  * <h2>Key format</h2>
@@ -55,6 +64,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   [4 bytes] payloadLen (int)
  *   [payloadLen bytes] payload (raw bytes)
  *   [1 byte]  qos
+ *   [1 byte]  phase (0=PUBLISH, 1=PUBREL; absent in legacy records)
  * </pre>
  *
  * @author L.cm
@@ -70,21 +80,11 @@ public class H2InflightStore implements InflightStore {
 	private final MVMap<String, byte[]> map;
 
 	/**
-	 * Small async writer pool — keeps the hot send path non-blocking.
-	 * The pool size of {@value #WRITER_POOL_SIZE} is intentional: inflight writes are sequential
-	 * per clientId and rarely need more than one thread; a second thread covers bursts.
+	 * A single writer is intentional: multiple writers can reorder put, PUBREL phase
+	 * update and ACK removal for the same packet, resurrecting stale inflight state.
 	 */
-	private static final int WRITER_POOL_SIZE = 2;
+	private static final int WRITER_POOL_SIZE = 1;
 	private final ExecutorService asyncWriter;
-
-	/**
-	 * Write counter used for batched commits.
-	 * Using {@code incrementAndGet()} in the async path ensures exactly one thread
-	 * per {@value #COMMIT_BATCH_SIZE} operations triggers a commit.
-	 * The counter is reset after each commit to prevent integer overflow.
-	 */
-	private final AtomicInteger pendingWrites = new AtomicInteger(0);
-	private static final int COMMIT_BATCH_SIZE = 50;
 
 	/**
 	 * Constructs an inflight store using the given shared H2 engine.
@@ -104,17 +104,15 @@ public class H2InflightStore implements InflightStore {
 	@Override
 	public void put(String clientId, int packetId, long expireAt, String topic, byte[] payload, int qos) {
 		String key = buildKey(clientId, packetId);
-		byte[] value = serialize(expireAt, topic, payload, qos);
+		byte[] value = serialize(expireAt, topic, payload, qos, PHASE_PUBLISH);
 		// Async write to avoid blocking the send path.
-		// Commit is batched: getAndIncrement() is atomic so exactly one thread per
-		// COMMIT_BATCH_SIZE operations triggers the commit — no double-fire possible.
+		// The writer is asynchronous, but each accepted mutation is committed so a
+		// kill -9 cannot erase a QoS packet after it became visible to the store.
 		asyncWriter.submit(() -> {
 			try {
 				map.put(key, value);
-				if (pendingWrites.incrementAndGet() % COMMIT_BATCH_SIZE == 0) {
-					pendingWrites.set(0);
-					engine.commit();
-				}
+				engine.recordWriteOperation();
+				engine.commit();
 			} catch (Exception e) {
 				logger.error("[InflightStore] Failed to persist inflight record clientId={} packetId={}", clientId, packetId, e);
 			}
@@ -122,16 +120,33 @@ public class H2InflightStore implements InflightStore {
 	}
 
 	@Override
+	public void updatePhase(String clientId, int packetId, int phase) {
+		String key = buildKey(clientId, packetId);
+		asyncWriter.submit(() -> {
+			try {
+				byte[] current = map.get(key);
+				engine.recordReadOperation();
+				if (current != null) {
+					map.put(key, withPhase(current, phase));
+					engine.recordWriteOperation();
+				}
+				engine.commit();
+			} catch (Exception e) {
+				logger.error("[InflightStore] Failed to update phase clientId={} packetId={} phase={}",
+					clientId, packetId, phase, e);
+			}
+		});
+	}
+
+	@Override
 	public void remove(String clientId, int packetId) {
 		String key = buildKey(clientId, packetId);
-		// Async to keep the ACK path non-blocking; same batched commit as put.
+		// Async to keep the ACK path non-blocking; commit prevents stale replay.
 		asyncWriter.submit(() -> {
 			try {
 				map.remove(key);
-				if (pendingWrites.incrementAndGet() % COMMIT_BATCH_SIZE == 0) {
-					pendingWrites.set(0);
-					engine.commit();
-				}
+				engine.recordWriteOperation();
+				engine.commit();
 			} catch (Exception e) {
 				logger.error("[InflightStore] Failed to remove inflight record clientId={} packetId={}", clientId, packetId, e);
 			}
@@ -140,6 +155,7 @@ public class H2InflightStore implements InflightStore {
 
 	@Override
 	public List<InflightEntry> listByClient(String clientId) {
+		engine.recordReadOperation();
 		String prefix = KEY_PREFIX + clientId + ":";
 		List<InflightEntry> result = new ArrayList<>();
 		Cursor<String, byte[]> cursor = map.cursor(prefix);
@@ -158,6 +174,7 @@ public class H2InflightStore implements InflightStore {
 
 	@Override
 	public int removeExpired(long nowMs) {
+		engine.recordReadOperation();
 		List<String> toRemove = new ArrayList<>();
 		// Use prefix cursor to avoid scanning unrelated map entries.
 		Cursor<String, byte[]> cursor = map.cursor(KEY_PREFIX);
@@ -179,6 +196,7 @@ public class H2InflightStore implements InflightStore {
 		if (!toRemove.isEmpty()) {
 			for (String key : toRemove) {
 				map.remove(key);
+				engine.recordWriteOperation();
 			}
 			engine.commit();
 			logger.debug("[InflightStore] Removed {} expired inflight records", toRemove.size());
@@ -188,6 +206,7 @@ public class H2InflightStore implements InflightStore {
 
 	@Override
 	public long count() {
+		engine.recordReadOperation();
 		return map.sizeAsLong();
 	}
 
@@ -208,7 +227,7 @@ public class H2InflightStore implements InflightStore {
 			asyncWriter.shutdownNow();
 			Thread.currentThread().interrupt();
 		}
-		// Flush any pending writes that were batched but not yet committed.
+		// Final defensive flush after the writer queue has drained.
 		engine.commit();
 	}
 
@@ -257,8 +276,12 @@ public class H2InflightStore implements InflightStore {
 	 * </pre>
 	 */
 	static byte[] serialize(long expireAt, String topic, byte[] payload, int qos) {
+		return serialize(expireAt, topic, payload, qos, PHASE_PUBLISH);
+	}
+
+	static byte[] serialize(long expireAt, String topic, byte[] payload, int qos, int phase) {
 		byte[] topicBytes = topic.getBytes(StandardCharsets.UTF_8);
-		int size = 8 + 4 + topicBytes.length + 4 + (payload == null ? 0 : payload.length) + 1;
+		int size = 8 + 4 + topicBytes.length + 4 + (payload == null ? 0 : payload.length) + 2;
 		ByteArrayOutputStream baos = new ByteArrayOutputStream(size);
 		try (DataOutputStream dos = new DataOutputStream(baos)) {
 			dos.writeLong(expireAt);
@@ -270,6 +293,7 @@ public class H2InflightStore implements InflightStore {
 				dos.write(payload);
 			}
 			dos.writeByte(qos);
+			dos.writeByte(phase);
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to serialize inflight record", e);
 		}
@@ -292,6 +316,7 @@ public class H2InflightStore implements InflightStore {
 				dis.readFully(payload);
 			}
 			int qos = dis.readByte() & 0xFF;
+			int phase = dis.available() > 0 ? dis.readByte() & 0xFF : PHASE_PUBLISH;
 
 			// Extract packetId from key: "inflight:{clientId}:{packetId}"
 			int lastColon = key.lastIndexOf(':');
@@ -303,10 +328,36 @@ public class H2InflightStore implements InflightStore {
 					logger.warn("[InflightStore] Invalid packetId in key: {}", key);
 				}
 			}
-			return new InflightEntry(clientId, packetId, expireAt, topic, payload, qos);
+			return new InflightEntry(clientId, packetId, expireAt, topic, payload, qos, phase);
 		} catch (IOException e) {
 			logger.warn("[InflightStore] Failed to deserialize inflight record key={}", key, e);
 			return null;
+		}
+	}
+
+	private static byte[] withPhase(byte[] value, int phase) throws IOException {
+		try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(value))) {
+			dis.readLong();
+			int topicLength = dis.readInt();
+			if (topicLength < 0 || topicLength > dis.available()) {
+				throw new IOException("Invalid inflight topic length: " + topicLength);
+			}
+			dis.skipBytes(topicLength);
+			int payloadLength = dis.readInt();
+			if (payloadLength < 0 || payloadLength > dis.available()) {
+				throw new IOException("Invalid inflight payload length: " + payloadLength);
+			}
+			dis.skipBytes(payloadLength);
+			dis.readByte();
+			int phaseOffset = value.length - dis.available();
+			if (dis.available() > 0) {
+				byte[] updated = java.util.Arrays.copyOf(value, value.length);
+				updated[phaseOffset] = (byte) phase;
+				return updated;
+			}
+			byte[] updated = java.util.Arrays.copyOf(value, value.length + 1);
+			updated[value.length] = (byte) phase;
+			return updated;
 		}
 	}
 

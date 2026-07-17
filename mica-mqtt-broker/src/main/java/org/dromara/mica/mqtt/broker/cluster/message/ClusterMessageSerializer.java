@@ -19,6 +19,11 @@ package org.dromara.mica.mqtt.broker.cluster.message;
 import net.dreamlu.mica.net.server.cluster.message.ClusterDataMessage;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -41,6 +46,9 @@ import java.util.Map;
  * @since 1.0.0
  */
 public class ClusterMessageSerializer {
+	private static final int ENVELOPE_MAGIC = 0x4D514343;
+	private static final int MAX_ENVELOPE_HEADERS = 64;
+	private static final int SUBSCRIPTION_FORMAT_V2 = -2;
 	/**
 	 * Header key for message type code.
 	 */
@@ -79,7 +87,10 @@ public class ClusterMessageSerializer {
 		headers.put(HEADER_SOURCE_NODE, sourceNode);
 		msg.toClusterData(headers);
 		byte[] payload = msg.toPayload();
-		return new ClusterDataMessage(System.currentTimeMillis(), headers, payload.length > 0 ? payload : null);
+		// Keep the MQTT envelope in the binary payload. This avoids depending on
+		// mica-net's optional JSON header codec, which is not present in every
+		// runtime distribution. fromClusterData still accepts the legacy format.
+		return new ClusterDataMessage(System.currentTimeMillis(), null, encodeEnvelope(headers, payload));
 	}
 
 	/**
@@ -92,6 +103,7 @@ public class ClusterMessageSerializer {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ClusterMessage> T fromClusterData(ClusterDataMessage data) {
+		data = unwrapEnvelope(data);
 		int typeCode = Integer.parseInt(data.getHeader(HEADER_TYPE));
 		ClusterMessageType type;
 		try {
@@ -116,7 +128,75 @@ public class ClusterMessageSerializer {
 	 * @return the source node identifier
 	 */
 	public static String getSourceNode(ClusterDataMessage data) {
-		return data.getHeader(HEADER_SOURCE_NODE);
+		return unwrapEnvelope(data).getHeader(HEADER_SOURCE_NODE);
+	}
+
+	private static byte[] encodeEnvelope(Map<String, String> headers, byte[] payload) {
+		try {
+			ByteArrayOutputStream bytes = new ByteArrayOutputStream(128 + payload.length);
+			DataOutputStream output = new DataOutputStream(bytes);
+			output.writeInt(ENVELOPE_MAGIC);
+			output.writeInt(headers.size());
+			for (Map.Entry<String, String> entry : headers.entrySet()) {
+				writeEnvelopeString(output, entry.getKey());
+				writeEnvelopeString(output, entry.getValue());
+			}
+			output.writeInt(payload.length);
+			output.write(payload);
+			output.flush();
+			return bytes.toByteArray();
+		} catch (IOException e) {
+			throw new IllegalStateException("Failed to encode cluster envelope", e);
+		}
+	}
+
+	private static ClusterDataMessage unwrapEnvelope(ClusterDataMessage data) {
+		if (data.getHeader(HEADER_TYPE) != null) {
+			return data;
+		}
+		byte[] payload = data.getPayload();
+		if (payload == null || payload.length < 12) {
+			return data;
+		}
+		try {
+			DataInputStream input = new DataInputStream(new ByteArrayInputStream(payload));
+			if (input.readInt() != ENVELOPE_MAGIC) {
+				return data;
+			}
+			int headerCount = input.readInt();
+			if (headerCount < 0 || headerCount > MAX_ENVELOPE_HEADERS) {
+				throw new IllegalArgumentException("Invalid cluster envelope header count: " + headerCount);
+			}
+			Map<String, String> headers = new HashMap<>(headerCount);
+			for (int i = 0; i < headerCount; i++) {
+				headers.put(readEnvelopeString(input), readEnvelopeString(input));
+			}
+			int payloadLength = input.readInt();
+			if (payloadLength < 0 || payloadLength > input.available()) {
+				throw new IllegalArgumentException("Invalid cluster envelope payload length: " + payloadLength);
+			}
+			byte[] messagePayload = new byte[payloadLength];
+			input.readFully(messagePayload);
+			return new ClusterDataMessage(data.getTimestamp(), headers, messagePayload);
+		} catch (IOException e) {
+			throw new IllegalArgumentException("Failed to decode cluster envelope", e);
+		}
+	}
+
+	private static void writeEnvelopeString(DataOutputStream output, String value) throws IOException {
+		byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+		output.writeInt(bytes.length);
+		output.write(bytes);
+	}
+
+	private static String readEnvelopeString(DataInputStream input) throws IOException {
+		int length = input.readInt();
+		if (length < 0 || length > input.available()) {
+			throw new IllegalArgumentException("Invalid cluster envelope string length: " + length);
+		}
+		byte[] bytes = new byte[length];
+		input.readFully(bytes);
+		return new String(bytes, StandardCharsets.UTF_8);
 	}
 
 	private static ClusterMessage createMessage(ClusterMessageType type) {
@@ -147,10 +227,13 @@ public class ClusterMessageSerializer {
 		case SHARED_SUBSCRIBE_REMOVE:
 		case SHARED_SUB_STATE_SYNC:
 		case SHARED_SUB_TAKEOVER:
-		case RETAIN_QUERY:
 			// V2 shared-subscribe notifications and V3 storage messages that
 			// are still under development; the caller will skip the null return.
 			return null;
+			case RETAIN_QUERY:
+				return new RetainQueryMessage();
+			case HEARTBEAT:
+				return new HeartbeatMessage();
 		case SESSION_TAKEOVER_REQUEST:
 			return new SessionTakeoverRequestMessage();
 		case SESSION_TAKEOVER_RESPONSE:
@@ -175,12 +258,18 @@ public class ClusterMessageSerializer {
 			return new byte[0];
 		}
 		ByteBuffer buf = ByteBuffer.allocate(calculateSubscriptionsLength(subscriptions));
+		// A negative marker distinguishes the complete MQTT 5 subscription format
+		// from the legacy qos/noLocal-only format, whose first int was a count.
+		buf.putInt(SUBSCRIPTION_FORMAT_V2);
 		buf.putInt(subscriptions.size());
 		for (Subscribe sub : subscriptions) {
 			writeString(buf, sub.getTopicFilter());
 			writeString(buf, sub.getClientId());
 			buf.put((byte) sub.getMqttQoS());
 			buf.put(sub.isNoLocal() ? (byte) 1 : 0);
+			buf.put(sub.isRetainAsPublished() ? (byte) 1 : 0);
+			buf.put((byte) sub.getRetainHandling());
+			buf.putInt(sub.getSubscriptionId());
 		}
 		byte[] result = new byte[buf.position()];
 		buf.flip();
@@ -199,7 +288,9 @@ public class ClusterMessageSerializer {
 			return null;
 		}
 		ByteBuffer buf = ByteBuffer.wrap(data);
-		int size = buf.getInt();
+		int marker = buf.getInt();
+		boolean completeOptions = marker == SUBSCRIPTION_FORMAT_V2;
+		int size = completeOptions ? buf.getInt() : marker;
 		if (size == 0) {
 			return null;
 		}
@@ -210,6 +301,11 @@ public class ClusterMessageSerializer {
 			sub.setClientId(readString(buf));
 			sub.setMqttQoS(buf.get() & 0xFF);
 			sub.setNoLocal(buf.get() == 1);
+			if (completeOptions) {
+				sub.setRetainAsPublished(buf.get() == 1);
+				sub.setRetainHandling(buf.get() & 0xFF);
+				sub.setSubscriptionId(buf.getInt());
+			}
 			list.add(sub);
 		}
 		return list;
@@ -351,11 +447,11 @@ public class ClusterMessageSerializer {
 	}
 
 	private static int calculateSubscriptionsLength(List<Subscribe> subscriptions) {
-		int len = 4;
+		int len = 8;
 		for (Subscribe sub : subscriptions) {
 			len += 2 + stringBytes(sub.getTopicFilter());
 			len += 2 + stringBytes(sub.getClientId());
-			len += 2;
+			len += 8;
 		}
 		return len;
 	}

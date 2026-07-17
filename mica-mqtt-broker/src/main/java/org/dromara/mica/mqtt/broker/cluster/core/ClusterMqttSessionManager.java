@@ -16,10 +16,24 @@
 
 package org.dromara.mica.mqtt.broker.cluster.core;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Tio;
+import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.broker.cluster.message.SubscribeNotifyMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.UnsubscribeNotifyMessage;
+import org.dromara.mica.mqtt.broker.cluster.store.InflightStore;
 import org.dromara.mica.mqtt.broker.cluster.store.SessionStore;
 import org.dromara.mica.mqtt.broker.cluster.store.SharedSubStore;
+import org.dromara.mica.mqtt.codec.MqttMessageType;
+import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttPubRelReasonCode;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
+import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttPubReplyMessageVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttPublishVariableHeader;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
@@ -32,8 +46,11 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -56,8 +73,11 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	private final IMqttSessionManager delegate;
 	private final MqttClusterManager clusterManager;
 	private final ConcurrentHashMap<String, String> clientNodeMap = new ConcurrentHashMap<>();
+	private final ConcurrentHashMap<String, ConcurrentHashMap<String, Subscribe>> routeSubscriptions = new ConcurrentHashMap<>();
 	private volatile SessionStore sessionStore;
 	private volatile SharedSubStore sharedSubStore;
+	private volatile InflightStore inflightStore;
+	private volatile long inflightTtlMs;
 
 	/**
 	 * Constructs a cluster session manager wrapping the specified delegate.
@@ -92,13 +112,40 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	}
 
 	/**
+	 * Marks a client as locally owned. Local clients are represented by the
+	 * absence of an entry in {@link #clientNodeMap}.
+	 *
+	 * @param clientId the client that connected to this node
+	 */
+	public void markLocalClient(String clientId) {
+		clientNodeMap.remove(clientId);
+	}
+
+	/**
+	 * Applies a session ownership change while preserving the fully replicated
+	 * subscription routes on every node.
+	 */
+	public void applySessionMigration(String clientId, String newOwnerNodeId) {
+		if (clientId == null || newOwnerNodeId == null) {
+			return;
+		}
+		if (clusterManager.getLocalNodeId().equals(newOwnerNodeId)) {
+			markLocalClient(clientId);
+		} else {
+			clientNodeMap.put(clientId, newOwnerNodeId);
+		}
+	}
+
+	/**
 	 * Removes a remote client registration and cleans up its session.
 	 *
 	 * @param clientId the client identifier
 	 */
 	public void removeRemoteClient(String clientId) {
 		String node = clientNodeMap.remove(clientId);
+		Map<String, Subscribe> removed = routeSubscriptions.remove(clientId);
 		delegate.remove(clientId);
+		removeSharedMembership(removed, clientId);
 		logger.debug("[Cluster] Removed remote client: {} from node: {}", clientId, node);
 	}
 
@@ -110,7 +157,9 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void clearNodeClientsAndSubscriptions(String nodeId) {
 		clientNodeMap.entrySet().removeIf(entry -> {
 			if (entry.getValue().equals(nodeId)) {
+				Map<String, Subscribe> removed = routeSubscriptions.remove(entry.getKey());
 				delegate.remove(entry.getKey());
+				removeSharedMembership(removed, entry.getKey());
 				return true;
 			}
 			return false;
@@ -135,7 +184,11 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		}
 		for (Subscribe sub : subscriptions) {
 			delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), clientId, sub.getMqttQoS(), sub.isNoLocal(),
-				sub.isRetainAsPublished(), sub.getRetainHandling());
+				sub.isRetainAsPublished(), sub.getRetainHandling(), sub.getSubscriptionId());
+			Subscribe tracked = copySubscription(sub);
+			tracked.setClientId(clientId);
+			trackSubscription(tracked);
+			updateSharedGroupOnSubscribe(sub.getTopicFilter(), clientId);
 			logger.debug("[Cluster] Synced remote subscription: client={}, topic={}, node={}",
 				clientId, sub.getTopicFilter(), nodeId);
 		}
@@ -150,6 +203,8 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void removeRemoteSubscriptions(String clientId, List<String> topics) {
 		for (String topic : topics) {
 			delegate.removeSubscribe(topic, clientId);
+			removeTrackedSubscription(clientId, topic);
+			updateSharedGroupOnUnsubscribe(topic, clientId);
 			logger.debug("[Cluster] Removed remote subscription: client={}, topic={}", clientId, topic);
 		}
 	}
@@ -157,10 +212,17 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	@Override
 	public boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal,
 								boolean retainAsPublished, int retainHandling) {
+		return addSubscribe(topicFilter, clientId, mqttQoS, noLocal, retainAsPublished, retainHandling, 0);
+	}
+
+	@Override
+	public boolean addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal,
+								boolean retainAsPublished, int retainHandling, int subscriptionId) {
 		boolean newSubscription = delegate.addSubscribe(topicFilter, clientId, mqttQoS, noLocal,
-			retainAsPublished, retainHandling);
+			retainAsPublished, retainHandling, subscriptionId);
 		Subscribe subscribe = new Subscribe(topicFilter.getTopic(), clientId, mqttQoS, noLocal,
-			retainAsPublished, retainHandling);
+			retainAsPublished, retainHandling, subscriptionId);
+		trackSubscription(subscribe);
 		afterSubscribe(topicFilter, clientId, subscribe);
 		return newSubscription;
 	}
@@ -190,6 +252,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	@Override
 	public void removeSubscribe(String topicFilter, String clientId) {
 		delegate.removeSubscribe(topicFilter, clientId);
+		removeTrackedSubscription(clientId, topicFilter);
 
 		if (clusterManager.isClusterEnabled()) {
 			UnsubscribeNotifyMessage notifyMessage = new UnsubscribeNotifyMessage();
@@ -222,21 +285,25 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 			return;
 		}
 		String underlyingTopic = extractUnderlyingTopic(topicFilter);
-		SharedSubStore.SharedSubGroup current = sharedSubStore.get(groupName);
-		long version = current == null ? 0L : current.getVersion();
-		java.util.List<String> members = new java.util.ArrayList<>();
-		if (current != null && current.getMembers() != null) {
-			members.addAll(current.getMembers());
+		while (true) {
+			SharedSubStore.SharedSubGroup current = sharedSubStore.get(groupName, underlyingTopic);
+			long version = current == null ? 0L : current.getVersion();
+			java.util.List<String> members = new java.util.ArrayList<>();
+			if (current != null && current.getMembers() != null) {
+				members.addAll(current.getMembers());
+			}
+			if (!members.contains(clientId)) {
+				members.add(clientId);
+			}
+			String[] owners = selectSharedGroupOwners(groupName, underlyingTopic, members);
+			SharedSubStore.SharedSubGroup updated = new SharedSubStore.SharedSubGroup(
+				groupName, underlyingTopic, members,
+				owners[0], owners[1],
+				version + 1, System.currentTimeMillis());
+			if (sharedSubStore.updateIfVersion(updated, version)) {
+				return;
+			}
 		}
-		if (!members.contains(clientId)) {
-			members.add(clientId);
-		}
-		SharedSubStore.SharedSubGroup updated = new SharedSubStore.SharedSubGroup(
-			groupName, underlyingTopic, members,
-			current == null ? clusterManager.getLocalNodeId() : current.getOwnerNodeId(),
-			current == null ? null : current.getBackupNodeId(),
-			version + 1, System.currentTimeMillis());
-		sharedSubStore.save(updated);
 	}
 
 	/**
@@ -254,20 +321,53 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		if (groupName == null) {
 			return;
 		}
-		SharedSubStore.SharedSubGroup current = sharedSubStore.get(groupName);
-		if (current == null || current.getMembers() == null || !current.getMembers().contains(clientId)) {
+		String underlyingTopic = extractUnderlyingTopic(topicFilter);
+		while (true) {
+			SharedSubStore.SharedSubGroup current = sharedSubStore.get(groupName, underlyingTopic);
+			if (current == null || current.getMembers() == null || !current.getMembers().contains(clientId)) {
+				return;
+			}
+			java.util.List<String> members = new java.util.ArrayList<>(current.getMembers());
+			members.remove(clientId);
+			if (members.isEmpty()) {
+				if (sharedSubStore.deleteIfVersion(groupName, underlyingTopic, current.getVersion())) {
+					return;
+				}
+			} else {
+				String[] owners = selectSharedGroupOwners(groupName, underlyingTopic, members);
+				SharedSubStore.SharedSubGroup updated = new SharedSubStore.SharedSubGroup(
+					groupName, current.getTopicFilter(), members,
+					owners[0], owners[1],
+					current.getVersion() + 1, System.currentTimeMillis());
+				if (sharedSubStore.updateIfVersion(updated, current.getVersion())) {
+					return;
+				}
+			}
+		}
+	}
+
+	private String[] selectSharedGroupOwners(String groupName, String topicFilter, List<String> members) {
+		Set<String> nodes = new TreeSet<>();
+		for (String member : members) {
+			String node = clientNodeMap.get(member);
+			nodes.add(node == null ? clusterManager.getLocalNodeId() : node);
+		}
+		if (nodes.isEmpty()) {
+			return new String[]{null, null};
+		}
+		List<String> ordered = new ArrayList<>(nodes);
+		int ownerIndex = Math.floorMod((groupName + '\u0000' + topicFilter).hashCode(), ordered.size());
+		String owner = ordered.get(ownerIndex);
+		String backup = ordered.size() > 1 ? ordered.get((ownerIndex + 1) % ordered.size()) : null;
+		return new String[]{owner, backup};
+	}
+
+	private void removeSharedMembership(Map<String, Subscribe> subscriptions, String clientId) {
+		if (subscriptions == null) {
 			return;
 		}
-		java.util.List<String> members = new java.util.ArrayList<>(current.getMembers());
-		members.remove(clientId);
-		if (members.isEmpty()) {
-			sharedSubStore.delete(groupName);
-		} else {
-			SharedSubStore.SharedSubGroup updated = new SharedSubStore.SharedSubGroup(
-				groupName, current.getTopicFilter(), members,
-				current.getOwnerNodeId(), current.getBackupNodeId(),
-				current.getVersion() + 1, System.currentTimeMillis());
-			sharedSubStore.save(updated);
+		for (Subscribe subscribe : subscriptions.values()) {
+			updateSharedGroupOnUnsubscribe(subscribe.getTopicFilter(), clientId);
 		}
 	}
 
@@ -316,7 +416,8 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		}
 		List<Subscribe> subs = delegate.getSubscriptions(clientId);
 		SessionStore.Session session = new SessionStore.Session(
-			clientId, subs, false, 0L, clusterManager.getLocalNodeId());
+			clientId, subs, delegate.isCleanStart(clientId),
+			delegate.getSessionExpiryInterval(clientId), clusterManager.getLocalNodeId());
 		sessionStore.save(clientId, session);
 	}
 
@@ -328,6 +429,18 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 */
 	public void setSessionStore(SessionStore sessionStore) {
 		this.sessionStore = sessionStore;
+		if (sessionStore == null) {
+			return;
+		}
+		for (SessionStore.Session session : sessionStore.loadAll()) {
+			// A clean session that survived only because the process crashed must not
+			// become an offline session after restart.
+			if (session.isCleanSession()) {
+				sessionStore.delete(session.getClientId());
+				continue;
+			}
+			restoreLocalSession(session);
+		}
 	}
 
 	/**
@@ -338,6 +451,11 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 */
 	public void setSharedSubStore(SharedSubStore sharedSubStore) {
 		this.sharedSubStore = sharedSubStore;
+	}
+
+	public void setInflightStore(InflightStore inflightStore, long inflightTtlMs) {
+		this.inflightStore = inflightStore;
+		this.inflightTtlMs = inflightTtlMs;
 	}
 
 	/**
@@ -372,6 +490,36 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 			// persistent group membership so the strategy won't pick it.
 			updateSharedGroupOnUnsubscribe(s.getTopicFilter(), clientId);
 		}
+		routeSubscriptions.remove(clientId);
+	}
+
+	/**
+	 * Restores a persisted session into the live local subscription table after
+	 * a successful cross-node takeover. This method deliberately avoids emitting
+	 * subscribe broadcasts because peers already hold the full replicated route;
+	 * the subsequent session-migrated notification only changes its owner node.
+	 *
+	 * @param session the persisted session returned by the previous owner
+	 */
+	public void restoreLocalSession(SessionStore.Session session) {
+		if (session == null || session.getClientId() == null) {
+			return;
+		}
+		markLocalClient(session.getClientId());
+		delegate.setSessionExpiryInterval(session.getClientId(),
+			(int) Math.min(Integer.MAX_VALUE, session.getSessionExpirySeconds()), session.isCleanSession());
+		List<Subscribe> subscriptions = session.getSubscriptions();
+		if (subscriptions == null) {
+			return;
+		}
+		for (Subscribe subscribe : subscriptions) {
+			delegate.addSubscribe(new TopicFilter(subscribe.getTopicFilter()), session.getClientId(),
+				subscribe.getMqttQoS(), subscribe.isNoLocal(), subscribe.isRetainAsPublished(),
+				subscribe.getRetainHandling(), subscribe.getSubscriptionId());
+			Subscribe restored = copySubscription(subscribe);
+			restored.setClientId(session.getClientId());
+			trackSubscription(restored);
+		}
 	}
 
 	@Override
@@ -381,19 +529,20 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public List<Subscribe> searchSubscribe(String topic) {
-		List<Subscribe> allSubscribers = delegate.searchSubscribe(topic);
-		if (allSubscribers == null || allSubscribers.isEmpty()) {
-			return allSubscribers;
+		if (!clusterManager.isClusterEnabled()) {
+			return delegate.searchSubscribe(topic);
 		}
-		String localNodeId = clusterManager.getLocalNodeId();
-		List<Subscribe> localSubscribers = new ArrayList<>(allSubscribers.size());
-		for (Subscribe sub : allSubscribers) {
-			String node = clientNodeMap.get(sub.getClientId());
-			if (node == null || node.equals(localNodeId)) {
-				localSubscribers.add(sub);
+		List<Subscribe> matches = findMatchingSubscriptions(topic, false, false);
+		Map<String, Subscribe> byClient = new LinkedHashMap<>();
+		for (Subscribe sub : matches) {
+			Subscribe current = byClient.get(sub.getClientId());
+			if (current == null) {
+				byClient.put(sub.getClientId(), copySubscription(sub));
+			} else {
+				mergeSubscription(current, sub);
 			}
 		}
-		return localSubscribers;
+		return new ArrayList<>(byClient.values());
 	}
 
 	/**
@@ -407,7 +556,60 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @return the list of all subscribers, or null if no subscriptions exist
 	 */
 	public List<Subscribe> searchAllSubscribe(String topic) {
-		return delegate.searchSubscribe(topic);
+		return findMatchingSubscriptions(topic, true, true);
+	}
+
+	private List<Subscribe> findMatchingSubscriptions(String topic, boolean includeRemote, boolean includeShared) {
+		List<Subscribe> matches = new ArrayList<>();
+		for (Map.Entry<String, ConcurrentHashMap<String, Subscribe>> entry : routeSubscriptions.entrySet()) {
+			String clientId = entry.getKey();
+			if (!includeRemote && clientNodeMap.containsKey(clientId)) {
+				continue;
+			}
+			for (Subscribe sub : entry.getValue().values()) {
+				TopicFilter filter = new TopicFilter(sub.getTopicFilter());
+				if (!includeShared && (filter.isShared() || filter.isQueue())) {
+					continue;
+				}
+				if (filter.match(topic)) {
+					matches.add(copySubscription(sub));
+				}
+			}
+		}
+		return matches;
+	}
+
+	private void trackSubscription(Subscribe subscribe) {
+		if (subscribe == null || subscribe.getClientId() == null || subscribe.getTopicFilter() == null) {
+			return;
+		}
+		routeSubscriptions.computeIfAbsent(subscribe.getClientId(), key -> new ConcurrentHashMap<>())
+			.put(subscribe.getTopicFilter(), copySubscription(subscribe));
+	}
+
+	private void removeTrackedSubscription(String clientId, String topicFilter) {
+		ConcurrentHashMap<String, Subscribe> subscriptions = routeSubscriptions.get(clientId);
+		if (subscriptions == null) {
+			return;
+		}
+		subscriptions.remove(topicFilter);
+		if (subscriptions.isEmpty()) {
+			routeSubscriptions.remove(clientId, subscriptions);
+		}
+	}
+
+	private static Subscribe copySubscription(Subscribe source) {
+		return new Subscribe(source.getTopicFilter(), source.getClientId(), source.getMqttQoS(),
+			source.isNoLocal(), source.isRetainAsPublished(), source.getRetainHandling(), source.getSubscriptionId());
+	}
+
+	private static void mergeSubscription(Subscribe target, Subscribe source) {
+		target.setMqttQoS(Math.max(target.getMqttQoS(), source.getMqttQoS()));
+		target.setNoLocal(target.isNoLocal() && source.isNoLocal());
+		target.setRetainAsPublished(target.isRetainAsPublished() || source.isRetainAsPublished());
+		if (target.getSubscriptionId() == 0) {
+			target.setSubscriptionId(source.getSubscriptionId());
+		}
 	}
 
 	/**
@@ -457,6 +659,10 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 			for (Subscribe sub : entry.getValue()) {
 				delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), entry.getKey(), sub.getMqttQoS(), sub.isNoLocal(),
 					sub.isRetainAsPublished(), sub.getRetainHandling());
+				Subscribe tracked = copySubscription(sub);
+				tracked.setClientId(entry.getKey());
+				trackSubscription(tracked);
+				updateSharedGroupOnSubscribe(sub.getTopicFilter(), entry.getKey());
 			}
 		}
 	}
@@ -469,6 +675,11 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	@Override
 	public void addPendingPublish(String clientId, int messageId, MqttPendingPublish pendingPublish) {
 		delegate.addPendingPublish(clientId, messageId, pendingPublish);
+		if (inflightStore != null && pendingPublish != null && pendingPublish.getMessage() != null) {
+			inflightStore.put(clientId, messageId, System.currentTimeMillis() + inflightTtlMs,
+				pendingPublish.getMessage().variableHeader().topicName(), pendingPublish.getMessage().payload(),
+				pendingPublish.getMessage().fixedHeader().qosLevel().value());
+		}
 	}
 
 	@Override
@@ -479,6 +690,137 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	@Override
 	public void removePendingPublish(String clientId, int messageId) {
 		delegate.removePendingPublish(clientId, messageId);
+		if (inflightStore != null) {
+			inflightStore.remove(clientId, messageId);
+		}
+	}
+
+	@Override
+	public void markPendingPublishPubRel(String clientId, int messageId) {
+		delegate.markPendingPublishPubRel(clientId, messageId);
+		if (inflightStore != null) {
+			inflightStore.updatePhase(clientId, messageId, InflightStore.PHASE_PUBREL);
+		}
+	}
+
+	/**
+	 * Replays durable QoS 1/2 PUBLISH records after a client reconnects. The
+	 * original packet identifier is preserved and DUP is set as required by MQTT.
+	 *
+	 * @param context the newly connected client channel
+	 * @param clientId the reconnecting client identifier
+	 * @param taskService timer used for subsequent retransmissions
+	 * @return number of PUBLISH/PUBREL packets submitted to the channel
+	 */
+	public int replayInflight(ChannelContext context, String clientId, TimerTaskService taskService) {
+		if (clientId == null || inflightStore == null) {
+			return 0;
+		}
+		return replayInflight(context, clientId, inflightStore.listByClient(clientId), taskService);
+	}
+
+	/**
+	 * Replays records supplied by a previous cluster owner during session takeover.
+	 */
+	public int replayInflight(ChannelContext context, String clientId,
+						  List<InflightStore.InflightEntry> entries, TimerTaskService taskService) {
+		if (context == null || context.isClosed() || clientId == null || taskService == null) {
+			return 0;
+		}
+		List<InflightStore.InflightEntry> clientEntries = new ArrayList<>();
+		if (entries != null) {
+			for (InflightStore.InflightEntry entry : entries) {
+				if (entry != null && clientId.equals(entry.getClientId())) {
+					clientEntries.add(entry);
+				}
+			}
+		}
+		List<MqttMessage> messages = restoreInflight(clientEntries, System.currentTimeMillis());
+		int replayed = 0;
+		for (MqttMessage message : messages) {
+			int packetId = getPacketId(message);
+			MqttPendingPublish pending = delegate.getPendingPublish(clientId, packetId);
+			if (pending == null) {
+				continue;
+			}
+			if (message.fixedHeader().messageType() == MqttMessageType.PUBREL) {
+				pending.startPubRelRetransmissionTimer(taskService, context);
+			} else {
+				pending.startPublishRetransmissionTimer(taskService, context);
+			}
+			if (Tio.send(context, message)) {
+				replayed++;
+			}
+		}
+		return replayed;
+	}
+
+	private static int getPacketId(MqttMessage message) {
+		if (message.variableHeader() instanceof MqttPublishVariableHeader) {
+			return ((MqttPublishVariableHeader) message.variableHeader()).packetId();
+		}
+		return ((MqttMessageIdVariableHeader) message.variableHeader()).messageId();
+	}
+
+	/**
+	 * Rebuilds the in-memory pending table from durable records. Kept package
+	 * visible so the packet-id, expiry and DUP semantics can be unit-tested
+	 * without opening a network channel.
+	 */
+	List<MqttMessage> restoreInflight(List<InflightStore.InflightEntry> entries, long nowMs) {
+		List<MqttMessage> messages = new ArrayList<>();
+		if (entries == null) {
+			return messages;
+		}
+		for (InflightStore.InflightEntry entry : entries) {
+			if (entry == null || entry.getClientId() == null) {
+				continue;
+			}
+			if (entry.getExpireAt() > 0 && entry.getExpireAt() <= nowMs) {
+				if (inflightStore != null) {
+					inflightStore.remove(entry.getClientId(), entry.getPacketId());
+				}
+				continue;
+			}
+			if (entry.getPacketId() < 1 || entry.getPacketId() > 65_535
+				|| (entry.getQos() != MqttQoS.QOS1.value() && entry.getQos() != MqttQoS.QOS2.value())
+				|| (entry.getPhase() != InflightStore.PHASE_PUBLISH && entry.getPhase() != InflightStore.PHASE_PUBREL)
+				|| (entry.getPhase() == InflightStore.PHASE_PUBREL && entry.getQos() != MqttQoS.QOS2.value())
+				|| entry.getTopic() == null || entry.getPayload() == null) {
+				logger.warn("[Cluster] Ignoring invalid inflight record clientId={} packetId={} qos={}",
+					entry.getClientId(), entry.getPacketId(), entry.getQos());
+				continue;
+			}
+			MqttPendingPublish existing = delegate.getPendingPublish(entry.getClientId(), entry.getPacketId());
+			if (existing != null) {
+				existing.onPubAckReceived();
+				existing.onPubCompReceived();
+			}
+			MqttQoS qos = MqttQoS.valueOf(entry.getQos());
+			MqttPublishMessage message = MqttPublishMessage.builder()
+				.topicName(entry.getTopic())
+				.payload(entry.getPayload())
+				.qos(qos)
+				.isDup(true)
+				.messageId(entry.getPacketId())
+				.build();
+			MqttPendingPublish pending = new MqttPendingPublish(message, qos);
+			MqttMessage replayMessage = message;
+			if (entry.getPhase() == InflightStore.PHASE_PUBREL) {
+				MqttFixedHeader fixedHeader = new MqttFixedHeader(
+					MqttMessageType.PUBREL, true, MqttQoS.QOS1, false, 0);
+				MqttPubReplyMessageVariableHeader variableHeader = new MqttPubReplyMessageVariableHeader(
+					entry.getPacketId(), MqttPubRelReasonCode.SUCCESS.value(), MqttProperties.NO_PROPERTIES);
+				replayMessage = new MqttMessage(fixedHeader, variableHeader);
+				pending.setPubRelMessage(replayMessage);
+			}
+			delegate.addPendingPublish(entry.getClientId(), entry.getPacketId(), pending);
+			if (inflightStore != null) {
+				inflightStore.put(entry);
+			}
+			messages.add(replayMessage);
+		}
+		return messages;
 	}
 
 	@Override
@@ -504,6 +846,22 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	@Override
 	public void setClientReceiveMaximum(String clientId, int receiveMaximum) {
 		delegate.setClientReceiveMaximum(clientId, receiveMaximum);
+	}
+
+	@Override
+	public void setSessionExpiryInterval(String clientId, int sessionExpirySeconds, boolean cleanStart) {
+		delegate.setSessionExpiryInterval(clientId, sessionExpirySeconds, cleanStart);
+		persistSession(clientId);
+	}
+
+	@Override
+	public int getSessionExpiryInterval(String clientId) {
+		return delegate.getSessionExpiryInterval(clientId);
+	}
+
+	@Override
+	public boolean isCleanStart(String clientId) {
+		return delegate.isCleanStart(clientId);
 	}
 
 	@Override
@@ -534,6 +892,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	@Override
 	public void remove(String clientId) {
 		clientNodeMap.remove(clientId);
+		routeSubscriptions.remove(clientId);
 		delegate.remove(clientId);
 		// V3 session persistence: clear the persistent record on disconnect.
 		if (sessionStore != null) {
@@ -545,5 +904,6 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void clean() {
 		delegate.clean();
 		clientNodeMap.clear();
+		routeSubscriptions.clear();
 	}
 }

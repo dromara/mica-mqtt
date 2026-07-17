@@ -25,6 +25,7 @@ import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.pipeline.IMqttMessagePipeline;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
+import org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.server.will.WillDelayScheduler;
 import org.slf4j.Logger;
@@ -47,6 +48,7 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 	private final IMqttConnectStatusListener connectStatusListener;
 	private final MqttMessageInterceptors messageInterceptors;
 	private final WillDelayScheduler willDelayScheduler;
+	private final SessionExpireScheduler sessionExpireScheduler;
 
 	public MqttServerAioListener(MqttServerCreator serverCreator) {
 		this.executor = serverCreator.getMqttExecutor();
@@ -56,6 +58,7 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		this.connectStatusListener = serverCreator.getConnectStatusListener();
 		this.messageInterceptors = serverCreator.getMessageInterceptors();
 		this.willDelayScheduler = serverCreator.getWillDelayScheduler();
+		this.sessionExpireScheduler = serverCreator.getSessionExpireScheduler();
 	}
 
 	@Override
@@ -134,6 +137,13 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 
 	private void cleanSession(String clientId) {
 		try {
+			int expirySeconds = sessionManager.getSessionExpiryInterval(clientId);
+			if (!sessionManager.isCleanStart(clientId) && expirySeconds > 0) {
+				if (!sessionExpireScheduler.isScheduled(clientId)) {
+					sessionExpireScheduler.scheduleExpire(clientId, expirySeconds);
+				}
+				return;
+			}
 			sessionManager.remove(clientId);
 		} catch (Throwable throwable) {
 			logger.error("Mqtt server clientId:{} session clean error.", clientId, throwable);

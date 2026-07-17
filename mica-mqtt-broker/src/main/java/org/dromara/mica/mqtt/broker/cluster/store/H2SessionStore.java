@@ -21,6 +21,7 @@ import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -63,6 +64,19 @@ public class H2SessionStore implements SessionStore {
 	public Session load(String clientId) {
 		byte[] bytes = store.get(buildKey(clientId));
 		return bytes == null ? null : deserialize(clientId, bytes);
+	}
+
+	@Override
+	public List<Session> loadAll() {
+		List<Session> sessions = new ArrayList<>();
+		for (LocalKvStore.KeyValue entry : store.scan(KEY_PREFIX)) {
+			String clientId = entry.getKey().substring(KEY_PREFIX.length());
+			Session session = deserialize(clientId, entry.getValue());
+			if (session != null) {
+				sessions.add(session);
+			}
+		}
+		return sessions;
 	}
 
 	@Override

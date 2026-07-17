@@ -88,6 +88,7 @@ public class MqttPubRecHandler extends AbstractMqttMessageHandler {
 		MqttMessage pubRelMessage = new MqttMessage(fixedHeader, pubRelVariableHeader);
 
 		pendingPublish.setPubRelMessage(pubRelMessage);
+		sessionManager.markPendingPublishPubRel(clientId, packetId);
 		pendingPublish.startPubRelRetransmissionTimer(taskService, context);
 
 		boolean result = Tio.send(context, pubRelMessage);

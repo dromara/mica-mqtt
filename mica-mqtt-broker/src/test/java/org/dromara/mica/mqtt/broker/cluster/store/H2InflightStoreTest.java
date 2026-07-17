@@ -16,12 +16,14 @@
 
 package org.dromara.mica.mqtt.broker.cluster.store;
 
+import org.h2.mvstore.MVMap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -80,6 +82,31 @@ class H2InflightStoreTest {
 
 		List<InflightStore.InflightEntry> entries = inflightStore.listByClient("c1");
 		assertTrue(entries.isEmpty());
+	}
+
+	@Test
+	void updatePhasePersistsPubRelState() throws InterruptedException {
+		long expireAt = System.currentTimeMillis() + 30_000L;
+		inflightStore.put("qos2", 9, expireAt, "jobs/a", new byte[]{1}, 2);
+		inflightStore.awaitWrites();
+
+		inflightStore.updatePhase("qos2", 9, InflightStore.PHASE_PUBREL);
+		inflightStore.awaitWrites();
+
+		InflightStore.InflightEntry entry = inflightStore.listByClient("qos2").get(0);
+		assertEquals(InflightStore.PHASE_PUBREL, entry.getPhase());
+	}
+
+	@Test
+	void legacyRecordWithoutPhaseDefaultsToPublish() {
+		byte[] current = H2InflightStore.serialize(123L, "legacy/topic", new byte[]{1}, 2);
+		byte[] legacy = Arrays.copyOf(current, current.length - 1);
+		MVMap<String, byte[]> map = engine.openMap(H2InflightStore.MAP_NAME);
+		map.put(H2InflightStore.buildKey("legacy", 7), legacy);
+		engine.commit();
+
+		InflightStore.InflightEntry entry = inflightStore.listByClient("legacy").get(0);
+		assertEquals(InflightStore.PHASE_PUBLISH, entry.getPhase());
 	}
 
 	@Test

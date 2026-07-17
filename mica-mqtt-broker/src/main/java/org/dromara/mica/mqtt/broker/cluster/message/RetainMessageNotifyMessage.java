@@ -35,6 +35,7 @@ import java.util.Map;
  * @since 1.0.0
  */
 public class RetainMessageNotifyMessage implements ClusterMessage {
+	private static final String HEADER_SENT_AT = "sentAt";
 	/**
 	 * The topic for which the retained message applies.
 	 */
@@ -47,6 +48,8 @@ public class RetainMessageNotifyMessage implements ClusterMessage {
 	 * The retained message payload, or null if this notice represents a clear operation.
 	 */
 	private Message retainMessage;
+	/** Sender wall-clock timestamp used to observe replication latency. */
+	private long sentAtMillis;
 
 	@Override
 	public ClusterMessageType getType() {
@@ -57,6 +60,10 @@ public class RetainMessageNotifyMessage implements ClusterMessage {
 	public void toClusterData(Map<String, String> headers) {
 		headers.put(ClusterMessageSerializer.HEADER_TOPIC, topic);
 		headers.put(ClusterMessageSerializer.HEADER_TIMEOUT, String.valueOf(timeout));
+		if (sentAtMillis <= 0L) {
+			sentAtMillis = System.currentTimeMillis();
+		}
+		headers.put(HEADER_SENT_AT, String.valueOf(sentAtMillis));
 	}
 
 	@Override
@@ -72,6 +79,8 @@ public class RetainMessageNotifyMessage implements ClusterMessage {
 		this.topic = message.getHeader(ClusterMessageSerializer.HEADER_TOPIC);
 		String timeoutStr = message.getHeader(ClusterMessageSerializer.HEADER_TIMEOUT);
 		this.timeout = timeoutStr != null ? Integer.parseInt(timeoutStr) : 0;
+		String sentAt = message.getHeader(HEADER_SENT_AT);
+		this.sentAtMillis = sentAt == null ? 0L : Long.parseLong(sentAt);
 		byte[] payload = message.getPayload();
 		if (payload != null && payload.length > 0) {
 			this.retainMessage = DefaultMessageSerializer.INSTANCE.deserialize(payload);
@@ -100,5 +109,13 @@ public class RetainMessageNotifyMessage implements ClusterMessage {
 
 	public void setRetainMessage(Message retainMessage) {
 		this.retainMessage = retainMessage;
+	}
+
+	public long getSentAtMillis() {
+		return sentAtMillis;
+	}
+
+	public void setSentAtMillis(long sentAtMillis) {
+		this.sentAtMillis = sentAtMillis;
 	}
 }

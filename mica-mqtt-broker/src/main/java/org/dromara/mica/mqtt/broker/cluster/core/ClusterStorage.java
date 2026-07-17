@@ -31,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Aggregates all V3 persistence components and owns their lifecycle.
@@ -61,6 +62,7 @@ public class ClusterStorage {
 	private H2SessionStore sessionStore;
 	private H2SharedSubStore sharedSubStore;
 	private RetainIndex retainIndex;
+	private volatile long startupDurationMillis;
 
 	private final boolean active;
 
@@ -80,7 +82,9 @@ public class ClusterStorage {
 	 *         should continue in pure-memory mode)
 	 */
 	public boolean start() {
+		long startedAt = System.nanoTime();
 		if (!active) {
+			startupDurationMillis = 0L;
 			logger.info("[Storage] V3 persistence disabled, using V1/V2 in-memory mode");
 			return false;
 		}
@@ -91,13 +95,21 @@ public class ClusterStorage {
 			inflightStore = new H2InflightStore(engine);
 			inflightCleaner = new InflightTtlCleaner(inflightStore, config.getInflightCleanPeriodMs());
 			inflightCleaner.start();
-			sessionStore = new H2SessionStore(engine);
-			sharedSubStore = new H2SharedSubStore(engine);
-			retainIndex = new RetainIndex(engine);
-			retainIndex.loadFromStore();
+			if (config.isPersistSession()) {
+				sessionStore = new H2SessionStore(engine);
+			}
+			if (config.isPersistSharedSub()) {
+				sharedSubStore = new H2SharedSubStore(engine);
+			}
+			if (config.isPersistRetain()) {
+				retainIndex = new RetainIndex(engine);
+				retainIndex.loadFromStore();
+			}
 			logger.info("[Storage] V3 persistence started at {}", dataDir.toAbsolutePath());
+			startupDurationMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
 			return true;
 		} catch (Exception e) {
+			startupDurationMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
 			logger.error("[Storage] Failed to start H2 store, falling back to in-memory mode", e);
 			engine = null;
 			inflightStore = null;
@@ -172,5 +184,22 @@ public class ClusterStorage {
 	 */
 	public LocalKvStore getRawStore() {
 		return engine;
+	}
+
+	/**
+	 * Returns a monitoring snapshot covering the shared H2 engine and all named maps.
+	 * Operation counters are cumulative and can be sampled periodically to derive QPS.
+	 *
+	 * @return current storage statistics, or an unhealthy zero snapshot when disabled
+	 */
+	public LocalKvStore.StoreStats getStats() {
+		H2MvStoreImpl current = engine;
+		return current == null
+			? new LocalKvStore.StoreStats(-1L, 0L, false)
+			: current.stats();
+	}
+
+	public long getStartupDurationMillis() {
+		return startupDurationMillis;
 	}
 }

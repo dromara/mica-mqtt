@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.broker.cluster.core;
 
 import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.broker.cluster.message.ClientConnectMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClientDisconnectMessage;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
@@ -51,6 +52,7 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 	private final IMqttConnectStatusListener delegate;
 	private final MqttClusterManager clusterManager;
 	private ClusterMqttSessionManager sessionManager;
+	private TimerTaskService taskService;
 
 	public ClusterMqttConnectStatusListener(IMqttConnectStatusListener delegate, MqttClusterManager clusterManager) {
 		this.delegate = delegate;
@@ -66,6 +68,10 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 	 */
 	public void setSessionManager(ClusterMqttSessionManager sessionManager) {
 		this.sessionManager = sessionManager;
+	}
+
+	public void setTaskService(TimerTaskService taskService) {
+		this.taskService = taskService;
 	}
 
 	@Override
@@ -85,10 +91,18 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 				previousOwner, clientId);
 			clusterManager.initiateSessionTakeover(clientId, previousOwner, DEFAULT_TAKEOVER_TIMEOUT_MS);
 		}
+		if (sessionManager != null) {
+			sessionManager.markLocalClient(clientId);
+			if (previousOwner == null || previousOwner.isEmpty()) {
+				int replayed = sessionManager.replayInflight(context, clientId, taskService);
+				clusterManager.getMetrics().inflightReplayedAdd(replayed);
+			}
+		}
 
 		ClientConnectMessage msg = new ClientConnectMessage();
 		msg.setClientId(clientId);
 		clusterManager.broadcast(msg);
+		clusterManager.getMetrics().clientConnectBroadcastInc();
 	}
 
 	@Override
@@ -100,6 +114,7 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 		ClientDisconnectMessage msg = new ClientDisconnectMessage();
 		msg.setClientId(clientId);
 		clusterManager.broadcast(msg);
+		clusterManager.getMetrics().clientDisconnectBroadcastInc();
 	}
 
 	private String lookupPreviousOwner(String clientId) {

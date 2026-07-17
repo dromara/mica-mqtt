@@ -17,6 +17,8 @@
 package org.dromara.mica.mqtt.broker.cluster.core;
 
 import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.server.cluster.core.ClusterApi;
 import net.dreamlu.mica.net.server.cluster.core.ClusterConfig;
 import net.dreamlu.mica.net.server.cluster.core.ClusterImpl;
@@ -25,7 +27,9 @@ import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterConfig;
 import org.dromara.mica.mqtt.broker.cluster.message.*;
 import org.dromara.mica.mqtt.broker.cluster.metrics.ClusterMetrics;
 import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.SharedSubscriptionStrategy;
-import org.dromara.mica.mqtt.broker.cluster.store.InflightStore;
+import org.dromara.mica.mqtt.broker.cluster.store.LocalKvStore;
+import org.dromara.mica.mqtt.broker.cluster.store.RetainShardRouter;
+import org.dromara.mica.mqtt.broker.cluster.store.RetainIndex;
 import org.dromara.mica.mqtt.broker.cluster.store.SessionStore;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.common.TopicFilterType;
@@ -37,7 +41,20 @@ import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Manager for MQTT broker cluster operations and inter-node communication.
@@ -63,6 +80,23 @@ public class MqttClusterManager {
 	private ClusterStorage clusterStorage;
 	private ClusterMqttSessionManager sessionManager;
 	private final ClusterMetrics metrics = new ClusterMetrics();
+	private final Map<String, PendingTakeover> pendingTakeovers = new ConcurrentHashMap<>();
+	private final Map<String, TakeoverGrant> takeoverGrants = new ConcurrentHashMap<>();
+	private final Map<String, PendingRetainQuery> pendingRetainQueries = new ConcurrentHashMap<>();
+	private final AtomicLong retainQuerySequence = new AtomicLong();
+	private final RetainShardRouter retainShardRouter = new RetainShardRouter();
+	private final Set<String> knownRemoteNodes = ConcurrentHashMap.newKeySet();
+	private final Map<String, Long> lastNodeSeen = new ConcurrentHashMap<>();
+	private final ScheduledExecutorService takeoverTimeoutExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+		Thread thread = new Thread(r, "mica-mqtt-session-takeover-timeout");
+		thread.setDaemon(true);
+		return thread;
+	});
+	private final ScheduledExecutorService membershipMonitorExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+		Thread thread = new Thread(r, "mica-mqtt-cluster-membership-monitor");
+		thread.setDaemon(true);
+		return thread;
+	});
 
 	/**
 	 * Constructs a new cluster manager with the specified configuration.
@@ -160,6 +194,10 @@ public class MqttClusterManager {
 
 		cluster = new ClusterImpl(clusterConfig);
 		cluster.start();
+		long monitorInterval = Math.max(1_000L, config.getHeartbeatInterval());
+		pollClusterMembership();
+		membershipMonitorExecutor.scheduleWithFixedDelay(
+			this::pollClusterMembership, monitorInterval, monitorInterval, TimeUnit.MILLISECONDS);
 
 		logger.info("Mqtt cluster manager started on {}:{} with nodeName {}", config.getClusterHost(), config.getClusterPort(), localNodeId);
 
@@ -173,8 +211,13 @@ public class MqttClusterManager {
 		try {
 			ClusterMessage clusterMsg = ClusterMessageSerializer.fromClusterData(message);
 			if (clusterMsg != null) {
-				logger.debug("Received cluster message of type: {}", clusterMsg.getType());
 				String sourceNode = ClusterMessageSerializer.getSourceNode(message);
+				markNodeSeen(sourceNode);
+				if (clusterMsg.getType() == ClusterMessageType.HEARTBEAT) {
+					return;
+				}
+				metrics.clusterMessagesReceivedInc();
+				logger.debug("Received cluster message of type: {}", clusterMsg.getType());
 				handleClusterMessageInternal(clusterMsg, sourceNode);
 			} else {
 				logger.debug("Skipped unknown or unsupported cluster message, type header: {}",
@@ -186,6 +229,9 @@ public class MqttClusterManager {
 	}
 
 	private void handleClusterMessageInternal(ClusterMessage clusterMsg, String sourceNode) {
+		if (clusterMsg.getType() == ClusterMessageType.HEARTBEAT) {
+			return;
+		}
 		ClusterMqttSessionManager sessionManager = this.sessionManager != null
 			? this.sessionManager
 			: (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
@@ -196,9 +242,6 @@ public class MqttClusterManager {
 				// ClusterMqttMessageStore 再次广播导致无限循环
 				Message fwdMsg = pfm.getMessage();
 				mqttServer.publishAll(fwdMsg.getTopic(), fwdMsg.getPayload(), MqttQoS.valueOf(fwdMsg.getQos()), false);
-				// V3 inflight persistence (P2.3): record QoS 1/2 forwards so the TTL
-				// cleaner can detect stuck deliveries even before per-client ACK is wired.
-				recordInflightForward(fwdMsg, sourceNode);
 				break;
 			}
 			case SESSION_TAKEOVER_REQUEST: {
@@ -247,22 +290,29 @@ public class MqttClusterManager {
 				break;
 			}
 			case NODE_LEAVE: {
-				sessionManager.clearNodeClientsAndSubscriptions(sourceNode);
-				logger.info("Node {} left cluster, cleaned up its clients and subscriptions", sourceNode);
+				handleNodeDeparture(sourceNode);
 				break;
 			}
 			case WILL_MESSAGE: {
 				WillMessageNotifyMessage wmm = (WillMessageNotifyMessage) clusterMsg;
 				IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
 				// 使用 Local 方法直接存储到 delegate，避免通过 ClusterMqttMessageStore 再次广播
-				if (messageStore instanceof ClusterMqttMessageStore && wmm.getWillMessage() != null) {
-					((ClusterMqttMessageStore) messageStore).addWillMessageLocal(wmm.getClientId(), wmm.getWillMessage());
-					logger.debug("[Cluster] Received and stored will message for clientId: {} from node: {}", wmm.getClientId(), sourceNode);
+				if (messageStore instanceof ClusterMqttMessageStore) {
+					ClusterMqttMessageStore clusterStore = (ClusterMqttMessageStore) messageStore;
+					if (wmm.getWillMessage() == null) {
+						clusterStore.clearWillMessageLocal(wmm.getClientId());
+					} else {
+						clusterStore.addWillMessageLocal(wmm.getClientId(), wmm.getWillMessage());
+						logger.debug("[Cluster] Received and stored will message for clientId: {} from node: {}", wmm.getClientId(), sourceNode);
+					}
 				}
 				break;
 			}
 			case RETAIN_MESSAGE: {
 				RetainMessageNotifyMessage rmm = (RetainMessageNotifyMessage) clusterMsg;
+				long sentAt = rmm.getSentAtMillis();
+				metrics.retainReplicaReceived(sentAt <= 0L
+					? -1L : Math.max(0L, System.currentTimeMillis() - sentAt));
 				IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
 				// 使用 Local 方法直接存储到 delegate，避免通过 ClusterMqttMessageStore 再次广播
 				if (messageStore instanceof ClusterMqttMessageStore) {
@@ -277,6 +327,9 @@ public class MqttClusterManager {
 				}
 				break;
 			}
+			case RETAIN_QUERY:
+				handleRetainQuery((RetainQueryMessage) clusterMsg, sourceNode);
+				break;
 			case SHARED_DISPATCH_TO_CLIENT: {
 				SharedDispatchToClientMessage sdm = (SharedDispatchToClientMessage) clusterMsg;
 				handleSharedDispatchToClient(sdm, sessionManager);
@@ -317,6 +370,7 @@ public class MqttClusterManager {
 			msg.getPayload(), MqttQoS.valueOf(msg.getQos()));
 
 		if (delivered) {
+			metrics.sharedDispatchReceivedInc();
 			logger.debug("[Cluster] Shared dispatch delivered to client={} topic={}", clientId, topic);
 			return;
 		}
@@ -324,14 +378,17 @@ public class MqttClusterManager {
 		// Target client is no longer local — re-pick from the local shared-subscription table.
 		logger.warn("[Cluster] Shared dispatch target client={} not found on this node for topic={}, re-picking",
 			clientId, topic);
+		metrics.sharedDispatchRepickInc();
 
 		if (sharedStrategy == null) {
+			metrics.sharedDispatchDroppedInc();
 			logger.debug("[Cluster] No shared strategy configured, dropping re-pick for topic={}", topic);
 			return;
 		}
 
 		List<Subscribe> candidates = sessionManager.searchAllSubscribe(topic);
 		if (candidates == null || candidates.isEmpty()) {
+			metrics.sharedDispatchDroppedInc();
 			logger.debug("[Cluster] No subscribers remain for topic={}, dropping", topic);
 			return;
 		}
@@ -402,24 +459,250 @@ public class MqttClusterManager {
 			Node node = new Node(parts[0], Integer.parseInt(parts[1]));
 			cluster.send(node, data);
 			logger.info("Sent state sync response to node: {}", requestNodeId);
+			rebalanceRetain(requestNodeId, null);
 		} catch (Exception e) {
 			logger.error("Failed to send state sync response to: {}", requestNodeId, e);
 		}
 	}
 
-	public void sendToNode(String nodeId, ClusterMessage clusterMsg) {
+	public boolean sendToNode(String nodeId, ClusterMessage clusterMsg) {
 		if (!config.isEnabled() || cluster == null) {
-			return;
+			return false;
 		}
 		try {
 			String[] parts = nodeId.split(":");
 			if (parts.length == 2) {
 				Node node = new Node(parts[0], Integer.parseInt(parts[1]));
-				cluster.send(node, ClusterMessageSerializer.toClusterData(clusterMsg, localNodeId));
+				if (cluster.send(node, ClusterMessageSerializer.toClusterData(clusterMsg, localNodeId))) {
+					metrics.clusterMessagesSentInc();
+					return true;
+				} else {
+					metrics.clusterSendErrorsInc();
+					logger.debug("Cluster channel is not available for node: {}", nodeId);
+				}
+			} else {
+				metrics.clusterSendErrorsInc();
+				logger.warn("Invalid cluster node id: {}", nodeId);
 			}
 		} catch (Exception e) {
+			metrics.clusterSendErrorsInc();
 			logger.error("Failed to send message to node: {}", nodeId, e);
 		}
+		return false;
+	}
+
+	public boolean isRetainShardingEnabled() {
+		return config.isRetainShardingEnabled();
+	}
+
+	public List<String> getRetainReplicaNodes(String topic) {
+		return retainShardRouter.replicasOf(topic, getClusterNodeIds(), config.getRetainReplicationFactor());
+	}
+
+	public long getRetainQueryTimeoutMs() {
+		return config.getRetainQueryTimeoutMs();
+	}
+
+	public Set<String> getClusterNodeIds() {
+		Set<String> nodeIds = new HashSet<>();
+		nodeIds.add(localNodeId);
+		nodeIds.addAll(knownRemoteNodes);
+		return nodeIds;
+	}
+
+	private Set<String> currentRemoteNodeIds() {
+		Set<String> nodeIds = new HashSet<>();
+		if (cluster == null) {
+			return nodeIds;
+		}
+		Collection<Node> remoteMembers = cluster.getRemoteMembers();
+		if (remoteMembers != null) {
+			for (Node node : remoteMembers) {
+				nodeIds.add(node.getPeerHost());
+			}
+		}
+		return nodeIds;
+	}
+
+	private void pollClusterMembership() {
+		try {
+			long now = System.currentTimeMillis();
+			for (String nodeId : currentRemoteNodeIds()) {
+				if (probeNode(nodeId)) {
+					markNodeSeen(nodeId);
+					continue;
+				}
+				Long lastSeen = lastNodeSeen.putIfAbsent(nodeId, now);
+				if (knownRemoteNodes.contains(nodeId) && lastSeen != null
+					&& now - lastSeen >= Math.max(1L, config.getNodeTimeout())) {
+					handleNodeDeparture(nodeId);
+				}
+			}
+		} catch (Throwable e) {
+			logger.warn("[Cluster] Membership monitor failed", e);
+		}
+	}
+
+	private boolean probeNode(String nodeId) {
+		try {
+			String[] parts = nodeId.split(":");
+			if (parts.length != 2) {
+				return false;
+			}
+			Node node = new Node(parts[0], Integer.parseInt(parts[1]));
+			return cluster.send(node, ClusterMessageSerializer.toClusterData(new HeartbeatMessage(), localNodeId));
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	private void markNodeSeen(String nodeId) {
+		if (nodeId == null || nodeId.equals(localNodeId)) {
+			return;
+		}
+		lastNodeSeen.put(nodeId, System.currentTimeMillis());
+		if (knownRemoteNodes.add(nodeId)) {
+			rebalanceRetain(nodeId, null);
+			logger.info("[Cluster] Detected joined node: {}", nodeId);
+		}
+	}
+
+	private void handleNodeDeparture(String nodeId) {
+		if (knownRemoteNodes.remove(nodeId)) {
+			metrics.nodeDeparturesInc();
+		}
+		lastNodeSeen.remove(nodeId);
+		List<String> departedClients = new ArrayList<>();
+		if (sessionManager != null) {
+			for (Map.Entry<String, String> entry : sessionManager.getClientNodeMap().entrySet()) {
+				if (nodeId.equals(entry.getValue())) {
+					departedClients.add(entry.getKey());
+				}
+			}
+			sessionManager.clearNodeClientsAndSubscriptions(nodeId);
+		}
+		publishDepartedNodeWills(nodeId, departedClients);
+		rebalanceRetain(null, nodeId);
+		logger.info("[Cluster] Node {} left, cleaned routes and rebalanced retained replicas", nodeId);
+	}
+
+	private void publishDepartedNodeWills(String departedNode, List<String> clientIds) {
+		if (clientIds.isEmpty() || mqttServer == null) {
+			return;
+		}
+		Set<String> survivors = getClusterNodeIds();
+		survivors.remove(departedNode);
+		String coordinator = survivors.stream().sorted().findFirst().orElse(localNodeId);
+		if (!localNodeId.equals(coordinator)) {
+			return;
+		}
+		IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
+		for (String clientId : clientIds) {
+			Message will = messageStore.getWillMessage(clientId);
+			if (will == null) {
+				continue;
+			}
+			mqttServer.getServerCreator().getMqttExecutor().execute(() -> {
+				try {
+					mqttServer.getServerCreator().getMessagePipeline().handle(will);
+					messageStore.clearWillMessage(clientId);
+				} catch (Throwable e) {
+					logger.error("[Cluster] Failed to publish will for departed node client={}", clientId, e);
+				}
+			});
+		}
+	}
+
+	private void rebalanceRetain(String additionalNode, String removedNode) {
+		if (!isRetainShardingEnabled() || mqttServer == null) {
+			return;
+		}
+		IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
+		if (!(messageStore instanceof ClusterMqttMessageStore)) {
+			return;
+		}
+		Set<String> nodes = getClusterNodeIds();
+		if (additionalNode != null) {
+			nodes.add(additionalNode);
+		}
+		if (removedNode != null) {
+			nodes.remove(removedNode);
+		}
+		long now = System.currentTimeMillis();
+		for (RetainIndex.RetainEntry entry
+			: ((ClusterMqttMessageStore) messageStore).getAllRetainEntriesLocal()) {
+			Message retained = entry.getMessage();
+			List<String> replicas = retainShardRouter.replicasOf(
+				retained.getTopic(), nodes, config.getRetainReplicationFactor());
+			RetainMessageNotifyMessage notification = new RetainMessageNotifyMessage();
+			notification.setTopic(retained.getTopic());
+			notification.setRetainMessage(retained);
+			notification.setTimeout(entry.remainingTimeoutSeconds(now));
+			for (String replica : replicas) {
+				if (!localNodeId.equals(replica)) {
+					sendToNode(replica, notification);
+				}
+			}
+		}
+	}
+
+	public List<Message> queryRemoteRetain(String topicFilter, long timeoutMs) {
+		if (!isRetainShardingEnabled() || cluster == null) {
+			return Collections.emptyList();
+		}
+		Set<String> remoteNodes;
+		if (topicFilter.indexOf('#') < 0 && topicFilter.indexOf('+') < 0) {
+			remoteNodes = new HashSet<>(getRetainReplicaNodes(topicFilter));
+		} else {
+			remoteNodes = getClusterNodeIds();
+		}
+		remoteNodes.remove(localNodeId);
+		if (remoteNodes.isEmpty()) {
+			return Collections.emptyList();
+		}
+		String requestId = localNodeId + ':' + retainQuerySequence.incrementAndGet();
+		PendingRetainQuery pending = new PendingRetainQuery(remoteNodes.size());
+		pendingRetainQueries.put(requestId, pending);
+		metrics.retainQueryRequestsInc();
+		RetainQueryMessage query = new RetainQueryMessage();
+		query.setRequestId(requestId);
+		query.setTopicFilter(topicFilter);
+		for (String nodeId : remoteNodes) {
+			sendToNode(nodeId, query);
+		}
+		try {
+			if (!pending.await(Math.max(1L, timeoutMs))) {
+				metrics.retainQueryTimedOutInc();
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} finally {
+			pendingRetainQueries.remove(requestId, pending);
+		}
+		return pending.messages();
+	}
+
+	private void handleRetainQuery(RetainQueryMessage query, String sourceNode) {
+		if (query.isResponse()) {
+			PendingRetainQuery pending = pendingRetainQueries.get(query.getRequestId());
+			if (pending != null) {
+				pending.accept(sourceNode, query.getMessages());
+			}
+			return;
+		}
+		List<Message> retained = Collections.emptyList();
+		IMqttMessageStore messageStore = mqttServer == null ? null : mqttServer.getServerCreator().getMessageStore();
+		if (messageStore instanceof ClusterMqttMessageStore) {
+			retained = ((ClusterMqttMessageStore) messageStore).getRetainMessageLocal(query.getTopicFilter());
+		} else if (messageStore != null) {
+			retained = messageStore.getRetainMessage(query.getTopicFilter());
+		}
+		RetainQueryMessage response = new RetainQueryMessage();
+		response.setRequestId(query.getRequestId());
+		response.setTopicFilter(query.getTopicFilter());
+		response.setResponse(true);
+		response.setMessages(retained);
+		sendToNode(sourceNode, response);
 	}
 
 	public void broadcast(ClusterMessage clusterMsg) {
@@ -428,12 +711,20 @@ public class MqttClusterManager {
 		}
 		try {
 			cluster.broadcast(ClusterMessageSerializer.toClusterData(clusterMsg, localNodeId));
+			metrics.clusterMessagesSentInc();
 		} catch (Exception e) {
+			metrics.clusterSendErrorsInc();
 			logger.error("Failed to broadcast message", e);
 		}
 	}
 
 	public void stop() {
+		takeoverTimeoutExecutor.shutdownNow();
+		membershipMonitorExecutor.shutdownNow();
+		pendingTakeovers.clear();
+		knownRemoteNodes.clear();
+		lastNodeSeen.clear();
+		pendingRetainQueries.clear();
 		if (cluster != null) {
 			NodeLeaveMessage leaveMsg = new NodeLeaveMessage();
 			broadcast(leaveMsg);
@@ -506,47 +797,6 @@ public class MqttClusterManager {
 		return localNodeId;
 	}
 
-	/**
-	 * Records an inflight entry for a forwarded QoS 1/2 message.
-	 * <p>
-	 * The V3 inflight store is the durable record of "messages in the process of
-	 * being delivered".  This broker records one row per (client, packetId); the
-	 * TTL cleaner (see {@link org.dromara.mica.mqtt.broker.cluster.store.InflightTtlCleaner})
-	 * eventually removes entries that have not been ACKed.  Packet IDs are
-	 * synthesized from a per-message counter because the wire protocol between
-	 * cluster nodes does not carry the destination clientId + packetId; per-client
-	 * tracking is left for a future revision.
-	 * </p>
-	 *
-	 * @param message the forwarded message
-	 * @param sourceNode the originating node id
-	 */
-	private void recordInflightForward(Message message, String sourceNode) {
-		if (clusterStorage == null || !clusterStorage.isActive()) {
-			return;
-		}
-		if (message == null) {
-			return;
-		}
-		int qos = message.getQos();
-		if (qos < 1) {
-			// QoS 0 has no ACK and no inflight semantics.
-			return;
-		}
-		InflightStore inflight = clusterStorage.getInflightStore();
-		if (inflight == null) {
-			return;
-		}
-		long ttl = clusterStorage.getConfig().getInflightTtlMs();
-		long expireAt = System.currentTimeMillis() + ttl;
-		// Synthesize a clientId: cross-node forwards don't carry one, so we
-		// bucket by (topic, sourceNode) for purposes of TTL cleanup.
-		String pseudoClient = "fwd:" + sourceNode;
-		// packetId 0 is the well-known inflight bucket for non-Acked forwards.
-		inflight.put(pseudoClient, 0, expireAt,
-			message.getTopic(), message.getPayload(), qos);
-	}
-
 	// -----------------------------------------------------------------------
 	// Session takeover protocol (P2.1)
 	// -----------------------------------------------------------------------
@@ -579,8 +829,23 @@ public class MqttClusterManager {
 		}
 		SessionTakeoverRequestMessage request = new SessionTakeoverRequestMessage();
 		request.setClientId(clientId);
-		request.setAttemptId(System.nanoTime());
+		long attemptId = System.nanoTime();
+		request.setAttemptId(attemptId);
 		request.setTimeoutMs(timeoutMs);
+		PendingTakeover pending = new PendingTakeover(attemptId, previousOwnerNode);
+		if (pendingTakeovers.putIfAbsent(clientId, pending) != null) {
+			logger.debug("[Cluster] Session takeover already pending: client={}", clientId);
+			return;
+		}
+		metrics.sessionTakeoverStartedInc();
+		long effectiveTimeoutMs = Math.max(1L, timeoutMs);
+		takeoverTimeoutExecutor.schedule(() -> {
+			if (pendingTakeovers.remove(clientId, pending)) {
+				metrics.sessionTakeoverTimedOutInc();
+				logger.warn("[Cluster] Session takeover timed out: client={} previousOwner={} attempt={}",
+					clientId, previousOwnerNode, attemptId);
+			}
+		}, effectiveTimeoutMs, TimeUnit.MILLISECONDS);
 		logger.info("[Cluster] Initiating session takeover: client={} from={} to={}",
 			clientId, previousOwnerNode, localNodeId);
 		sendToNode(previousOwnerNode, request);
@@ -598,7 +863,9 @@ public class MqttClusterManager {
 		SessionTakeoverResponseMessage response = new SessionTakeoverResponseMessage();
 		response.setClientId(request.getClientId());
 		response.setAttemptId(request.getAttemptId());
-		if (clusterStorage == null || !clusterStorage.isActive()) {
+		if (!tryGrantTakeover(request.getClientId(), sourceNode, request.getAttemptId(), request.getTimeoutMs())) {
+			response.setStatus(SessionTakeoverResponseMessage.STATUS_TIMEOUT);
+		} else if (clusterStorage == null || !clusterStorage.isActive() || clusterStorage.getSessionStore() == null) {
 			response.setStatus(SessionTakeoverResponseMessage.STATUS_NOT_FOUND);
 		} else {
 			byte[] sessionBytes = clusterStorage.getSessionStore().loadRaw(request.getClientId());
@@ -607,11 +874,35 @@ public class MqttClusterManager {
 			} else {
 				response.setStatus(SessionTakeoverResponseMessage.STATUS_OK);
 				response.setSessionBytes(sessionBytes);
+				if (clusterStorage.getInflightStore() != null) {
+					response.setInflightEntries(clusterStorage.getInflightStore().listByClient(request.getClientId()));
+				}
 			}
+		}
+		if (!SessionTakeoverResponseMessage.STATUS_OK.equals(response.getStatus())) {
+			releaseTakeoverGrant(request.getClientId(), sourceNode, request.getAttemptId());
 		}
 		if (cluster != null) {
 			sendToNode(sourceNode, response);
 		}
+	}
+
+	boolean tryGrantTakeover(String clientId, String requesterNode, long attemptId, long timeoutMs) {
+		if (clientId == null || requesterNode == null) {
+			return false;
+		}
+		long now = System.currentTimeMillis();
+		long expiresAt = now + Math.max(1L, timeoutMs);
+		TakeoverGrant candidate = new TakeoverGrant(requesterNode, attemptId, expiresAt);
+		TakeoverGrant granted = takeoverGrants.compute(clientId, (key, current) ->
+			current == null || current.expiresAt <= now ? candidate : current);
+		return granted == candidate
+			|| (granted.attemptId == attemptId && granted.requesterNode.equals(requesterNode));
+	}
+
+	private void releaseTakeoverGrant(String clientId, String requesterNode, long attemptId) {
+		takeoverGrants.computeIfPresent(clientId, (key, grant) ->
+			grant.attemptId == attemptId && grant.requesterNode.equals(requesterNode) ? null : grant);
 	}
 
 	/**
@@ -627,20 +918,40 @@ public class MqttClusterManager {
 		if (clientId == null) {
 			return;
 		}
+		PendingTakeover pending = pendingTakeovers.get(clientId);
+		if (pending == null || pending.attemptId != response.getAttemptId()
+			|| !pending.previousOwnerNode.equals(sourceNode)) {
+			logger.warn("[Cluster] Ignoring stale session takeover response: client={} attempt={} from={}",
+				clientId, response.getAttemptId(), sourceNode);
+			return;
+		}
+		pendingTakeovers.remove(clientId, pending);
 		String status = response.getStatus();
 		if (!SessionTakeoverResponseMessage.STATUS_OK.equals(status)) {
+			metrics.sessionTakeoverFailedInc();
 			logger.warn("[Cluster] Session takeover response not ok: client={} status={} from={}",
 				clientId, status, sourceNode);
 			return;
 		}
-		if (clusterStorage == null || !clusterStorage.isActive()) {
+		if (clusterStorage == null || !clusterStorage.isActive() || clusterStorage.getSessionStore() == null) {
+			metrics.sessionTakeoverFailedInc();
 			return;
 		}
 		SessionStore.Session installed = clusterStorage.getSessionStore()
 			.restoreRaw(clientId, response.getSessionBytes());
 		if (installed == null) {
+			metrics.sessionTakeoverFailedInc();
 			logger.warn("[Cluster] Takeover restore returned null: client={}", clientId);
 			return;
+		}
+		installed.setOwnerNodeId(localNodeId);
+		clusterStorage.getSessionStore().save(clientId, installed);
+		if (sessionManager != null) {
+			sessionManager.restoreLocalSession(installed);
+			ChannelContext context = Tio.getByBsId(mqttServer.getServerConfig(), clientId);
+			int replayed = sessionManager.replayInflight(context, clientId,
+				response.getInflightEntries(), mqttServer.getServerCreator().getTaskService());
+			metrics.inflightReplayedAdd(replayed);
 		}
 		logger.info("[Cluster] Session takeover ok: client={} from={} subs={}",
 			clientId, sourceNode,
@@ -651,6 +962,7 @@ public class MqttClusterManager {
 		notify.setNewOwnerNodeId(localNodeId);
 		notify.setPreviousOwnerNodeId(sourceNode);
 		broadcast(notify);
+		metrics.sessionTakeoverSucceededInc();
 	}
 
 	/**
@@ -664,12 +976,10 @@ public class MqttClusterManager {
 			return;
 		}
 		if (sessionManager != null) {
-			sessionManager.getClientNodeMap().put(clientId, newOwner);
+			sessionManager.applySessionMigration(clientId, newOwner);
 		}
-		// If we used to own this session, drop local subscriptions and the
-		// durable record.
-		if (localNodeId.equals(notify.getPreviousOwnerNodeId()) && sessionManager != null) {
-			sessionManager.clearLocalSubscription(clientId);
+		if (localNodeId.equals(notify.getPreviousOwnerNodeId())) {
+			takeoverGrants.remove(clientId);
 		}
 		logger.info("[Cluster] Session migrated: client={} newOwner={} prev={}",
 			clientId, newOwner, notify.getPreviousOwnerNodeId());
@@ -687,7 +997,7 @@ public class MqttClusterManager {
 		if (sessionManager != null) {
 			sessionManager.getClientNodeMap().remove(clientId);
 		}
-		if (clusterStorage != null && clusterStorage.isActive()) {
+		if (clusterStorage != null && clusterStorage.isActive() && clusterStorage.getSessionStore() != null) {
 			clusterStorage.getSessionStore().delete(clientId);
 		}
 	}
@@ -710,5 +1020,96 @@ public class MqttClusterManager {
 	 */
 	public ClusterMetrics getMetrics() {
 		return metrics;
+	}
+
+	/**
+	 * Exports cluster counters together with storage health and capacity gauges.
+	 * The returned text can be served directly from an application-owned
+	 * Prometheus scrape endpoint.
+	 *
+	 * @return metrics in Prometheus text exposition format
+	 */
+	public String toPrometheus() {
+		StringBuilder output = new StringBuilder(metrics.toPrometheus());
+		ClusterStorage storage = clusterStorage;
+		LocalKvStore.StoreStats stats = storage == null
+			? new LocalKvStore.StoreStats(-1L, 0L, false)
+			: storage.getStats();
+		appendGauge(output, "mqtt_cluster_storage_healthy", stats.isHealthy() ? 1L : 0L);
+		appendGauge(output, "mqtt_cluster_storage_file_size_bytes", stats.getFileSizeBytes());
+		appendGauge(output, "mqtt_cluster_storage_entries", stats.getEntryCount());
+		appendCounter(output, "mqtt_cluster_storage_read_operations_total", stats.getReadOperations());
+		appendCounter(output, "mqtt_cluster_storage_write_operations_total", stats.getWriteOperations());
+		appendGauge(output, "mqtt_cluster_storage_startup_duration_millis",
+			storage == null ? 0L : storage.getStartupDurationMillis());
+		long inflightCount = storage != null && storage.getInflightStore() != null
+			? storage.getInflightStore().count() : 0L;
+		appendGauge(output, "mqtt_cluster_inflight_entries", inflightCount);
+		long inflightExpired = storage != null && storage.getInflightCleaner() != null
+			? storage.getInflightCleaner().getRemovedExpiredCount() : 0L;
+		appendCounter(output, "mqtt_cluster_inflight_expired_total", inflightExpired);
+		return output.toString();
+	}
+
+	private static void appendGauge(StringBuilder output, String name, long value) {
+		output.append("# TYPE ").append(name).append(" gauge\n");
+		output.append(name).append(' ').append(value).append('\n');
+	}
+
+	private static void appendCounter(StringBuilder output, String name, long value) {
+		output.append("# TYPE ").append(name).append(" counter\n");
+		output.append(name).append(' ').append(value).append('\n');
+	}
+
+	private static class PendingTakeover {
+		private final long attemptId;
+		private final String previousOwnerNode;
+
+		private PendingTakeover(long attemptId, String previousOwnerNode) {
+			this.attemptId = attemptId;
+			this.previousOwnerNode = previousOwnerNode;
+		}
+	}
+
+	private static class TakeoverGrant {
+		private final String requesterNode;
+		private final long attemptId;
+		private final long expiresAt;
+
+		private TakeoverGrant(String requesterNode, long attemptId, long expiresAt) {
+			this.requesterNode = requesterNode;
+			this.attemptId = attemptId;
+			this.expiresAt = expiresAt;
+		}
+	}
+
+	private static class PendingRetainQuery {
+		private final CountDownLatch responses;
+		private final Set<String> respondedNodes = ConcurrentHashMap.newKeySet();
+		private final List<Message> retained = Collections.synchronizedList(new ArrayList<>());
+
+		private PendingRetainQuery(int expectedResponses) {
+			this.responses = new CountDownLatch(expectedResponses);
+		}
+
+		private void accept(String nodeId, List<Message> messages) {
+			if (!respondedNodes.add(nodeId)) {
+				return;
+			}
+			if (messages != null) {
+				retained.addAll(messages);
+			}
+			responses.countDown();
+		}
+
+		private boolean await(long timeoutMs) throws InterruptedException {
+			return responses.await(timeoutMs, TimeUnit.MILLISECONDS);
+		}
+
+		private List<Message> messages() {
+			synchronized (retained) {
+				return new ArrayList<>(retained);
+			}
+		}
 	}
 }

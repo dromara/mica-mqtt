@@ -160,6 +160,13 @@ public interface IMqttSessionManager {
 	void removePendingPublish(String clientId, int messageId);
 
 	/**
+	 * Marks a QoS 2 outbound delivery as having entered the PUBREL phase.
+	 * Persistent session managers can override this hook for reconnect recovery.
+	 */
+	default void markPendingPublishPubRel(String clientId, int messageId) {
+	}
+
+	/**
 	 * 将 PUBLISH 加入客户端维度的"待发送"队列（PR7 / spec 3.3.4 Receive Maximum）。
 	 * <p>
 	 * 当客户端当前的 in-flight 数达到 Receive Maximum 上限时，服务端应当缓存后续要发送的 QoS>0

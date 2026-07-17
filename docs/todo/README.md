@@ -145,13 +145,13 @@ MVP 路径（1 人 / 2 周）：tasks §9
 
 | 文档 | 版本 | 状态 | 更新日期 |
 |---|---|---|---|
-| `mqtt-server-cluster.md` | v3.0 | V1+V2 已实现；V3 部分实现 | 2026-06-22 |
-| `mqtt-server-cluster-routing.md` | v1.2 | V2 dispatcher 已实现 | 2026-06-22 |
-| `mqtt-server-cluster-storage.md` | v1.2 | V3 部分实现 | 2026-06-22 |
-| `mqtt-server-cluster-tasks.md` | v1.1 | 执行中 | 2026-06-22 |
-| `mqtt-server-cluster-monitoring.md` | v1.0 | 补充文档 | 2026-06-05 |
+| `mqtt-server-cluster.md` | v3.0 | V1/V2/V3 主链路已实现；3/5 独立 JVM 探活/强杀/重连已验收 | 2026-07-16 |
+| `mqtt-server-cluster-routing.md` | v1.2 | V2 dispatcher 已接入 MQTT PUBLISH；10 万候选策略基线达标，待端到端 MQTT 压测 | 2026-07-16 |
+| `mqtt-server-cluster-storage.md` | v1.2 | V3 主链路与离线 Session 恢复已实现；10 万 Retain 基线、部署告警和 3/5 JVM H2 强杀恢复已完成 | 2026-07-16 |
+| `mqtt-server-cluster-tasks.md` | v1.1 | P3 仅余网络抖动与端到端 MQTT 压测；P4 已完成 | 2026-07-16 |
+| `mqtt-server-cluster-monitoring.md` | v1.1 | 指标、可部署告警与 Runbook 已实现 | 2026-07-16 |
 | `mqtt5-features.md` | v1.0 | 初稿 | 2026-07-06 |
-| `README.md` | v1.3 | 索引（新增 MQTT 5.0 文档） | 2026-07-06 |
+| `README.md` | v1.4 | 索引与实现状态校准 | 2026-07-16 |
 
 ---
 
@@ -162,4 +162,3 @@ MVP 路径（1 人 / 2 周）：tasks §9
 - 部署问题: 参考各文档的"注意事项"小节
 - 排期问题: 参考 `mqtt-server-cluster-tasks.md` §7, §8
 - MQTT 5.0 协议兼容问题: 参考 `mqtt5-features.md` §7 §8
-

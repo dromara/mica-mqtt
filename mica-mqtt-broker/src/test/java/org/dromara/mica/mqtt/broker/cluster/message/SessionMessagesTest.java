@@ -16,9 +16,11 @@
 
 package org.dromara.mica.mqtt.broker.cluster.message;
 
+import org.dromara.mica.mqtt.broker.cluster.store.InflightStore;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -67,6 +69,34 @@ class SessionMessagesTest {
 		assertEquals(SessionTakeoverResponseMessage.STATUS_OK, rt.getStatus());
 		assertTrue(rt.isOk());
 		assertArrayEquals("payload".getBytes(StandardCharsets.UTF_8), rt.getSessionBytes());
+	}
+
+	@Test
+	void takeoverResponseCarriesInflightRecords() {
+		SessionTakeoverResponseMessage response = new SessionTakeoverResponseMessage();
+		response.setClientId("client-b");
+		response.setAttemptId(8L);
+		response.setStatus(SessionTakeoverResponseMessage.STATUS_OK);
+		response.setSessionBytes(new byte[]{9, 8, 7});
+		response.setInflightEntries(Arrays.asList(
+			new InflightStore.InflightEntry("client-b", 42, 123_456L, "jobs/一", new byte[]{1, 2}, 1),
+			new InflightStore.InflightEntry("client-b", 43, 123_457L, "jobs/two", new byte[]{3}, 2,
+				InflightStore.PHASE_PUBREL)
+		));
+
+		SessionTakeoverResponseMessage decoded = (SessionTakeoverResponseMessage) ClusterMessageSerializer.fromClusterData(
+			ClusterMessageSerializer.toClusterData(response, "node-c")
+		);
+
+		assertArrayEquals(new byte[]{9, 8, 7}, decoded.getSessionBytes());
+		assertEquals(2, decoded.getInflightEntries().size());
+		InflightStore.InflightEntry second = decoded.getInflightEntries().get(1);
+		assertEquals("client-b", second.getClientId());
+		assertEquals(43, second.getPacketId());
+		assertEquals("jobs/two", second.getTopic());
+		assertArrayEquals(new byte[]{3}, second.getPayload());
+		assertEquals(2, second.getQos());
+		assertEquals(InflightStore.PHASE_PUBREL, second.getPhase());
 	}
 
 	@Test

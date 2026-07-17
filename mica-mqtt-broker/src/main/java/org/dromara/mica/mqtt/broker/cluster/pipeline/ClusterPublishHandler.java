@@ -16,17 +16,26 @@
 
 package org.dromara.mica.mqtt.broker.cluster.pipeline;
 
+import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttSessionManager;
 import org.dromara.mica.mqtt.broker.cluster.core.MqttClusterManager;
 import org.dromara.mica.mqtt.broker.cluster.message.PublishForwardMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.SharedDispatchToClientMessage;
+import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.SharedSubscriptionStrategy;
+import org.dromara.mica.mqtt.core.common.TopicFilter;
+import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
+import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.pipeline.MqttPublishPipelineHandler;
 import org.dromara.mica.mqtt.core.server.pipeline.PublishContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -43,10 +52,18 @@ import java.util.Set;
 public class ClusterPublishHandler implements MqttPublishPipelineHandler {
 	private static final Logger logger = LoggerFactory.getLogger(ClusterPublishHandler.class);
 
+	private final MqttServer mqttServer;
 	private final MqttClusterManager clusterManager;
+	private final ClusterMqttSessionManager sessionManager;
+	private final SharedSubscriptionStrategy sharedStrategy;
 
-	public ClusterPublishHandler(MqttClusterManager clusterManager) {
+	public ClusterPublishHandler(MqttServer mqttServer, MqttClusterManager clusterManager,
+								 ClusterMqttSessionManager sessionManager,
+								 SharedSubscriptionStrategy sharedStrategy) {
+		this.mqttServer = mqttServer;
 		this.clusterManager = clusterManager;
+		this.sessionManager = sessionManager;
+		this.sharedStrategy = sharedStrategy;
 	}
 
 	@Override
@@ -55,28 +72,95 @@ public class ClusterPublishHandler implements MqttPublishPipelineHandler {
 			return true;
 		}
 
-		String topic = context.getTopic();
-		String localNodeId = clusterManager.getLocalNodeId();
-
-		// Get all remote nodes that have subscribers for this topic
-		Set<String> remoteNodes = clusterManager.getRemoteNodesWithSubscriber(topic);
-
-		if (remoteNodes.isEmpty()) {
-			logger.debug("[Cluster] No remote subscribers for topic: {}, skip forwarding", topic);
+		List<Subscribe> allSubscribers = sessionManager.searchAllSubscribe(context.getTopic());
+		if (allSubscribers.isEmpty()) {
 			return true;
 		}
 
-		logger.debug("[Cluster] Forwarding message on topic: {} to remote nodes: {}", topic, remoteNodes);
-		for (String nodeId : remoteNodes) {
-			forwardToNode(nodeId, context);
+		List<Subscribe> normalSubscribers = new ArrayList<>();
+		Map<String, List<Subscribe>> sharedGroups = new HashMap<>();
+		for (Subscribe subscribe : allSubscribers) {
+			TopicFilter filter = new TopicFilter(subscribe.getTopicFilter());
+			if ((filter.isShared() || filter.isQueue()) && subscribe.isNoLocal()
+				&& subscribe.getClientId().equals(context.getClientId())) {
+				continue;
+			}
+			if (filter.isShared()) {
+				sharedGroups.computeIfAbsent(filter.getShareGroupName(), key -> new ArrayList<>()).add(subscribe);
+			} else if (filter.isQueue()) {
+				sharedGroups.computeIfAbsent("$queue", key -> new ArrayList<>()).add(subscribe);
+			} else {
+				normalSubscribers.add(subscribe);
+			}
 		}
 
+		dispatchNormal(context, normalSubscribers);
+		dispatchShared(context, sharedGroups);
+
 		return true; // continue to local delivery
+	}
+
+	private void dispatchNormal(PublishContext context, List<Subscribe> subscribers) {
+		Set<String> remoteNodes = new HashSet<>();
+		for (Subscribe subscribe : subscribers) {
+			String nodeId = sessionManager.getClientNode(subscribe.getClientId());
+			if (nodeId != null && !nodeId.equals(clusterManager.getLocalNodeId())) {
+				remoteNodes.add(nodeId);
+			}
+		}
+		for (String nodeId : remoteNodes) {
+			forwardToNode(nodeId, context);
+			clusterManager.getMetrics().publishForwardSentInc();
+		}
+	}
+
+	private void dispatchShared(PublishContext context, Map<String, List<Subscribe>> sharedGroups) {
+		Message message = buildMessage(context);
+		for (Map.Entry<String, List<Subscribe>> entry : sharedGroups.entrySet()) {
+			List<Subscribe> remaining = new ArrayList<>(entry.getValue());
+			boolean delivered = false;
+			while (!remaining.isEmpty()) {
+				Subscribe picked = sharedStrategy.pick(entry.getKey(), remaining,
+					clusterManager.getLocalNodeId(), message);
+				if (picked == null) {
+					break;
+				}
+				String nodeId = sessionManager.getClientNode(picked.getClientId());
+				if (nodeId == null || nodeId.equals(clusterManager.getLocalNodeId())) {
+					mqttServer.publish(picked.getClientId(), context.getTopic(), context.getPayload(),
+						context.getQos(), context.isRetain(), context.getProperties());
+					delivered = true;
+					break;
+				}
+				SharedDispatchToClientMessage dispatch = new SharedDispatchToClientMessage();
+				dispatch.setClientId(picked.getClientId());
+				dispatch.setTopic(context.getTopic());
+				dispatch.setMessage(message);
+				if (clusterManager.sendToNode(nodeId, dispatch)) {
+					clusterManager.getMetrics().sharedDispatchSentInc();
+					delivered = true;
+					break;
+				}
+				// The transport rejected the send before enqueueing it. Remove this
+				// subscriber and re-pick; no blind retry means no duplicate delivery.
+				remaining.removeIf(candidate -> picked.getClientId().equals(candidate.getClientId()));
+			}
+			if (!delivered) {
+				clusterManager.getMetrics().sharedDispatchDroppedInc();
+			}
+		}
 	}
 
 	private void forwardToNode(String nodeId, PublishContext context) {
 		logger.debug("[Cluster] Forwarding to node: {}, topic: {}", nodeId, context.getTopic());
 
+		PublishForwardMessage clusterMsg = new PublishForwardMessage();
+		clusterMsg.setMessage(buildMessage(context));
+
+		clusterManager.sendToNode(nodeId, clusterMsg);
+	}
+
+	private static Message buildMessage(PublishContext context) {
 		Message message = new Message();
 		message.setMessageType(MessageType.UP_STREAM);
 		message.setFromClientId(context.getClientId());
@@ -86,12 +170,9 @@ public class ClusterPublishHandler implements MqttPublishPipelineHandler {
 		message.setQos(context.getQos().value());
 		message.setDup(context.isDup());
 		message.setRetain(context.isRetain());
-		message.setTimestamp(System.currentTimeMillis());
-
-		PublishForwardMessage clusterMsg = new PublishForwardMessage();
-		clusterMsg.setMessage(message);
-
-		clusterManager.sendToNode(nodeId, clusterMsg);
+		message.setProperties(context.getProperties());
+		message.setTimestamp(context.getTimestamp());
+		return message;
 	}
 
 	@Override

@@ -166,11 +166,22 @@ public interface LocalKvStore extends AutoCloseable {
 		private final long entryCount;
 		/** Whether the store is currently open and healthy. */
 		private final boolean healthy;
+		/** Cumulative logical read operations since this store instance was opened. */
+		private final long readOperations;
+		/** Cumulative logical write/delete operations since this store instance was opened. */
+		private final long writeOperations;
 
 		public StoreStats(long fileSizeBytes, long entryCount, boolean healthy) {
+			this(fileSizeBytes, entryCount, healthy, 0L, 0L);
+		}
+
+		public StoreStats(long fileSizeBytes, long entryCount, boolean healthy,
+						  long readOperations, long writeOperations) {
 			this.fileSizeBytes = fileSizeBytes;
 			this.entryCount = entryCount;
 			this.healthy = healthy;
+			this.readOperations = readOperations;
+			this.writeOperations = writeOperations;
 		}
 
 		public long getFileSizeBytes() {
@@ -185,10 +196,20 @@ public interface LocalKvStore extends AutoCloseable {
 			return healthy;
 		}
 
+		public long getReadOperations() {
+			return readOperations;
+		}
+
+		public long getWriteOperations() {
+			return writeOperations;
+		}
+
 		@Override
 		public String toString() {
 			return "StoreStats{fileSizeBytes=" + fileSizeBytes +
 				", entryCount=" + entryCount +
+				", readOperations=" + readOperations +
+				", writeOperations=" + writeOperations +
 				", healthy=" + healthy + '}';
 		}
 	}

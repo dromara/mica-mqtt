@@ -21,6 +21,7 @@ import org.dromara.mica.mqtt.broker.cluster.core.MqttClusterManager;
 import org.dromara.mica.mqtt.broker.cluster.message.PublishForwardMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.SharedDispatchToClientMessage;
 import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.SharedSubscriptionStrategy;
+import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
@@ -139,10 +140,16 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 				continue;
 			}
 			if (topicFilter.startsWith(TopicFilterType.SHARE_GROUP_PREFIX)) {
+				if (sub.isNoLocal() && sub.getClientId().equals(message.getFromClientId())) {
+					continue;
+				}
 				// $share/<group>/<topic>
 				String groupName = TopicFilterType.getShareGroupName(topicFilter);
 				sharedGroups.computeIfAbsent(groupName, k -> new ArrayList<>()).add(sub);
 			} else if (topicFilter.startsWith(TopicFilterType.SHARE_QUEUE_PREFIX)) {
+				if (sub.isNoLocal() && sub.getClientId().equals(message.getFromClientId())) {
+					continue;
+				}
 				// $queue/<topic> — treated as a single unnamed group
 				sharedGroups.computeIfAbsent("$queue", k -> new ArrayList<>()).add(sub);
 			} else {
@@ -219,7 +226,11 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 			boolean isLocal = targetNodeId == null || targetNodeId.equals(localNodeId);
 
 			if (isLocal) {
-				// Local delivery — let the downstream pipeline handle it as usual.
+				// Shared subscriptions are filtered out of the downstream local lookup,
+				// so deliver the dispatcher-selected client explicitly.
+				mqttServer.publish(picked.getClientId(), message.getTopic(), message.getPayload(),
+					MqttQoS.valueOf(message.getQos()),
+					message.isRetain(), message.getProperties());
 				logger.debug("[Cluster] Shared dispatch group={} client={} -> local delivery on topic: {}",
 					groupName, picked.getClientId(), topic);
 			} else {

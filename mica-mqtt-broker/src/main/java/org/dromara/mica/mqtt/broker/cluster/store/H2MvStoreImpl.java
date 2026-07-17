@@ -26,6 +26,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
@@ -72,6 +73,8 @@ public class H2MvStoreImpl implements LocalKvStore {
 
 	private volatile MVStore store;
 	private volatile MVMap<String, byte[]> dataMap;
+	private final AtomicLong readOperations = new AtomicLong();
+	private final AtomicLong writeOperations = new AtomicLong();
 
 	/**
 	 * Guards store-level operations (commit, close) from concurrent access.
@@ -89,9 +92,8 @@ public class H2MvStoreImpl implements LocalKvStore {
 		try {
 			store = new MVStore.Builder()
 				.fileName(filePath)
-				// Disable auto-commit so callers control flush timing.
-				// Sub-stores (e.g. H2InflightStore) commit after every N writes;
-				// a final commit is always performed in close() to flush uncommitted data.
+				// Writes are committed explicitly before their API call completes so
+				// acknowledged state survives an abrupt JVM exit.
 				.autoCommitDisabled()
 				.open();
 			dataMap = store.openMap(DEFAULT_MAP_NAME);
@@ -117,6 +119,7 @@ public class H2MvStoreImpl implements LocalKvStore {
 
 	@Override
 	public byte[] get(String key) {
+		readOperations.incrementAndGet();
 		lock.readLock().lock();
 		try {
 			return dataMap.get(key);
@@ -127,26 +130,31 @@ public class H2MvStoreImpl implements LocalKvStore {
 
 	@Override
 	public void put(String key, byte[] value) {
-		lock.readLock().lock();
+		writeOperations.incrementAndGet();
+		lock.writeLock().lock();
 		try {
 			dataMap.put(key, value);
+			store.commit();
 		} finally {
-			lock.readLock().unlock();
+			lock.writeLock().unlock();
 		}
 	}
 
 	@Override
 	public void delete(String key) {
-		lock.readLock().lock();
+		writeOperations.incrementAndGet();
+		lock.writeLock().lock();
 		try {
 			dataMap.remove(key);
+			store.commit();
 		} finally {
-			lock.readLock().unlock();
+			lock.writeLock().unlock();
 		}
 	}
 
 	@Override
 	public List<KeyValue> scan(String prefix) {
+		readOperations.incrementAndGet();
 		lock.readLock().lock();
 		try {
 			List<KeyValue> result = new ArrayList<>();
@@ -193,7 +201,8 @@ public class H2MvStoreImpl implements LocalKvStore {
 	@Override
 	public StoreStats stats() {
 		if (store == null || store.isClosed()) {
-			return new StoreStats(-1L, 0L, false);
+			return new StoreStats(-1L, 0L, false,
+				readOperations.get(), writeOperations.get());
 		}
 		long fileSize = -1L;
 		try {
@@ -203,8 +212,13 @@ public class H2MvStoreImpl implements LocalKvStore {
 		} catch (Exception e) {
 			logger.debug("[H2Store] Could not read file size", e);
 		}
-		long entryCount = dataMap == null ? 0L : dataMap.sizeAsLong();
-		return new StoreStats(fileSize, entryCount, true);
+		long entryCount = 0L;
+		for (String mapName : store.getMapNames()) {
+			MVMap<?, ?> map = store.openMap(mapName);
+			entryCount += map.sizeAsLong();
+		}
+		return new StoreStats(fileSize, entryCount, true,
+			readOperations.get(), writeOperations.get());
 	}
 
 	/**
@@ -237,6 +251,14 @@ public class H2MvStoreImpl implements LocalKvStore {
 		} finally {
 			lock.writeLock().unlock();
 		}
+	}
+
+	void recordReadOperation() {
+		readOperations.incrementAndGet();
+	}
+
+	void recordWriteOperation() {
+		writeOperations.incrementAndGet();
 	}
 
 	/** Exposed for testing. */

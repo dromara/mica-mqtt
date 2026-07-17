@@ -135,4 +135,17 @@ class H2SessionStoreTest {
 		List<Subscribe> subs = loaded.getSubscriptions();
 		assertTrue(subs == null || subs.isEmpty());
 	}
+
+	@Test
+	void loadAllReturnsPersistedSessions() {
+		store.save("client-1", new SessionStore.Session(
+			"client-1", Collections.emptyList(), false, 60L, "node-1"));
+		store.save("client-2", new SessionStore.Session(
+			"client-2", Collections.emptyList(), false, 120L, "node-1"));
+
+		List<SessionStore.Session> sessions = store.loadAll();
+		assertEquals(2, sessions.size());
+		assertTrue(sessions.stream().anyMatch(session -> "client-1".equals(session.getClientId())));
+		assertTrue(sessions.stream().anyMatch(session -> "client-2".equals(session.getClientId())));
+	}
 }

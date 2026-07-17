@@ -32,7 +32,7 @@ import java.util.List;
  * H2 MVStore-backed implementation of {@link SharedSubStore}.
  * <p>
  * Persists each {@link SharedSubStore.SharedSubGroup} under key
- * {@code "shared_sub:<groupName>"} in a dedicated {@link org.h2.mvstore.MVMap} inside the
+ * {@code "shared_sub:<groupName>\u001F<topicFilter>"} in a dedicated {@link org.h2.mvstore.MVMap} inside the
  * shared {@link H2MvStoreImpl} engine.
  * </p>
  * <h2>Value format</h2>
@@ -59,6 +59,7 @@ public class H2SharedSubStore implements SharedSubStore {
 
 	static final String MAP_NAME = "mica_mqtt_shared_sub";
 	private static final String KEY_PREFIX = "shared_sub:";
+	private static final char KEY_SEPARATOR = '\u001F';
 
 	private final LocalKvStore store;
 
@@ -71,17 +72,25 @@ public class H2SharedSubStore implements SharedSubStore {
 	}
 
 	@Override
-	public void save(SharedSubGroup group) {
-		String key = buildKey(group.getGroupName());
+	public synchronized void save(SharedSubGroup group) {
+		String key = buildKey(group.getGroupName(), group.getTopicFilter());
 		byte[] value = serialize(group);
 		store.put(key, value);
+		String legacyKey = buildKey(group.getGroupName());
+		byte[] legacyValue = store.get(legacyKey);
+		if (legacyValue != null) {
+			SharedSubGroup legacy = deserialize(group.getGroupName(), legacyValue);
+			if (legacy != null && java.util.Objects.equals(group.getTopicFilter(), legacy.getTopicFilter())) {
+				store.delete(legacyKey);
+			}
+		}
 	}
 
 	@Override
-	public boolean updateIfVersion(SharedSubGroup group, long expectedVersion) {
-		String key = buildKey(group.getGroupName());
-		SharedSubGroup current = get(group.getGroupName());
-		if (current != null && current.getVersion() != expectedVersion) {
+	public synchronized boolean updateIfVersion(SharedSubGroup group, long expectedVersion) {
+		SharedSubGroup current = get(group.getGroupName(), group.getTopicFilter());
+		if ((current == null && expectedVersion != 0L)
+			|| (current != null && current.getVersion() != expectedVersion)) {
 			return false;
 		}
 		save(group);
@@ -89,19 +98,64 @@ public class H2SharedSubStore implements SharedSubStore {
 	}
 
 	@Override
-	public void delete(String groupName) {
-		String key = buildKey(groupName);
-		store.delete(key);
+	public synchronized void delete(String groupName) {
+		store.delete(buildKey(groupName));
+		for (SharedSubGroup group : listAll()) {
+			if (groupName.equals(group.getGroupName())) {
+				delete(groupName, group.getTopicFilter());
+			}
+		}
+	}
+
+	@Override
+	public synchronized void delete(String groupName, String topicFilter) {
+		store.delete(buildKey(groupName, topicFilter));
+		String legacyKey = buildKey(groupName);
+		byte[] legacyValue = store.get(legacyKey);
+		if (legacyValue != null) {
+			SharedSubGroup legacy = deserialize(groupName, legacyValue);
+			if (legacy != null && java.util.Objects.equals(topicFilter, legacy.getTopicFilter())) {
+				store.delete(legacyKey);
+			}
+		}
+	}
+
+	@Override
+	public synchronized boolean deleteIfVersion(String groupName, String topicFilter, long expectedVersion) {
+		SharedSubGroup current = get(groupName, topicFilter);
+		if (current == null || current.getVersion() != expectedVersion) {
+			return false;
+		}
+		delete(groupName, topicFilter);
+		return true;
 	}
 
 	@Override
 	public SharedSubGroup get(String groupName) {
-		String key = buildKey(groupName);
-		byte[] value = store.get(key);
+		byte[] value = store.get(buildKey(groupName));
 		if (value == null) {
+			for (SharedSubGroup group : listAll()) {
+				if (groupName.equals(group.getGroupName())) {
+					return group;
+				}
+			}
 			return null;
 		}
 		return deserialize(groupName, value);
+	}
+
+	@Override
+	public SharedSubGroup get(String groupName, String topicFilter) {
+		byte[] value = store.get(buildKey(groupName, topicFilter));
+		if (value != null) {
+			return deserialize(groupName, value);
+		}
+		byte[] legacyValue = store.get(buildKey(groupName));
+		if (legacyValue == null) {
+			return null;
+		}
+		SharedSubGroup legacy = deserialize(groupName, legacyValue);
+		return legacy != null && java.util.Objects.equals(topicFilter, legacy.getTopicFilter()) ? legacy : null;
 	}
 
 	@Override
@@ -109,14 +163,23 @@ public class H2SharedSubStore implements SharedSubStore {
 		List<LocalKvStore.KeyValue> entries = store.scan(KEY_PREFIX);
 		List<SharedSubGroup> groups = new ArrayList<>(entries.size());
 		for (LocalKvStore.KeyValue kv : entries) {
-			String name = kv.getKey().substring(KEY_PREFIX.length());
-			groups.add(deserialize(name, kv.getValue()));
+			String storageId = kv.getKey().substring(KEY_PREFIX.length());
+			int separator = storageId.indexOf(KEY_SEPARATOR);
+			String name = separator < 0 ? storageId : storageId.substring(0, separator);
+			SharedSubGroup group = deserialize(name, kv.getValue());
+			if (group != null) {
+				groups.add(group);
+			}
 		}
 		return groups;
 	}
 
 	static String buildKey(String groupName) {
 		return KEY_PREFIX + groupName;
+	}
+
+	static String buildKey(String groupName, String topicFilter) {
+		return KEY_PREFIX + groupName + KEY_SEPARATOR + topicFilter;
 	}
 
 	static byte[] serialize(SharedSubGroup group) {

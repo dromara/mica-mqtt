@@ -68,19 +68,46 @@ public interface SharedSubStore {
 	boolean updateIfVersion(SharedSubGroup group, long expectedVersion);
 
 	/**
-	 * Removes a shared-subscription group.
+	 * Removes every topic filter under a logical shared-subscription group.
 	 *
 	 * @param groupName the name extracted from {@code $share/<group>/<topic>}
 	 */
 	void delete(String groupName);
 
 	/**
-	 * Returns the group with the given name, or {@code null} if absent.
+	 * Removes one topic filter from a logical shared-subscription group.
+	 */
+	void delete(String groupName, String topicFilter);
+
+	/**
+	 * Removes one topic filter only when its version still matches the caller's
+	 * snapshot. Implementations should make the compare-and-delete atomic.
+	 */
+	default boolean deleteIfVersion(String groupName, String topicFilter, long expectedVersion) {
+		SharedSubGroup current = get(groupName, topicFilter);
+		if (current == null || current.getVersion() != expectedVersion) {
+			return false;
+		}
+		delete(groupName, topicFilter);
+		return true;
+	}
+
+	/**
+	 * Returns an arbitrary topic filter under the given logical group name, or
+	 * {@code null} if absent. New routing code should use
+	 * {@link #get(String, String)} because a logical group can contain multiple
+	 * independent topic filters.
 	 *
 	 * @param groupName the group name
 	 * @return the group, or {@code null}
 	 */
 	SharedSubGroup get(String groupName);
+
+	/**
+	 * Returns one shared-subscription group identified by logical group and
+	 * underlying topic filter.
+	 */
+	SharedSubGroup get(String groupName, String topicFilter);
 
 	/**
 	 * Returns all groups persisted in the store.  Used at startup to rebuild

@@ -114,6 +114,13 @@ public class MqttClusterConfig {
 	 */
 	private MqttStorageConfig storageConfig;
 
+	/** Enables RF-based retained-message placement instead of full broadcast replication. */
+	private boolean retainShardingEnabled;
+	/** Number of nodes that keep each retained topic when sharding is enabled. */
+	private int retainReplicationFactor = 2;
+	/** Maximum wait for remote retain-query responses during SUBSCRIBE. */
+	private long retainQueryTimeoutMs = 2_000L;
+
 	public boolean isEnabled() {
 		return enabled;
 	}
@@ -228,6 +235,45 @@ public class MqttClusterConfig {
 
 	public MqttClusterConfig storageConfig(MqttStorageConfig storageConfig) {
 		this.storageConfig = storageConfig;
+		return this;
+	}
+
+	public boolean isRetainShardingEnabled() {
+		return retainShardingEnabled;
+	}
+
+	public void setRetainShardingEnabled(boolean retainShardingEnabled) {
+		this.retainShardingEnabled = retainShardingEnabled;
+	}
+
+	public MqttClusterConfig retainShardingEnabled(boolean retainShardingEnabled) {
+		this.retainShardingEnabled = retainShardingEnabled;
+		return this;
+	}
+
+	public int getRetainReplicationFactor() {
+		return retainReplicationFactor;
+	}
+
+	public void setRetainReplicationFactor(int retainReplicationFactor) {
+		this.retainReplicationFactor = Math.max(1, retainReplicationFactor);
+	}
+
+	public MqttClusterConfig retainReplicationFactor(int retainReplicationFactor) {
+		setRetainReplicationFactor(retainReplicationFactor);
+		return this;
+	}
+
+	public long getRetainQueryTimeoutMs() {
+		return retainQueryTimeoutMs;
+	}
+
+	public void setRetainQueryTimeoutMs(long retainQueryTimeoutMs) {
+		this.retainQueryTimeoutMs = Math.max(1L, retainQueryTimeoutMs);
+	}
+
+	public MqttClusterConfig retainQueryTimeoutMs(long retainQueryTimeoutMs) {
+		setRetainQueryTimeoutMs(retainQueryTimeoutMs);
 		return this;
 	}
 }

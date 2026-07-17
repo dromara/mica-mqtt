@@ -130,9 +130,14 @@ class H2MvStoreImplTest {
 	@Test
 	void testStats() {
 		store.put("k", "v".getBytes());
+		store.get("k");
+		store.scan("k");
+		store.openMap("mqtt_test_stats").put("named", "value".getBytes());
 		LocalKvStore.StoreStats stats = store.stats();
 		assertTrue(stats.isHealthy());
-		assertEquals(1L, stats.getEntryCount());
+		assertEquals(2L, stats.getEntryCount());
+		assertEquals(2L, stats.getReadOperations());
+		assertEquals(1L, stats.getWriteOperations());
 	}
 
 	@Test

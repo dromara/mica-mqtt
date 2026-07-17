@@ -128,6 +128,9 @@ public class MqttClusterBrokerCreator {
 		if (clusterStorage != null) {
 			clusterSessionManager.setSessionStore(clusterStorage.getSessionStore());
 			clusterSessionManager.setSharedSubStore(clusterStorage.getSharedSubStore());
+			clusterSessionManager.setInflightStore(
+				clusterStorage.getInflightStore(), storageConfig.getInflightTtlMs()
+			);
 		}
 
 		if (serverCreator.getMessageStore() != null) {
@@ -146,14 +149,17 @@ public class MqttClusterBrokerCreator {
 		clusterConnectStatusListener.setSessionManager(clusterSessionManager);
 		serverCreator.connectStatusListener(clusterConnectStatusListener);
 
-		ClusterPublishHandler publishHandler = new ClusterPublishHandler(clusterManager);
-		serverCreator.addPublishPipelineHandler(publishHandler);
-
 		MqttServer mqttServer = serverCreator.build();
 		clusterManager.setMqttServer(mqttServer);
+		clusterConnectStatusListener.setTaskService(serverCreator.getTaskService());
 
 		SharedSubscriptionStrategy strategy = createStrategy(clusterConfig, clusterSessionManager);
 		clusterManager.setSharedStrategy(strategy);
+
+		ClusterPublishHandler publishHandler = new ClusterPublishHandler(
+			mqttServer, clusterManager, clusterSessionManager, strategy
+		);
+		serverCreator.addPublishPipelineHandler(publishHandler);
 
 		ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(mqttServer, clusterManager, clusterSessionManager, strategy);
 		serverCreator.addMessagePipelineHandler(dispatcher);

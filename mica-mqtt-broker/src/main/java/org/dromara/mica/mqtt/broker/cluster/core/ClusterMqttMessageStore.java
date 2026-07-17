@@ -25,7 +25,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Decorator for {@link IMqttMessageStore} that synchronizes will and retained messages across cluster nodes.
@@ -85,7 +87,14 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 
 	@Override
 	public boolean clearWillMessage(String clientId) {
-		return delegate.clearWillMessage(clientId);
+		boolean cleared = delegate.clearWillMessage(clientId);
+		if (clusterManager.isClusterEnabled()) {
+			WillMessageNotifyMessage willMsg = new WillMessageNotifyMessage();
+			willMsg.setClientId(clientId);
+			willMsg.setWillMessage(null);
+			clusterManager.broadcast(willMsg);
+		}
+		return cleared;
 	}
 
 	@Override
@@ -95,10 +104,26 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 
 	@Override
 	public boolean addRetainMessage(String topic, int timeout, Message message) {
+		if (isRetainShardingActive()) {
+			List<String> replicas = clusterManager.getRetainReplicaNodes(topic);
+			if (replicas.contains(clusterManager.getLocalNodeId())) {
+				addRetainMessageLocal(topic, timeout, message);
+			}
+			RetainMessageNotifyMessage retainMsg = new RetainMessageNotifyMessage();
+			retainMsg.setTopic(topic);
+			retainMsg.setTimeout(timeout);
+			retainMsg.setRetainMessage(message);
+			for (String replica : replicas) {
+				if (!clusterManager.getLocalNodeId().equals(replica)) {
+					clusterManager.sendToNode(replica, retainMsg);
+				}
+			}
+			return true;
+		}
 		delegate.addRetainMessage(topic, timeout, message);
 		// V3 persistence: mirror to durable retain index when storage is enabled
 		if (retainIndex != null) {
-			retainIndex.put(topic, message);
+			retainIndex.put(topic, message, timeout);
 		}
 		if (clusterManager.isClusterEnabled()) {
 			RetainMessageNotifyMessage retainMsg = new RetainMessageNotifyMessage();
@@ -131,6 +156,21 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 
 	@Override
 	public List<Message> getRetainMessage(String topicFilter) {
+		if (isRetainShardingActive()) {
+			Map<String, Message> byTopic = new LinkedHashMap<>();
+			for (Message message : getRetainMessageLocal(topicFilter)) {
+				byTopic.put(message.getTopic(), message);
+			}
+			for (Message message : clusterManager.queryRemoteRetain(
+				topicFilter, clusterManager.getRetainQueryTimeoutMs())) {
+				byTopic.put(message.getTopic(), message);
+			}
+			return new ArrayList<>(byTopic.values());
+		}
+		return getRetainMessageLocal(topicFilter);
+	}
+
+	public List<Message> getRetainMessageLocal(String topicFilter) {
 		List<Message> messages = delegate.getRetainMessage(topicFilter);
 		if ((messages == null || messages.isEmpty()) && retainIndex != null) {
 			// Fallback to durable index when the in-memory delegate has nothing
@@ -140,7 +180,21 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 				return new ArrayList<>(0);
 			}
 		}
-		return messages;
+		return messages == null ? new ArrayList<>(0) : messages;
+	}
+
+	public List<Message> getAllRetainMessageLocal() {
+		RetainIndex index = retainIndex;
+		return index == null ? new ArrayList<>(0) : index.snapshot();
+	}
+
+	public List<RetainIndex.RetainEntry> getAllRetainEntriesLocal() {
+		RetainIndex index = retainIndex;
+		return index == null ? new ArrayList<>(0) : index.snapshotEntries();
+	}
+
+	private boolean isRetainShardingActive() {
+		return clusterManager.isRetainShardingEnabled() && retainIndex != null;
 	}
 
 	/**
@@ -178,7 +232,7 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 		boolean ok = delegate.addRetainMessage(topic, timeout, message);
 		// V3 persistence: also write to durable index when receiving retain from peer
 		if (retainIndex != null && ok && message != null) {
-			retainIndex.put(topic, message);
+			retainIndex.put(topic, message, timeout);
 		}
 		return ok;
 	}
