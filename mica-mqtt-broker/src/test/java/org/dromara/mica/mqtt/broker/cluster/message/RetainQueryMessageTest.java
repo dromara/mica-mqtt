@@ -76,6 +76,13 @@ class RetainQueryMessageTest {
 	}
 
 	@Test
+	void clusterNameRoundTrip() {
+		ClusterDataMessage encoded = ClusterMessageSerializer.toClusterData(
+			new HeartbeatMessage(), "node-1", "production");
+		assertEquals("production", ClusterMessageSerializer.getClusterName(encoded));
+	}
+
+	@Test
 	void legacyTransportHeadersRemainReadable() {
 		Map<String, String> headers = new HashMap<>();
 		headers.put(ClusterMessageSerializer.HEADER_TYPE,

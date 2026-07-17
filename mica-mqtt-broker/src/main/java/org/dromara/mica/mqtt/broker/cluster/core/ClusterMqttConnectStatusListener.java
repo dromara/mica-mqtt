@@ -113,6 +113,7 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 
 		ClientDisconnectMessage msg = new ClientDisconnectMessage();
 		msg.setClientId(clientId);
+		msg.setPersistentSession(sessionManager != null && sessionManager.isPersistentSession(clientId));
 		clusterManager.broadcast(msg);
 		clusterManager.getMetrics().clientDisconnectBroadcastInc();
 	}

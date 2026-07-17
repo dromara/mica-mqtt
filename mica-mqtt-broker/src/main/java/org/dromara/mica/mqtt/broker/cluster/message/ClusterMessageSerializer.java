@@ -73,6 +73,7 @@ public class ClusterMessageSerializer {
 	 * Header key for timeout value in milliseconds.
 	 */
 	public static final String HEADER_TIMEOUT = "timeout";
+	public static final String HEADER_CLUSTER_NAME = "clusterName";
 
 	/**
 	 * Serializes a cluster message into a t-io cluster data message for network transmission.
@@ -82,9 +83,16 @@ public class ClusterMessageSerializer {
 	 * @return the serialized {@link ClusterDataMessage} ready for transmission
 	 */
 	public static ClusterDataMessage toClusterData(ClusterMessage msg, String sourceNode) {
+		return toClusterData(msg, sourceNode, null);
+	}
+
+	public static ClusterDataMessage toClusterData(ClusterMessage msg, String sourceNode, String clusterName) {
 		Map<String, String> headers = new HashMap<>(8);
 		headers.put(HEADER_TYPE, String.valueOf(msg.getType().getCode()));
 		headers.put(HEADER_SOURCE_NODE, sourceNode);
+		if (clusterName != null) {
+			headers.put(HEADER_CLUSTER_NAME, clusterName);
+		}
 		msg.toClusterData(headers);
 		byte[] payload = msg.toPayload();
 		// Keep the MQTT envelope in the binary payload. This avoids depending on
@@ -129,6 +137,10 @@ public class ClusterMessageSerializer {
 	 */
 	public static String getSourceNode(ClusterDataMessage data) {
 		return unwrapEnvelope(data).getHeader(HEADER_SOURCE_NODE);
+	}
+
+	public static String getClusterName(ClusterDataMessage data) {
+		return unwrapEnvelope(data).getHeader(HEADER_CLUSTER_NAME);
 	}
 
 	private static byte[] encodeEnvelope(Map<String, String> headers, byte[] payload) {

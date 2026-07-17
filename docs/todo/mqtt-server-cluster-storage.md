@@ -744,7 +744,7 @@ RETAIN_QUERY(20),
 
 > **v1.2 修正**：原 v1.1 使用 9-19 编号，与 V1 已实现的 WILL_MESSAGE(9)/RETAIN_MESSAGE(10) 冲突。本版起与 cluster v3.0 对齐，V2 占 11-13，V3 存储占 14-20。移除未实现的 `RETAIN_REPLICATE`，RETAIN_QUERY 为 code=20；cluster 另使用 HEARTBEAT(21)，全局总计 21 个枚举值。
 
-向后兼容：旧节点收到新消息类型时记录 warning 并忽略。
+兼容边界：当前节点要求相同 `clusterName` 和 binary envelope。旧版 header transport 节点需先摘流退出，不与当前版本混跑。
 
 ---
 
@@ -774,10 +774,10 @@ mqtt:
       cache-size-mb: 64
       compress: lzf
       auto-commit-buffer: 1024
-    # QoS 1/2 飞行消息 TTL 清理
+    # QoS 1/2 飞行消息 TTL 清理；默认关闭，避免静默破坏 QoS 保证
     inflight:
       cleanup-interval-seconds: 30
-      default-ttl-factor: 3      # TTL = session.keepalive * factor
+      ttl-ms: 0                  # 0=不按 TTL 删除；正数为显式有损容量策略
       max-stale-records: 100000  # 滞后堆积告警阈值
     # Retain 内存索引
     retain-index:
@@ -851,7 +851,7 @@ MqttServer server = MqttBroker.create()
 
 - [x] `InflightStore` 抽象（接口定义）
 - [x] `H2InflightStore` 实现（同文件不同 Map）
-- [x] 后台 TTL 清理线程（30s 周期）
+- [x] 后台 TTL 清理线程（默认 TTL=0 不删除；配置正数后按周期清理）
 - [x] 异步写线程池（不阻塞发送路径）
 - [x] 客户端重连重放 + 过期过滤（保留原 packetId、设置 DUP；QoS 2 按持久化 phase 恢复 PUBLISH/PUBREL）
 - [x] inflight 数量、重放计数及 L2 累计读写操作可导出（阈值告警由部署侧配置）
@@ -916,7 +916,7 @@ MqttServer server = MqttBroker.create()
 - [x] Session 元数据持久化（H2）
 - [x] Retain 消息持久化（H2）+ 内存 Skiplist 通配索引 + TTL
 - [x] Shared Subscription 状态持久化（H2）
-- [x] QoS 1/2 飞行消息持久化（H2）+ 后台 TTL 清理
+- [x] QoS 1/2 飞行消息持久化（H2）+ 可选 TTL 清理（默认关闭）
 
 ### 9.2 集群能力升级
 

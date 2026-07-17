@@ -127,14 +127,16 @@ public class ClusterPublishHandler implements MqttPublishPipelineHandler {
 				}
 				String nodeId = sessionManager.getClientNode(picked.getClientId());
 				if (nodeId == null || nodeId.equals(clusterManager.getLocalNodeId())) {
-					mqttServer.publish(picked.getClientId(), context.getTopic(), context.getPayload(),
-						context.getQos(), context.isRetain(), context.getProperties());
+					mqttServer.deliverLocal(picked.getClientId(), context.getTopic(), context.getPayload(),
+						context.getQos(), picked.getMqttQoS(),
+						context.isRetain() && picked.isRetainAsPublished(), context.getProperties());
 					delivered = true;
 					break;
 				}
 				SharedDispatchToClientMessage dispatch = new SharedDispatchToClientMessage();
 				dispatch.setClientId(picked.getClientId());
 				dispatch.setTopic(context.getTopic());
+				dispatch.setGroupName(entry.getKey());
 				dispatch.setMessage(message);
 				if (clusterManager.sendToNode(nodeId, dispatch)) {
 					clusterManager.getMetrics().sharedDispatchSentInc();

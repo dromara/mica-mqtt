@@ -55,6 +55,8 @@ public class SharedDispatchToClientMessage implements ClusterMessage {
 	 * The original published topic (not the shared-subscription topic filter).
 	 */
 	private String topic;
+	private String groupName;
+	private int retryCount;
 
 	/**
 	 * The MQTT message payload to be delivered to the selected client.
@@ -70,6 +72,8 @@ public class SharedDispatchToClientMessage implements ClusterMessage {
 	public void toClusterData(Map<String, String> headers) {
 		headers.put(ClusterMessageSerializer.HEADER_CLIENT_ID, clientId);
 		headers.put(ClusterMessageSerializer.HEADER_TOPIC, topic);
+		headers.put("groupName", groupName == null ? "" : groupName);
+		headers.put("retryCount", String.valueOf(retryCount));
 	}
 
 	@Override
@@ -84,6 +88,10 @@ public class SharedDispatchToClientMessage implements ClusterMessage {
 	public void fromClusterData(ClusterDataMessage data) {
 		this.clientId = data.getHeader(ClusterMessageSerializer.HEADER_CLIENT_ID);
 		this.topic = data.getHeader(ClusterMessageSerializer.HEADER_TOPIC);
+		String group = data.getHeader("groupName");
+		this.groupName = group == null || group.isEmpty() ? null : group;
+		String retries = data.getHeader("retryCount");
+		this.retryCount = retries == null ? 0 : Integer.parseInt(retries);
 		byte[] payload = data.getPayload();
 		if (payload != null && payload.length > 0) {
 			this.message = DefaultMessageSerializer.INSTANCE.deserialize(payload);
@@ -104,6 +112,22 @@ public class SharedDispatchToClientMessage implements ClusterMessage {
 
 	public void setTopic(String topic) {
 		this.topic = topic;
+	}
+
+	public String getGroupName() {
+		return groupName;
+	}
+
+	public void setGroupName(String groupName) {
+		this.groupName = groupName;
+	}
+
+	public int getRetryCount() {
+		return retryCount;
+	}
+
+	public void setRetryCount(int retryCount) {
+		this.retryCount = retryCount;
 	}
 
 	public Message getMessage() {

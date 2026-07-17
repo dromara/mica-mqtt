@@ -28,6 +28,7 @@ import org.dromara.mica.mqtt.broker.cluster.message.*;
 import org.dromara.mica.mqtt.broker.cluster.metrics.ClusterMetrics;
 import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.SharedSubscriptionStrategy;
 import org.dromara.mica.mqtt.broker.cluster.store.LocalKvStore;
+import org.dromara.mica.mqtt.broker.cluster.store.InflightStore;
 import org.dromara.mica.mqtt.broker.cluster.store.RetainShardRouter;
 import org.dromara.mica.mqtt.broker.cluster.store.RetainIndex;
 import org.dromara.mica.mqtt.broker.cluster.store.SessionStore;
@@ -48,6 +49,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -210,6 +212,12 @@ public class MqttClusterManager {
 
 	private void handleClusterMessage(ClusterDataMessage message) {
 		try {
+			String messageClusterName = ClusterMessageSerializer.getClusterName(message);
+			if (!Objects.equals(config.getClusterName(), messageClusterName)) {
+				logger.warn("Ignored cluster message from a different or legacy cluster: expected={} actual={}",
+					config.getClusterName(), messageClusterName);
+				return;
+			}
 			ClusterMessage clusterMsg = ClusterMessageSerializer.fromClusterData(message);
 			if (clusterMsg != null) {
 				String sourceNode = ClusterMessageSerializer.getSourceNode(message);
@@ -242,7 +250,8 @@ public class MqttClusterManager {
 				// retain 存储由 RETAIN_MESSAGE 单独同步，此处仅投递给本地订阅者，避免通过
 				// ClusterMqttMessageStore 再次广播导致无限循环
 				Message fwdMsg = pfm.getMessage();
-				mqttServer.publishAll(fwdMsg.getTopic(), fwdMsg.getPayload(), MqttQoS.valueOf(fwdMsg.getQos()), false);
+				mqttServer.deliverLocal(fwdMsg.getTopic(), fwdMsg.getPayload(),
+					MqttQoS.valueOf(fwdMsg.getQos()), fwdMsg.isRetain(), fwdMsg.getProperties());
 				break;
 			}
 			case SESSION_TAKEOVER_REQUEST: {
@@ -278,7 +287,11 @@ public class MqttClusterManager {
 			}
 			case CLIENT_DISCONNECT: {
 				ClientDisconnectMessage cdm = (ClientDisconnectMessage) clusterMsg;
-				sessionManager.removeRemoteClient(cdm.getClientId());
+				if (cdm.isPersistentSession()) {
+					sessionManager.markRemoteClientOffline(cdm.getClientId());
+				} else {
+					sessionManager.removeRemoteClient(cdm.getClientId());
+				}
 				break;
 			}
 			case STATE_SYNC_REQUEST:
@@ -367,8 +380,10 @@ public class MqttClusterManager {
 		}
 
 		// Try to deliver to the selected client locally.
-		boolean delivered = mqttServer.publish(clientId, msg.getTopic(),
-			msg.getPayload(), MqttQoS.valueOf(msg.getQos()));
+		Subscribe selected = findSubscription(sessionManager, clientId, topic, sdm.getGroupName());
+		boolean delivered = selected != null && mqttServer.deliverLocal(clientId, msg.getTopic(),
+			msg.getPayload(), MqttQoS.valueOf(msg.getQos()), selected.getMqttQoS(),
+			msg.isRetain() && selected.isRetainAsPublished(), msg.getProperties());
 
 		if (delivered) {
 			metrics.sharedDispatchReceivedInc();
@@ -381,7 +396,7 @@ public class MqttClusterManager {
 			clientId, topic);
 		metrics.sharedDispatchRepickInc();
 
-		if (sharedStrategy == null) {
+		if (sharedStrategy == null || sdm.getGroupName() == null || sdm.getRetryCount() >= 1) {
 			metrics.sharedDispatchDroppedInc();
 			logger.debug("[Cluster] No shared strategy configured, dropping re-pick for topic={}", topic);
 			return;
@@ -395,7 +410,7 @@ public class MqttClusterManager {
 		}
 
 		// Narrow to shared subscribers only, group the same way the dispatcher does.
-		java.util.Map<String, java.util.List<Subscribe>> sharedGroups = new java.util.HashMap<>();
+		java.util.List<Subscribe> groupCandidates = new java.util.ArrayList<>();
 		for (Subscribe sub : candidates) {
 			String topicFilter = sub.getTopicFilter();
 			if (topicFilter == null) {
@@ -403,27 +418,36 @@ public class MqttClusterManager {
 			}
 			if (topicFilter.startsWith(TopicFilterType.SHARE_GROUP_PREFIX)) {
 				String groupName = TopicFilterType.getShareGroupName(topicFilter);
-				sharedGroups.computeIfAbsent(groupName, k -> new java.util.ArrayList<>()).add(sub);
+				if (sdm.getGroupName().equals(groupName)) {
+					groupCandidates.add(sub);
+				}
 			} else if (topicFilter.startsWith(TopicFilterType.SHARE_QUEUE_PREFIX)) {
-				sharedGroups.computeIfAbsent("$queue", k -> new java.util.ArrayList<>()).add(sub);
+				if ("$queue".equals(sdm.getGroupName())) {
+					groupCandidates.add(sub);
+				}
 			}
 		}
 
-		for (java.util.Map.Entry<String, java.util.List<Subscribe>> entry : sharedGroups.entrySet()) {
-			Subscribe rePicked = sharedStrategy.pick(entry.getKey(), entry.getValue(), localNodeId, msg);
+		if (!groupCandidates.isEmpty()) {
+			groupCandidates.removeIf(candidate -> clientId.equals(candidate.getClientId()));
+			Subscribe rePicked = sharedStrategy.pick(sdm.getGroupName(), groupCandidates, localNodeId, msg);
 			if (rePicked == null) {
-				continue;
+				metrics.sharedDispatchDroppedInc();
+				return;
 			}
 			String rePickedNode = sessionManager.getClientNode(rePicked.getClientId());
 			boolean isLocal = rePickedNode == null || rePickedNode.equals(localNodeId);
 			if (isLocal) {
-				mqttServer.publish(rePicked.getClientId(), msg.getTopic(),
-					msg.getPayload(), MqttQoS.valueOf(msg.getQos()));
+				mqttServer.deliverLocal(rePicked.getClientId(), msg.getTopic(),
+					msg.getPayload(), MqttQoS.valueOf(msg.getQos()), rePicked.getMqttQoS(),
+					msg.isRetain() && rePicked.isRetainAsPublished(), msg.getProperties());
 				logger.debug("[Cluster] Re-pick delivered to client={} topic={}", rePicked.getClientId(), topic);
 			} else {
 				SharedDispatchToClientMessage retry = new SharedDispatchToClientMessage();
 				retry.setClientId(rePicked.getClientId());
 				retry.setTopic(topic);
+				retry.setGroupName(sdm.getGroupName());
+				retry.setRetryCount(sdm.getRetryCount() + 1);
 				retry.setMessage(msg);
 				sendToNode(rePickedNode, retry);
 				logger.debug("[Cluster] Re-pick forwarded to node={} client={} topic={}", rePickedNode, rePicked.getClientId(), topic);
@@ -431,12 +455,29 @@ public class MqttClusterManager {
 		}
 	}
 
+	private Subscribe findSubscription(ClusterMqttSessionManager sessionManager, String clientId,
+								   String topic, String groupName) {
+		for (Subscribe subscribe : sessionManager.searchAllSubscribe(topic)) {
+			if (!clientId.equals(subscribe.getClientId())) {
+				continue;
+			}
+			String filter = subscribe.getTopicFilter();
+			if (filter != null && (groupName == null
+				|| (filter.startsWith(TopicFilterType.SHARE_GROUP_PREFIX)
+				&& groupName.equals(TopicFilterType.getShareGroupName(filter)))
+				|| ("$queue".equals(groupName) && filter.startsWith(TopicFilterType.SHARE_QUEUE_PREFIX)))) {
+				return subscribe;
+			}
+		}
+		return null;
+	}
+
 	private void handleStateSyncRequest(String requestNodeId) {
 		ClusterMqttSessionManager sessionManager = this.sessionManager != null
 			? this.sessionManager
 			: (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
 
-		Map<String, String> clientNodeMap = sessionManager.getRemoteClientNodeMap();
+		Map<String, String> clientNodeMap = sessionManager.getStateClientNodeMap();
 		Map<String, List<Subscribe>> subscriptionMap = new HashMap<>();
 		for (Map.Entry<String, String> entry : clientNodeMap.entrySet()) {
 			String clientId = entry.getKey();
@@ -451,7 +492,8 @@ public class MqttClusterManager {
 		response.setSubscriptionMap(subscriptionMap);
 
 		try {
-			ClusterDataMessage data = ClusterMessageSerializer.toClusterData(response, localNodeId);
+			ClusterDataMessage data = ClusterMessageSerializer.toClusterData(
+				response, localNodeId, config.getClusterName());
 			String[] parts = requestNodeId.split(":");
 			if (parts.length != 2) {
 				logger.warn("Invalid node id format for state sync request: {}", requestNodeId);
@@ -474,7 +516,8 @@ public class MqttClusterManager {
 			String[] parts = nodeId.split(":");
 			if (parts.length == 2) {
 				Node node = new Node(parts[0], Integer.parseInt(parts[1]));
-				if (cluster.send(node, ClusterMessageSerializer.toClusterData(clusterMsg, localNodeId))) {
+				if (cluster.send(node, ClusterMessageSerializer.toClusterData(
+					clusterMsg, localNodeId, config.getClusterName()))) {
 					metrics.clusterMessagesSentInc();
 					return true;
 				} else {
@@ -573,7 +616,8 @@ public class MqttClusterManager {
 				return false;
 			}
 			Node node = new Node(parts[0], Integer.parseInt(parts[1]));
-			return cluster.send(node, ClusterMessageSerializer.toClusterData(new HeartbeatMessage(), localNodeId));
+			return cluster.send(node, ClusterMessageSerializer.toClusterData(
+				new HeartbeatMessage(), localNodeId, config.getClusterName()));
 		} catch (Exception e) {
 			return false;
 		}
@@ -661,10 +705,14 @@ public class MqttClusterManager {
 			notification.setTopic(retained.getTopic());
 			notification.setRetainMessage(retained);
 			notification.setTimeout(entry.remainingTimeoutSeconds(now));
+			boolean allReplicasAccepted = true;
 			for (String replica : replicas) {
 				if (!localNodeId.equals(replica)) {
-					sendToNode(replica, notification);
+					allReplicasAccepted &= sendToNode(replica, notification);
 				}
+			}
+			if (!replicas.contains(localNodeId) && allReplicasAccepted) {
+				((ClusterMqttMessageStore) messageStore).clearRetainMessageLocal(retained.getTopic());
 			}
 		}
 	}
@@ -733,7 +781,8 @@ public class MqttClusterManager {
 			return;
 		}
 		try {
-			cluster.broadcast(ClusterMessageSerializer.toClusterData(clusterMsg, localNodeId));
+			cluster.broadcast(ClusterMessageSerializer.toClusterData(
+				clusterMsg, localNodeId, config.getClusterName()));
 			metrics.clusterMessagesSentInc();
 		} catch (Exception e) {
 			metrics.clusterSendErrorsInc();
@@ -1003,6 +1052,17 @@ public class MqttClusterManager {
 		}
 		if (localNodeId.equals(notify.getPreviousOwnerNodeId())) {
 			takeoverGrants.remove(clientId);
+			if (clusterStorage != null && clusterStorage.isActive()) {
+				if (clusterStorage.getSessionStore() != null) {
+					clusterStorage.getSessionStore().delete(clientId);
+				}
+				if (clusterStorage.getInflightStore() != null) {
+					for (InflightStore.InflightEntry entry
+						: clusterStorage.getInflightStore().listByClient(clientId)) {
+						clusterStorage.getInflightStore().remove(clientId, entry.getPacketId());
+					}
+				}
+			}
 		}
 		logger.info("[Cluster] Session migrated: client={} newOwner={} prev={}",
 			clientId, newOwner, notify.getPreviousOwnerNodeId());

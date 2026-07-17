@@ -41,6 +41,7 @@ import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
+import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.serializer.MqttSerializer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListeners;
@@ -421,6 +422,54 @@ public final class MqttServer {
 			publish(context, clientId, topic, payload, qos, subscribe.getMqttQoS(), false, effectiveProperties);
 		}
 		return true;
+	}
+
+	/**
+	 * Delivers a clustered publish to local normal subscribers without storing the
+	 * retained message again. Retain As Published is evaluated per subscription.
+	 */
+	public boolean deliverLocal(String topic, Object payload, MqttQoS qos,
+							 boolean publishedRetain, MqttProperties properties) {
+		List<Subscribe> subscribeList = sessionManager.searchSubscribe(topic);
+		if (subscribeList == null || subscribeList.isEmpty()) {
+			return false;
+		}
+		boolean delivered = false;
+		for (Subscribe subscribe : subscribeList) {
+			ChannelContext context = Tio.getByBsId(getServerConfig(), subscribe.getClientId());
+			if (context == null || context.isClosed()) {
+				continue;
+			}
+			boolean retain = publishedRetain && subscribe.isRetainAsPublished();
+			MqttProperties effectiveProperties = resolveSubscriptionProperties(
+				context, properties, subscribe.getSubscriptionId());
+			delivered |= publish(context, subscribe.getClientId(), topic, payload, qos,
+				subscribe.getMqttQoS(), retain, effectiveProperties);
+		}
+		return delivered;
+	}
+
+	/** Delivers to one already-selected subscriber without mutating retained state. */
+	public boolean deliverLocal(String clientId, String topic, Object payload, MqttQoS qos,
+							 int subscriptionQos, boolean retain, MqttProperties properties) {
+		ChannelContext context = Tio.getByBsId(getServerConfig(), clientId);
+		if (context == null || context.isClosed()) {
+			return false;
+		}
+		int subscriptionId = 0;
+		List<Subscribe> subscriptions = sessionManager.getSubscriptions(clientId);
+		if (subscriptions != null) {
+			for (Subscribe subscribe : subscriptions) {
+				if (subscribe.getTopicFilter() != null
+					&& new TopicFilter(subscribe.getTopicFilter()).match(topic)) {
+					subscriptionId = subscribe.getSubscriptionId();
+					break;
+				}
+			}
+		}
+		MqttProperties effectiveProperties = resolveSubscriptionProperties(
+			context, properties, subscriptionId);
+		return publish(context, clientId, topic, payload, qos, subscriptionQos, retain, effectiveProperties);
 	}
 
 	/**

@@ -73,6 +73,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	private final IMqttSessionManager delegate;
 	private final MqttClusterManager clusterManager;
 	private final ConcurrentHashMap<String, String> clientNodeMap = new ConcurrentHashMap<>();
+	private final Set<String> localClientIds = ConcurrentHashMap.newKeySet();
 	private final ConcurrentHashMap<String, ConcurrentHashMap<String, Subscribe>> routeSubscriptions = new ConcurrentHashMap<>();
 	private volatile SessionStore sessionStore;
 	private volatile SharedSubStore sharedSubStore;
@@ -107,6 +108,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @param nodeId the identifier of the node where the client is connected
 	 */
 	public void registerRemoteClient(String clientId, String nodeId) {
+		localClientIds.remove(clientId);
 		clientNodeMap.put(clientId, nodeId);
 		logger.debug("[Cluster] Registered remote client: {} -> node: {}", clientId, nodeId);
 	}
@@ -119,6 +121,16 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 */
 	public void markLocalClient(String clientId) {
 		clientNodeMap.remove(clientId);
+		localClientIds.add(clientId);
+	}
+
+	public boolean isPersistentSession(String clientId) {
+		return clientId != null && !delegate.isCleanStart(clientId)
+			&& delegate.getSessionExpiryInterval(clientId) != 0;
+	}
+
+	public void markRemoteClientOffline(String clientId) {
+		logger.debug("[Cluster] Preserved persistent offline session route: client={}", clientId);
 	}
 
 	/**
@@ -132,7 +144,10 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		if (clusterManager.getLocalNodeId().equals(newOwnerNodeId)) {
 			markLocalClient(clientId);
 		} else {
-			clientNodeMap.put(clientId, newOwnerNodeId);
+			registerRemoteClient(clientId, newOwnerNodeId);
+			if (sessionStore != null) {
+				sessionStore.delete(clientId);
+			}
 		}
 	}
 
@@ -142,6 +157,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @param clientId the client identifier
 	 */
 	public void removeRemoteClient(String clientId) {
+		localClientIds.remove(clientId);
 		String node = clientNodeMap.remove(clientId);
 		Map<String, Subscribe> removed = routeSubscriptions.remove(clientId);
 		delegate.remove(clientId);
@@ -634,6 +650,15 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		return new HashMap<>(clientNodeMap);
 	}
 
+	public Map<String, String> getStateClientNodeMap() {
+		Map<String, String> state = new HashMap<>(clientNodeMap);
+		String localNodeId = clusterManager.getLocalNodeId();
+		for (String clientId : localClientIds) {
+			state.put(clientId, localNodeId);
+		}
+		return state;
+	}
+
 	/**
 	 * Performs a full state synchronization from a joining node.
 	 * <p>
@@ -648,7 +673,16 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		if (clientNodeMap == null) {
 			return;
 		}
-		this.clientNodeMap.putAll(clientNodeMap);
+		for (Map.Entry<String, String> entry : clientNodeMap.entrySet()) {
+			if (clusterManager.getLocalNodeId().equals(entry.getValue())) {
+				markLocalClient(entry.getKey());
+			} else {
+				registerRemoteClient(entry.getKey(), entry.getValue());
+				if (sessionStore != null) {
+					sessionStore.delete(entry.getKey());
+				}
+			}
+		}
 		if (subscriptionMap == null) {
 			return;
 		}
@@ -676,7 +710,8 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void addPendingPublish(String clientId, int messageId, MqttPendingPublish pendingPublish) {
 		delegate.addPendingPublish(clientId, messageId, pendingPublish);
 		if (inflightStore != null && pendingPublish != null && pendingPublish.getMessage() != null) {
-			inflightStore.put(clientId, messageId, System.currentTimeMillis() + inflightTtlMs,
+			long expireAt = inflightTtlMs > 0L ? System.currentTimeMillis() + inflightTtlMs : 0L;
+			inflightStore.put(clientId, messageId, expireAt,
 				pendingPublish.getMessage().variableHeader().topicName(), pendingPublish.getMessage().payload(),
 				pendingPublish.getMessage().fixedHeader().qosLevel().value());
 		}
@@ -891,6 +926,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void remove(String clientId) {
+		localClientIds.remove(clientId);
 		clientNodeMap.remove(clientId);
 		routeSubscriptions.remove(clientId);
 		delegate.remove(clientId);
@@ -904,6 +940,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void clean() {
 		delegate.clean();
 		clientNodeMap.clear();
+		localClientIds.clear();
 		routeSubscriptions.clear();
 	}
 }

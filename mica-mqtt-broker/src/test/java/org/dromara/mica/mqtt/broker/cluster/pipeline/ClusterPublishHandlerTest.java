@@ -90,7 +90,10 @@ class ClusterPublishHandlerTest {
 		assertInstanceOf(PublishForwardMessage.class, clusterManager.sent.get(0).message);
 		assertEquals("node-2", clusterManager.sent.get(0).nodeId);
 		assertInstanceOf(SharedDispatchToClientMessage.class, clusterManager.sent.get(1).message);
-		assertNotEquals("publisher", ((SharedDispatchToClientMessage) clusterManager.sent.get(1).message).getClientId());
+		SharedDispatchToClientMessage shared =
+			(SharedDispatchToClientMessage) clusterManager.sent.get(1).message;
+		assertNotEquals("publisher", shared.getClientId());
+		assertEquals("g1", shared.getGroupName());
 		assertEquals(1, clusterManager.getMetrics().getPublishForwardSent());
 		assertEquals(1, clusterManager.getMetrics().getSharedDispatchSent());
 	}

@@ -74,9 +74,11 @@ public class MqttStorageConfig {
 	 * <p>
 	 * A QoS 1/2 message that has been in flight longer than this value is removed
 	 * by the periodic cleaner (see {@link org.dromara.mica.mqtt.broker.cluster.store.InflightTtlCleaner}).
+	 * A value of {@code 0} disables TTL eviction and is the default, preserving
+	 * MQTT delivery guarantees. Positive values are an explicit lossy capacity policy.
 	 * </p>
 	 */
-	private long inflightTtlMs = 30_000L;
+	private long inflightTtlMs = 0L;
 
 	/**
 	 * Inflight cleaner period in milliseconds.

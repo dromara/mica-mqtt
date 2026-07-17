@@ -166,6 +166,13 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 				sessionExpiryValue = Integer.MAX_VALUE;
 			}
 			sessionManager.setSessionExpiryInterval(uniqueId, sessionExpiryValue, cleanStart);
+		} else {
+			// MQTT 3.x Clean Session=false is a persistent session. Record the same
+			// normalized state used by the cluster layer so disconnect does not erase
+			// its owner and subscriptions on peer nodes.
+			boolean cleanSession = variableHeader.isCleanStart();
+			sessionManager.setSessionExpiryInterval(uniqueId,
+				cleanSession ? 0 : Integer.MAX_VALUE, cleanSession);
 		}
 		// 5. 绑定 uniqueId / username
 		Tio.bindBsId(context, uniqueId);

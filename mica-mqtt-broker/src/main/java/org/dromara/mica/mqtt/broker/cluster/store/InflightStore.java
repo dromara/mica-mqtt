@@ -24,7 +24,7 @@ import java.util.List;
  * When a broker delivers a QoS 1/2 message to a client it adds an <em>inflight</em>
  * record to this store.  The record is removed when the client acknowledges delivery
  * (PUBACK for QoS 1, PUBCOMP for QoS 2).  On node restart or client reconnect, the
- * broker replays all inflight records to guarantee at-least-once delivery.
+	 * broker replays all inflight records to guarantee at-least-once delivery.
  * </p>
  *
  * <h2>TTL</h2>
@@ -32,7 +32,9 @@ import java.util.List;
  * Inflight messages carry an {@code expireAt} timestamp (milliseconds since epoch).
  * A background {@link InflightTtlCleaner} periodically sweeps expired records so that
  * sessions that never send ACKs (e.g. silent client crashes) do not accumulate unbounded
- * state.  The default TTL is 30 seconds (see {@link InflightTtlCleaner#DEFAULT_TTL_MS}).
+	 * state. TTL eviction is disabled by default because silently expiring an
+	 * unacknowledged QoS packet would violate MQTT delivery guarantees. Operators
+	 * may opt in only when their application has an equivalent expiry policy.
  * </p>
  *
  * <h2>Key structure</h2>

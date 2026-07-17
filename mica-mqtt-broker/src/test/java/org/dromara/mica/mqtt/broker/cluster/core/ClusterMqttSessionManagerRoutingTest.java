@@ -98,6 +98,22 @@ class ClusterMqttSessionManagerRoutingTest {
 	}
 
 	@Test
+	void fullStateIncludesLocalOwnersAndPersistentOfflineRoutes() {
+		MqttClusterManager clusterManager = new MqttClusterManager(
+			new MqttClusterConfig().enabled(true), "node-1");
+		ClusterMqttSessionManager sessions = new ClusterMqttSessionManager(
+			new InMemoryMqttSessionManager(), clusterManager);
+		sessions.markLocalClient("persistent");
+		sessions.setSessionExpiryInterval("persistent", 3600, false);
+		sessions.addSubscribe(new TopicFilter("devices/#"), "persistent", 1, false, false, 0);
+
+		assertEquals("node-1", sessions.getStateClientNodeMap().get("persistent"));
+		assertTrue(sessions.isPersistentSession("persistent"));
+		sessions.markRemoteClientOffline("persistent");
+		assertEquals(1, sessions.searchAllSubscribe("devices/a").size());
+	}
+
+	@Test
 	void pendingPublishLifecycleUsesRealClientAndPacketId() {
 		MqttClusterManager clusterManager = new MqttClusterManager(new MqttClusterConfig().enabled(true), "node-1");
 		ClusterMqttSessionManager sessions = new ClusterMqttSessionManager(
@@ -169,6 +185,10 @@ class ClusterMqttSessionManagerRoutingTest {
 			assertEquals(77, restored.getSubscriptionId());
 			assertEquals(3600, sessions.getSessionExpiryInterval("persistent"));
 			assertTrue(store.load("clean") == null);
+
+			sessions.applySessionMigration("persistent", "node-2");
+			assertEquals("node-2", sessions.getStateClientNodeMap().get("persistent"));
+			assertTrue(store.load("persistent") == null);
 		} finally {
 			engine.close();
 		}
@@ -352,6 +372,7 @@ class ClusterMqttSessionManagerRoutingTest {
 		private String topic;
 		private boolean removed;
 		private int phase = InflightStore.PHASE_PUBLISH;
+		private long expireAt;
 
 		@Override
 		public void put(String clientId, int packetId, long expireAt, String topic, byte[] payload, int qos) {
@@ -359,6 +380,7 @@ class ClusterMqttSessionManagerRoutingTest {
 			this.packetId = packetId;
 			this.topic = topic;
 			this.qos = qos;
+			this.expireAt = expireAt;
 		}
 
 		@Override

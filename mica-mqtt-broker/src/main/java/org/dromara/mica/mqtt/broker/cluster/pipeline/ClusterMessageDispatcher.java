@@ -228,9 +228,9 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 			if (isLocal) {
 				// Shared subscriptions are filtered out of the downstream local lookup,
 				// so deliver the dispatcher-selected client explicitly.
-				mqttServer.publish(picked.getClientId(), message.getTopic(), message.getPayload(),
-					MqttQoS.valueOf(message.getQos()),
-					message.isRetain(), message.getProperties());
+				mqttServer.deliverLocal(picked.getClientId(), message.getTopic(), message.getPayload(),
+					MqttQoS.valueOf(message.getQos()), picked.getMqttQoS(),
+					message.isRetain() && picked.isRetainAsPublished(), message.getProperties());
 				logger.debug("[Cluster] Shared dispatch group={} client={} -> local delivery on topic: {}",
 					groupName, picked.getClientId(), topic);
 			} else {
@@ -240,6 +240,7 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 				SharedDispatchToClientMessage dispatch = new SharedDispatchToClientMessage();
 				dispatch.setClientId(picked.getClientId());
 				dispatch.setTopic(topic);
+				dispatch.setGroupName(groupName);
 				dispatch.setMessage(message);
 				clusterManager.sendToNode(targetNodeId, dispatch);
 			}

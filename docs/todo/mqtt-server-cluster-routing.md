@@ -765,13 +765,13 @@ cluster_shared_sub_dispatch_latency_seconds               # 延迟分布
 ### 9.2 集群协议扩展
 
 - [x] `SHARED_DISPATCH_TO_CLIENT` (11) — dispatcher 模型核心
-- [x] `SHARED_SUBSCRIBE_NOTIFY` (12) — 可选拆分
-- [x] `SHARED_SUBSCRIBE_REMOVE` (13) — 可选拆分
+- [ ] `SHARED_SUBSCRIBE_NOTIFY` (12) — 兼容保留位，当前主链路复用 `SUBSCRIBE_NOTIFY(3)`
+- [ ] `SHARED_SUBSCRIBE_REMOVE` (13) — 兼容保留位，当前主链路复用 `UNSUBSCRIBE_NOTIFY(4)`
 
 ### 9.3 兼容性
 
-- [x] 向后兼容 V1：旧消息类型保留
-- [x] 平滑升级路径 — §8.3
+- [x] 旧消息编号保留；12/13 当前仅为兼容保留位
+- [ ] 在线混合滚动升级 — binary envelope 与旧 header transport 不混跑，需摘流升级
 - [x] 灰度发布可行 — strategy 可配置
 
 ### 9.4 与 storage 层协同

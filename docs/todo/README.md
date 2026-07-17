@@ -118,7 +118,7 @@ V1 (cluster 文档, 已实现)
 | 路由表同步 | 全量复制 | 简单, 决策本地化 |
 | 共享订阅路由 | dispatcher 模型 | 消除单点, 复用 V1 全量表 |
 | Session 存储 | H2 MVStore | 嵌入式, ACID, 2MB |
-| QoS 飞行消息 | H2 MVStore + 30s TTL 线程 | 替代 RocksDB, 单一引擎 |
+| QoS 飞行消息 | H2 MVStore + 可选 TTL 线程 | 默认不按 TTL 丢弃；正数 TTL 为显式有损容量策略 |
 | Retain 索引 | 内存 Skiplist + H2 持久化 | 零第三方依赖, 10w 级 < 1ms |
 | Retain 复制 | 分片 (RF=2) | 避免全节点内存爆炸 |
 | 节点身份 | 启动随机 ID | 简单 (一致哈希) |
@@ -145,7 +145,7 @@ MVP 路径（1 人 / 2 周）：tasks §9
 
 | 文档 | 版本 | 状态 | 更新日期 |
 |---|---|---|---|
-| `mqtt-server-cluster.md` | v3.0 | V1/V2/V3 主链路完成；3 节点真实 MQTT 与 3/5 JVM 强杀恢复已验收 | 2026-07-17 |
+| `mqtt-server-cluster.md` | v3.0 | V1/V2/V3 主链路完成；持久断线、晚加入同步、接管清理与 clusterName 隔离已修复；旧 transport 不混跑 | 2026-07-17 |
 | `mqtt-server-cluster-routing.md` | v1.2 | dispatcher、失败重选、QoS 1/2、共享去重与迁移已验收；容量压测为上线门禁 | 2026-07-17 |
 | `mqtt-server-cluster-storage.md` | v1.2 | V3 主链路与离线 Session 恢复完成；10 万 Retain 基线、告警和 3/5 JVM H2 恢复已验收 | 2026-07-17 |
 | `mqtt-server-cluster-tasks.md` | v1.1 | 当前版本设计与仓库内验收完成；V4+ 与目标硬件容量门禁已明确分界 | 2026-07-17 |

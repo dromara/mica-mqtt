@@ -37,6 +37,7 @@ public class ClientDisconnectMessage implements ClusterMessage {
 	 * Unique identifier of the disconnected MQTT client.
 	 */
 	private String clientId;
+	private boolean persistentSession;
 
 	@Override
 	public ClusterMessageType getType() {
@@ -46,6 +47,7 @@ public class ClientDisconnectMessage implements ClusterMessage {
 	@Override
 	public void toClusterData(Map<String, String> headers) {
 		headers.put(ClusterMessageSerializer.HEADER_CLIENT_ID, clientId);
+		headers.put("persistentSession", String.valueOf(persistentSession));
 	}
 
 	@Override
@@ -56,6 +58,7 @@ public class ClientDisconnectMessage implements ClusterMessage {
 	@Override
 	public void fromClusterData(ClusterDataMessage message) {
 		this.clientId = message.getHeader(ClusterMessageSerializer.HEADER_CLIENT_ID);
+		this.persistentSession = Boolean.parseBoolean(message.getHeader("persistentSession"));
 	}
 
 	public String getClientId() {
@@ -64,5 +67,13 @@ public class ClientDisconnectMessage implements ClusterMessage {
 
 	public void setClientId(String clientId) {
 		this.clientId = clientId;
+	}
+
+	public boolean isPersistentSession() {
+		return persistentSession;
+	}
+
+	public void setPersistentSession(boolean persistentSession) {
+		this.persistentSession = persistentSession;
 	}
 }

@@ -366,7 +366,7 @@ public interface SharedSubscriptionStrategy {
 | 工作量 | 2.5 天 |
 | 依赖 | P2.0 |
 | 风险 | 低 |
-| 验收 | inflight 消息 30s TTL 清理；客户端重连可重放 |
+| 验收 | 默认不按 TTL 丢弃；显式配置 TTL 后可清理；客户端重连可重放 |
 | 涉及文件 | `cluster/store/InflightStore.java`, `cluster/store/InflightTtlCleaner.java` |
 | 设计参考 | storage v1.2 §4.3 |
 
@@ -380,7 +380,7 @@ public interface SharedSubscriptionStrategy {
 | 2.3.4 滞后堆积告警（>10w 条告警） | 0.5 天 | 接 P0.4 metrics |
 
 **P2.3 验收**：
-- [x] TTL 准确：30s 周期清理，滞后 < 60s
+- [x] TTL 可选：默认关闭；显式配置后周期清理，滞后不超过一个清理周期
 - [x] 重放正确：客户端重连后 inflight 全部重发
 - [x] 不阻塞发送路径：put 异步有序执行
 
@@ -581,7 +581,7 @@ public interface SharedSubscriptionStrategy {
 | INV-4 | 节点宕机重启后 L1 必须从 L2 完整恢复 | kill -9 测试 |
 | INV-5 | L2 写入失败 → 重试 3 次 → 转异步队列 | 注入故障测试 |
 | INV-6 | L2 启动失败 → 允许 Broker 启动但降级为纯内存 | 故障注入 |
-| INV-7 | V2/V3 协议消息 V1 节点收到仅 warning 忽略 | 兼容性测试 |
+| INV-7 | 节点必须使用相同 `clusterName` 与当前 binary envelope；旧节点先摘流再升级 | 兼容性测试 |
 | INV-8 | Inflight TTL 滞后 < 60s | 监控 + 测试 |
 | INV-9 | Retain 通配查询 P99 < 5ms（10w 条） | 压测 |
 

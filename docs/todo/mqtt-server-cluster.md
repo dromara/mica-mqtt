@@ -131,7 +131,7 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
 
 | 枚举值 | 消息类型 | 所属文档 | 状态 |
 |---|---|---|---|
-| 11-13 | `SHARED_DISPATCH_TO_CLIENT` / `SHARED_SUBSCRIBE_NOTIFY` / `SHARED_SUBSCRIBE_REMOVE` | routing 文档 | V2 已实现 |
+| 11-13 | `SHARED_DISPATCH_TO_CLIENT` / `SHARED_SUBSCRIBE_NOTIFY` / `SHARED_SUBSCRIBE_REMOVE` | routing 文档 | 11 已实现；12/13 为保留位，主链路复用 3/4 |
 | 14-17 | `SESSION_TAKEOVER_REQUEST/RESPONSE` / `SESSION_MIGRATED_NOTIFY` / `SESSION_DELETE_NOTIFY` | storage 文档 | V3 已实现 |
 | 18-19 | `SHARED_SUB_STATE_SYNC` / `SHARED_SUB_TAKEOVER` | storage 文档 | V3 枚举已定义，消息类待实现 |
 | 20 | `RETAIN_QUERY` | storage 文档 | V3 已实现 |
@@ -236,7 +236,7 @@ public enum ClusterMessageType {
 }
 ```
 
-**向后兼容**：旧节点收到新消息类型时记录 warning 并忽略。V2/V3 完整定义见：
+**兼容边界**：节点会校验 `clusterName`，不同集群消息直接拒绝。当前 binary envelope 与旧版 header transport 不混跑；升级时旧节点应先摘流退出。V2/V3 完整定义见：
 - 路由层扩展：`docs/todo/mqtt-server-cluster-routing.md` §5
 - 存储层扩展：`docs/todo/mqtt-server-cluster-storage.md` §5
 
@@ -396,6 +396,10 @@ mqtt:
 ## 5. 注意事项与限制
 
 ### 5.1 网络要求
+
+- 节点会校验 binary envelope 中的 `clusterName`，不同集群消息直接拒绝
+- 当前集群传输本身不提供 TLS 或节点凭证认证，只允许部署在受信、隔离的内网；跨不可信网络必须由 mTLS sidecar/VPN 提供加密与双向认证
+- 当前版本不支持旧 header transport 节点在线混跑，升级前需摘流旧节点
 - **低延迟网络**：建议同机房部署（延迟 < 5ms）
 - **防火墙配置**：开放集群端口（默认 9000-9099）
 - **带宽规划**：根据消息吞吐量预估集群间流量
@@ -416,7 +420,7 @@ mqtt:
 - Session 一致性：H2 `mqtt_session` 表 + WAL 崩溃安全 + 跨节点 `SESSION_TAKEOVER` 协议
 - Retain 一致性：H2 `mqtt_retain` 表 + 内存 `RetainIndex`（ConcurrentSkipListMap）+ `RETAIN_QUERY(20)` 按需拉取协议（P2.5 已实现）
 - Shared Sub 一致性：H2 `mqtt_shared_sub` 表 + owner/backup 角色 + 跨节点 `SHARED_SUB_STATE_SYNC` 协议
-- QoS 1/2 飞行消息：H2 `mqtt_inflight` 表 + 30s 后台 TTL 清理（接受 30s 滞后换 0 第三方依赖）
+- QoS 1/2 飞行消息：H2 `mqtt_inflight` 表；TTL 默认关闭，显式启用时作为有损容量策略
 
 **V3 关键不变量**（来自 storage 文档 §2.4）：
 - Session 写入：必须在 CONNACK 前同步落 H2
