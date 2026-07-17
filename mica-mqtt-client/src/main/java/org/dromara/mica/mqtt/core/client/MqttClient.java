@@ -27,6 +27,7 @@ import net.dreamlu.mica.net.utils.timer.TimerTask;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
@@ -751,7 +752,9 @@ public final class MqttClient implements IMqttClient {
 	 * @return 处理后的 properties（永远非空；可能与入参同一对象）
 	 */
 	private MqttProperties applySubscriptionIdentifier(MqttProperties properties) {
-		if (!MqttCodecUtil.isMqtt5(this.context)) {
+		// 仅当协议版本为 MQTT 5 时启用
+		MqttVersion version = config.getVersion();
+		if (version != MqttVersion.MQTT_5) {
 			return properties == null ? MqttProperties.NO_PROPERTIES : properties;
 		}
 		MqttProperties out = properties == null ? new MqttProperties() : properties;
