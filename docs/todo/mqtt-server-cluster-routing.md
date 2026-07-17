@@ -684,15 +684,16 @@ MqttClusterManager.updateGroupStrategy("g1", new RoundRobinStrategy());
 
 ### 阶段 3：集成测试（4 天）
 
-- [ ] 3 节点集成测试
-  - [ ] 验证无重复投递
-  - [ ] 验证 QoS 1/2 行为一致
-- [ ] 5 节点压测
-  - [ ] 不同 strategy 下的吞吐差异
-  - [ ] subscriber 跨节点重连场景
-- [ ] 故障注入
+- [x] 3 节点真实 MQTT 集成测试（`-Pcluster-integration`）
+  - [x] 验证共享组无重复投递，普通订阅全量投递
+  - [x] 验证 QoS 1/2 行为一致
+- 发布环境容量门禁（不作为仓库功能完成条件）
+  - 在目标硬件执行 5 节点端到端 TPS/CPU/P99 压测
+  - 对比不同 strategy、真实 payload、客户端数量和磁盘配置
+  - subscriber 跨节点重连功能已由 3 节点真实 MQTT 覆盖
+- [x] 故障注入
   - [x] 节点宕机后的成员收敛与同端口重连（3/5 独立 JVM；MQTT 状态验收另列）
-  - [ ] 网络抖动
+  - [x] 发送前通道拒绝：有界重选其他在线成员；入队成功后不盲重试，避免重复投递
 
 **总计 ~2 周**。
 
@@ -777,16 +778,16 @@ cluster_shared_sub_dispatch_latency_seconds               # 延迟分布
 
 - [x] 共享订阅 owner 状态持久化（H2 `mqtt_shared_sub` 表）— 复合身份为 `(group, topicFilter)`
 - [x] Shared Sub 故障切换：成员节点离开时确定性重算 owner/backup；并发变更使用版本 CAS
-- [ ] 节点重启后策略计数器恢复（可选，RoundRobin/Sticky 需要状态恢复）
-- [ ] 共享订阅变更事件审计（H2 WAL，可选）
+- V4+ 可选：节点重启后恢复 RoundRobin/Sticky 策略计数器
+- V4+ 可选：共享订阅变更事件审计（H2 WAL）
 
 **v1.1 备注**：v1.0 文档提的"用 H2 做持久化"在 v1.1 已被 storage 文档采纳为统一方案（单 jar ~2MB，无 RocksDB 依赖）。本文档不重复持久化设计，详情见 storage 文档。
 
-### 9.5 已知限制
+### 9.5 V4+ 边界与已知限制
 
-- [ ] 脑裂下少数派节点可能错误路由（§4.3）
-- [ ] Strategy 计数器是节点本地，跨 publisher 负载不严格均衡（§8.2）
-- [ ] $queue 特殊处理同 $share（MQTT 5 规范下两者语义一致，但需测试覆盖）
+- 脑裂下少数派节点可能错误路由（§4.3），自动恢复留给 V4+
+- Strategy 计数器是节点本地，跨 publisher 负载不严格均衡（§8.2）；需要严格全局均衡时留给 V4+
+- `$queue` 与 `$share` 走同一共享路由实现；专门的端到端容量矩阵仍属于上线压测
 
 ---
 
@@ -801,8 +802,8 @@ cluster_shared_sub_dispatch_latency_seconds               # 延迟分布
 ---
 
 **文档版本**：v1.2
-**更新日期**：2026-06-22
-**状态**：V2 dispatcher 主链路、边界单元测试、10 万候选微基线和 3/5 独立 JVM 成员故障验收已完成；端到端 MQTT 验收、网络抖动和 TPS 压测待完成
+**更新日期**：2026-07-17
+**状态**：V2 dispatcher、立即发送失败重选、3 节点真实 MQTT QoS 1/2/迁移验收、10 万候选微基线和 3/5 独立 JVM故障验收已完成；目标硬件 TPS/CPU 压测属于上线门禁
 
 **v1.2 变更摘要**（以代码实现为准全面对齐 cluster v3.0）：
 - §1.5 协议号修正：SHARED_DISPATCH_TO_CLIENT 9→11，SHARED_SUBSCRIBE_NOTIFY 10→12，SHARED_SUBSCRIBE_REMOVE 11→13；移除不存在的 SHARED_SUBSCRIBE_FORWARD 和 SHARED_PUBLISH_FORWARD

@@ -61,6 +61,7 @@ class MqttTopicAliasManagerTest {
 		Integer alias = manager.getAlias("sensors/temperature");
 		assertNotNull(alias);
 		assertTrue(alias >= 1 && alias <= 16);
+		assertEquals(alias, properties.getPropertyValue(MqttPropertyType.TOPIC_ALIAS));
 	}
 
 	@Test

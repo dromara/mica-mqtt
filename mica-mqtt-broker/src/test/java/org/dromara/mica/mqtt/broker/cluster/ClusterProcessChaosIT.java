@@ -83,6 +83,11 @@ class ClusterProcessChaosIT {
 			nodes.get(0).markMessages();
 			nodes.get(1).sendTo(nodes.get(0));
 			nodes.get(0).awaitMessage(Duration.ofSeconds(10));
+			// Verify the reverse direction too: node 0 normally owns a server-side
+			// channel while node 1 owns the client-side half of the same connection.
+			nodes.get(1).markMessages();
+			nodes.get(0).sendTo(nodes.get(1));
+			nodes.get(1).awaitMessage(Duration.ofSeconds(10));
 
 			NodeProcess killed = nodes.remove(nodes.size() - 1);
 			int killedPort = killed.port;
@@ -99,6 +104,9 @@ class ClusterProcessChaosIT {
 			nodes.get(0).markMessages();
 			replacement.sendTo(nodes.get(0));
 			nodes.get(0).awaitMessage(Duration.ofSeconds(10));
+			replacement.markMessages();
+			nodes.get(0).sendTo(replacement);
+			replacement.awaitMessage(Duration.ofSeconds(10));
 		} finally {
 			for (NodeProcess node : nodes) {
 				node.close();

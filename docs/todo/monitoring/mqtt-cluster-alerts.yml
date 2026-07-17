@@ -1,6 +1,14 @@
 groups:
   - name: mica-mqtt-cluster
     rules:
+      - alert: MqttClusterTopologyIncomplete
+        expr: mqtt_cluster_topology_healthy == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Not every discovered MQTT cluster node has a direct DATA channel"
+
       - alert: MqttClusterStorageUnavailable
         expr: mqtt_cluster_storage_healthy == 0
         for: 5m

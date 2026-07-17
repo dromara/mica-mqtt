@@ -194,6 +194,7 @@ public class MqttClusterManager {
 
 		cluster = new ClusterImpl(clusterConfig);
 		cluster.start();
+		BidirectionalClusterClientHandler.install(cluster, this::handleClusterMessage);
 		long monitorInterval = Math.max(1_000L, config.getHeartbeatInterval());
 		pollClusterMembership();
 		membershipMonitorExecutor.scheduleWithFixedDelay(
@@ -508,6 +509,28 @@ public class MqttClusterManager {
 		nodeIds.add(localNodeId);
 		nodeIds.addAll(knownRemoteNodes);
 		return nodeIds;
+	}
+
+	/**
+	 * Returns nodes that currently have a direct mica-net channel to this node,
+	 * including the local node. Broadcast replication requires this set to match
+	 * {@link #getClusterNodeIds()} because mica-net does not relay DATA messages.
+	 *
+	 * @return local and directly connected node ids
+	 */
+	public Set<String> getDirectNodeIds() {
+		Set<String> nodeIds = BidirectionalClusterClientHandler.directMemberIds(cluster);
+		nodeIds.add(localNodeId);
+		return nodeIds;
+	}
+
+	/**
+	 * Whether every discovered live node is directly connected.
+	 *
+	 * @return {@code true} when cluster broadcasts can reach every live node
+	 */
+	public boolean isTopologyHealthy() {
+		return getDirectNodeIds().containsAll(getClusterNodeIds());
 	}
 
 	private Set<String> currentRemoteNodeIds() {
@@ -1031,6 +1054,9 @@ public class MqttClusterManager {
 	 */
 	public String toPrometheus() {
 		StringBuilder output = new StringBuilder(metrics.toPrometheus());
+		appendGauge(output, "mqtt_cluster_members", getClusterNodeIds().size());
+		appendGauge(output, "mqtt_cluster_direct_members", getDirectNodeIds().size());
+		appendGauge(output, "mqtt_cluster_topology_healthy", isTopologyHealthy() ? 1L : 0L);
 		ClusterStorage storage = clusterStorage;
 		LocalKvStore.StoreStats stats = storage == null
 			? new LocalKvStore.StoreStats(-1L, 0L, false)

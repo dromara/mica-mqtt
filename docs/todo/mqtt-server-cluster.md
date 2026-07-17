@@ -62,6 +62,7 @@
 - **种子节点（Seed Members）**：预配置的集群成员列表，用于初始节点发现
 - **动态加入**：新节点启动后，连接任意种子节点即可加入集群
 - **全连接拓扑**：所有节点两两连接（适合小规模集群）
+- **DATA 不转发**：mica-net 的广播只覆盖直连通道，因此每个存活节点必须与其余节点直接相连；运行时以 `mqtt_cluster_topology_healthy=1` 为准，不能只看成员数
 
 ### 2.2 核心组件
 
@@ -413,7 +414,7 @@ mqtt:
 
 **V3 改进**（持久化层引入后，参见 storage 文档）：
 - Session 一致性：H2 `mqtt_session` 表 + WAL 崩溃安全 + 跨节点 `SESSION_TAKEOVER` 协议
-- Retain 一致性：H2 `mqtt_retain` 表 + 内存 `RetainIndex`（ConcurrentSkipListMap）+ `RETAIN_QUERY(20)` 按需拉取协议（P2.5 可选，未实现）
+- Retain 一致性：H2 `mqtt_retain` 表 + 内存 `RetainIndex`（ConcurrentSkipListMap）+ `RETAIN_QUERY(20)` 按需拉取协议（P2.5 已实现）
 - Shared Sub 一致性：H2 `mqtt_shared_sub` 表 + owner/backup 角色 + 跨节点 `SHARED_SUB_STATE_SYNC` 协议
 - QoS 1/2 飞行消息：H2 `mqtt_inflight` 表 + 30s 后台 TTL 清理（接受 30s 滞后换 0 第三方依赖）
 
@@ -458,7 +459,7 @@ mqtt:
 ### 6.1 节点发现与集群基础管理
 - [x] V1: 基于 TCP 的节点互联与发现（通过 mica-net cluster 实现）
 - [x] V1: 节点离开时的状态清理（`NODE_LEAVE` 事件处理）
-- [ ] 脑裂（Split-Brain）检测与自动恢复机制
+- V4+ 边界：脑裂（Split-Brain）检测与自动恢复机制尚未实现，当前依赖同机房网络隔离与拓扑告警
 
 ### 6.2 客户端会话与状态同步
 - [x] V1: 客户端连接/断开事件的集群广播
@@ -490,14 +491,14 @@ mqtt:
 
 ### 6.6 可观测性与高级特性
 - [x] 集群级别的统一指标监控 API（snapshot + Prometheus 文本）
-- [ ] 全局限流控制协调机制
+- V4+ 边界：全局协调限流尚未实现；当前仅支持节点本地限流
 - [x] 存储层 metrics（L2 文件大小/entry、累计读写、Inflight 重放、Retain 复制延迟）
 
 ---
 
 **文档版本：** v3.0
-**更新日期：** 2026-07-16
-**状态：** V1/V2/V3 主链路已实现；3/5 独立 JVM 的协议、探活、强杀收敛、同端口重连与 H2 状态恢复已验收，剩余端到端 MQTT 容量压测
+**更新日期：** 2026-07-17
+**状态：** V1/V2/V3 主链路已实现；3 节点真实 MQTT QoS 1/2、共享订阅去重与迁移，以及 3/5 独立 JVM 强杀恢复均已验收；目标硬件容量压测属于上线门禁
 
 **v3.0 变更摘要**（以代码实现为准全面对齐）：
 - **§2.2 目录树重写**：补充 `config/MqttStorageConfig.java`、`core/ClusterStorage.java`、`metrics/ClusterMetrics.java`、`pipeline/strategy/` 目录（5 个策略实现）、`store/` 下的 SessionStore/H2SessionStore/SharedSubStore/H2SharedSubStore/InflightStore/H2InflightStore/MemoryKvStoreImpl 等已实现文件
@@ -505,6 +506,3 @@ mqtt:
 - **§3.2 枚举块更新**：与协议号表同步，V2 编号对齐，V3 去掉 RETAIN_REPLICATE
 - **§3.4 dispatcher 重写**：反映 V2 dispatcher 已实现（不再是"待演进"）
 - **§6.3 共享订阅**：从 🚧 改为 ✅ V2 dispatcher 已实现
-
-**更新日期：** 2026-07-16
-**状态：** V1/V2/V3 主链路已实现；独立 JVM 成员故障验收、10 万条目微基线和部署告警已完成，端到端 MQTT 压测仍待完成

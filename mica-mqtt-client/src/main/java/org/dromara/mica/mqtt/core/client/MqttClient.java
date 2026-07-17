@@ -731,7 +731,7 @@ public final class MqttClient implements IMqttClient {
 			return;
 		}
 		MqttProperties properties = builder.getProperties();
-		if (properties == null) {
+		if (properties == null || properties == MqttProperties.NO_PROPERTIES) {
 			properties = new MqttProperties();
 			builder.properties(properties);
 		}

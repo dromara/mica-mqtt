@@ -145,13 +145,13 @@ MVP 路径（1 人 / 2 周）：tasks §9
 
 | 文档 | 版本 | 状态 | 更新日期 |
 |---|---|---|---|
-| `mqtt-server-cluster.md` | v3.0 | V1/V2/V3 主链路已实现；3/5 独立 JVM 探活/强杀/重连已验收 | 2026-07-16 |
-| `mqtt-server-cluster-routing.md` | v1.2 | V2 dispatcher 已接入 MQTT PUBLISH；10 万候选策略基线达标，待端到端 MQTT 压测 | 2026-07-16 |
-| `mqtt-server-cluster-storage.md` | v1.2 | V3 主链路与离线 Session 恢复已实现；10 万 Retain 基线、部署告警和 3/5 JVM H2 强杀恢复已完成 | 2026-07-16 |
-| `mqtt-server-cluster-tasks.md` | v1.1 | P3 仅余网络抖动与端到端 MQTT 压测；P4 已完成 | 2026-07-16 |
-| `mqtt-server-cluster-monitoring.md` | v1.1 | 指标、可部署告警与 Runbook 已实现 | 2026-07-16 |
+| `mqtt-server-cluster.md` | v3.0 | V1/V2/V3 主链路完成；3 节点真实 MQTT 与 3/5 JVM 强杀恢复已验收 | 2026-07-17 |
+| `mqtt-server-cluster-routing.md` | v1.2 | dispatcher、失败重选、QoS 1/2、共享去重与迁移已验收；容量压测为上线门禁 | 2026-07-17 |
+| `mqtt-server-cluster-storage.md` | v1.2 | V3 主链路与离线 Session 恢复完成；10 万 Retain 基线、告警和 3/5 JVM H2 恢复已验收 | 2026-07-17 |
+| `mqtt-server-cluster-tasks.md` | v1.1 | 当前版本设计与仓库内验收完成；V4+ 与目标硬件容量门禁已明确分界 | 2026-07-17 |
+| `mqtt-server-cluster-monitoring.md` | v1.1 | 指标、全互联拓扑告警与 Runbook 已实现 | 2026-07-17 |
 | `mqtt5-features.md` | v1.0 | 初稿 | 2026-07-06 |
-| `README.md` | v1.4 | 索引与实现状态校准 | 2026-07-16 |
+| `README.md` | v1.4 | 索引与实现状态校准 | 2026-07-17 |
 
 ---
 

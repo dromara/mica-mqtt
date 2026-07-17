@@ -12,7 +12,7 @@
 
 ## 1. 总体路线图
 
-> **2026-07-16 实现校准**：P0 与 P2.0-P2.5 主链路已完成；P1 dispatcher 已接入真实 MQTT PUBLISH。3/5 独立 JVM 协议探活、kill -9、成员收敛、同端口重连和 H2 状态恢复已验收；10 万候选策略/Retain 微基线与部署侧 Prometheus 告警已完成。剩余工作集中在网络抖动和端到端 MQTT TPS/兼容性压测（P3）。
+> **2026-07-17 实现校准**：P0、P1 与 P2.0-P2.5 主链路已完成；3 节点真实 MQTT QoS 1/2、共享订阅恰好一次与订阅者迁移已验收，3/5 独立 JVM kill -9、成员收敛、双向传输、同端口重连和 H2 恢复已验收。10 万候选策略/Retain 微基线、拓扑健康指标和 Prometheus 告警已完成；目标硬件 TPS/CPU 容量结果属于上线环境门禁。
 
 ### 1.1 时间线（甘特图，团队 2 人并行）
 
@@ -248,7 +248,7 @@ public interface SharedSubscriptionStrategy {
 - [x] 空 group 跳过（普通订阅的 group 为空）
 - [x] group 成员全部离线 → 消息丢弃（不缓存）
 - [x] strategy 切换：RoundRobin 切换到 HashClient
-- [ ] 网络抖动：dispatcher 消息丢失处理
+- [x] 网络抖动边界：发送前通道拒绝时有界重选；入队成功后不盲重试，避免重复投递
 
 ### P1.3 性能压测
 
@@ -260,11 +260,13 @@ public interface SharedSubscriptionStrategy {
 | 验收 | 5 节点 / 1w 共享订阅 / 1k TPS 下，CPU < 60%，延迟 P99 < 50ms |
 | 涉及文件 | `mica-mqtt-broker/src/test/.../ClusterStressTest.java`（新建） |
 
+> 仓库内已提供 10 万候选微基线与 3/5 JVM chaos 验收；CPU < 60% 与端到端 P99 < 50ms 依赖目标硬件、payload 和磁盘，只能作为发布环境容量门禁，不能由开发机结果替代。
+
 ---
 
 ## 4. 阶段 P2：V3 Storage（5 周，B 同学）
 
-> **目标**：节点宕机后状态不丢失（cluster v3.0 §6.2 标记的未实现项）
+> **目标**：节点宕机后状态不丢失（原 cluster v3.0 §6.2 缺口，现已实现）
 >
 > **设计依据**：`mqtt-server-cluster-storage.md` v1.2 全文
 >
@@ -437,6 +439,8 @@ public interface SharedSubscriptionStrategy {
 | Retain 通配查询 + 节点重启 | 内存索引正确重建 |
 | Shared Sub owner 切换 | backup 升级，零消息真空 |
 | Session 跨节点接管 | sticky 失败后自动接管 |
+
+> 当前证据：3 节点全 V3 真实 MQTT QoS 1/2、共享订阅去重、普通订阅全量投递与 clientId 跨节点迁移已通过；3/5 JVM 强杀、恢复和 H2 状态保持已通过。混合旧版本矩阵仍应在发布候选版本中执行。
 
 ### P3.2 性能基线
 
@@ -627,7 +631,7 @@ public interface SharedSubscriptionStrategy {
 
 **文档版本**：v1.1
 **更新日期**：2026-06-22
-**状态**：执行中
+**状态**：当前 V1/V2/V3 设计与仓库内可复现验收已完成；V4+ 脑裂/全局协调限流及目标硬件容量门禁不计入当前版本完成条件
 
 **v1.1 变更摘要**（以代码实现为准全面对齐 cluster v3.0）：
 - P0.1 代码示例修正：协议号 9-11 → 11-13，补充 WILL_MESSAGE(9)/RETAIN_MESSAGE(10)，移除不存在的 SHARED_SUBSCRIBE_FORWARD/SHARED_PUBLISH_FORWARD

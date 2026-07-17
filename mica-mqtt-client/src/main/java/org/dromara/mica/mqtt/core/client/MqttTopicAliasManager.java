@@ -138,6 +138,9 @@ public class MqttTopicAliasManager {
 			return false;
 		}
 		registerAlias(topic, newAlias);
+		// The first PUBLISH must carry both the topic name and Topic Alias so the
+		// server can establish the mapping before an empty-topic PUBLISH uses it.
+		ensureProperty(properties, MqttPropertyType.TOPIC_ALIAS, newAlias);
 		// 防御：清理可能存在的"同 topic 旧 alias"残留（并发场景下另一个线程可能先用其他 alias 注册过该 topic）
 		cleanStaleAliasesForTopic(topic, newAlias);
 		if (logger.isDebugEnabled()) {

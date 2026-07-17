@@ -173,6 +173,9 @@ class ClusterStorageTest {
 				new MqttClusterConfig().enabled(false), "node-1");
 			manager.setClusterStorage(storage);
 			String metrics = manager.toPrometheus();
+			assertTrue(metrics.contains("mqtt_cluster_members 1"));
+			assertTrue(metrics.contains("mqtt_cluster_direct_members 1"));
+			assertTrue(metrics.contains("mqtt_cluster_topology_healthy 1"));
 			assertTrue(metrics.contains("mqtt_cluster_storage_healthy 1"));
 			assertTrue(metrics.contains("mqtt_cluster_storage_file_size_bytes"));
 			assertTrue(metrics.contains("mqtt_cluster_storage_write_operations_total"));
