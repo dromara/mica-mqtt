@@ -73,7 +73,7 @@ public final class MqttClient implements IMqttClient {
 	 * PR10：MQTT 5.0 Topic Alias 自动维护（client 端，spec 3.3.2.3.4）。
 	 * <p>可由业务方通过 {@link #setTopicAliasManager} 替换或设置 maxAlias。
 	 */
-	private MqttTopicAliasManager topicAliasManager = new MqttTopicAliasManager();
+	private MqttTopicAliasManager topicAliasManager;
 	/**
 	 * PR10：MQTT 5.0 Subscription Identifier 自动分配（client 端，spec 3.3.2.3.6）。
 	 * <p>按 subscribe 调用顺序递增分配，0 表示未分配。
@@ -92,6 +92,7 @@ public final class MqttClient implements IMqttClient {
 		this.mqttExecutor = config.getMqttExecutor();
 		this.clientSession = config.getClientSession();
 		this.mqttSerializer = config.getMqttSerializer();
+		this.topicAliasManager = config.getTopicAliasManager();
 	}
 
 	/**
@@ -416,16 +417,15 @@ public final class MqttClient implements IMqttClient {
 		// qos 判断
 		boolean isHighLevelQoS = MqttQoS.QOS1 == qos || MqttQoS.QOS2 == qos;
 		int messageId = isHighLevelQoS ? clientSession.getPacketId() : -1;
-		// PR10：MQTT 5 Topic Alias 自动维护（在 build 前注入 alias）
-		applyTopicAlias(builder);
-		// 内置配置
-		MqttPublishMessage message = builder
-			.messageId(messageId)
-			.build();
 		ClientChannelContext clientContext = getContext();
 		// mqtt 尚未连接成功的情况，加入待发送队列
 		// https://gitee.com/dromara/mica-mqtt/issues/IC4DWT
 		if (clientContext == null || !clientContext.isAccepted()) {
+			// Topic Alias 只在当前网络连接内有效。离线消息必须保留完整 topic，
+			// 不能把基于旧连接映射的空 topic 消息放入待发送队列。
+			MqttPublishMessage message = builder
+				.messageId(messageId)
+				.build();
 			// 只有开启待发送队列功能时才添加消息到队列
 			if (config.isPendingPublishQueueEnabled()) {
 				clientSession.addPendingPublishMessage(message);
@@ -439,6 +439,11 @@ public final class MqttClient implements IMqttClient {
 				return false;
 			}
 		}
+		// MQTT 5 Topic Alias 只能在 CONNACK 成功后按服务端宣告的上限应用。
+		applyTopicAlias(builder);
+		MqttPublishMessage message = builder
+			.messageId(messageId)
+			.build();
 		// 如果是高版本的 qos
 		if (isHighLevelQoS) {
 			MqttPendingPublish pendingPublish = new MqttPendingPublish(message, qos);
@@ -712,6 +717,7 @@ public final class MqttClient implements IMqttClient {
 	 */
 	public void setTopicAliasManager(MqttTopicAliasManager topicAliasManager) {
 		this.topicAliasManager = Objects.requireNonNull(topicAliasManager, "topicAliasManager is null");
+		this.config.setTopicAliasManager(this.topicAliasManager);
 	}
 
 	/**

@@ -191,6 +191,7 @@ class MqttTopicAliasManagerTest {
 	@Test
 	void negativeMaxAliasThrows() {
 		assertThrows(IllegalArgumentException.class, () -> new MqttTopicAliasManager(-1));
+		assertThrows(IllegalArgumentException.class, () -> new MqttTopicAliasManager(0x10000));
 	}
 
 	@Test
@@ -203,6 +204,44 @@ class MqttTopicAliasManagerTest {
 		assertEquals(false, usedAlias);
 		assertEquals("test/topic", builder.getTopicName());
 		assertEquals(0, manager.size());
+	}
+
+	@Test
+	void defaultManagerIsDisabledUntilConnAck() {
+		MqttTopicAliasManager manager = new MqttTopicAliasManager();
+		MqttPublishBuilder builder = newBuilder("test/topic");
+		MqttProperties properties = new MqttProperties();
+
+		assertEquals(false, manager.apply(builder, properties));
+		assertEquals("test/topic", builder.getTopicName());
+		assertNull(properties.getPropertyValue(MqttPropertyType.TOPIC_ALIAS));
+		assertEquals(0, manager.getMaxAlias());
+	}
+
+	@Test
+	void resetClearsMappingsAndUsesNegotiatedMaximum() {
+		MqttTopicAliasManager manager = new MqttTopicAliasManager(16);
+		manager.apply(newBuilder("old/topic"), new MqttProperties());
+		assertEquals(1, manager.size());
+
+		manager.reset(2);
+
+		assertEquals(0, manager.size());
+		assertNull(manager.getAlias("old/topic"));
+		assertEquals(2, manager.getMaxAlias());
+		MqttProperties properties = new MqttProperties();
+		MqttPublishBuilder builder = newBuilder("new/topic");
+		manager.apply(builder, properties);
+		Integer alias = properties.getPropertyValue(MqttPropertyType.TOPIC_ALIAS);
+		assertNotNull(alias);
+		assertTrue(alias >= 1 && alias <= 2);
+	}
+
+	@Test
+	void resetRejectsMaximumOutsideProtocolRange() {
+		MqttTopicAliasManager manager = new MqttTopicAliasManager();
+		assertThrows(IllegalArgumentException.class, () -> manager.reset(-1));
+		assertThrows(IllegalArgumentException.class, () -> manager.reset(0x10000));
 	}
 
 	@Test

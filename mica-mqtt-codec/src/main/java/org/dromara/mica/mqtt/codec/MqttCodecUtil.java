@@ -59,6 +59,11 @@ public final class MqttCodecUtil {
 	 */
 	private static final String MQTT_TOPIC_ALIAS_MAXIMUM_KEY = "MQTT_TAM";
 	/**
+	 * 当前连接本端允许接收的 Topic Alias Maximum。
+	 * 与 {@link #MQTT_TOPIC_ALIAS_MAXIMUM_KEY} 的对端接收上限方向相反。
+	 */
+	private static final String MQTT_INBOUND_TOPIC_ALIAS_MAXIMUM_KEY = "MQTT_ITAM";
+	/**
 	 * 实际的 Topic Alias 取值上限，spec 3.3.2.3.4 / 5.4.4：1 ~ 0xFFFF。
 	 */
 	public static final int MAX_TOPIC_ALIAS = 0xFFFF;
@@ -217,6 +222,32 @@ public final class MqttCodecUtil {
 			ctx.remove(MQTT_TOPIC_ALIAS_MAXIMUM_KEY);
 		} else {
 			ctx.set(MQTT_TOPIC_ALIAS_MAXIMUM_KEY, topicAliasMaximum);
+		}
+	}
+
+	/**
+	 * 获取本端在当前连接上允许接收的 Topic Alias Maximum。
+	 * 服务端使用自身 CONNACK 宣告值，客户端使用自身 CONNECT 宣告值。
+	 *
+	 * @param ctx ChannelContext
+	 * @return 入站 Topic Alias Maximum；0 表示不允许接收 Topic Alias
+	 */
+	public static int getInboundTopicAliasMaximum(ChannelContext ctx) {
+		Integer value = ctx.get(MQTT_INBOUND_TOPIC_ALIAS_MAXIMUM_KEY);
+		return value == null ? 0 : value;
+	}
+
+	/**
+	 * 设置本端在当前连接上允许接收的 Topic Alias Maximum。
+	 *
+	 * @param ctx               ChannelContext
+	 * @param topicAliasMaximum 入站 Topic Alias Maximum；0 表示禁用
+	 */
+	public static void setInboundTopicAliasMaximum(ChannelContext ctx, int topicAliasMaximum) {
+		if (topicAliasMaximum <= 0) {
+			ctx.remove(MQTT_INBOUND_TOPIC_ALIAS_MAXIMUM_KEY);
+		} else {
+			ctx.set(MQTT_INBOUND_TOPIC_ALIAS_MAXIMUM_KEY, topicAliasMaximum);
 		}
 	}
 

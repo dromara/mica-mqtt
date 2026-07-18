@@ -47,19 +47,16 @@ import java.util.concurrent.ConcurrentMap;
  * }</pre>
  *
  * <p>spec 3.3.2.3.4：客户端 Topic Alias 上限由服务端 CONNACK 中的 {@code Topic Alias Maximum} 决定；
- * 缺省 0 表示禁用。本实现使用 {@link #DEFAULT_MAX_TOPIC_ALIAS}（16）作为客户端假设上限。
- * 业务方可在 CONNACK 处理回调中通过 {@link org.dromara.mica.mqtt.core.client.MqttClient#setTopicAliasManager}
- * 替换为带实际 maxAlias 的 manager。
+ * 缺省 0 表示禁用。每次新连接建立后，本实现会先禁用 Topic Alias，再按 CONNACK 宣告值更新上限。
  *
  * @author L.cm
  */
 public class MqttTopicAliasManager {
 	private static final Logger logger = LoggerFactory.getLogger(MqttTopicAliasManager.class);
 	/**
-	 * 缺省客户端假设 Topic Alias 上限（spec 3.3.2.3.4）。
-	 * <p>实际允许值由服务端 CONNACK 中的 {@code Topic Alias Maximum} 决定。
+	 * MQTT 规范默认 Topic Alias 上限；服务端未在 CONNACK 中宣告时必须禁用。
 	 */
-	public static final int DEFAULT_MAX_TOPIC_ALIAS = 16;
+	public static final int DEFAULT_MAX_TOPIC_ALIAS = 0;
 	/**
 	 * alias 槽位临时占位符（用于原子分配）。
 	 */
@@ -71,7 +68,7 @@ public class MqttTopicAliasManager {
 	 * spec 3.3.2.3.4：Topic Alias 合法值 1 ~ 0xFFFF。0 用作"未使用 alias"标记。
 	 */
 	private static final int MIN_ALIAS = 1;
-	private final int maxAlias;
+	private volatile int maxAlias;
 
 	public MqttTopicAliasManager() {
 		this(DEFAULT_MAX_TOPIC_ALIAS);
@@ -81,8 +78,8 @@ public class MqttTopicAliasManager {
 	 * @param maxAlias 客户端允许的 Topic Alias 上限（来自服务端 CONNACK 的 Topic Alias Maximum）。
 	 */
 	public MqttTopicAliasManager(int maxAlias) {
-		if (maxAlias < 0) {
-			throw new IllegalArgumentException("maxAlias must be >= 0, got " + maxAlias);
+		if (maxAlias < 0 || maxAlias > 0xFFFF) {
+			throw new IllegalArgumentException("maxAlias must be in [0, 65535], got " + maxAlias);
 		}
 		this.maxAlias = maxAlias;
 	}
@@ -217,6 +214,21 @@ public class MqttTopicAliasManager {
 	public void clear() {
 		topicToAlias.clear();
 		aliasToTopic.clear();
+	}
+
+	/**
+	 * 更新当前连接允许使用的 Topic Alias 上限并清空旧连接的映射。
+	 *
+	 * @param maxAlias 服务端在 CONNACK 中宣告的 Topic Alias Maximum；0 表示禁用
+	 */
+	public void reset(int maxAlias) {
+		if (maxAlias < 0 || maxAlias > 0xFFFF) {
+			throw new IllegalArgumentException("maxAlias must be in [0, 65535], got " + maxAlias);
+		}
+		// 先禁用，避免并发 publish 在清理两张映射表期间复用旧连接状态。
+		this.maxAlias = 0;
+		clear();
+		this.maxAlias = maxAlias;
 	}
 
 	/**

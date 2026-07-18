@@ -165,6 +165,10 @@ public final class MqttClientCreator {
 	 */
 	private MqttProperties properties;
 	/**
+	 * MQTT 5 Topic Alias 状态。由客户端发送路径和 CONNACK 处理器共享。
+	 */
+	private MqttTopicAliasManager topicAliasManager = new MqttTopicAliasManager();
+	/**
 	 * 连接监听器
 	 */
 	private IMqttClientConnectListener connectListener;
@@ -330,6 +334,14 @@ public final class MqttClientCreator {
 
 	public MqttProperties getProperties() {
 		return properties;
+	}
+
+	MqttTopicAliasManager getTopicAliasManager() {
+		return topicAliasManager;
+	}
+
+	void setTopicAliasManager(MqttTopicAliasManager topicAliasManager) {
+		this.topicAliasManager = Objects.requireNonNull(topicAliasManager, "topicAliasManager is null");
 	}
 
 	public IMqttClientConnectListener getConnectListener() {

@@ -71,6 +71,8 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		MqttConnectReasonCode returnCode = connAckVariableHeader.connectReturnCode();
 		switch (returnCode) {
 			case CONNECTION_ACCEPTED:
+				Integer topicAliasMaximum = message.getProperties().getTopicAliasMaximum();
+				mqttClientCreator.getTopicAliasManager().reset(topicAliasMaximum == null ? 0 : topicAliasMaximum);
 				// 1. 连接成功的日志
 				context.setAccepted(true);
 				if (logger.isInfoEnabled()) {

@@ -305,6 +305,11 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 	private void connAckByReturnCode(String clientId, String uniqueId, ChannelContext context, MqttConnectReasonCode returnCode,
 									 int serverKeepAlive, boolean assignedClientId, boolean requestProblemInformation,
 									 boolean requestResponseInformation) {
+		if (returnCode.isAccepted() && MqttCodecUtil.isMqtt5(context)) {
+			// 解码器必须使用与 CONNACK 宣告一致的入站 Topic Alias 上限。
+			MqttCodecUtil.setInboundTopicAliasMaximum(context,
+				serverCreator.getMqttServerProperties().getTopicAliasMaximum());
+		}
 		MqttConnAckMessage message = MqttConnAckMessage.builder()
 			.returnCode(returnCode)
 			.sessionPresent(false)

@@ -137,6 +137,9 @@ public class MqttServerProperties {
 	}
 
 	public MqttServerProperties topicAliasMaximum(int topicAliasMaximum) {
+		if (topicAliasMaximum < 0 || topicAliasMaximum > 0xFFFF) {
+			throw new IllegalArgumentException("topicAliasMaximum must be in [0, 65535], got " + topicAliasMaximum);
+		}
 		this.topicAliasMaximum = topicAliasMaximum;
 		return this;
 	}

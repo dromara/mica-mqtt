@@ -20,6 +20,7 @@ import net.dreamlu.mica.net.client.DefaultTioClientListener;
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
+import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.builder.MqttConnectBuilder;
@@ -53,8 +54,16 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 	public void onAfterConnected(ChannelContext context, boolean isConnected, boolean isReconnect) {
 		logger.info("MqttClient onAfterConnected context:{} isConnected:{} isReconnect:{}", context, isConnected, isReconnect);
 		if (isConnected) {
+			// Topic Alias 映射的生命周期是网络连接，而不是 MQTT session。
+			// 在收到本次连接的 CONNACK 前保持禁用，避免复用旧连接的空 topic 消息。
+			clientCreator.getTopicAliasManager().reset(0);
+			MqttConnectMessage connectMessage = getConnectMessage(this.clientCreator);
+			Integer inboundTopicAliasMaximum = connectMessage.variableHeader().properties()
+				.getPropertyValue(MqttPropertyType.TOPIC_ALIAS_MAXIMUM);
+			MqttCodecUtil.setInboundTopicAliasMaximum(context,
+				inboundTopicAliasMaximum == null ? 0 : inboundTopicAliasMaximum);
 			// 重连时，发送 mqtt 连接消息
-			boolean result = Tio.bSend(context, getConnectMessage(this.clientCreator));
+			boolean result = Tio.bSend(context, connectMessage);
 			logger.info("MqttClient reconnect send connect result:{}", result);
 			if (!result) {
 				// 如果重连未成功，直接关闭连接，等待后续重连

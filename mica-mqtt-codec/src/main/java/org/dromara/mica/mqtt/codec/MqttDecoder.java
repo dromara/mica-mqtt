@@ -832,10 +832,10 @@ public final class MqttDecoder {
 		if (mqttVersion == MqttVersion.MQTT_5) {
 			Integer topicAlias = properties.getPropertyValue(MqttPropertyType.TOPIC_ALIAS);
 			if (topicAlias != null && topicAlias > 0) {
-				Integer topicAliasMaximum = MqttCodecUtil.getTopicAliasMaximum(ctx);
-				if (topicAliasMaximum > 0 && topicAlias > topicAliasMaximum) {
+				Integer topicAliasMaximum = MqttCodecUtil.getInboundTopicAliasMaximum(ctx);
+				if (topicAlias > topicAliasMaximum) {
 					throw new DecoderException("Topic Alias " + topicAlias
-						+ " exceeds server's Topic Alias Maximum " + topicAliasMaximum);
+						+ " exceeds receiver's Topic Alias Maximum " + topicAliasMaximum);
 				}
 				if (decodedTopic.isEmpty()) {
 					Map<Integer, String> aliasMap = MqttCodecUtil.getClientTopicAliasMap(ctx);
