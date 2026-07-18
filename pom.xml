@@ -24,7 +24,7 @@
         <mica-auto.version>2.3.5</mica-auto.version>
         <spring.boot.version>2.7.18</spring.boot.version>
         <solon.version>4.0.3</solon.version>
-        <jfinal.version>5.2.7</jfinal.version>
+        <jfinal.version>5.2.8</jfinal.version>
         <tinylog.version>2.7.0</tinylog.version>
         <h2.version>2.2.224</h2.version>
         <snakeyaml.version>2.6</snakeyaml.version>
