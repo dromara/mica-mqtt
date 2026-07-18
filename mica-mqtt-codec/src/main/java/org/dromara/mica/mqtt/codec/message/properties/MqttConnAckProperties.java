@@ -239,6 +239,9 @@ public class MqttConnAckProperties {
 	 * @return MqttConnAckProperty
 	 */
 	public MqttConnAckProperties setMaximumQos(int maximumQos) {
+		if (maximumQos < 0 || maximumQos > 1) {
+			throw new IllegalArgumentException("CONNACK Maximum QoS property must be 0 or 1, got " + maximumQos);
+		}
 		properties.add(new IntegerProperty(MqttPropertyType.MAXIMUM_QOS, maximumQos));
 		return this;
 	}

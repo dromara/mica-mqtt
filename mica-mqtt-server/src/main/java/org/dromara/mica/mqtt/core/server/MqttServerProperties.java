@@ -97,6 +97,9 @@ public class MqttServerProperties {
 	}
 
 	public MqttServerProperties maximumQos(int maximumQos) {
+		if (maximumQos < 0 || maximumQos > 2) {
+			throw new IllegalArgumentException("maximumQos must be in [0, 2], got " + maximumQos);
+		}
 		this.maximumQos = maximumQos;
 		return this;
 	}
