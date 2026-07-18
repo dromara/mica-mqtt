@@ -338,7 +338,6 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		MqttServerProperties properties = serverCreator.getMqttServerProperties();
 		connAckProperties
 			.setReceiveMaximum(properties.getReceiveMaximum())
-			.setMaximumQos(properties.getMaximumQos())
 			.setRetainAvailable(properties.isRetainAvailable())
 			// 协议宣告值不能大于实际解码上限，否则客户端会按错误上限发送大包。
 			.setMaximumPacketSize(Math.min(properties.getMaximumPacketSize(), serverCreator.getMaxBytesInMessage()))
@@ -346,6 +345,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			.setWildcardSubscriptionAvailable(properties.isWildcardSubscriptionAvailable())
 			.setSharedSubscriptionAvailable(properties.isSharedSubscriptionAvailable())
 			.setSubscriptionIdentifiersAvailable(properties.isSubscriptionIdentifierAvailable());
+		setMaximumQosProperty(connAckProperties, properties.getMaximumQos());
 		// 仅当 serverKeepAlive > 0 时才下发该字段，避免污染 3.x 客户端
 		if (serverKeepAlive > 0) {
 			connAckProperties.setServerKeepAlive(serverKeepAlive);
@@ -362,6 +362,16 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			}
 		}
 		return connAckProperties;
+	}
+
+	/**
+	 * MQTT 5.0 规范 3.2.2.3.4：Maximum QoS 属性只能为 0 或 1；
+	 * 属性缺省表示服务端支持 QoS 2。
+	 */
+	static void setMaximumQosProperty(MqttConnAckProperties connAckProperties, int maximumQos) {
+		if (maximumQos < 2) {
+			connAckProperties.setMaximumQos(maximumQos);
+		}
 	}
 
 	private boolean isRequestProblemInformation(ChannelContext context, MqttConnectVariableHeader variableHeader) {
