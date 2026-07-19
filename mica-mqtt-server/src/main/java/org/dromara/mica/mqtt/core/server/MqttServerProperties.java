@@ -101,6 +101,9 @@ public class MqttServerProperties {
 	}
 
 	public MqttServerProperties receiveMaximum(int receiveMaximum) {
+		if (receiveMaximum < 1 || receiveMaximum > 0xFFFF) {
+			throw new IllegalArgumentException("receiveMaximum must be in [1, 65535], got " + receiveMaximum);
+		}
 		this.receiveMaximum = receiveMaximum;
 		return this;
 	}
@@ -131,6 +134,9 @@ public class MqttServerProperties {
 	}
 
 	public MqttServerProperties maximumPacketSize(int maximumPacketSize) {
+		if (maximumPacketSize < 1) {
+			throw new IllegalArgumentException("maximumPacketSize must be greater than 0, got " + maximumPacketSize);
+		}
 		this.maximumPacketSize = maximumPacketSize;
 		return this;
 	}
@@ -179,6 +185,9 @@ public class MqttServerProperties {
 	}
 
 	public MqttServerProperties serverKeepAlive(int serverKeepAlive) {
+		if (serverKeepAlive < 0 || serverKeepAlive > 0xFFFF) {
+			throw new IllegalArgumentException("serverKeepAlive must be in [0, 65535], got " + serverKeepAlive);
+		}
 		this.serverKeepAlive = serverKeepAlive;
 		return this;
 	}

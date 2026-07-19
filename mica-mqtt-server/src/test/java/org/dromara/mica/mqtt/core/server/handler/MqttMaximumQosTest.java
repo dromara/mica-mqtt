@@ -63,4 +63,17 @@ class MqttMaximumQosTest {
 		Assertions.assertThrows(IllegalArgumentException.class, () -> properties.maximumQos(-1));
 		Assertions.assertThrows(IllegalArgumentException.class, () -> properties.maximumQos(3));
 	}
+
+	@Test
+	void serverConfigurationRejectsValuesThatCannotBeEncodedLegally() {
+		MqttServerProperties properties = new MqttServerProperties();
+
+		Assertions.assertThrows(IllegalArgumentException.class, () -> properties.receiveMaximum(0));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> properties.receiveMaximum(0x10000));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> properties.maximumPacketSize(0));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> properties.topicAliasMaximum(-1));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> properties.topicAliasMaximum(0x10000));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> properties.serverKeepAlive(-1));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> properties.serverKeepAlive(0x10000));
+	}
 }

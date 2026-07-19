@@ -159,6 +159,9 @@ public class MqttConnectProperties {
 	 * @return MqttConnectProperty
 	 */
 	public MqttConnectProperties setReceiveMaximum(int receiveMaximum) {
+		if (receiveMaximum < 1 || receiveMaximum > 0xFFFF) {
+			throw new IllegalArgumentException("Receive Maximum must be in [1, 65535], got " + receiveMaximum);
+		}
 		properties.add(new IntegerProperty(MqttPropertyType.RECEIVE_MAXIMUM, receiveMaximum));
 		return this;
 	}
@@ -179,6 +182,9 @@ public class MqttConnectProperties {
 	 * @return MqttConnectProperty
 	 */
 	public MqttConnectProperties setTopicAliasMaximum(int topicAliasMaximum) {
+		if (topicAliasMaximum < 0 || topicAliasMaximum > 0xFFFF) {
+			throw new IllegalArgumentException("Topic Alias Maximum must be in [0, 65535], got " + topicAliasMaximum);
+		}
 		properties.add(new IntegerProperty(MqttPropertyType.TOPIC_ALIAS_MAXIMUM, topicAliasMaximum));
 		return this;
 	}
@@ -199,6 +205,9 @@ public class MqttConnectProperties {
 	 * @return MqttConnectProperty
 	 */
 	public MqttConnectProperties setMaximumPacketSize(int maximumPacketSize) {
+		if (maximumPacketSize == 0) {
+			throw new IllegalArgumentException("Maximum Packet Size must not be 0");
+		}
 		properties.add(new IntegerProperty(MqttPropertyType.MAXIMUM_PACKET_SIZE, maximumPacketSize));
 		return this;
 	}
