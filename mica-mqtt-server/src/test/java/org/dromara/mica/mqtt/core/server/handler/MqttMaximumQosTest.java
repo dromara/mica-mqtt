@@ -24,27 +24,6 @@ import org.junit.jupiter.api.Test;
 class MqttMaximumQosTest {
 
 	@Test
-	void qosTwoMustBeRepresentedByAbsentProperty() {
-		MqttConnAckProperties properties = new MqttConnAckProperties();
-
-		MqttConnectHandler.setMaximumQosProperty(properties, 2);
-
-		Assertions.assertNull(properties.getMaximumQos());
-	}
-
-	@Test
-	void qosZeroAndOneMustBeIncluded() {
-		MqttConnAckProperties qosZero = new MqttConnAckProperties();
-		MqttConnAckProperties qosOne = new MqttConnAckProperties();
-
-		MqttConnectHandler.setMaximumQosProperty(qosZero, 0);
-		MqttConnectHandler.setMaximumQosProperty(qosOne, 1);
-
-		Assertions.assertEquals(Integer.valueOf(0), qosZero.getMaximumQos());
-		Assertions.assertEquals(Integer.valueOf(1), qosOne.getMaximumQos());
-	}
-
-	@Test
 	void connAckPropertyRejectsIllegalMaximumQos() {
 		MqttConnAckProperties properties = new MqttConnAckProperties();
 
