@@ -2,6 +2,18 @@
 
 ## 发行版本
 
+### v2.6.9 - 2026-08-01
+- ✨ mqtt-client 实现 MQTT 5.0 Topic Alias 自动维护功能，提升大数据量场景下发布性能。
+- ✨ mqtt-server 落地 MQTT 5.0 Receive Maximum 基础运行时流控（P1.7 部分完成）。#196
+- ✨ mqtt-server 强化 MQTT 5.0 Subscribe 能力协商逻辑（#197），并落地 PR7~PR10 相关特性及若干 review bug 修复。
+- ✨ mica-mqtt-broker（cluster）支持持久会话标记并增强消息路由与集群兼容性。
+- ✨ mica-mqtt-broker（cluster）实现双向集群客户端数据处理并补充集成测试覆盖。
+- ✨ mica-mqtt-broker（cluster）增强集群消息分发与会话管理功能。
+- ♻️ mqtt-server 重构 mqtt 内部消息处理流水线，支持按类型多处理器链路扩展。
+- ♻️ mqtt-serversession 优化客户端接收最大值（Receive Maximum）的存储逻辑。
+- ♻️ mqtt-client 调整 PubComp 处理日志级别为 debug，减少噪音。
+- ⬆️ mica-net 升级到 2.0.12。
+
 ### v2.6.8.1 - 2026-07-21
 - 🐛 mqtt-server修复 `MqttConnectHandler` 中 `Maximum QoS` 属性处理逻辑，确保符合 MQTT 5.0 规范。github #200 感谢 `@waterlyx` 反馈。
 
