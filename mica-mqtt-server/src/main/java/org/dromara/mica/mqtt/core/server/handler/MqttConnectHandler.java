@@ -345,6 +345,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			.setWildcardSubscriptionAvailable(properties.isWildcardSubscriptionAvailable())
 			.setSharedSubscriptionAvailable(properties.isSharedSubscriptionAvailable())
 			.setSubscriptionIdentifiersAvailable(properties.isSubscriptionIdentifierAvailable());
+		// MQTT 5.0 规范 3.2.2.3.4：Maximum QoS 属性只能为 0 或 1；属性缺省表示服务端支持 QoS 2。
 		setMaximumQosProperty(connAckProperties, properties.getMaximumQos());
 		// 仅当 serverKeepAlive > 0 时才下发该字段，避免污染 3.x 客户端
 		if (serverKeepAlive > 0) {
