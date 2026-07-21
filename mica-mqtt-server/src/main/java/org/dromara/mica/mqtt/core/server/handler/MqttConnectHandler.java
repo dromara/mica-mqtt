@@ -229,7 +229,11 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			.setWildcardSubscriptionAvailable(properties.isWildcardSubscriptionAvailable())
 			.setSharedSubscriptionAvailable(properties.isSharedSubscriptionAvailable())
 			.setSubscriptionIdentifiersAvailable(properties.isSubscriptionIdentifierAvailable());
-		setMaximumQosProperty(connAckProperties, properties.getMaximumQos());
+		// MQTT 5.0 规范 3.2.2.3.4：Maximum QoS 属性只能为 0 或 1；属性缺省表示服务端支持 QoS 2。
+		int maximumQos = properties.getMaximumQos();
+		if (maximumQos < 2) {
+			connAckProperties.setMaximumQos(maximumQos);
+		}
 		// 仅当 serverKeepAlive > 0 时才下发该字段，避免污染 3.x 客户端
 		if (serverKeepAlive > 0) {
 			connAckProperties.setServerKeepAlive(serverKeepAlive);
@@ -238,16 +242,6 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			connAckProperties.setAssignedClientIdentifier(uniqueId);
 		}
 		return connAckProperties;
-	}
-
-	/**
-	 * MQTT 5.0 规范 3.2.2.3.4：Maximum QoS 属性只能为 0 或 1；
-	 * 属性缺省表示服务端支持 QoS 2。
-	 */
-	static void setMaximumQosProperty(MqttConnAckProperties connAckProperties, int maximumQos) {
-		if (maximumQos < 2) {
-			connAckProperties.setMaximumQos(maximumQos);
-		}
 	}
 
 	private boolean isRequestProblemInformation(ChannelContext context, MqttConnectVariableHeader variableHeader) {
