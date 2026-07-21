@@ -400,9 +400,9 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		if (pendingPublish == null) {
 			return;
 		}
-		if (logger.isInfoEnabled()) {
+		if (logger.isDebugEnabled()) {
 			String topicName = pendingPublish.getMessage().variableHeader().topicName();
-			logger.info("MQTT Topic:{} successfully PubComp", topicName);
+			logger.debug("MQTT Topic:{} successfully PubComp", topicName);
 		}
 		pendingPublish.onPubCompReceived();
 		clientSession.removePendingPublish(packetId);
