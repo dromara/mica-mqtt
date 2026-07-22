@@ -307,12 +307,18 @@ public final class MqttEncoder {
 
 	private static ByteBuffer encodeUnSubAckMessage(ChannelContext ctx, MqttUnSubAckMessage message) {
 		MqttVersion mqttVersion = MqttCodecUtil.getMqttVersion(ctx);
+		return encodeUnSubAckMessage(mqttVersion, message);
+	}
+
+	static ByteBuffer encodeUnSubAckMessage(MqttVersion mqttVersion, MqttUnSubAckMessage message) {
 		MqttMessageIdVariableHeader variableHeader = message.variableHeader();
 		byte[] propertiesBytes = encodePropertiesIfNeeded(mqttVersion, variableHeader.properties());
 
 		int variableHeaderBufferSize = 2 + propertiesBytes.length;
 		MqttUnsubAckPayload payload = message.payload();
-		int payloadBufferSize = payload == null ? 0 : payload.unsubscribeReasonCodes().size();
+		// MQTT 3.x UNSUBACK 仅包含 Packet Identifier，reason code payload 是 MQTT 5.0 新增内容。
+		boolean needIncludePayload = mqttVersion == MqttVersion.MQTT_5 && payload != null;
+		int payloadBufferSize = needIncludePayload ? payload.unsubscribeReasonCodes().size() : 0;
 		int variablePartSize = variableHeaderBufferSize + payloadBufferSize;
 		int fixedHeaderBufferSize = 1 + getVariableLengthInt(variablePartSize);
 		ByteBuffer buf = ByteBuffer.allocate(fixedHeaderBufferSize + variablePartSize);
@@ -321,7 +327,7 @@ public final class MqttEncoder {
 		buf.putShort((short) variableHeader.messageId());
 		buf.put(propertiesBytes);
 
-		if (payload != null) {
+		if (needIncludePayload) {
 			for (Short reasonCode : payload.unsubscribeReasonCodes()) {
 				buf.put(reasonCode.byteValue());
 			}

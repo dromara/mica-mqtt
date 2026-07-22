@@ -14,8 +14,11 @@
 - ♻️ mqtt-client 调整 PubComp 处理日志级别为 debug，减少噪音。
 - ⬆️ mica-net 升级到 2.0.12。
 
+### v2.6.8.2 - 2026-07-21
+- 🐛 mqtt-codec 修复 UNSUBACK 消息的 MQTT 版本兼容编码 github #201 感谢 `@waterlyx` 反馈。
+
 ### v2.6.8.1 - 2026-07-21
-- 🐛 mqtt-server修复 `MqttConnectHandler` 中 `Maximum QoS` 属性处理逻辑，确保符合 MQTT 5.0 规范。github #200 感谢 `@waterlyx` 反馈。
+- 🐛 mqtt-server 修复 `MqttConnectHandler` 中 `Maximum QoS` 属性处理逻辑，确保符合 MQTT 5.0 规范。github #200 感谢 `@waterlyx` 反馈。
 
 ### v2.6.8 - 2026-07-10
 - ✨ mqtt-server 支持 MQTT 5.0 服务端能力属性及断开连接扩展配置，包括 Receive Maximum、Maximum QoS、Retain Available、最大报文大小等。
