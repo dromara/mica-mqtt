@@ -377,6 +377,10 @@ class MqttClientReconnectChaosTest {
 			} catch (IOException ignore) {
 				// already closed
 			}
+			// Wait until the accept loop has fully stopped before taking the active-socket
+			// snapshot. Otherwise an accept already completed by the OS can add a socket
+			// after the cleanup below, allowing the old broker to answer a reconnect.
+			boolean acceptStopped = stoppedLatch.await(3, TimeUnit.SECONDS);
 			// Drop existing sockets with a TCP RST so the client sees the disconnect immediately
 			// instead of waiting for the next keep-alive / read timeout.
 			for (Socket socket : activeSockets) {
@@ -392,7 +396,9 @@ class MqttClientReconnectChaosTest {
 				}
 			}
 			activeSockets.clear();
-			stoppedLatch.await(1, TimeUnit.SECONDS);
+			if (!acceptStopped) {
+				throw new IOException("Fake broker accept thread did not stop in time.");
+			}
 		}
 	}
 
