@@ -11,7 +11,7 @@
 - ✨ mica-mqtt-broker（cluster）实现双向集群客户端数据处理并补充集成测试覆盖。
 - ✨ mica-mqtt-broker（cluster）增强集群消息分发与会话管理功能。
 - ♻️ mqtt-server 重构 mqtt 内部消息处理流水线，支持按类型多处理器链路扩展。
-- ♻️ mqtt-serversession 优化客户端接收最大值（Receive Maximum）的存储逻辑。
+- ♻️ mqtt-server session 优化客户端接收最大值（Receive Maximum）的存储逻辑。
 - ♻️ mqtt-client 调整 PubComp 处理日志级别为 debug，减少噪音。
 - ⬆️ mica-net 升级到 2.0.12。
 
