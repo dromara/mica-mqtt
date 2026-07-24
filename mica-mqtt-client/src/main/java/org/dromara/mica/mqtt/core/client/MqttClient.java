@@ -765,7 +765,7 @@ public final class MqttClient implements IMqttClient {
 		}
 		MqttProperties out = properties == null ? new MqttProperties() : properties;
 		Integer existing = out.getPropertyValue(MqttPropertyType.SUBSCRIPTION_IDENTIFIER);
-		if (existing == null) {
+		if (existing == null && config.isSubscriptionIdentifiersAvailable()) {
 			int newId = subscriptionIdManager.nextId();
 			out.add(new IntegerProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER, newId));
 			logger.debug("Subscription Identifier auto-allocated: {}", newId);

@@ -159,12 +159,6 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			Integer sessionExpirySeconds = connectProps.getSessionExpiryInterval();
 			int sessionExpiryValue = sessionExpirySeconds == null ? 0 : sessionExpirySeconds;
 			boolean cleanStart = variableHeader.isCleanStart();
-			// spec 3.1.2.11.4: cleanStart = false 且 sessionExpiryInterval = 0 → 服务端按 0xFFFFFFFF 看待
-			if (!cleanStart && sessionExpiryValue == 0) {
-				// 在 mica-mqtt 默认 SessionExpireScheduler 行为下，0xFFFFFFFF 会调度到 ~136 年后，效果上视为"永不过期"。
-				// 业务方可通过自定义 SessionExpireScheduler 引入上限。
-				sessionExpiryValue = Integer.MAX_VALUE;
-			}
 			sessionManager.setSessionExpiryInterval(uniqueId, sessionExpiryValue, cleanStart);
 		} else {
 			// MQTT 3.x Clean Session=false is a persistent session. Record the same
@@ -427,7 +421,6 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 	/**
 	 * 校验客户端在 CONNECT 中声明的 Maximum Packet Size 是否在合法范围。
 	 * MQTT 5.0 规范 3.1.2.11.5：取值范围 [1, 4294967295]。
-	 * 同时应小于服务端在 CONNACK 下发的 Maximum Packet Size，否则客户端发送的包将永远无法被服务端接受。
 	 */
 	private boolean hasInvalidClientMaxPacketSize(ChannelContext context, MqttConnectVariableHeader variableHeader, String clientId) {
 		if (!MqttCodecUtil.isMqtt5(context)) {
@@ -437,16 +430,8 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		if (maxPacketSize == null) {
 			return false;
 		}
-		if (maxPacketSize < 1) {
-			logger.warn("Connect clientId:{} invalid Maximum Packet Size:{}, must be >= 1", clientId, maxPacketSize);
-			return true;
-		}
-		int serverMaxPacketSize = serverCreator.getMqttServerProperties().getMaximumPacketSize();
-		int serverBytesLimit = serverCreator.getMaxBytesInMessage();
-		int effectiveServerMax = Math.min(serverMaxPacketSize, serverBytesLimit);
-		if (maxPacketSize > effectiveServerMax) {
-			logger.warn("Connect clientId:{} Maximum Packet Size:{} exceeds server limit:{}, rejecting.",
-				clientId, maxPacketSize, effectiveServerMax);
+		if (maxPacketSize == 0) {
+			logger.warn("Connect clientId:{} invalid Maximum Packet Size:0", clientId);
 			return true;
 		}
 		return false;

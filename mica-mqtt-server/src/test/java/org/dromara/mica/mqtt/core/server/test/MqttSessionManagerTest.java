@@ -37,6 +37,10 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -492,6 +496,41 @@ class MqttSessionManagerTest {
 		Assertions.assertEquals(10, sessionManager.getClientReceiveMaximum("client1"));
 		sessionManager.remove("client1");
 		Assertions.assertEquals(IMqttSessionManager.MQTT5_DEFAULT_RECEIVE_MAXIMUM, sessionManager.getClientReceiveMaximum("client1"));
+	}
+
+	@Test
+	void testTryAddPendingPublishHonorsReceiveMaximumConcurrently() throws InterruptedException {
+		IMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		String clientId = "client1";
+		int receiveMaximum = 5;
+		int threadCount = 32;
+		sessionManager.setClientReceiveMaximum(clientId, receiveMaximum);
+		CountDownLatch start = new CountDownLatch(1);
+		CountDownLatch done = new CountDownLatch(threadCount);
+		AtomicInteger accepted = new AtomicInteger();
+		AtomicReference<Throwable> error = new AtomicReference<>();
+		for (int i = 0; i < threadCount; i++) {
+			final int messageId = i + 1;
+			new Thread(() -> {
+				try {
+					start.await();
+					MqttPendingPublish pendingPublish = new MqttPendingPublish(
+						createPublishMessage("/test/topic", messageId, MqttQoS.QOS1), MqttQoS.QOS1);
+					if (sessionManager.tryAddPendingPublish(clientId, messageId, pendingPublish)) {
+						accepted.incrementAndGet();
+					}
+				} catch (Throwable e) {
+					error.compareAndSet(null, e);
+				} finally {
+					done.countDown();
+				}
+			}).start();
+		}
+		start.countDown();
+		Assertions.assertTrue(done.await(10, TimeUnit.SECONDS));
+		Assertions.assertNull(error.get());
+		Assertions.assertEquals(receiveMaximum, accepted.get());
+		Assertions.assertEquals(receiveMaximum, sessionManager.getPendingPublishCount(clientId));
 	}
 
 	// ----------------- PR7（P1.7）PublishBacklog 行为 -----------------

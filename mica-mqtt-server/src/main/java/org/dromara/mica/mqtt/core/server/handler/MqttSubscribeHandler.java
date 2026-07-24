@@ -39,6 +39,7 @@ import org.dromara.mica.mqtt.core.server.MqttServerProperties;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
 import org.dromara.mica.mqtt.core.server.model.Message;
+import org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
@@ -231,7 +232,13 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 				.build();
 			if (isHighLevelQoS) {
 				MqttPendingPublish pendingPublish = new MqttPendingPublish(publishMessage, mqttQoS);
-				sessionManager.addPendingPublish(clientId, messageId, pendingPublish);
+				if (!sessionManager.tryAddPendingPublish(clientId, messageId, pendingPublish)) {
+					sessionManager.addPendingPublishBacklog(clientId,
+						new PublishBacklogEntry(
+							retainMessage.getTopic(), retainMessage.getPayload(), mqttQoS,
+							mqttQoS.value(), true, retainMessage.getProperties()));
+					continue;
+				}
 				pendingPublish.startPublishRetransmissionTimer(taskService, context);
 			}
 			boolean result = Tio.send(context, publishMessage);

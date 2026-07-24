@@ -801,14 +801,6 @@ public final class MqttDecoder {
 		// 之前登记过该 alias 的非空 topic，否则视为协议错误。
 		boolean topicNameFromAlias = false;
 		int numberOfBytesConsumed = tempBytesConsumed.value;
-		// MQTT 5.0: 校验客户端声明的 Maximum Packet Size（仅对 MQTT 5 校验）
-		if (mqttVersion == MqttVersion.MQTT_5) {
-			int clientMaxPacketSize = MqttCodecUtil.getMaxPacketSize(ctx);
-			if (clientMaxPacketSize > 0 && mqttFixedHeader.getMessageLength() > clientMaxPacketSize) {
-				throw new DecoderException("PUBLISH packet size " + mqttFixedHeader.getMessageLength()
-					+ " exceeds client's Maximum Packet Size " + clientMaxPacketSize);
-			}
-		}
 
 		int packetId = -1;
 		if (mqttFixedHeader.qosLevel().value() > 0) {

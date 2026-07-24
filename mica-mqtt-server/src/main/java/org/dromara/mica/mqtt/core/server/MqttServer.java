@@ -243,22 +243,6 @@ public final class MqttServer {
 		MqttQoS mqttQoS = qos.value() > subMqttQoS ? MqttQoS.valueOf(subMqttQoS) : qos;
 		// 判断是否高版本 qos
 		boolean isHighLevelQoS = MqttQoS.QOS1 == mqttQoS || MqttQoS.QOS2 == mqttQoS;
-		// PR7（P1.7）：Receive Maximum 限流时把 PUBLISH 缓存到 backlog 而非直接返回 false，
-		// 等 PUBACK/PUBCOMP 释放 in-flight 配额后再由 drainPublishBacklog 出队发送。
-		// QoS0 不占 in-flight 配额，按原路径直接发送。
-		if (isHighLevelQoS && isReceiveMaximumExceeded(clientId)) {
-			byte[] snapshot = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
-			PublishBacklogEntry entry = new PublishBacklogEntry(topic, snapshot, qos, subMqttQoS, retain, properties);
-			sessionManager.addPendingPublishBacklog(clientId, entry);
-			if (logger.isDebugEnabled()) {
-				logger.debug("MQTT Topic:{} qos:{} publish backloged (Receive Maximum exceeded) clientId:{} pending:{} limit:{} backlog:{}",
-					topic, mqttQoS, clientId,
-					sessionManager.getPendingPublishCount(clientId),
-					sessionManager.getClientReceiveMaximum(clientId),
-					sessionManager.getPendingPublishBacklogSize(clientId));
-			}
-			return true;
-		}
 		// 消息id
 		int messageId = isHighLevelQoS ? sessionManager.getPacketId(clientId) : -1;
 		byte[] newPayload = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
@@ -273,7 +257,18 @@ public final class MqttServer {
 		// 先启动高 qos 的重试
 		if (isHighLevelQoS) {
 			MqttPendingPublish pendingPublish = new MqttPendingPublish(message, qos);
-			sessionManager.addPendingPublish(clientId, messageId, pendingPublish);
+			if (!sessionManager.tryAddPendingPublish(clientId, messageId, pendingPublish)) {
+				PublishBacklogEntry entry = new PublishBacklogEntry(topic, newPayload, qos, subMqttQoS, retain, properties);
+				sessionManager.addPendingPublishBacklog(clientId, entry);
+				if (logger.isDebugEnabled()) {
+					logger.debug("MQTT Topic:{} qos:{} publish backloged (Receive Maximum exceeded) clientId:{} pending:{} limit:{} backlog:{}",
+						topic, mqttQoS, clientId,
+						sessionManager.getPendingPublishCount(clientId),
+						sessionManager.getClientReceiveMaximum(clientId),
+						sessionManager.getPendingPublishBacklogSize(clientId));
+				}
+				return true;
+			}
 			pendingPublish.startPublishRetransmissionTimer(taskService, context);
 		}
 		// 发送消息

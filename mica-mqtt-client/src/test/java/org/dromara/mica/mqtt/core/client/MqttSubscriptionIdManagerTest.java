@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -122,6 +123,16 @@ class MqttSubscriptionIdManagerTest {
 			int id = manager.nextId();
 			assertTrue(id >= 1);
 		}
+	}
+
+	@Test
+	void subscriptionIdentifierCapabilityDefaultsToAvailableAndCanBeUpdated() {
+		MqttClientCreator creator = new MqttClientCreator();
+		assertTrue(creator.isSubscriptionIdentifiersAvailable());
+		creator.setSubscriptionIdentifiersAvailable(false);
+		assertFalse(creator.isSubscriptionIdentifiersAvailable());
+		creator.setSubscriptionIdentifiersAvailable(true);
+		assertTrue(creator.isSubscriptionIdentifiersAvailable());
 	}
 
 	@Test

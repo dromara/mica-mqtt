@@ -143,6 +143,25 @@ public interface IMqttSessionManager {
 	void addPendingPublish(String clientId, int messageId, MqttPendingPublish pendingPublish);
 
 	/**
+	 * 在客户端 Receive Maximum 范围内原子地添加发布过程存储。
+	 *
+	 * @param clientId       clientId
+	 * @param messageId      messageId
+	 * @param pendingPublish MqttPendingPublish
+	 * @return 添加成功返回 {@code true}，已达到 Receive Maximum 返回 {@code false}
+	 */
+	default boolean tryAddPendingPublish(String clientId, int messageId, MqttPendingPublish pendingPublish) {
+		synchronized (this) {
+			int receiveMaximum = getClientReceiveMaximum(clientId);
+			if (receiveMaximum < 1 || getPendingPublishCount(clientId) >= receiveMaximum) {
+				return false;
+			}
+			addPendingPublish(clientId, messageId, pendingPublish);
+			return true;
+		}
+	}
+
+	/**
 	 * 获取发布过程存储
 	 *
 	 * @param clientId  clientId

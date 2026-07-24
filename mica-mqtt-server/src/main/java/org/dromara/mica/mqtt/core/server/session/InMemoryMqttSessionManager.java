@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -115,6 +116,27 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 	}
 
 	@Override
+	public boolean tryAddPendingPublish(String clientId, int messageId, MqttPendingPublish pendingPublish) {
+		int receiveMaximum = getClientReceiveMaximum(clientId);
+		if (receiveMaximum < 1) {
+			return false;
+		}
+		AtomicBoolean added = new AtomicBoolean();
+		pendingPublishStore.compute(clientId, (key, data) -> {
+			ConcurrentMap<Integer, MqttPendingPublish> pending = data;
+			if (pending == null) {
+				pending = new ConcurrentHashMap<>(16);
+			}
+			if (pending.size() < receiveMaximum) {
+				pending.put(messageId, pendingPublish);
+				added.set(true);
+			}
+			return pending;
+		});
+		return added.get();
+	}
+
+	@Override
 	public MqttPendingPublish getPendingPublish(String clientId, int messageId) {
 		Map<Integer, MqttPendingPublish> data = pendingPublishStore.get(clientId);
 		if (data == null) {
@@ -145,12 +167,7 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 		if (queue == null) {
 			return null;
 		}
-		org.dromara.mica.mqtt.core.server.model.PublishBacklogEntry entry = queue.poll();
-		if (entry != null && queue.isEmpty()) {
-			// 队列空时安全删除，避免内存膨胀
-			pendingPublishBacklogStore.remove(clientId, queue);
-		}
-		return entry;
+		return queue.poll();
 	}
 
 	@Override

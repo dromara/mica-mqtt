@@ -73,6 +73,10 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			case CONNECTION_ACCEPTED:
 				Integer topicAliasMaximum = message.getProperties().getTopicAliasMaximum();
 				mqttClientCreator.getTopicAliasManager().reset(topicAliasMaximum == null ? 0 : topicAliasMaximum);
+				Boolean subscriptionIdentifiersAvailable =
+					message.getProperties().getSubscriptionIdentifiersAvailable();
+				mqttClientCreator.setSubscriptionIdentifiersAvailable(
+					subscriptionIdentifiersAvailable == null || subscriptionIdentifiersAvailable);
 				// 1. 连接成功的日志
 				context.setAccepted(true);
 				if (logger.isInfoEnabled()) {

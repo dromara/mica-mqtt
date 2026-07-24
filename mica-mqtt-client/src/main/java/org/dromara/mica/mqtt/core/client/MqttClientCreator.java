@@ -169,6 +169,11 @@ public final class MqttClientCreator {
 	 */
 	private MqttTopicAliasManager topicAliasManager = new MqttTopicAliasManager();
 	/**
+	 * 当前连接的服务端是否支持 Subscription Identifier。
+	 * CONNACK 未携带该属性时，MQTT 5.0 规范默认支持。
+	 */
+	private volatile boolean subscriptionIdentifiersAvailable = true;
+	/**
 	 * 连接监听器
 	 */
 	private IMqttClientConnectListener connectListener;
@@ -342,6 +347,14 @@ public final class MqttClientCreator {
 
 	void setTopicAliasManager(MqttTopicAliasManager topicAliasManager) {
 		this.topicAliasManager = Objects.requireNonNull(topicAliasManager, "topicAliasManager is null");
+	}
+
+	boolean isSubscriptionIdentifiersAvailable() {
+		return subscriptionIdentifiersAvailable;
+	}
+
+	void setSubscriptionIdentifiersAvailable(boolean subscriptionIdentifiersAvailable) {
+		this.subscriptionIdentifiersAvailable = subscriptionIdentifiersAvailable;
 	}
 
 	public IMqttClientConnectListener getConnectListener() {

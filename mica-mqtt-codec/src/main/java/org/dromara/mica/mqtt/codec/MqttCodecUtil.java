@@ -130,7 +130,7 @@ public final class MqttCodecUtil {
 	 * @param maxPacketSize  Maximum Packet Size
 	 */
 	static void setMaxPacketSize(ChannelContext ctx, int maxPacketSize) {
-		if (maxPacketSize <= 0) {
+		if (maxPacketSize == 0) {
 			ctx.remove(MQTT_MAX_PACKET_SIZE_KEY);
 		} else {
 			ctx.set(MQTT_MAX_PACKET_SIZE_KEY, maxPacketSize);

@@ -57,6 +57,7 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 			// Topic Alias 映射的生命周期是网络连接，而不是 MQTT session。
 			// 在收到本次连接的 CONNACK 前保持禁用，避免复用旧连接的空 topic 消息。
 			clientCreator.getTopicAliasManager().reset(0);
+			clientCreator.setSubscriptionIdentifiersAvailable(true);
 			MqttConnectMessage connectMessage = getConnectMessage(this.clientCreator);
 			Integer inboundTopicAliasMaximum = connectMessage.variableHeader().properties()
 				.getPropertyValue(MqttPropertyType.TOPIC_ALIAS_MAXIMUM);

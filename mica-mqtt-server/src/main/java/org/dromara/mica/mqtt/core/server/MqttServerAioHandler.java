@@ -22,11 +22,13 @@ import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.core.exception.TioDecodeException;
 import net.dreamlu.mica.net.core.intf.Packet;
 import net.dreamlu.mica.net.server.intf.TioServerHandler;
+import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.codec.MqttDecoder;
 import org.dromara.mica.mqtt.codec.MqttEncoder;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.exception.DecoderException;
+import org.dromara.mica.mqtt.codec.exception.EncoderException;
 import org.dromara.mica.mqtt.codec.exception.MqttIdentifierRejectedException;
 import org.dromara.mica.mqtt.codec.exception.MqttUnacceptableProtocolVersionException;
 import org.dromara.mica.mqtt.codec.message.MqttConnAckMessage;
@@ -82,7 +84,14 @@ public class MqttServerAioHandler implements TioServerHandler {
 	 */
 	@Override
 	public ByteBuffer encode(Packet packet, TioConfig tioConfig, ChannelContext context) {
-		return mqttEncoder.doEncode(context, (MqttMessage) packet);
+		ByteBuffer buffer = mqttEncoder.doEncode(context, (MqttMessage) packet);
+		int maxPacketSize = MqttCodecUtil.getMaxPacketSize(context);
+		if (maxPacketSize != MqttCodecUtil.NO_MAX_PACKET_SIZE
+			&& Integer.toUnsignedLong(buffer.position()) > Integer.toUnsignedLong(maxPacketSize)) {
+			throw new EncoderException("MQTT packet size " + buffer.position()
+				+ " exceeds client's Maximum Packet Size " + Integer.toUnsignedLong(maxPacketSize));
+		}
+		return buffer;
 	}
 
 	/**

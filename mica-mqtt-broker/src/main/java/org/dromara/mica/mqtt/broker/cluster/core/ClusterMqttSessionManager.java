@@ -709,6 +709,19 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	@Override
 	public void addPendingPublish(String clientId, int messageId, MqttPendingPublish pendingPublish) {
 		delegate.addPendingPublish(clientId, messageId, pendingPublish);
+		storePendingPublish(clientId, messageId, pendingPublish);
+	}
+
+	@Override
+	public boolean tryAddPendingPublish(String clientId, int messageId, MqttPendingPublish pendingPublish) {
+		if (!delegate.tryAddPendingPublish(clientId, messageId, pendingPublish)) {
+			return false;
+		}
+		storePendingPublish(clientId, messageId, pendingPublish);
+		return true;
+	}
+
+	private void storePendingPublish(String clientId, int messageId, MqttPendingPublish pendingPublish) {
 		if (inflightStore != null && pendingPublish != null && pendingPublish.getMessage() != null) {
 			long expireAt = inflightTtlMs > 0L ? System.currentTimeMillis() + inflightTtlMs : 0L;
 			inflightStore.put(clientId, messageId, expireAt,
