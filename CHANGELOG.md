@@ -6,7 +6,7 @@
 - ✨ mqtt-client 实现 MQTT 5.0 Topic Alias 自动维护功能，提升大数据量场景下发布性能。
 - ✨ mqtt-server 落地 MQTT 5.0 Receive Maximum 基础运行时流控（P1.7 部分完成）。#196
 - ✨ mqtt-server 强化 MQTT 5.0 Subscribe 能力协商逻辑（#197），并落地 PR7~PR10 相关特性及若干 review bug 修复。
-- ✨ mqtt-server 和 mqtt-client 的 solon、Spring boot starter 添加 yml ssl tls 协议等参数配置。
+- ✨ mqtt-server 和 mqtt-client 的 solon、Spring boot starter 添加 yml ssl tls 协议版本等参数配置。
 - ✨ mica-mqtt-broker（cluster）支持持久会话标记并增强消息路由与集群兼容性。
 - ✨ mica-mqtt-broker（cluster）实现双向集群客户端数据处理并补充集成测试覆盖。
 - ✨ mica-mqtt-broker（cluster）增强集群消息分发与会话管理功能。
