@@ -124,6 +124,21 @@
       "description": "truststore 证书路径"
     },
     {
+      "name": "mqtt.server.http-listener.ssl.protocols",
+      "type": "java.lang.String[]",
+      "description": "启用的 TLS 协议，为空时使用 JDK 默认配置（2.6.9 开始支持）"
+    },
+    {
+      "name": "mqtt.server.http-listener.ssl.cipher-suites",
+      "type": "java.lang.String[]",
+      "description": "启用的密码套件，为空时使用 JDK 默认配置（2.6.9 开始支持）"
+    },
+    {
+      "name": "mqtt.server.http-listener.ssl.use-cipher-suites-order",
+      "type": "java.lang.Boolean",
+      "description": "是否优先使用服务端密码套件顺序（2.6.9 开始支持）"
+    },
+    {
       "name": "mqtt.server.keepalive-backoff",
       "type": "java.lang.Float",
       "description": "MQTT 客户端 keepalive 系数，连接超时缺省为连接设置的 keepalive * keepaliveBackoff * 2，默认：0.75 <p> 如果读者想对该值做一些调整，可以在此进行配置。比如设置为 0.75，则变为 keepalive * 1.5。但是该值不得小于 0.5，否则将小于 keepalive 设定的时间。"
@@ -194,6 +209,21 @@
       "name": "mqtt.server.mqtt-ssl-listener.ssl.truststore-path",
       "type": "java.lang.String",
       "description": "truststore 证书路径"
+    },
+    {
+      "name": "mqtt.server.mqtt-ssl-listener.ssl.protocols",
+      "type": "java.lang.String[]",
+      "description": "启用的 TLS 协议，为空时使用 JDK 默认配置（2.6.9 开始支持）"
+    },
+    {
+      "name": "mqtt.server.mqtt-ssl-listener.ssl.cipher-suites",
+      "type": "java.lang.String[]",
+      "description": "启用的密码套件，为空时使用 JDK 默认配置（2.6.9 开始支持）"
+    },
+    {
+      "name": "mqtt.server.mqtt-ssl-listener.ssl.use-cipher-suites-order",
+      "type": "java.lang.Boolean",
+      "description": "是否优先使用服务端密码套件顺序（2.6.9 开始支持）"
     },
     {
       "name": "mqtt.server.properties.maximum-packet-size",
@@ -329,6 +359,21 @@
       "name": "mqtt.server.wss-listener.ssl.truststore-path",
       "type": "java.lang.String",
       "description": "truststore 证书路径"
+    },
+    {
+      "name": "mqtt.server.wss-listener.ssl.protocols",
+      "type": "java.lang.String[]",
+      "description": "启用的 TLS 协议，为空时使用 JDK 默认配置（2.6.9 开始支持）"
+    },
+    {
+      "name": "mqtt.server.wss-listener.ssl.cipher-suites",
+      "type": "java.lang.String[]",
+      "description": "启用的密码套件，为空时使用 JDK 默认配置（2.6.9 开始支持）"
+    },
+    {
+      "name": "mqtt.server.wss-listener.ssl.use-cipher-suites-order",
+      "type": "java.lang.Boolean",
+      "description": "是否优先使用服务端密码套件顺序（2.6.9 开始支持）"
     }
   ]
 }

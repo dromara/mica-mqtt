@@ -243,6 +243,22 @@ public class MqttClientProperties {
 		 * truststore 密码
 		 */
 		private String truststorePass;
+		/**
+		 * 启用的 TLS 协议，为空时使用 JDK 默认配置
+		 */
+		private String[] protocols;
+		/**
+		 * 启用的密码套件，为空时使用 JDK 默认配置
+		 */
+		private String[] cipherSuites;
+		/**
+		 * 端点识别算法，生产环境建议配置为 HTTPS
+		 */
+		private String endpointIdentificationAlgorithm;
+		/**
+		 * TLS 握手时使用的 SNI 域名。必须是完整域名（如 api.example.com），不能是 IP 地址，也不能包含端口号
+		 */
+		private String serverName;
 	}
 
 }

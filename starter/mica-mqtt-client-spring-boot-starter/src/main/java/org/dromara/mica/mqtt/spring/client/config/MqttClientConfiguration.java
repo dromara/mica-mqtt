@@ -129,8 +129,18 @@ public class MqttClientConfiguration {
 		// 开启 ssl
 		MqttClientProperties.Ssl ssl = properties.getSsl();
 		if (ssl.isEnabled()) {
-			SslConfig sslConfig = SslConfig.forClient(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass());
+			// 配置 ssl 证书
+			SslConfig sslConfig = SslConfig.forClient(
+				ssl.getKeystorePath(), ssl.getKeystorePass(),
+				ssl.getTruststorePath(), ssl.getTruststorePass()
+			);
+			// 配置 ssl 参数
+			sslConfig.setProtocols(ssl.getProtocols());
+			sslConfig.setCipherSuites(ssl.getCipherSuites());
+			sslConfig.setEndpointIdentificationAlgorithm(ssl.getEndpointIdentificationAlgorithm());
+			sslConfig.setServerName(ssl.getServerName());
 			clientCreator.sslConfig(sslConfig);
+			// 如果存在 ssl 自定义 bean 配置，设置到 sslConfig 中
 			sslCustomizers.ifAvailable(sslConfig::setSslEngineCustomizer);
 		}
 		// 构造遗嘱消息

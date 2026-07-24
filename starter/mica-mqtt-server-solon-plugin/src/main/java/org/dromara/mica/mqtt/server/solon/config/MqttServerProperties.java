@@ -204,6 +204,18 @@ public class MqttServerProperties {
 		 * 认证类型
 		 */
 		private ClientAuth clientAuth = ClientAuth.NONE;
+		/**
+		 * 启用的 TLS 协议，为空时使用 JDK 默认配置
+		 */
+		private String[] protocols;
+		/**
+		 * 启用的密码套件，为空时使用 JDK 默认配置
+		 */
+		private String[] cipherSuites;
+		/**
+		 * 是否优先使用服务端密码套件顺序
+		 */
+		private Boolean useCipherSuitesOrder;
 	}
 
 	@Getter

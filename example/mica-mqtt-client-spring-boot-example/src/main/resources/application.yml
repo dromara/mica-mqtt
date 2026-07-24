@@ -36,6 +36,16 @@ mqtt:
       keystore-pass:            # 可选参数：ssl 双向认证 keystore 密码
       truststore-path:          # 可选参数：ssl 双向认证 truststore 目录，支持 classpath:/ 路径。
       truststore-pass:          # 可选参数：ssl 双向认证 truststore 密码
+      protocols:                # 可选参数：启用的 TLS 协议，需运行时 JDK 支持
+        - TLSv1.2
+        - TLSv1.3
+      cipher-suites:            # 可选参数：启用的密码套件，为空时使用 JDK 默认配置
+        - TLS_AES_128_GCM_SHA256
+        - TLS_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+      endpoint-identification-algorithm: HTTPS # 可选参数：服务端证书主机名校验，生产环境建议 HTTPS
+      server-name: mqtt.example.com # 可选参数：SNI 服务名，必须为域名，不能带端口号
 topic1: /test2/#
 springdoc:
   swagger-ui:

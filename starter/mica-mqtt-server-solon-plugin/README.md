@@ -65,6 +65,15 @@ mqtt:
         truststore-path:        # 可选参数：ssl 双向认证 truststore 目录，支持 classpath:/ 路径。
         truststore-pass:        # 可选参数：ssl 双向认证 truststore 密码
         client-auth: NONE       # 是否需要客户端认证（双向认证），默认：NONE（不需要）
+        protocols:              # 可选参数：启用的 TLS 协议，需运行时 JDK 支持（2.6.9 开始支持）
+          - TLSv1.2
+          - TLSv1.3
+        cipher-suites:          # 可选参数：启用的密码套件，为空时使用 JDK 默认配置（2.6.9 开始支持）
+          - TLS_AES_128_GCM_SHA256
+          - TLS_AES_256_GCM_SHA384
+          - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+          - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        use-cipher-suites-order: true # 可选参数：是否优先使用服务端密码套件顺序（2.6.9 开始支持）
     ws-listener:                # websocket mqtt 监听器
       enable: true              # 是否开启，默认：false
       port: 8083                # websocket 端口，默认：8083
@@ -77,6 +86,15 @@ mqtt:
         truststore-path:        # 可选参数：ssl 双向认证 truststore 目录，支持 classpath:/ 路径。
         truststore-pass:        # 可选参数：ssl 双向认证 truststore 密码
         client-auth: NONE       # 是否需要客户端认证（双向认证），默认：NONE（不需要）
+        protocols:              # 可选参数：启用的 TLS 协议，需运行时 JDK 支持（2.6.9 开始支持）
+            - TLSv1.2
+            - TLSv1.3
+        cipher-suites:          # 可选参数：启用的密码套件，为空时使用 JDK 默认配置（2.6.9 开始支持）
+          - TLS_AES_128_GCM_SHA256
+          - TLS_AES_256_GCM_SHA384
+          - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+          - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        use-cipher-suites-order: true # 可选参数：是否优先使用服务端密码套件顺序（2.6.9 开始支持）
     http-listener:
       enable: true
       port: 18083
@@ -86,6 +104,22 @@ mqtt:
         password: mica
       mcp:                      # 大模型 mcp
         enable: true
+      ssl:                      # http ssl 配置
+        enable: false           # 是否启用，默认：false
+        keystore-path:          # 必填：ssl keystore 证书路径，支持 classpath:/ 路径
+        keystore-pass:          # 必填：ssl keystore 密码
+        truststore-path:        # 可选：ssl 双向认证 truststore 证书路径
+        truststore-pass:        # 可选：ssl 双向认证 truststore 密码
+        client-auth: NONE       # 客户端认证类型，默认：NONE（不需要），可选 OPTIONAL / REQUIRE
+        protocols:              # 可选参数：启用的 TLS 协议，需运行时 JDK 支持（2.6.9 开始支持）
+            - TLSv1.2
+            - TLSv1.3
+        cipher-suites:          # 可选：启用的密码套件，为空时使用 JDK 默认配置（2.6.9 开始支持）
+          - TLS_AES_128_GCM_SHA256
+          - TLS_AES_256_GCM_SHA384
+          - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+          - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        use-cipher-suites-order: true # 可选：是否优先使用服务端密码套件顺序（2.6.9 开始支持）
 ```
 
 注意：**ssl** 存在三种情况

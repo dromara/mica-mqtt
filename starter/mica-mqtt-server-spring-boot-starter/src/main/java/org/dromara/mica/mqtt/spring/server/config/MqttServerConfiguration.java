@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.spring.server.config;
 
 import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.core.ssl.SslConfig;
 import net.dreamlu.mica.net.http.common.router.HttpFilter;
 import net.dreamlu.mica.net.http.mcp.server.McpServer;
 import org.dromara.mica.mqtt.core.deserialize.MqttDeserializer;
@@ -142,10 +143,9 @@ public class MqttServerConfiguration {
 		// mqtt ssl 协议
 		MqttServerProperties.SslListener mqttSslListener = mqttServerProperties.getMqttSslListener();
 		if (mqttSslListener.isEnable()) {
-			MqttServerProperties.Ssl ssl = mqttSslListener.getSsl();
 			serverCreator.enableMqttSsl(sslBuilder -> sslBuilder
 				.serverNode(mqttSslListener.getServerNode())
-				.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth())
+				.sslConfig(createSslConfig(mqttSslListener.getSsl()))
 				.build());
 		}
 		// mqtt websocket 协议
@@ -155,10 +155,9 @@ public class MqttServerConfiguration {
 		}
 		MqttServerProperties.SslListener wssListener = mqttServerProperties.getWssListener();
 		if (wssListener.isEnable()) {
-			MqttServerProperties.Ssl ssl = wssListener.getSsl();
 			serverCreator.enableMqttWss(sslBuilder -> sslBuilder
 				.serverNode(wssListener.getServerNode())
-				.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth())
+				.sslConfig(createSslConfig(wssListener.getSsl()))
 				.build());
 		}
 		// mqtt http api
@@ -180,7 +179,7 @@ public class MqttServerConfiguration {
 					builder.mcpServer(mcpServer);
 				}
 				if (ssl.isEnable()) {
-					builder.useSsl(ssl.getKeystorePath(), ssl.getKeystorePass(), ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth());
+					builder.sslConfig(createSslConfig(ssl));
 				}
 				// 认证处理
 				httpFilterObjectProvider.ifAvailable(builder::authFilter);
@@ -215,6 +214,19 @@ public class MqttServerConfiguration {
 		// 自定义处理
 		customizers.ifAvailable((customizer) -> customizer.customize(serverCreator));
 		return serverCreator;
+	}
+
+	private static SslConfig createSslConfig(MqttServerProperties.Ssl ssl) {
+		// 配置 ssl 证书
+		SslConfig sslConfig = SslConfig.forServer(
+			ssl.getKeystorePath(), ssl.getKeystorePass(),
+			ssl.getTruststorePath(), ssl.getTruststorePass(), ssl.getClientAuth()
+		);
+		// 配置 ssl 参数
+		sslConfig.setProtocols(ssl.getProtocols());
+		sslConfig.setCipherSuites(ssl.getCipherSuites());
+		sslConfig.setUseCipherSuitesOrder(ssl.getUseCipherSuitesOrder());
+		return sslConfig;
 	}
 
 	@Bean
