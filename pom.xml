@@ -18,7 +18,7 @@
         <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven-jar-plugin.version>3.5.1</maven-jar-plugin.version>
-        <maven-flatten.version>1.7.3</maven-flatten.version>
+        <maven-flatten.version>1.8.0</maven-flatten.version>
         <!-- mica-net version -->
         <mica-net.version>2.0.13-SNAPSHOT</mica-net.version>
         <mica-auto.version>2.3.5</mica-auto.version>
