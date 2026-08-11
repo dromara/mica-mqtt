@@ -657,7 +657,11 @@ public final class MqttClient implements IMqttClient {
 			// 双重检查，避免并发下重复执行 getConnecteds
 			if (!isValid(this.context)) {
 				Set<ChannelContext> contextSet = Tio.getConnecteds(clientTioConfig);
-				this.context = (contextSet == null || contextSet.isEmpty()) ? null : (ClientChannelContext) contextSet.iterator().next();
+				if (contextSet == null || contextSet.isEmpty()) {
+					this.context = null;
+				} else {
+					this.context = (ClientChannelContext) contextSet.iterator().next();
+				}
 			}
 		}
 		return this.context;
