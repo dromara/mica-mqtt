@@ -649,18 +649,28 @@ public final class MqttClient implements IMqttClient {
 	 * @return ClientChannelContext
 	 */
 	public ClientChannelContext getContext() {
-		if (context != null) {
-			return context;
+		// 快路径：缓存未关闭且未移除，直接返回
+		if (isValid(this.context)) {
+			return this.context;
 		}
 		synchronized (this) {
-			if (context == null) {
+			// 双重检查，避免并发下重复执行 getConnecteds
+			if (!isValid(this.context)) {
 				Set<ChannelContext> contextSet = Tio.getConnecteds(clientTioConfig);
-				if (contextSet != null && !contextSet.isEmpty()) {
-					this.context = (ClientChannelContext) contextSet.iterator().next();
-				}
+				this.context = (contextSet == null || contextSet.isEmpty()) ? null : (ClientChannelContext) contextSet.iterator().next();
 			}
 		}
 		return this.context;
+	}
+
+	/**
+	 * 判断缓存的 context 是否仍然有效（未关闭且未移除）
+	 *
+	 * @param context ClientChannelContext
+	 * @return 是否有效
+	 */
+	private static boolean isValid(ClientChannelContext context) {
+		return context != null && !context.isClosed() && !context.isRemoved();
 	}
 
 	/**
