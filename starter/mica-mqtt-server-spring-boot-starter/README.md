@@ -130,7 +130,7 @@ mqtt:
         enable: false                   # 是否启用，默认：false
         endpoint: /mcp/message          # stream http endpoint
         sse-endpoint: /mcp/sse          # sse 端点
-        sse-message-endpoint: /mcp/message  # sse message 端点
+        sse-message-endpoint: /mcp/sse/message  # sse message 端点
       ssl:                              # http ssl 配置
         enable: false                   # 是否启用，默认：false
         keystore-path:                  # 必填：ssl keystore 证书路径，支持 classpath: 路径
