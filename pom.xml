@@ -27,7 +27,7 @@
         <jfinal.version>5.3.0</jfinal.version>
         <tinylog.version>2.7.0</tinylog.version>
         <h2.version>2.2.224</h2.version>
-        <snakeyaml.version>2.6</snakeyaml.version>
+        <snakeyaml.version>2.7</snakeyaml.version>
         <lombok.version>1.18.46</lombok.version>
     </properties>
 
