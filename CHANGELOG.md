@@ -2,6 +2,11 @@
 
 ## 发行版本
 
+### v2.6.10 - 2026-09-13
+- fix(mica-mqtt-client): getContext() 校验缓存 context 活体，失效时重新获取。
+- docs(readme): 更新 mqtt服务器 MCP 协议 文档 streamable http 和 sse 端点说明。
+- chore(deps): 更新 mica-net 到 2.0.15，支持 MCP 协议到 2026-07-28。
+
 ### v2.6.9.1 - 2026-08-10
 - feat(auth): mica-mqtt-server 优化 HTTP API 认证支持多种方案。
 - refactor(cluster): mica-mqtt-broker 优化 H2InflightStore 的异步写入线程池。
