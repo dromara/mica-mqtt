@@ -16,17 +16,24 @@
 
 package org.dromara.mica.mqtt.core.client;
 
+import net.dreamlu.mica.net.utils.hutool.ClassUtil;
 import net.dreamlu.mica.net.utils.hutool.CollUtil;
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.builder.MqttPublishBuilder;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.annotation.MqttClientPublish;
 import org.dromara.mica.mqtt.core.annotation.MqttPayload;
 import org.dromara.mica.mqtt.core.annotation.MqttRetain;
+import org.dromara.mica.mqtt.core.annotation.TopicParam;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
@@ -61,9 +68,17 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 			? (Consumer<MqttPublishBuilder>) args[metadata.getBuilderIndex()]
 			: null;
 
-		String topic = TopicUtil.resolveTopic(metadata.getMqttPublish().value(), payload);
-		MqttQoS qos = metadata.getMqttPublish().qos();
+		// 按需取值：先把方法参数按 ${var} 查一次，未匹配再回退到 payload 字段。
+		String topic = TopicUtil.resolveTopic(metadata.getMqttPublish().value(), (fieldName) -> {
+			Integer index = metadata.getVariableParamIndices().get(fieldName);
+			Object value = (index != null && args != null && index < args.length) ? args[index] : null;
+			if (value == null) {
+				value = ClassUtil.getFieldValue(payload, fieldName);
+			}
+			return value;
+		});
 
+		MqttQoS qos = metadata.getMqttPublish().qos();
 		if (topic == null || topic.isEmpty()) {
 			throw new IllegalArgumentException("Resolved topic is null or empty");
 		}
@@ -84,11 +99,13 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 
 			Annotation[][] paramAnnotations = m.getParameterAnnotations();
 			Class<?>[] paramTypes = m.getParameterTypes();
+			Parameter[] parameters = m.getParameters();
 
 			int payloadIndex = -1;
 			int retainIndex = -1;
 			int propertiesIndex = -1;
 			int builderIndex = -1;
+			Map<String, Integer> variableParamIndices = new LinkedHashMap<>();
 
 			for (int i = 0; i < paramAnnotations.length; i++) {
 				for (Annotation annotation : paramAnnotations[i]) {
@@ -108,8 +125,48 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 				}
 			}
 
-			return new MethodMetadata(mqttPublish, payloadIndex, retainIndex, propertiesIndex, builderIndex);
+			// 记录可作为占位符数据源的方法参数。
+			// 1) 优先使用 @TopicParam 显式声明的变量名；
+			// 2) 缺失时回退到编译期参数名（需开启 -parameters / <parameters>true</parameters>）；
+			// 3) 都没拿到就跳过，避免拿到 arg0/arg1 后把 ${productKey} 静默替换成 arg0。
+			for (int i = 0; i < parameters.length; i++) {
+				if (i == payloadIndex || i == retainIndex || i == propertiesIndex || i == builderIndex) {
+					continue;
+				}
+				Parameter parameter = parameters[i];
+				String paramName = resolveParameterName(parameter);
+				if (paramName == null || paramName.isEmpty()) {
+					continue;
+				}
+				variableParamIndices.put(paramName, i);
+			}
+
+			return new MethodMetadata(mqttPublish, payloadIndex, retainIndex, propertiesIndex, builderIndex, variableParamIndices);
 		});
+	}
+
+	/**
+	 * 解析参数的占位符名称：先看 @TopicParam 显式声明，没有时回退到编译期参数名。
+	 * 都没有时返回 null，由调用方跳过该参数。
+	 *
+	 * @param parameter 方法参数
+	 * @return 变量名
+	 */
+	private static String resolveParameterName(Parameter parameter) {
+		TopicParam topicParam = parameter.getAnnotation(TopicParam.class);
+		if (topicParam != null) {
+			String name = topicParam.value();
+			if (StrUtil.isNotBlank(name)) {
+				return name;
+			}
+		}
+		if (parameter.isNamePresent()) {
+			String name = parameter.getName();
+			if (StrUtil.isNotBlank(name)) {
+				return name;
+			}
+		}
+		return null;
 	}
 
 	private static class MethodMetadata {
@@ -124,16 +181,20 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 
 		private final int builderIndex;
 
+		private final Map<String, Integer> variableParamIndices;
+
 		MethodMetadata(MqttClientPublish mqttPublish,
 					   int payloadIndex,
 					   int retainIndex,
 					   int propertiesIndex,
-					   int builderIndex) {
+					   int builderIndex,
+					   Map<String, Integer> variableParamIndices) {
 			this.mqttPublish = mqttPublish;
 			this.payloadIndex = payloadIndex;
 			this.retainIndex = retainIndex;
 			this.propertiesIndex = propertiesIndex;
 			this.builderIndex = builderIndex;
+			this.variableParamIndices = variableParamIndices;
 		}
 
 		public MqttClientPublish getMqttPublish() {
@@ -154,6 +215,10 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 
 		public int getBuilderIndex() {
 			return builderIndex;
+		}
+
+		public Map<String, Integer> getVariableParamIndices() {
+			return variableParamIndices;
 		}
 	}
 }

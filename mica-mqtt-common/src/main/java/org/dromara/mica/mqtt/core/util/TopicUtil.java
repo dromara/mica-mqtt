@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.function.Function;
 
 /**
  * Mqtt Topic 工具
@@ -285,7 +286,18 @@ public final class TopicUtil {
 	 * @return 解析后的 topic
 	 */
 	public static String resolveTopic(String topicTemplate, Object payload) {
-		if (payload == null) {
+		return resolveTopic(topicTemplate, fieldName -> ClassUtil.getFieldValue(payload, fieldName));
+	}
+
+	/**
+	 * 解析 topic 中的变量，变量的格式为 ${x}，x 为 payload 中的字段名
+	 *
+	 * @param topicTemplate topic 模板
+	 * @param topicVarFunc  topicVarFunc，topic 变量函数
+	 * @return 解析后的 topic
+	 */
+	public static String resolveTopic(String topicTemplate, Function<String, Object> topicVarFunc) {
+		if (topicVarFunc == null) {
 			return topicTemplate;
 		}
 		// 替换变量
@@ -294,7 +306,7 @@ public final class TopicUtil {
 		for (int start, end; (start = topicTemplate.indexOf("${", cursor)) != -1 && (end = topicTemplate.indexOf('}', start)) != -1; ) {
 			sb.append(topicTemplate, cursor, start);
 			String fieldName = topicTemplate.substring(start + 2, end);
-			Object value = ClassUtil.getFieldValue(payload, fieldName);
+			Object value = topicVarFunc.apply(fieldName);
 			sb.append(value == null ? "" : value);
 			cursor = end + 1;
 		}

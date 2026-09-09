@@ -524,4 +524,44 @@ class TopicUtilTest {
 		Assertions.assertEquals(10, parts3.length);
 	}
 
+	@Test
+	void testResolveTopicWithMethodParametersPrecedence() {
+		// gitee issues #IKED1S：MqttInvocationHandler 把方法参数 + payload 合并成 Map 调两参 resolveTopic
+		// 这里复现合并后的 Map，验证"方法参数优先 > payload 兜底 > 变量保留"行为。
+		Map<String, Object> params = new HashMap<>();
+		params.put("productKey", "pk-from-param");
+		params.put("deviceId", "did-from-param");
+		// payload 携带相同字段但应被方法参数覆盖
+		TestBean payload = new TestBean();
+		payload.setName("payload-name");
+		payload.setNode("payload-node");
+		// 模拟 MqttInvocationHandler.mergeContext：先 put 方法参数，再 put payload 字段
+		Map<String, Object> merged = new HashMap<>(params);
+		Map<String, Object> beanFields = new HashMap<>();
+		beanFields.put("name", payload.getName());
+		beanFields.put("node", payload.getNode());
+		merged.putAll(beanFields);
+		String result = TopicUtil.resolveTopic("/sys/${productKey}/${deviceId}/thing/sub", merged);
+		Assertions.assertEquals("/sys/pk-from-param/did-from-param/thing/sub", result);
+	}
+
+	@Test
+	void testResolveTopicWithMethodParametersFallback() {
+		// 方法参数缺失的占位符，继续从 payload 兜底
+		Map<String, Object> params = new HashMap<>();
+		params.put("productKey", "pk-from-param");
+		Map<String, Object> merged = new HashMap<>(params);
+		merged.put("node", "payload-node");
+		String result = TopicUtil.resolveTopic("/sys/${productKey}/${node}/thing/sub", merged);
+		Assertions.assertEquals("/sys/pk-from-param/payload-node/thing/sub", result);
+	}
+
+	@Test
+	void testResolveTopicWithMethodParametersMissingKeepVariable() {
+		// 两参 resolveTopic 在变量缺失时会替换成空串（兼容旧行为）。
+		// 这个用例记录当前语义，使用方应通过 @TopicParam/参数名 显式声明避免漏写。
+		String result = TopicUtil.resolveTopic("/sys/${productKey}/thing/sub", new HashMap<String, Object>());
+		Assertions.assertEquals("/sys//thing/sub", result);
+	}
+
 }
