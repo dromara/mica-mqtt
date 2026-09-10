@@ -35,7 +35,6 @@ import java.lang.reflect.Parameter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
 
 /**
@@ -43,7 +42,7 @@ import java.util.function.Consumer;
  */
 public class MqttInvocationHandler<T extends IMqttClient> implements InvocationHandler {
 	private final T mqttClient;
-	private final ConcurrentMap<Method, MethodMetadata> methodCache;
+	private final Map<Method, MethodMetadata> methodCache;
 
 	public MqttInvocationHandler(T mqttClient) {
 		this.mqttClient = mqttClient;
@@ -133,12 +132,11 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 				if (i == payloadIndex || i == retainIndex || i == propertiesIndex || i == builderIndex) {
 					continue;
 				}
-				Parameter parameter = parameters[i];
-				String paramName = resolveParameterName(parameter);
-				if (paramName == null || paramName.isEmpty()) {
-					continue;
+				// 参数名
+				String paramName = resolveParameterName(parameters[i]);
+				if (StrUtil.isNotBlank(paramName)) {
+					variableParamIndices.put(paramName, i);
 				}
-				variableParamIndices.put(paramName, i);
 			}
 
 			return new MethodMetadata(mqttPublish, payloadIndex, retainIndex, propertiesIndex, builderIndex, variableParamIndices);
