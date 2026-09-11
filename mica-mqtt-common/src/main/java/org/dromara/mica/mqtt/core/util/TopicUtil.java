@@ -99,7 +99,7 @@ public final class TopicUtil {
 	 * 解析保留消息主题， topicName
 	 *
 	 * @param topicName topicName
-	 * @return IntPair<String> time, topicName 保留消息时间，topicName
+	 * @return 保留消息时间，topicName
 	 */
 	public static IntPair<String> retainTopicName(String topicName) {
 		if (topicName.startsWith("$retain/")) {
