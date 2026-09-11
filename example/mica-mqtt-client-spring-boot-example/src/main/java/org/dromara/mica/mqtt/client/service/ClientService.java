@@ -37,6 +37,11 @@ public class ClientService {
 		return true;
 	}
 
+	public boolean publishHelloInterfaceA(String productId, String deviceId, String body) {
+		helloInterfaceA.sayHello(productId, deviceId, body.getBytes(StandardCharsets.UTF_8));
+		return true;
+	}
+
 	public boolean publishHelloInterfaceB(String body) {
 		helloInterfaceB.sayHello(body.getBytes(StandardCharsets.UTF_8));
 		return true;

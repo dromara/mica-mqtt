@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.client.service;
 
 import org.dromara.mica.mqtt.core.annotation.MqttClientPublish;
 import org.dromara.mica.mqtt.core.annotation.MqttPayload;
+import org.dromara.mica.mqtt.core.annotation.TopicParam;
 import org.dromara.mica.mqtt.spring.client.annotation.MqttClient;
 
 /**
@@ -28,4 +29,9 @@ public interface HelloInterfaceA {
 
     @MqttClientPublish("/test/HelloInterfaceA")
     void sayHello(@MqttPayload Object payload);
+
+	@MqttClientPublish("/xlink/${productId}/${deviceId}/hello")
+	void sayHello(@TopicParam("productId") String productId,
+				  @TopicParam("deviceId") String deviceId,
+				  @MqttPayload Object payload);
 }

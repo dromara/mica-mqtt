@@ -44,7 +44,7 @@ public class MqttServerTest {
 //			开启代理协议，支持 nginx、haproxy、elb 等转发设备原始 ip
 			.proxyProtocolEnable()
 			.messageListener((context, clientId, topic, qos, message) -> {
-				logger.info("clientId:{} payload:{}", clientId, new String(message.payload(), StandardCharsets.UTF_8));
+				logger.info("clientId:{} topic:{} payload:{}", clientId, topic, new String(message.payload(), StandardCharsets.UTF_8));
 			})
 			// 客户端连接状态监听
 			.connectStatusListener(new MqttConnectStatusListener())

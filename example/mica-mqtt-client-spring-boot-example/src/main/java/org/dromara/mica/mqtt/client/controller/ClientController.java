@@ -23,6 +23,13 @@ public class ClientController {
 		return true;
 	}
 
+	@Operation(summary = "publishHelloInterfaceA")
+	@PostMapping("/publishHelloInterfaceA")
+	public boolean publishHelloInterfaceA(@RequestParam String productId, @RequestParam String deviceId, @RequestParam String body) {
+		service.publishHelloInterfaceA(productId, deviceId, body);
+		return true;
+	}
+
 	@Operation(summary = "sub")
 	@GetMapping("/sub")
 	public boolean sub() {
