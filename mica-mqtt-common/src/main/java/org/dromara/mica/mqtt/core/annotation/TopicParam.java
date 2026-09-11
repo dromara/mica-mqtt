@@ -26,16 +26,16 @@ import java.lang.annotation.Target;
  * topic 模板占位符 <code>${value}</code> 的数据源。
  *
  * <p>示例：
- * <pre>{@code
- * @MqttClient
+ * <pre><code>
+ * &#64;MqttClient
  * public interface DoorClient {
  *
- *     @MqttClientPublish("/sys/${productKey}/${deviceId}/thing/sub")
- *     void sendMessage(@TopicParam("productKey") String productKey,
- *                      @TopicParam("deviceId") String deviceId,
- *                      @MqttPayload String message);
+ *     &#64;MqttClientPublish("/sys/${productKey}/${deviceId}/thing/sub")
+ *     void sendMessage(&#64;TopicParam("productKey") String productKey,
+ *                      &#64;TopicParam("deviceId") String deviceId,
+ *                      &#64;MqttPayload String message);
  * }
- * }</pre>
+ * </code></pre>
  *
  * <p>占位符解析顺序：先按 {@link TopicParam} 显式声明的 name 取值，
  * 缺失时回退到 {@link MqttPayload} 标注的 bean / Map 字段；

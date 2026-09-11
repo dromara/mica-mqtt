@@ -66,6 +66,7 @@ public enum TopicFilterType {
 	/**
 	 * 获取 topicFilter 前缀长度
 	 *
+	 * @param topicFilter topicFilter
 	 * @return topicFilter 前缀长度
 	 */
 	public abstract int getPrefixLength(String topicFilter);
