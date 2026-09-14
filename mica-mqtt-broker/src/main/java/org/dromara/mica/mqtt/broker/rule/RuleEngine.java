@@ -65,14 +65,10 @@ public class RuleEngine {
 	}
 
 	/**
-	 * 启动：执行 RuleManager.start()，把当前所有 rule 挂到 functionManager。
+	 * 启动：执行 RuleManager.start()，事件回调会自动把 rule 挂到 functionManager。
 	 */
 	public void start() {
 		ruleManager.start();
-		for (Map.Entry<String, RuleFunctionListener> e : listenerMap.entrySet()) {
-			Rule r = e.getValue().getRule();
-			functionManager.register(r.getTopicFilter(), e.getValue());
-		}
 	}
 
 	/**

@@ -59,11 +59,6 @@ public class HttpSink implements Sink {
 	}
 
 	@Override
-	public String getType() {
-		return HttpSinkFactory.TYPE;
-	}
-
-	@Override
 	public String getName() {
 		return name;
 	}

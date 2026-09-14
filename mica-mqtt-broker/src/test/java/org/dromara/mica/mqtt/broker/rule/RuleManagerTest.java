@@ -19,7 +19,6 @@ package org.dromara.mica.mqtt.broker.rule;
 import org.dromara.mica.mqtt.broker.rule.sink.SinkRef;
 import org.dromara.mica.mqtt.broker.rule.store.InMemoryRuleStore;
 import org.dromara.mica.mqtt.broker.rule.store.RuleEvent;
-import org.dromara.mica.mqtt.broker.rule.store.RuleStoreListener;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -59,7 +58,7 @@ class RuleManagerTest {
 				removedCount.incrementAndGet();
 			}
 		});
-		store.setListener(new RuleStoreListener() {
+		store.setListener(new RuleChangeListener() {
 			@Override
 			public void onSaved(Rule rule) {
 				// 通过 store.save 时会触发
@@ -136,8 +135,10 @@ class RuleManagerTest {
 
 	@Test
 	void sinkRefBuilder() {
-		SinkRef ref = SinkRef.of("log", "logger-1")
-			.prop("level", "debug");
+		SinkRef ref = SinkRef.builder("log")
+			.name("logger-1")
+			.prop("level", "debug")
+			.build();
 		assertEquals("log", ref.getType());
 		assertEquals("logger-1", ref.getName());
 		assertEquals("debug", ref.getProps().get("level"));

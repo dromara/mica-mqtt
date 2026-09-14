@@ -18,7 +18,6 @@ package org.dromara.mica.mqtt.broker.rule;
 
 import org.dromara.mica.mqtt.broker.rule.codec.PayloadCodecFactory;
 import org.dromara.mica.mqtt.broker.rule.codec.PayloadCodecRegistry;
-import org.dromara.mica.mqtt.broker.rule.loader.LoaderListener;
 import org.dromara.mica.mqtt.broker.rule.loader.RuleLoader;
 import org.dromara.mica.mqtt.broker.rule.matcher.MatcherRegistry;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcherFactory;
@@ -219,7 +218,7 @@ public class RuleManager {
 					}
 					fireEvent(RuleEvent.added(r));
 				}
-				loader.setListener(new LoaderListener() {
+				loader.setListener(new RuleChangeListener() {
 					@Override
 					public void onSaved(Rule rule) {
 						if (ruleStore != null) {
@@ -243,14 +242,21 @@ public class RuleManager {
 	}
 
 	/**
-	 * 停止：清空 sink 缓存。
+	 * 停止：清空所有缓存与注册的监听器、加载器。
 	 */
 	public void stop() {
 		if (!started) {
 			return;
 		}
 		started = false;
+		// 先摘除 listeners，避免 stop 过程中事件回调造成状态不一致
+		listeners.clear();
+		// 关闭各 registry 缓存的资源
 		sinkRegistry.clear();
+		matcherRegistry.clear();
+		codecRegistry.clear();
+		// 清空加载器引用，便于 GC
+		loaders.clear();
 	}
 
 	private void fireEvent(RuleEvent event) {

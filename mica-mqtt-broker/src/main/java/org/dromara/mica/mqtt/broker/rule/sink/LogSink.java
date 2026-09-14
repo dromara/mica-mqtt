@@ -41,11 +41,6 @@ public class LogSink implements Sink {
 	}
 
 	@Override
-	public String getType() {
-		return "log";
-	}
-
-	@Override
 	public String getName() {
 		return name;
 	}

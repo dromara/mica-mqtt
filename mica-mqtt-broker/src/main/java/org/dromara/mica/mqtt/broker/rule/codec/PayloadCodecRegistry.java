@@ -49,4 +49,11 @@ public class PayloadCodecRegistry {
 		}
 		return cache.get(name);
 	}
+
+	/**
+	 * 清空所有缓存的 codec（broker 关闭时调用）。
+	 */
+	public void clear() {
+		cache.clear();
+	}
 }

@@ -37,12 +37,10 @@ public final class Rule {
 	private final String name;
 	private final String topicFilter;
 	private final boolean enabled;
-	private final String codecType;
 	private final String matcherType;
 	private final Map<String, String> matcherProps;
 	private final List<SinkRef> sinks;
 	private final boolean stopOnError;
-	private final long timeoutMs;
 	private final Map<String, String> labels;
 
 	private Rule(Builder b) {
@@ -50,7 +48,6 @@ public final class Rule {
 		this.name = b.name;
 		this.topicFilter = Objects.requireNonNull(b.topicFilter, "topicFilter is required");
 		this.enabled = b.enabled;
-		this.codecType = b.codecType;
 		this.matcherType = b.matcherType;
 		this.matcherProps = b.matcherProps == null
 			? Collections.emptyMap()
@@ -58,7 +55,6 @@ public final class Rule {
 		List<SinkRef> sinkList = new ArrayList<>(b.sinks);
 		this.sinks = Collections.unmodifiableList(sinkList);
 		this.stopOnError = b.stopOnError;
-		this.timeoutMs = b.timeoutMs > 0 ? b.timeoutMs : 5000L;
 		this.labels = b.labels == null
 			? Collections.emptyMap()
 			: Collections.unmodifiableMap(new LinkedHashMap<>(b.labels));
@@ -84,10 +80,6 @@ public final class Rule {
 		return enabled;
 	}
 
-	public String getCodecType() {
-		return codecType;
-	}
-
 	public String getMatcherType() {
 		return matcherType;
 	}
@@ -102,10 +94,6 @@ public final class Rule {
 
 	public boolean isStopOnError() {
 		return stopOnError;
-	}
-
-	public long getTimeoutMs() {
-		return timeoutMs;
 	}
 
 	public Map<String, String> getLabels() {
@@ -148,12 +136,10 @@ public final class Rule {
 		private String name;
 		private String topicFilter;
 		private boolean enabled = true;
-		private String codecType;
 		private String matcherType;
 		private Map<String, String> matcherProps;
 		private final List<SinkRef> sinks = new ArrayList<>();
 		private boolean stopOnError;
-		private long timeoutMs = 5000L;
 		private Map<String, String> labels;
 
 		public Builder id(String id) {
@@ -173,11 +159,6 @@ public final class Rule {
 
 		public Builder enabled(boolean enabled) {
 			this.enabled = enabled;
-			return this;
-		}
-
-		public Builder codecType(String codecType) {
-			this.codecType = codecType;
 			return this;
 		}
 
@@ -206,11 +187,6 @@ public final class Rule {
 
 		public Builder stopOnError(boolean stopOnError) {
 			this.stopOnError = stopOnError;
-			return this;
-		}
-
-		public Builder timeoutMs(long timeoutMs) {
-			this.timeoutMs = timeoutMs;
 			return this;
 		}
 

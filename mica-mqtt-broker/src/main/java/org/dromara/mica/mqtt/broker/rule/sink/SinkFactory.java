@@ -28,7 +28,7 @@ package org.dromara.mica.mqtt.broker.rule.sink;
 public interface SinkFactory {
 
 	/**
-	 * @return sink 类型标识（与 {@link Sink#getType()} 对应）
+	 * @return sink 类型标识
 	 */
 	String getType();
 

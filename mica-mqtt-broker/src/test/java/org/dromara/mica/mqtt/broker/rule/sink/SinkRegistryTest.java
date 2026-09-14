@@ -50,11 +50,6 @@ class SinkRegistryTest {
 				factoryCount.incrementAndGet();
 				return new Sink() {
 					@Override
-					public String getType() {
-						return "fake";
-					}
-
-					@Override
 					public String getName() {
 						return ref.getName();
 					}
@@ -85,11 +80,6 @@ class SinkRegistryTest {
 			public Sink create(SinkRef ref) {
 				return new Sink() {
 					@Override
-					public String getType() {
-						return "fake";
-					}
-
-					@Override
 					public String getName() {
 						return ref.getName();
 					}
@@ -100,8 +90,8 @@ class SinkRegistryTest {
 				};
 			}
 		});
-		SinkRef r1 = SinkRef.of("fake").prop("x", "1");
-		SinkRef r2 = SinkRef.of("fake").prop("x", "2");
+		SinkRef r1 = SinkRef.builder("fake").prop("x", "1").build();
+		SinkRef r2 = SinkRef.builder("fake").prop("x", "2").build();
 		assertNotNull(registry.materialize(r1));
 		assertNotNull(registry.materialize(r2));
 	}

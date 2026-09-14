@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.broker.rule.matcher;
 
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -45,11 +47,13 @@ public class MatcherRegistry {
 	 * @param props 属性
 	 * @return matcher 实例（type 为空返回 null）
 	 */
-	public RuleMatcher get(String type, java.util.Map<String, String> props) {
+	public RuleMatcher get(String type, Map<String, String> props) {
 		if (type == null || type.isEmpty()) {
 			return null;
 		}
-		String key = type + "|" + props;
+		// 用 TreeMap 排序 key 后再 toString，避免 HashMap 顺序不确定导致缓存 key 不一致
+		Map<String, String> ordered = props == null ? null : new TreeMap<>(props);
+		String key = type + "|" + ordered;
 		RuleMatcher matcher = cache.get(key);
 		if (matcher != null) {
 			return matcher;
@@ -59,5 +63,12 @@ public class MatcherRegistry {
 			throw new IllegalStateException("No RuleMatcherFactory for type: " + type);
 		}
 		return cache.computeIfAbsent(key, k -> factory.create(props));
+	}
+
+	/**
+	 * 清空所有缓存的 matcher（broker 关闭时调用）。
+	 */
+	public void clear() {
+		cache.clear();
 	}
 }

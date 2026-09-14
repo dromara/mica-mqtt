@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.broker.rule.loader;
 
 import org.dromara.mica.mqtt.broker.rule.Rule;
+import org.dromara.mica.mqtt.broker.rule.RuleChangeListener;
 
 import java.util.List;
 
@@ -44,6 +45,6 @@ public interface RuleLoader {
 	 *
 	 * @param listener 监听器（null 表示只加载一次）
 	 */
-	default void setListener(LoaderListener listener) {
+	default void setListener(RuleChangeListener listener) {
 	}
 }

@@ -114,10 +114,8 @@ public class JsonRuleLoader implements RuleLoader {
 			.name(stringOf(map.get("name")))
 			.topicFilter(topicFilter)
 			.enabled(booleanOf(map.get("enabled"), true))
-			.codecType(stringOf(map.get("codec")))
 			.matcherType(stringOf(map.get("matcher")))
 			.stopOnError(booleanOf(map.get("stopOnError"), false))
-			.timeoutMs(longOf(map.get("timeoutMs"), 5000L))
 			.labels(stringMap(map.get("labels")));
 		Object matcherProps = map.get("matcherProps");
 		if (matcherProps instanceof Map) {
@@ -146,7 +144,10 @@ public class JsonRuleLoader implements RuleLoader {
 			return null;
 		}
 		String name = stringOf(map.get("name"));
-		SinkRef ref = (name == null || name.isEmpty()) ? SinkRef.of(type) : SinkRef.of(type, name);
+		SinkRef.Builder builder = SinkRef.builder(type);
+		if (name != null && !name.isEmpty()) {
+			builder.name(name);
+		}
 		Object props = map.get("props");
 		if (props == null) {
 			props = map;
@@ -158,11 +159,11 @@ public class JsonRuleLoader implements RuleLoader {
 					continue;
 				}
 				if (key != null) {
-					ref = ref.prop(key, e.getValue());
+					builder.prop(key, e.getValue());
 				}
 			}
 		}
-		return ref;
+		return builder.build();
 	}
 
 	private static String stringOf(Object o) {
@@ -177,20 +178,6 @@ public class JsonRuleLoader implements RuleLoader {
 			return (Boolean) o;
 		}
 		return Boolean.parseBoolean(o.toString());
-	}
-
-	private static long longOf(Object o, long def) {
-		if (o == null) {
-			return def;
-		}
-		if (o instanceof Number) {
-			return ((Number) o).longValue();
-		}
-		try {
-			return Long.parseLong(o.toString());
-		} catch (NumberFormatException ignore) {
-			return def;
-		}
 	}
 
 	private static Map<String, String> stringMap(Object o) {

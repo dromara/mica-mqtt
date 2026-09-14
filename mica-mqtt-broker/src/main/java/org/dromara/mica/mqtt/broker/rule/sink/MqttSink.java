@@ -52,11 +52,6 @@ public class MqttSink implements Sink, AutoCloseable {
 	}
 
 	@Override
-	public String getType() {
-		return MqttSinkFactory.TYPE;
-	}
-
-	@Override
 	public String getName() {
 		return name;
 	}

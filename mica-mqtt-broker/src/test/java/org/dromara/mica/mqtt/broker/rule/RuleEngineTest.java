@@ -68,11 +68,6 @@ class RuleEngineTest {
 				int seq = counter.incrementAndGet();
 				return new Sink() {
 					@Override
-					public String getType() {
-						return "seq";
-					}
-
-					@Override
 					public String getName() {
 						return name == null ? "seq-" + seq : name;
 					}
@@ -178,11 +173,6 @@ class RuleEngineTest {
 				int n = counter.incrementAndGet();
 				return new Sink() {
 					@Override
-					public String getType() {
-						return "mix";
-					}
-
-					@Override
 					public String getName() {
 						return "mix-" + n;
 					}
@@ -232,11 +222,6 @@ class RuleEngineTest {
 			public Sink create(SinkRef ref) {
 				int n = counter.incrementAndGet();
 				return new Sink() {
-					@Override
-					public String getType() {
-						return "stop";
-					}
-
 					@Override
 					public String getName() {
 						return "stop-" + n;
@@ -345,11 +330,6 @@ class RuleEngineTest {
 			public Sink create(SinkRef ref) {
 				created.incrementAndGet();
 				return new Sink() {
-					@Override
-					public String getType() {
-						return "x";
-					}
-
 					@Override
 					public String getName() {
 						return ref.getName();

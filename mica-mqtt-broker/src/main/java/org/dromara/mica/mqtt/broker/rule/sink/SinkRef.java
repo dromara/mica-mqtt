@@ -23,6 +23,9 @@ import java.util.Objects;
 
 /**
  * 不可变的 sink 引用（type + name + props）。
+ * <p>
+ * 使用 {@link Builder} 链式构建，避免每次 {@code prop()} 调用都复制整个 props Map。
+ * </p>
  *
  * @author L.cm
  */
@@ -46,18 +49,23 @@ public final class SinkRef {
 		return new SinkRef(type, name, Collections.<String, Object>emptyMap());
 	}
 
-	public SinkRef prop(String key, Object value) {
-		Map<String, Object> merged = new LinkedHashMap<>(this.props);
-		merged.put(key, value);
-		return new SinkRef(this.type, this.name, merged);
+	/**
+	 * 创建可变 builder，便于一次性追加多个 prop，避免链式 {@code prop()} 重复复制。
+	 *
+	 * @param type sink 类型
+	 * @return builder
+	 */
+	public static Builder builder(String type) {
+		return new Builder(type);
 	}
 
-	public SinkRef props(Map<String, Object> props) {
-		Map<String, Object> merged = new LinkedHashMap<>(this.props);
-		if (props != null) {
-			merged.putAll(props);
-		}
-		return new SinkRef(this.type, this.name, merged);
+	/**
+	 * 基于当前实例派生 builder（继承 type/name/props）。
+	 *
+	 * @return builder
+	 */
+	public Builder toBuilder() {
+		return new Builder(type, name, props);
 	}
 
 	public String getType() {
@@ -98,5 +106,47 @@ public final class SinkRef {
 			", name='" + name + '\'' +
 			", props=" + props.size() +
 			'}';
+	}
+
+	/**
+	 * SinkRef 可变构建器，一次性累积 props 后生成不可变 SinkRef。
+	 */
+	public static final class Builder {
+		private final String type;
+		private String name;
+		private final Map<String, Object> props = new LinkedHashMap<>();
+
+		private Builder(String type) {
+			this(type, type, Collections.<String, Object>emptyMap());
+		}
+
+		private Builder(String type, String name, Map<String, Object> props) {
+			this.type = Objects.requireNonNull(type, "type is required");
+			this.name = name;
+			if (props != null) {
+				this.props.putAll(props);
+			}
+		}
+
+		public Builder name(String name) {
+			this.name = name;
+			return this;
+		}
+
+		public Builder prop(String key, Object value) {
+			this.props.put(key, value);
+			return this;
+		}
+
+		public Builder props(Map<String, Object> props) {
+			if (props != null) {
+				this.props.putAll(props);
+			}
+			return this;
+		}
+
+		public SinkRef build() {
+			return new SinkRef(type, name, props);
+		}
 	}
 }

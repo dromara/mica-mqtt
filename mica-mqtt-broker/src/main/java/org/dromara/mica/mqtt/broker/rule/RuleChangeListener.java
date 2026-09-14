@@ -14,16 +14,14 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.rule.loader;
-
-import org.dromara.mica.mqtt.broker.rule.Rule;
+package org.dromara.mica.mqtt.broker.rule;
 
 /**
- * loader 热加载变更监听。
+ * 规则变更监听：loader 热加载 / store 持久化变更统一通知入口。
  *
  * @author L.cm
  */
-public interface LoaderListener {
+public interface RuleChangeListener {
 
 	/**
 	 * 规则被新增或更新。
