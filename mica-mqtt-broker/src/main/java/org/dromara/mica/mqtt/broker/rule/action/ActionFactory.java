@@ -14,30 +14,30 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.rule.sink;
+package org.dromara.mica.mqtt.broker.rule.action;
 
 /**
- * Sink 工厂：通过 type 字符串 + 配置 Map 物化 Sink 实例。
+ * Action 工厂：通过 type 字符串 + 配置 Map 物化 Action 实例。
  * <p>
- * 注册方式：在 {@code META-INF/services/org.dromara.mica.mqtt.broker.rule.sink.SinkFactory}
+ * 注册方式：在 {@code META-INF/services/org.dromara.mica.mqtt.broker.rule.action.ActionFactory}
  * 中列出实现类全名，broker 启动时由 JDK {@link java.util.ServiceLoader} 加载。
  * </p>
  *
  * @author L.cm
  */
-public interface SinkFactory {
+public interface ActionFactory {
 
 	/**
-	 * @return sink 类型标识
+	 * @return action 类型标识
 	 */
 	String getType();
 
 	/**
-	 * 由 SinkRegistry 调用，物化 Sink 实例。
+	 * 由 ActionRegistry 调用，物化 Action 实例。
 	 *
-	 * @param ref sink 引用
-	 * @return sink 实例
+	 * @param ref action 引用
+	 * @return action 实例
 	 * @throws Exception 物化失败
 	 */
-	Sink create(SinkRef ref) throws Exception;
+	Action create(ActionRef ref) throws Exception;
 }

@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.rule.sink;
+package org.dromara.mica.mqtt.broker.rule.action;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * {@link HttpSink} 工厂。
+ * {@link HttpAction} 工厂。
  *
  * @author L.cm
  */
-public class HttpSinkFactory implements SinkFactory {
+public class HttpActionFactory implements ActionFactory {
 
 	public static final String TYPE = "http";
 
@@ -34,15 +34,15 @@ public class HttpSinkFactory implements SinkFactory {
 	}
 
 	@Override
-	public Sink create(SinkRef ref) {
+	public Action create(ActionRef ref) {
 		String name = ref.getName();
-		String url = MqttSink.stringProp(ref, "url");
+		String url = MqttAction.stringProp(ref, "url");
 		if (url == null || url.isEmpty()) {
-			throw new IllegalArgumentException("HttpSink requires 'url' prop");
+			throw new IllegalArgumentException("HttpAction requires 'url' prop");
 		}
-		String method = MqttSink.stringProp(ref, "method");
-		String contentType = MqttSink.stringProp(ref, "contentType");
-		int timeoutMs = MqttSink.intProp(ref, "timeoutMs", 3000);
+		String method = MqttAction.stringProp(ref, "method");
+		String contentType = MqttAction.stringProp(ref, "contentType");
+		int timeoutMs = MqttAction.intProp(ref, "timeoutMs", 3000);
 
 		Map<String, String> headers = null;
 		Object h = ref.getProps().get("headers");
@@ -56,6 +56,6 @@ public class HttpSinkFactory implements SinkFactory {
 				}
 			}
 		}
-		return new HttpSink(name, url, method, contentType, timeoutMs, headers);
+		return new HttpAction(name, url, method, contentType, timeoutMs, headers);
 	}
 }

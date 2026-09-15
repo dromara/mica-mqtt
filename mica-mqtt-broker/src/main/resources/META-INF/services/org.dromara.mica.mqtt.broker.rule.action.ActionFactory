@@ -1,0 +1,7 @@
+org.dromara.mica.mqtt.broker.rule.action.LogActionFactory
+org.dromara.mica.mqtt.broker.rule.action.HttpActionFactory
+org.dromara.mica.mqtt.broker.rule.action.MqttActionFactory
+org.dromara.mica.mqtt.broker.rule.ext.template.PublishTemplateAction$Factory
+org.dromara.mica.mqtt.broker.rule.ext.template.StoreTemplateAction$Factory
+org.dromara.mica.mqtt.broker.rule.ext.template.AlertTemplateAction$Factory
+org.dromara.mica.mqtt.broker.rule.ext.template.WebhookTemplateAction$Factory

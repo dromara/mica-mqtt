@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.broker.rule;
 
-import org.dromara.mica.mqtt.broker.rule.sink.SinkRef;
+import org.dromara.mica.mqtt.broker.rule.action.ActionRef;
 import org.dromara.mica.mqtt.broker.rule.store.InMemoryRuleStore;
 import org.dromara.mica.mqtt.broker.rule.store.RuleEvent;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,14 +76,14 @@ class RuleManagerTest {
 			.id("r1")
 			.name("test")
 			.topicFilter("a/b/c")
-			.addSink(SinkRef.of("log"))
+			.addAction(ActionRef.of("log"))
 			.build();
 		ruleManager.addRule(rule);
 		Rule got = ruleManager.getRule("r1");
 		assertNotNull(got);
 		assertEquals("r1", got.getId());
 		assertEquals("test", got.getName());
-		assertEquals(1, got.getSinks().size());
+		assertEquals(1, got.getActions().size());
 		assertEquals(1, addedCount.get());
 	}
 
@@ -134,8 +134,8 @@ class RuleManagerTest {
 	}
 
 	@Test
-	void sinkRefBuilder() {
-		SinkRef ref = SinkRef.builder("log")
+	void actionRefBuilder() {
+		ActionRef ref = ActionRef.builder("log")
 			.name("logger-1")
 			.prop("level", "debug")
 			.build();

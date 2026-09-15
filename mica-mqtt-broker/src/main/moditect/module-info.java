@@ -17,6 +17,6 @@ open module org.dromara.mica.mqtt.broker {
 	exports org.dromara.mica.mqtt.broker.rule.loader;
 	exports org.dromara.mica.mqtt.broker.rule.matcher;
 	exports org.dromara.mica.mqtt.broker.rule.metrics;
-	exports org.dromara.mica.mqtt.broker.rule.sink;
+	exports org.dromara.mica.mqtt.broker.rule.action;
 	exports org.dromara.mica.mqtt.broker.rule.store;
 }

@@ -27,6 +27,8 @@
         <jfinal.version>5.3.0</jfinal.version>
         <tinylog.version>2.7.0</tinylog.version>
         <h2.version>2.2.224</h2.version>
+        <aviator.version>5.9.0</aviator.version>
+        <caffeine.version>3.1.8</caffeine.version>
         <snakeyaml.version>2.7</snakeyaml.version>
         <lombok.version>1.18.48</lombok.version>
     </properties>
@@ -166,6 +168,17 @@
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
+            </dependency>
+            <!-- 规则引擎：表达式求值 + 去重缓存 -->
+            <dependency>
+                <groupId>io.github.aviatorscript</groupId>
+                <artifactId>aviator</artifactId>
+                <version>${aviator.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

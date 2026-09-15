@@ -32,45 +32,45 @@ public class RuleMetricsRecorder implements RuleMetrics {
 	private final ConcurrentMap<String, Stat> stats = new ConcurrentHashMap<>();
 
 	@Override
-	public void recordSuccess(String ruleId, String sinkName, long costMs) {
-		Stat stat = stats.computeIfAbsent(key(ruleId, sinkName),
-			k -> new Stat(ruleId, sinkName));
+	public void recordSuccess(String ruleId, String actionName, long costMs) {
+		Stat stat = stats.computeIfAbsent(key(ruleId, actionName),
+			k -> new Stat(ruleId, actionName));
 		stat.successCount.increment();
 		stat.totalLatencyMs.add(costMs);
 		stat.recordMax(costMs);
 	}
 
 	@Override
-	public void recordFailure(String ruleId, String sinkName, long costMs) {
-		Stat stat = stats.computeIfAbsent(key(ruleId, sinkName),
-			k -> new Stat(ruleId, sinkName));
+	public void recordFailure(String ruleId, String actionName, long costMs) {
+		Stat stat = stats.computeIfAbsent(key(ruleId, actionName),
+			k -> new Stat(ruleId, actionName));
 		stat.failureCount.increment();
 		stat.totalLatencyMs.add(costMs);
 		stat.recordMax(costMs);
 	}
 
 	@Override
-	public Map<String, SinkStat> snapshot() {
-		Map<String, SinkStat> snap = new HashMap<>(stats.size());
-		stats.forEach((k, v) -> snap.put(k, v.toSinkStat()));
+	public Map<String, ActionStat> snapshot() {
+		Map<String, ActionStat> snap = new HashMap<>(stats.size());
+		stats.forEach((k, v) -> snap.put(k, v.toActionStat()));
 		return snap;
 	}
 
-	private static String key(String ruleId, String sinkName) {
-		return ruleId + "|" + sinkName;
+	private static String key(String ruleId, String actionName) {
+		return ruleId + "|" + actionName;
 	}
 
 	private static final class Stat {
 		final String ruleId;
-		final String sinkName;
+		final String actionName;
 		final LongAdder successCount = new LongAdder();
 		final LongAdder failureCount = new LongAdder();
 		final LongAdder totalLatencyMs = new LongAdder();
 		volatile long maxLatencyMs;
 
-		Stat(String ruleId, String sinkName) {
+		Stat(String ruleId, String actionName) {
 			this.ruleId = ruleId;
-			this.sinkName = sinkName;
+			this.actionName = actionName;
 		}
 
 		void recordMax(long costMs) {
@@ -84,10 +84,10 @@ public class RuleMetricsRecorder implements RuleMetrics {
 			}
 		}
 
-		SinkStat toSinkStat() {
-			return new SinkStat(
+		ActionStat toActionStat() {
+			return new ActionStat(
 				ruleId,
-				sinkName,
+				actionName,
 				successCount.sum(),
 				failureCount.sum(),
 				totalLatencyMs.sum(),

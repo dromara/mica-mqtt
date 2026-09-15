@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.rule.sink;
+package org.dromara.mica.mqtt.broker.rule.action;
 
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.broker.rule.RuleContext;
@@ -27,13 +27,13 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 内置 MqttSink：复用 mica-mqtt-client 转发到另一台 MQTT broker。
+ * 内置 MqttAction：复用 mica-mqtt-client 转发到另一台 MQTT broker。
  *
  * @author L.cm
  */
-public class MqttSink implements Sink, AutoCloseable {
+public class MqttAction implements Action, AutoCloseable {
 
-	private static final Logger logger = LoggerFactory.getLogger(MqttSink.class);
+	private static final Logger logger = LoggerFactory.getLogger(MqttAction.class);
 
 	private final String name;
 	private final MqttClient client;
@@ -42,7 +42,7 @@ public class MqttSink implements Sink, AutoCloseable {
 	private final boolean retain;
 	private final AtomicBoolean closed = new AtomicBoolean(false);
 
-	public MqttSink(String name, MqttClient client,
+	public MqttAction(String name, MqttClient client,
 					String topicTemplate, MqttQoS qos, boolean retain) {
 		this.name = name == null || name.isEmpty() ? "mqtt" : name;
 		this.client = client;
@@ -59,7 +59,7 @@ public class MqttSink implements Sink, AutoCloseable {
 	@Override
 	public void send(RuleContext ctx) {
 		if (closed.get()) {
-			throw new IllegalStateException("MqttSink is closed: " + name);
+			throw new IllegalStateException("MqttAction is closed: " + name);
 		}
 		String targetTopic = renderTopic(topicTemplate, ctx);
 		if (targetTopic == null || targetTopic.isEmpty()) {
@@ -68,7 +68,7 @@ public class MqttSink implements Sink, AutoCloseable {
 		boolean ok = client.publish(targetTopic, ctx.getPayload(), qos, ctx.isRetain() && retain);
 		if (!ok) {
 			throw new IllegalStateException(
-				"MqttSink publish failed: " + name + " topic=" + targetTopic);
+				"MqttAction publish failed: " + name + " topic=" + targetTopic);
 		}
 	}
 
@@ -78,7 +78,7 @@ public class MqttSink implements Sink, AutoCloseable {
 			try {
 				client.stop();
 			} catch (Exception e) {
-				logger.warn("Failed to stop mqtt client for sink {}", name, e);
+				logger.warn("Failed to stop mqtt client for action {}", name, e);
 			}
 		}
 	}
@@ -97,9 +97,9 @@ public class MqttSink implements Sink, AutoCloseable {
 	}
 
 	/**
-	 * 用于 {@link MqttSinkFactory} 物化客户端连接。
+	 * 用于 {@link MqttActionFactory} 物化客户端连接。
 	 */
-	public static MqttClient buildClient(SinkRef ref) {
+	public static MqttClient buildClient(ActionRef ref) {
 		String host = stringProp(ref, "host");
 		Integer port = intProp(ref, "port", 1883);
 		String clientId = stringProp(ref, "clientId");
@@ -120,12 +120,12 @@ public class MqttSink implements Sink, AutoCloseable {
 		return creator.connect();
 	}
 
-	static String stringProp(SinkRef ref, String key) {
+	static String stringProp(ActionRef ref, String key) {
 		Object v = ref.getProps().get(key);
 		return v == null ? null : v.toString();
 	}
 
-	static Integer intProp(SinkRef ref, String key, int def) {
+	static Integer intProp(ActionRef ref, String key, int def) {
 		Object v = ref.getProps().get(key);
 		if (v == null) {
 			return def;
@@ -137,7 +137,7 @@ public class MqttSink implements Sink, AutoCloseable {
 		}
 	}
 
-	static Boolean booleanProp(SinkRef ref, String key, boolean def) {
+	static Boolean booleanProp(ActionRef ref, String key, boolean def) {
 		Object v = ref.getProps().get(key);
 		if (v == null) {
 			return def;

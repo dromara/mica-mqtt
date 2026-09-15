@@ -17,24 +17,24 @@
 package org.dromara.mica.mqtt.broker.rule.metrics;
 
 /**
- * 单一 sink 的指标快照。
+ * 单一 action 的指标快照。
  *
  * @author L.cm
  */
-public final class SinkStat {
+public final class ActionStat {
 
 	private final String ruleId;
-	private final String sinkName;
+	private final String actionName;
 	private final long successCount;
 	private final long failureCount;
 	private final long totalLatencyMs;
 	private final long maxLatencyMs;
 
-	public SinkStat(String ruleId, String sinkName,
+	public ActionStat(String ruleId, String actionName,
 					long successCount, long failureCount,
 					long totalLatencyMs, long maxLatencyMs) {
 		this.ruleId = ruleId;
-		this.sinkName = sinkName;
+		this.actionName = actionName;
 		this.successCount = successCount;
 		this.failureCount = failureCount;
 		this.totalLatencyMs = totalLatencyMs;
@@ -45,8 +45,8 @@ public final class SinkStat {
 		return ruleId;
 	}
 
-	public String getSinkName() {
-		return sinkName;
+	public String getActionName() {
+		return actionName;
 	}
 
 	public long getSuccessCount() {

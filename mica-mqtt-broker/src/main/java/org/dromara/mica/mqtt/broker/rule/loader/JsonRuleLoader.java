@@ -18,7 +18,7 @@ package org.dromara.mica.mqtt.broker.rule.loader;
 
 import net.dreamlu.mica.net.utils.json.JsonUtil;
 import org.dromara.mica.mqtt.broker.rule.Rule;
-import org.dromara.mica.mqtt.broker.rule.sink.SinkRef;
+import org.dromara.mica.mqtt.broker.rule.action.ActionRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,12 +121,12 @@ public class JsonRuleLoader implements RuleLoader {
 		if (matcherProps instanceof Map) {
 			builder.matcherProps(stringMap(matcherProps));
 		}
-		Object sinksObj = map.get("sinks");
-		if (sinksObj instanceof List) {
-			for (Object s : (List<?>) sinksObj) {
-				SinkRef ref = parseSink(s);
+		Object actionsObj = map.get("actions");
+		if (actionsObj instanceof List) {
+			for (Object s : (List<?>) actionsObj) {
+				ActionRef ref = parseAction(s);
 				if (ref != null) {
-					builder.addSink(ref);
+					builder.addAction(ref);
 				}
 			}
 		}
@@ -134,7 +134,7 @@ public class JsonRuleLoader implements RuleLoader {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static SinkRef parseSink(Object item) {
+	private static ActionRef parseAction(Object item) {
 		if (!(item instanceof Map)) {
 			return null;
 		}
@@ -144,7 +144,7 @@ public class JsonRuleLoader implements RuleLoader {
 			return null;
 		}
 		String name = stringOf(map.get("name"));
-		SinkRef.Builder builder = SinkRef.builder(type);
+		ActionRef.Builder builder = ActionRef.builder(type);
 		if (name != null && !name.isEmpty()) {
 			builder.name(name);
 		}

@@ -28,7 +28,7 @@ public interface RuleMatcher {
 
 	/**
 	 * @param ctx 规则上下文
-	 * @return true 放行执行 sinks
+	 * @return true 放行执行 actions
 	 */
 	boolean matches(RuleContext ctx);
 }

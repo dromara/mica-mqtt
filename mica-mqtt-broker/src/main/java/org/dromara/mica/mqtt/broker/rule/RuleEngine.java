@@ -20,8 +20,8 @@ import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcher;
 import org.dromara.mica.mqtt.broker.rule.metrics.RuleMetrics;
 import org.dromara.mica.mqtt.broker.rule.metrics.RuleMetricsRecorder;
-import org.dromara.mica.mqtt.broker.rule.sink.Sink;
-import org.dromara.mica.mqtt.broker.rule.sink.SinkRef;
+import org.dromara.mica.mqtt.broker.rule.action.Action;
+import org.dromara.mica.mqtt.broker.rule.action.ActionRef;
 import org.dromara.mica.mqtt.broker.rule.store.RuleEvent;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
@@ -142,7 +142,7 @@ public class RuleEngine {
 	}
 
 	/**
-	 * 单条规则的 function 监听器，在 broker IO 线程上同步执行 sinks。
+	 * 单条规则的 function 监听器，在 broker IO 线程上同步执行 actions。
 	 */
 	private static final class RuleFunctionListener implements IMqttFunctionMessageListener {
 		private final Rule rule;
@@ -181,18 +181,18 @@ public class RuleEngine {
 				return;
 			}
 			boolean stopped = false;
-			for (SinkRef ref : rule.getSinks()) {
+			for (ActionRef ref : rule.getActions()) {
 				if (stopped) {
 					break;
 				}
-				Sink sink = ruleManager.getSinkRegistry().materialize(ref);
+				Action action = ruleManager.getActionRegistry().materialize(ref);
 				long start = System.nanoTime();
 				try {
-					sink.send(ctx);
-					metrics.recordSuccess(rule.getId(), sink.getName(), costMs(start));
+					action.send(ctx);
+					metrics.recordSuccess(rule.getId(), action.getName(), costMs(start));
 				} catch (Exception e) {
-					metrics.recordFailure(rule.getId(), sink.getName(), costMs(start));
-					logger.error("rule {} sink {} failed", rule.getId(), sink.getName(), e);
+					metrics.recordFailure(rule.getId(), action.getName(), costMs(start));
+					logger.error("rule {} action {} failed", rule.getId(), action.getName(), e);
 					if (rule.isStopOnError()) {
 						stopped = true;
 					}

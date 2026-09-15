@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.rule.sink;
+package org.dromara.mica.mqtt.broker.rule.action;
 
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.broker.rule.RuleContext;
@@ -29,17 +29,17 @@ import java.util.Iterator;
 import java.util.Map;
 
 /**
- * 内置 HttpSink：JDK HttpURLConnection 同步调用（无三方依赖）。
+ * 内置 HttpAction：JDK HttpURLConnection 同步调用（无三方依赖）。
  * <p>
- * MVP 阶段使用同步实现。后续会替换为 sink 线程池 + 异步 HttpClient
+ * MVP 阶段使用同步实现。后续会替换为 action 线程池 + 异步 HttpClient
  * （避免在 t-io IO 线程上阻塞慢 HTTP 后端）。
  * </p>
  *
  * @author L.cm
  */
-public class HttpSink implements Sink {
+public class HttpAction implements Action {
 
-	private static final Logger logger = LoggerFactory.getLogger(HttpSink.class);
+	private static final Logger logger = LoggerFactory.getLogger(HttpAction.class);
 
 	private final String name;
 	private final String url;
@@ -48,7 +48,7 @@ public class HttpSink implements Sink {
 	private final int timeoutMs;
 	private final Map<String, String> headers;
 
-	public HttpSink(String name, String url, String method, String contentType,
+	public HttpAction(String name, String url, String method, String contentType,
 					int timeoutMs, Map<String, String> headers) {
 		this.name = name == null || name.isEmpty() ? "http" : name;
 		this.url = url;
@@ -102,10 +102,10 @@ public class HttpSink implements Sink {
 			}
 			int code = conn.getResponseCode();
 			if (code < 200 || code >= 300) {
-				throw new IOException("HttpSink " + name
+				throw new IOException("HttpAction " + name
 					+ " HTTP " + code + " from " + url);
 			}
-			logger.debug("HttpSink {} posted {} bytes to {} -> {}",
+			logger.debug("HttpAction {} posted {} bytes to {} -> {}",
 				name, payload == null ? 0 : payload.length, url, code);
 		} finally {
 			conn.disconnect();

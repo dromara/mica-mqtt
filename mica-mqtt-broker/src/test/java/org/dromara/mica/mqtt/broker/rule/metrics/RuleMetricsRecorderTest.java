@@ -37,8 +37,8 @@ class RuleMetricsRecorderTest {
 		m.recordSuccess("r1", "s1", 10);
 		m.recordSuccess("r1", "s1", 20);
 		m.recordFailure("r1", "s1", 5);
-		Map<String, SinkStat> snap = m.snapshot();
-		SinkStat stat = snap.get("r1|s1");
+		Map<String, ActionStat> snap = m.snapshot();
+		ActionStat stat = snap.get("r1|s1");
 		assertNotNull(stat);
 		assertEquals(2, stat.getSuccessCount());
 		assertEquals(1, stat.getFailureCount());
@@ -47,11 +47,11 @@ class RuleMetricsRecorderTest {
 	}
 
 	@Test
-	void multipleSinksTrackedSeparately() {
+	void multipleActionsTrackedSeparately() {
 		RuleMetricsRecorder m = new RuleMetricsRecorder();
 		m.recordSuccess("r1", "a", 1);
 		m.recordSuccess("r1", "b", 2);
-		Map<String, SinkStat> snap = m.snapshot();
+		Map<String, ActionStat> snap = m.snapshot();
 		assertEquals(2, snap.size());
 		assertNotNull(snap.get("r1|a"));
 		assertNotNull(snap.get("r1|b"));
@@ -62,7 +62,7 @@ class RuleMetricsRecorderTest {
 		RuleMetricsRecorder m = new RuleMetricsRecorder();
 		m.recordSuccess("r", "s", 10);
 		m.recordFailure("r", "s", 20);
-		SinkStat stat = m.snapshot().get("r|s");
+		ActionStat stat = m.snapshot().get("r|s");
 		assertNotNull(stat);
 		assertEquals(15.0, stat.getAvgLatencyMs(), 0.001);
 	}

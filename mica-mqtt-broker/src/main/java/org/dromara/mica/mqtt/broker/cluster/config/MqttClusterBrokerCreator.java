@@ -38,10 +38,10 @@ import org.dromara.mica.mqtt.broker.rule.codec.RawPayloadCodecFactory;
 import org.dromara.mica.mqtt.broker.rule.codec.StringPayloadCodecFactory;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcherFactory;
 import org.dromara.mica.mqtt.broker.rule.matcher.TopicRuleMatcherFactory;
-import org.dromara.mica.mqtt.broker.rule.sink.HttpSinkFactory;
-import org.dromara.mica.mqtt.broker.rule.sink.LogSinkFactory;
-import org.dromara.mica.mqtt.broker.rule.sink.MqttSinkFactory;
-import org.dromara.mica.mqtt.broker.rule.sink.SinkFactory;
+import org.dromara.mica.mqtt.broker.rule.action.HttpActionFactory;
+import org.dromara.mica.mqtt.broker.rule.action.LogActionFactory;
+import org.dromara.mica.mqtt.broker.rule.action.MqttActionFactory;
+import org.dromara.mica.mqtt.broker.rule.action.ActionFactory;
 import org.dromara.mica.mqtt.broker.rule.store.InMemoryRuleStore;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
@@ -87,7 +87,7 @@ public class MqttClusterBrokerCreator {
 	private RuleEngine ruleEngine;
 
 	// SPI 静态缓存，避免每次 build() 重复扫描 ServiceLoader
-	private static volatile List<SinkFactory> CACHED_SINK_FACTORIES;
+	private static volatile List<ActionFactory> CACHED_SINK_FACTORIES;
 	private static volatile List<RuleMatcherFactory> CACHED_MATCHER_FACTORIES;
 	private static volatile List<PayloadCodecFactory> CACHED_CODEC_FACTORIES;
 
@@ -97,7 +97,7 @@ public class MqttClusterBrokerCreator {
 	private static synchronized void loadRuleSpi(RuleManager rm) {
 		if (CACHED_SINK_FACTORIES == null) {
 			CACHED_SINK_FACTORIES = StreamSupport
-				.stream(ServiceLoader.load(SinkFactory.class).spliterator(), false)
+				.stream(ServiceLoader.load(ActionFactory.class).spliterator(), false)
 				.collect(Collectors.toList());
 		}
 		if (CACHED_MATCHER_FACTORIES == null) {
@@ -110,7 +110,7 @@ public class MqttClusterBrokerCreator {
 				.stream(ServiceLoader.load(PayloadCodecFactory.class).spliterator(), false)
 				.collect(Collectors.toList());
 		}
-		CACHED_SINK_FACTORIES.forEach(rm::registerSinkFactory);
+		CACHED_SINK_FACTORIES.forEach(rm::registerActionFactory);
 		CACHED_MATCHER_FACTORIES.forEach(rm::registerMatcherFactory);
 		CACHED_CODEC_FACTORIES.forEach(rm::registerCodecFactory);
 	}
@@ -126,9 +126,9 @@ public class MqttClusterBrokerCreator {
 		rm.setRuleStore(new InMemoryRuleStore());
 		loadRuleSpi(rm);
 		// 内置工厂兜底（即使没注册 SPI 也能跑）
-		rm.registerSinkFactory(new LogSinkFactory());
-		rm.registerSinkFactory(new MqttSinkFactory());
-		rm.registerSinkFactory(new HttpSinkFactory());
+		rm.registerActionFactory(new LogActionFactory());
+		rm.registerActionFactory(new MqttActionFactory());
+		rm.registerActionFactory(new HttpActionFactory());
 		rm.registerMatcherFactory(new TopicRuleMatcherFactory());
 		rm.registerCodecFactory(new RawPayloadCodecFactory());
 		rm.registerCodecFactory(new StringPayloadCodecFactory());
@@ -146,7 +146,7 @@ public class MqttClusterBrokerCreator {
 						((org.dromara.mica.mqtt.core.server.event.IMqttMessageListener) prevListener)
 							.onMessage(ctx, clientId, topic, qos, message);
 					} catch (Exception ignore) {
-						// 不影响其它 sink
+						// 不影响其它 action
 					}
 				});
 		}

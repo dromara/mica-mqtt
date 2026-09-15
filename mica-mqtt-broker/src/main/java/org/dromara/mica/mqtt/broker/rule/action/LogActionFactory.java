@@ -14,19 +14,16 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.rule.sink;
-
-import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.dromara.mica.mqtt.core.client.MqttClient;
+package org.dromara.mica.mqtt.broker.rule.action;
 
 /**
- * {@link MqttSink} 工厂。
+ * {@link LogAction} 工厂。
  *
  * @author L.cm
  */
-public class MqttSinkFactory implements SinkFactory {
+public class LogActionFactory implements ActionFactory {
 
-	public static final String TYPE = "mqtt";
+	public static final String TYPE = "log";
 
 	@Override
 	public String getType() {
@@ -34,20 +31,9 @@ public class MqttSinkFactory implements SinkFactory {
 	}
 
 	@Override
-	public Sink create(SinkRef ref) {
+	public Action create(ActionRef ref) {
 		String name = ref.getName();
-		MqttClient client = MqttSink.buildClient(ref);
-		String template = MqttSink.stringProp(ref, "topicTemplate");
-		MqttQoS qos = MqttQoS.QOS0;
-		String qosStr = MqttSink.stringProp(ref, "qos");
-		if (qosStr != null) {
-			try {
-				qos = MqttQoS.valueOf(MqttSink.intProp(ref, "qos", 0));
-			} catch (Exception ignore) {
-				// 默认 QOS0
-			}
-		}
-		boolean retain = MqttSink.booleanProp(ref, "retain", false);
-		return new MqttSink(name, client, template, qos, retain);
+		Object level = ref.getProps().get("level");
+		return new LogAction(name, level == null ? null : level.toString());
 	}
 }

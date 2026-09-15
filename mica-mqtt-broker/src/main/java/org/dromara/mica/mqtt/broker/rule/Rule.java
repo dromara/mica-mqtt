@@ -16,7 +16,7 @@
 
 package org.dromara.mica.mqtt.broker.rule;
 
-import org.dromara.mica.mqtt.broker.rule.sink.SinkRef;
+import org.dromara.mica.mqtt.broker.rule.action.ActionRef;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,7 +39,7 @@ public final class Rule {
 	private final boolean enabled;
 	private final String matcherType;
 	private final Map<String, String> matcherProps;
-	private final List<SinkRef> sinks;
+	private final List<ActionRef> actions;
 	private final boolean stopOnError;
 	private final Map<String, String> labels;
 
@@ -52,8 +52,8 @@ public final class Rule {
 		this.matcherProps = b.matcherProps == null
 			? Collections.emptyMap()
 			: Collections.unmodifiableMap(new LinkedHashMap<>(b.matcherProps));
-		List<SinkRef> sinkList = new ArrayList<>(b.sinks);
-		this.sinks = Collections.unmodifiableList(sinkList);
+		List<ActionRef> actionList = new ArrayList<>(b.actions);
+		this.actions = Collections.unmodifiableList(actionList);
 		this.stopOnError = b.stopOnError;
 		this.labels = b.labels == null
 			? Collections.emptyMap()
@@ -88,8 +88,8 @@ public final class Rule {
 		return matcherProps;
 	}
 
-	public List<SinkRef> getSinks() {
-		return sinks;
+	public List<ActionRef> getActions() {
+		return actions;
 	}
 
 	public boolean isStopOnError() {
@@ -124,7 +124,7 @@ public final class Rule {
 			", name='" + name + '\'' +
 			", topicFilter='" + topicFilter + '\'' +
 			", enabled=" + enabled +
-			", sinks=" + sinks.size() +
+			", actions=" + actions.size() +
 			'}';
 	}
 
@@ -138,7 +138,7 @@ public final class Rule {
 		private boolean enabled = true;
 		private String matcherType;
 		private Map<String, String> matcherProps;
-		private final List<SinkRef> sinks = new ArrayList<>();
+		private final List<ActionRef> actions = new ArrayList<>();
 		private boolean stopOnError;
 		private Map<String, String> labels;
 
@@ -172,15 +172,15 @@ public final class Rule {
 			return this;
 		}
 
-		public Builder addSink(SinkRef ref) {
-			this.sinks.add(ref);
+		public Builder addAction(ActionRef ref) {
+			this.actions.add(ref);
 			return this;
 		}
 
-		public Builder sinks(List<SinkRef> refs) {
-			this.sinks.clear();
+		public Builder actions(List<ActionRef> refs) {
+			this.actions.clear();
 			if (refs != null) {
-				this.sinks.addAll(refs);
+				this.actions.addAll(refs);
 			}
 			return this;
 		}

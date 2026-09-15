@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.rule.sink;
+package org.dromara.mica.mqtt.broker.rule.action;
 
 import org.dromara.mica.mqtt.broker.rule.Rule;
 import org.dromara.mica.mqtt.broker.rule.RuleContext;
@@ -29,26 +29,26 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * SinkRegistry 单测：工厂注册 + 缓存共享。
+ * ActionRegistry 单测：工厂注册 + 缓存共享。
  *
  * @author L.cm
  */
-class SinkRegistryTest {
+class ActionRegistryTest {
 
 	@Test
 	void materializeCachesByRef() {
-		SinkRegistry registry = new SinkRegistry();
+		ActionRegistry registry = new ActionRegistry();
 		AtomicInteger factoryCount = new AtomicInteger();
-		registry.registerFactory(new SinkFactory() {
+		registry.registerFactory(new ActionFactory() {
 			@Override
 			public String getType() {
 				return "fake";
 			}
 
 			@Override
-			public Sink create(SinkRef ref) {
+			public Action create(ActionRef ref) {
 				factoryCount.incrementAndGet();
-				return new Sink() {
+				return new Action() {
 					@Override
 					public String getName() {
 						return ref.getName();
@@ -60,25 +60,25 @@ class SinkRegistryTest {
 				};
 			}
 		});
-		SinkRef ref = SinkRef.of("fake", "f1");
-		Sink first = registry.materialize(ref);
-		Sink second = registry.materialize(ref);
+		ActionRef ref = ActionRef.of("fake", "f1");
+		Action first = registry.materialize(ref);
+		Action second = registry.materialize(ref);
 		assertSame(first, second);
 		assertEquals(1, factoryCount.get());
 	}
 
 	@Test
 	void differentRefsDifferentInstances() {
-		SinkRegistry registry = new SinkRegistry();
-		registry.registerFactory(new SinkFactory() {
+		ActionRegistry registry = new ActionRegistry();
+		registry.registerFactory(new ActionFactory() {
 			@Override
 			public String getType() {
 				return "fake";
 			}
 
 			@Override
-			public Sink create(SinkRef ref) {
-				return new Sink() {
+			public Action create(ActionRef ref) {
+				return new Action() {
 					@Override
 					public String getName() {
 						return ref.getName();
@@ -90,16 +90,16 @@ class SinkRegistryTest {
 				};
 			}
 		});
-		SinkRef r1 = SinkRef.builder("fake").prop("x", "1").build();
-		SinkRef r2 = SinkRef.builder("fake").prop("x", "2").build();
+		ActionRef r1 = ActionRef.builder("fake").prop("x", "1").build();
+		ActionRef r2 = ActionRef.builder("fake").prop("x", "2").build();
 		assertNotNull(registry.materialize(r1));
 		assertNotNull(registry.materialize(r2));
 	}
 
 	@Test
 	void missingTypeThrows() {
-		SinkRegistry registry = new SinkRegistry();
-		SinkRef ref = SinkRef.of("missing");
+		ActionRegistry registry = new ActionRegistry();
+		ActionRef ref = ActionRef.of("missing");
 		assertThrows(IllegalStateException.class, () -> registry.materialize(ref));
 	}
 

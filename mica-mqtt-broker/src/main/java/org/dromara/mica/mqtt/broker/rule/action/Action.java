@@ -14,26 +14,32 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.rule.sink;
+package org.dromara.mica.mqtt.broker.rule.action;
+
+import org.dromara.mica.mqtt.broker.rule.RuleContext;
 
 /**
- * {@link LogSink} 工厂。
+ * 真正干活的单元：转发 / 写库 / 调 HTTP 等。
+ * <p>
+ * 实现必须是无 rule 状态的（同一 ActionRef 共享同一 Action 实例）。
+ * </p>
  *
  * @author L.cm
  */
-public class LogSinkFactory implements SinkFactory {
+public interface Action {
 
-	public static final String TYPE = "log";
+	/**
+	 * 调试用，唯一实例名。
+	 *
+	 * @return action 实例名
+	 */
+	String getName();
 
-	@Override
-	public String getType() {
-		return TYPE;
-	}
-
-	@Override
-	public Sink create(SinkRef ref) {
-		String name = ref.getName();
-		Object level = ref.getProps().get("level");
-		return new LogSink(name, level == null ? null : level.toString());
-	}
+	/**
+	 * 处理一条规则上下文。
+	 *
+	 * @param ctx 规则执行上下文
+	 * @throws Exception 业务异常
+	 */
+	void send(RuleContext ctx) throws Exception;
 }

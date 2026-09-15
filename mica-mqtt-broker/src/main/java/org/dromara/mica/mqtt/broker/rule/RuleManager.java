@@ -21,8 +21,8 @@ import org.dromara.mica.mqtt.broker.rule.codec.PayloadCodecRegistry;
 import org.dromara.mica.mqtt.broker.rule.loader.RuleLoader;
 import org.dromara.mica.mqtt.broker.rule.matcher.MatcherRegistry;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcherFactory;
-import org.dromara.mica.mqtt.broker.rule.sink.SinkFactory;
-import org.dromara.mica.mqtt.broker.rule.sink.SinkRegistry;
+import org.dromara.mica.mqtt.broker.rule.action.ActionFactory;
+import org.dromara.mica.mqtt.broker.rule.action.ActionRegistry;
 import org.dromara.mica.mqtt.broker.rule.store.RuleEvent;
 import org.dromara.mica.mqtt.broker.rule.store.RuleStore;
 import org.slf4j.Logger;
@@ -42,7 +42,7 @@ public class RuleManager {
 
 	private static final Logger logger = LoggerFactory.getLogger(RuleManager.class);
 
-	private final SinkRegistry sinkRegistry = new SinkRegistry();
+	private final ActionRegistry actionRegistry = new ActionRegistry();
 	private final MatcherRegistry matcherRegistry = new MatcherRegistry();
 	private final PayloadCodecRegistry codecRegistry = new PayloadCodecRegistry();
 	private final List<RuleLoader> loaders = new CopyOnWriteArrayList<>();
@@ -51,12 +51,12 @@ public class RuleManager {
 	private volatile boolean started;
 
 	/**
-	 * 注册 sink 工厂。
+	 * 注册 action 工厂。
 	 *
 	 * @param factory 工厂
 	 */
-	public void registerSinkFactory(SinkFactory factory) {
-		sinkRegistry.registerFactory(factory);
+	public void registerActionFactory(ActionFactory factory) {
+		actionRegistry.registerFactory(factory);
 	}
 
 	/**
@@ -77,8 +77,8 @@ public class RuleManager {
 		codecRegistry.registerFactory(factory);
 	}
 
-	public SinkRegistry getSinkRegistry() {
-		return sinkRegistry;
+	public ActionRegistry getActionRegistry() {
+		return actionRegistry;
 	}
 
 	public MatcherRegistry getMatcherRegistry() {
@@ -252,7 +252,7 @@ public class RuleManager {
 		// 先摘除 listeners，避免 stop 过程中事件回调造成状态不一致
 		listeners.clear();
 		// 关闭各 registry 缓存的资源
-		sinkRegistry.clear();
+		actionRegistry.clear();
 		matcherRegistry.clear();
 		codecRegistry.clear();
 		// 清空加载器引用，便于 GC

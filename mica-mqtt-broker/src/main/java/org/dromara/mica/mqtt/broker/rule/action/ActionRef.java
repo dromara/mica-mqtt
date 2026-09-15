@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.rule.sink;
+package org.dromara.mica.mqtt.broker.rule.action;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -22,37 +22,37 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * 不可变的 sink 引用（type + name + props）。
+ * 不可变的 action 引用（type + name + props）。
  * <p>
  * 使用 {@link Builder} 链式构建，避免每次 {@code prop()} 调用都复制整个 props Map。
  * </p>
  *
  * @author L.cm
  */
-public final class SinkRef {
+public final class ActionRef {
 
 	private final String type;
 	private final String name;
 	private final Map<String, Object> props;
 
-	private SinkRef(String type, String name, Map<String, Object> props) {
+	private ActionRef(String type, String name, Map<String, Object> props) {
 		this.type = Objects.requireNonNull(type, "type is required");
 		this.name = (name == null || name.isEmpty()) ? type : name;
 		this.props = Collections.unmodifiableMap(new LinkedHashMap<>(props));
 	}
 
-	public static SinkRef of(String type) {
-		return new SinkRef(type, type, Collections.<String, Object>emptyMap());
+	public static ActionRef of(String type) {
+		return new ActionRef(type, type, Collections.<String, Object>emptyMap());
 	}
 
-	public static SinkRef of(String type, String name) {
-		return new SinkRef(type, name, Collections.<String, Object>emptyMap());
+	public static ActionRef of(String type, String name) {
+		return new ActionRef(type, name, Collections.<String, Object>emptyMap());
 	}
 
 	/**
 	 * 创建可变 builder，便于一次性追加多个 prop，避免链式 {@code prop()} 重复复制。
 	 *
-	 * @param type sink 类型
+	 * @param type action 类型
 	 * @return builder
 	 */
 	public static Builder builder(String type) {
@@ -85,10 +85,10 @@ public final class SinkRef {
 		if (this == o) {
 			return true;
 		}
-		if (!(o instanceof SinkRef)) {
+		if (!(o instanceof ActionRef)) {
 			return false;
 		}
-		SinkRef that = (SinkRef) o;
+		ActionRef that = (ActionRef) o;
 		return Objects.equals(type, that.type)
 			&& Objects.equals(name, that.name)
 			&& Objects.equals(props, that.props);
@@ -101,7 +101,7 @@ public final class SinkRef {
 
 	@Override
 	public String toString() {
-		return "SinkRef{" +
+		return "ActionRef{" +
 			"type='" + type + '\'' +
 			", name='" + name + '\'' +
 			", props=" + props.size() +
@@ -109,7 +109,7 @@ public final class SinkRef {
 	}
 
 	/**
-	 * SinkRef 可变构建器，一次性累积 props 后生成不可变 SinkRef。
+	 * ActionRef 可变构建器，一次性累积 props 后生成不可变 ActionRef。
 	 */
 	public static final class Builder {
 		private final String type;
@@ -145,8 +145,8 @@ public final class SinkRef {
 			return this;
 		}
 
-		public SinkRef build() {
-			return new SinkRef(type, name, props);
+		public ActionRef build() {
+			return new ActionRef(type, name, props);
 		}
 	}
 }

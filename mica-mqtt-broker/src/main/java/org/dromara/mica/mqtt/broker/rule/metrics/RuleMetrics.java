@@ -25,14 +25,14 @@ import java.util.Map;
  */
 public interface RuleMetrics {
 
-	void recordSuccess(String ruleId, String sinkName, long costMs);
+	void recordSuccess(String ruleId, String actionName, long costMs);
 
-	void recordFailure(String ruleId, String sinkName, long costMs);
+	void recordFailure(String ruleId, String actionName, long costMs);
 
 	/**
 	 * 快照，供 HTTP API / log 拉取。
 	 *
 	 * @return 指标快照
 	 */
-	Map<String, SinkStat> snapshot();
+	Map<String, ActionStat> snapshot();
 }

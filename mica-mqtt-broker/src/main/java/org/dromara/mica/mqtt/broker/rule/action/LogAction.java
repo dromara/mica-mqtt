@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.rule.sink;
+package org.dromara.mica.mqtt.broker.rule.action;
 
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.broker.rule.RuleContext;
@@ -24,18 +24,18 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 内置 LogSink：打印 clientId / topic / qos / payload 到 SLF4J。
+ * 内置 LogAction：打印 clientId / topic / qos / payload 到 SLF4J。
  *
  * @author L.cm
  */
-public class LogSink implements Sink {
+public class LogAction implements Action {
 
-	private static final Logger logger = LoggerFactory.getLogger(LogSink.class);
+	private static final Logger logger = LoggerFactory.getLogger(LogAction.class);
 
 	private final String name;
 	private final String level;
 
-	public LogSink(String name, String level) {
+	public LogAction(String name, String level) {
 		this.name = name == null || name.isEmpty() ? "log" : name;
 		this.level = level == null || level.isEmpty() ? "info" : level.toLowerCase();
 	}

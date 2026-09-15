@@ -17,7 +17,7 @@
 package org.dromara.mica.mqtt.broker.rule;
 
 /**
- * ChannelContext 的薄封装，避免用户 Sink 直接依赖 t-io。
+ * ChannelContext 的薄封装，避免用户 Action 直接依赖 t-io。
  *
  * @author L.cm
  */

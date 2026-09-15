@@ -1,3 +1,0 @@
-org.dromara.mica.mqtt.broker.rule.sink.LogSinkFactory
-org.dromara.mica.mqtt.broker.rule.sink.MqttSinkFactory
-org.dromara.mica.mqtt.broker.rule.sink.HttpSinkFactory

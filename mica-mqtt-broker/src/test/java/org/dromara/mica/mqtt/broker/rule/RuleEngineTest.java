@@ -17,10 +17,10 @@
 package org.dromara.mica.mqtt.broker.rule;
 
 import net.dreamlu.mica.net.core.ChannelContext;
-import org.dromara.mica.mqtt.broker.rule.sink.Sink;
-import org.dromara.mica.mqtt.broker.rule.sink.SinkFactory;
-import org.dromara.mica.mqtt.broker.rule.sink.SinkRef;
-import org.dromara.mica.mqtt.broker.rule.sink.SinkRegistry;
+import org.dromara.mica.mqtt.broker.rule.action.Action;
+import org.dromara.mica.mqtt.broker.rule.action.ActionFactory;
+import org.dromara.mica.mqtt.broker.rule.action.ActionRef;
+import org.dromara.mica.mqtt.broker.rule.action.ActionRegistry;
 import org.dromara.mica.mqtt.broker.rule.store.InMemoryRuleStore;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * RuleEngine 单测：sink 顺序执行 / 失败继续 / 运行时增删 / 缓存共享。
+ * RuleEngine 单测：action 顺序执行 / 失败继续 / 运行时增删 / 缓存共享。
  *
  * @author L.cm
  */
@@ -52,21 +52,21 @@ class RuleEngineTest {
 		return new MqttPublishMessage(header, vh, payload);
 	}
 
-	private static RuleManager newRuleManager(List<String> sinkEvents) {
+	private static RuleManager newRuleManager(List<String> actionEvents) {
 		RuleManager rm = new RuleManager();
 		rm.setRuleStore(new InMemoryRuleStore());
 		AtomicInteger counter = new AtomicInteger();
-		SinkFactory seq = new SinkFactory() {
+		ActionFactory seq = new ActionFactory() {
 			@Override
 			public String getType() {
 				return "seq";
 			}
 
 			@Override
-			public Sink create(SinkRef ref) {
+			public Action create(ActionRef ref) {
 				String name = ref.getName();
 				int seq = counter.incrementAndGet();
-				return new Sink() {
+				return new Action() {
 					@Override
 					public String getName() {
 						return name == null ? "seq-" + seq : name;
@@ -74,12 +74,12 @@ class RuleEngineTest {
 
 					@Override
 					public void send(RuleContext ctx) {
-						sinkEvents.add(getName() + ":" + new String(ctx.getPayload()));
+						actionEvents.add(getName() + ":" + new String(ctx.getPayload()));
 					}
 				};
 			}
 		};
-		SinkRegistry sr = rm.getSinkRegistry();
+		ActionRegistry sr = rm.getActionRegistry();
 		sr.registerFactory(seq);
 		return rm;
 	}
@@ -95,13 +95,13 @@ class RuleEngineTest {
 		rm.setRuleStore(new InMemoryRuleStore());
 		engine.start();
 
-		// 第一次添加：rule r1 含两个 sink
+		// 第一次添加：rule r1 含两个 action
 		Rule r1 = Rule.builder()
 			.id("r1")
 			.name("r1")
 			.topicFilter("sensor/+/temp")
-			.addSink(SinkRef.of("seq", "s1"))
-			.addSink(SinkRef.of("seq", "s2"))
+			.addAction(ActionRef.of("seq", "s1"))
+			.addAction(ActionRef.of("seq", "s2"))
 			.build();
 		rm.addRule(r1);
 		// 触发一次消息
@@ -121,7 +121,7 @@ class RuleEngineTest {
 		rm.addRule(Rule.builder()
 			.id("r1")
 			.topicFilter("sensor/+/temp")
-			.addSink(SinkRef.of("seq", "s3"))
+			.addAction(ActionRef.of("seq", "s3"))
 			.build());
 		invokeFunctionManager(fnMgr, "sensor/room1/temp", "y".getBytes(), false);
 		assertEquals(1, events.size());
@@ -137,16 +137,16 @@ class RuleEngineTest {
 		engine.attach();
 		engine.start();
 
-		// 两条规则共用相同的 SinkRef（type+name 一致）
+		// 两条规则共用相同的 ActionRef（type+name 一致）
 		rm.addRule(Rule.builder()
 			.id("a")
 			.topicFilter("a/#")
-			.addSink(SinkRef.of("seq", "shared"))
+			.addAction(ActionRef.of("seq", "shared"))
 			.build());
 		rm.addRule(Rule.builder()
 			.id("b")
 			.topicFilter("b/#")
-			.addSink(SinkRef.of("seq", "shared"))
+			.addAction(ActionRef.of("seq", "shared"))
 			.build());
 
 		invokeFunctionManager(fnMgr, "a/x", "1".getBytes(), false);
@@ -157,21 +157,21 @@ class RuleEngineTest {
 	}
 
 	@Test
-	void failedSinkDoesNotStopOthersByDefault() {
+	void failedActionDoesNotStopOthersByDefault() {
 		List<String> events = new ArrayList<>();
 		RuleManager rm = new RuleManager();
 		rm.setRuleStore(new InMemoryRuleStore());
 		AtomicInteger counter = new AtomicInteger();
-		SinkFactory seq = new SinkFactory() {
+		ActionFactory seq = new ActionFactory() {
 			@Override
 			public String getType() {
 				return "mix";
 			}
 
 			@Override
-			public Sink create(SinkRef ref) {
+			public Action create(ActionRef ref) {
 				int n = counter.incrementAndGet();
-				return new Sink() {
+				return new Action() {
 					@Override
 					public String getName() {
 						return "mix-" + n;
@@ -187,7 +187,7 @@ class RuleEngineTest {
 				};
 			}
 		};
-		rm.getSinkRegistry().registerFactory(seq);
+		rm.getActionRegistry().registerFactory(seq);
 		MqttFunctionManager fnMgr = new MqttFunctionManager();
 		RuleEngine engine = new RuleEngine(rm, fnMgr, null);
 		engine.attach();
@@ -197,8 +197,8 @@ class RuleEngineTest {
 			.id("r1")
 			.topicFilter("a/#")
 			.stopOnError(false)
-			.addSink(SinkRef.of("mix", "first"))
-			.addSink(SinkRef.of("mix", "second"))
+			.addAction(ActionRef.of("mix", "first"))
+			.addAction(ActionRef.of("mix", "second"))
 			.build());
 
 		invokeFunctionManager(fnMgr, "a/x", "".getBytes(), false);
@@ -212,16 +212,16 @@ class RuleEngineTest {
 		RuleManager rm = new RuleManager();
 		rm.setRuleStore(new InMemoryRuleStore());
 		AtomicInteger counter = new AtomicInteger();
-		SinkFactory seq = new SinkFactory() {
+		ActionFactory seq = new ActionFactory() {
 			@Override
 			public String getType() {
 				return "stop";
 			}
 
 			@Override
-			public Sink create(SinkRef ref) {
+			public Action create(ActionRef ref) {
 				int n = counter.incrementAndGet();
-				return new Sink() {
+				return new Action() {
 					@Override
 					public String getName() {
 						return "stop-" + n;
@@ -237,7 +237,7 @@ class RuleEngineTest {
 				};
 			}
 		};
-		rm.getSinkRegistry().registerFactory(seq);
+		rm.getActionRegistry().registerFactory(seq);
 		MqttFunctionManager fnMgr = new MqttFunctionManager();
 		RuleEngine engine = new RuleEngine(rm, fnMgr, null);
 		engine.attach();
@@ -247,12 +247,12 @@ class RuleEngineTest {
 			.id("r1")
 			.topicFilter("a/#")
 			.stopOnError(true)
-			.addSink(SinkRef.of("stop", "first"))
-			.addSink(SinkRef.of("stop", "second"))
+			.addAction(ActionRef.of("stop", "first"))
+			.addAction(ActionRef.of("stop", "second"))
 			.build());
 
 		invokeFunctionManager(fnMgr, "a/x", "".getBytes(), false);
-		assertTrue(events.isEmpty(), "stopOnError should stop subsequent sinks");
+		assertTrue(events.isEmpty(), "stopOnError should stop subsequent actions");
 	}
 
 	@Test
@@ -268,7 +268,7 @@ class RuleEngineTest {
 			.id("off")
 			.topicFilter("a/#")
 			.enabled(false)
-			.addSink(SinkRef.of("seq", "x"))
+			.addAction(ActionRef.of("seq", "x"))
 			.build());
 		invokeFunctionManager(fnMgr, "a/x", "1".getBytes(), false);
 		assertTrue(events.isEmpty());
@@ -286,7 +286,7 @@ class RuleEngineTest {
 		Rule r1 = Rule.builder()
 			.id("r1")
 			.topicFilter("a/#")
-			.addSink(SinkRef.of("seq", "s1"))
+			.addAction(ActionRef.of("seq", "s1"))
 			.build();
 		rm.addRule(r1);
 		invokeFunctionManager(fnMgr, "a/x", "1".getBytes(), false);
@@ -311,25 +311,25 @@ class RuleEngineTest {
 			try {
 				fn.onMessage(ctx, "client1", topic, MqttQoS.QOS0, msg);
 			} catch (Throwable ignore) {
-				// 失败 sink 内部已 log
+				// 失败 action 内部已 log
 			}
 		}
 	}
 
 	@Test
-	void sinkRegistryCacheReturnsSameInstance() {
-		SinkRegistry sr = new SinkRegistry();
+	void actionRegistryCacheReturnsSameInstance() {
+		ActionRegistry sr = new ActionRegistry();
 		AtomicInteger created = new AtomicInteger();
-		sr.registerFactory(new SinkFactory() {
+		sr.registerFactory(new ActionFactory() {
 			@Override
 			public String getType() {
 				return "x";
 			}
 
 			@Override
-			public Sink create(SinkRef ref) {
+			public Action create(ActionRef ref) {
 				created.incrementAndGet();
-				return new Sink() {
+				return new Action() {
 					@Override
 					public String getName() {
 						return ref.getName();
@@ -341,9 +341,9 @@ class RuleEngineTest {
 				};
 			}
 		});
-		SinkRef ref = SinkRef.of("x", "n");
-		Sink a = sr.materialize(ref);
-		Sink b = sr.materialize(ref);
+		ActionRef ref = ActionRef.of("x", "n");
+		Action a = sr.materialize(ref);
+		Action b = sr.materialize(ref);
 		assertSame(a, b);
 		assertEquals(1, created.get());
 	}
