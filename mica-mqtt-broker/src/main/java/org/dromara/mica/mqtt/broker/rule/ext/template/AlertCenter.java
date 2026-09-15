@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -117,9 +118,9 @@ public class AlertCenter {
 		}
 	}
 
-	public java.util.List<AlertEvent> snapshot() {
+	public List<AlertEvent> snapshot() {
 		synchronized (ring) {
-			return new java.util.ArrayList<>(ring);
+			return new ArrayList<>(ring);
 		}
 	}
 

@@ -32,7 +32,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author L.cm
  */
 public class MqttAction implements Action, AutoCloseable {
-
 	private static final Logger logger = LoggerFactory.getLogger(MqttAction.class);
 
 	private final String name;
@@ -100,13 +99,12 @@ public class MqttAction implements Action, AutoCloseable {
 	 * 用于 {@link MqttActionFactory} 物化客户端连接。
 	 */
 	public static MqttClient buildClient(ActionRef ref) {
-		String host = stringProp(ref, "host");
-		Integer port = intProp(ref, "port", 1883);
-		String clientId = stringProp(ref, "clientId");
-		String username = stringProp(ref, "username");
-		String password = stringProp(ref, "password");
-		Boolean ssl = booleanProp(ref, "ssl", false);
-
+		String host = ref.getString("host");
+		int port = ref.getInt("port", 1883);
+		String clientId = ref.getString("clientId");
+		String username = ref.getString("username");
+		String password = ref.getString("password");
+		boolean ssl = ref.getBoolean("ssl", false);
 		MqttClientCreator creator = MqttClient.create()
 			.ip(host)
 			.port(port)
@@ -114,37 +112,9 @@ public class MqttAction implements Action, AutoCloseable {
 			.username(username)
 			.password(password)
 			.reconnect(true);
-		if (Boolean.TRUE.equals(ssl)) {
+		if (ssl) {
 			creator.useSsl();
 		}
-		return creator.connect();
-	}
-
-	static String stringProp(ActionRef ref, String key) {
-		Object v = ref.getProps().get(key);
-		return v == null ? null : v.toString();
-	}
-
-	static Integer intProp(ActionRef ref, String key, int def) {
-		Object v = ref.getProps().get(key);
-		if (v == null) {
-			return def;
-		}
-		try {
-			return Integer.parseInt(v.toString());
-		} catch (NumberFormatException nfe) {
-			return def;
-		}
-	}
-
-	static Boolean booleanProp(ActionRef ref, String key, boolean def) {
-		Object v = ref.getProps().get(key);
-		if (v == null) {
-			return def;
-		}
-		if (v instanceof Boolean) {
-			return (Boolean) v;
-		}
-		return Boolean.parseBoolean(v.toString());
+		return creator.connectSync();
 	}
 }

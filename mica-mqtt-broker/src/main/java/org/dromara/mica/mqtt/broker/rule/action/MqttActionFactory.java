@@ -37,17 +37,9 @@ public class MqttActionFactory implements ActionFactory {
 	public Action create(ActionRef ref) {
 		String name = ref.getName();
 		MqttClient client = MqttAction.buildClient(ref);
-		String template = MqttAction.stringProp(ref, "topicTemplate");
-		MqttQoS qos = MqttQoS.QOS0;
-		String qosStr = MqttAction.stringProp(ref, "qos");
-		if (qosStr != null) {
-			try {
-				qos = MqttQoS.valueOf(MqttAction.intProp(ref, "qos", 0));
-			} catch (Exception ignore) {
-				// 默认 QOS0
-			}
-		}
-		boolean retain = MqttAction.booleanProp(ref, "retain", false);
+		String template = ref.getString("topicTemplate");
+		MqttQoS qos = MqttQoS.valueOf(ref.getInt("qos", 0));
+		boolean retain = ref.getBoolean("retain", false);
 		return new MqttAction(name, client, template, qos, retain);
 	}
 }

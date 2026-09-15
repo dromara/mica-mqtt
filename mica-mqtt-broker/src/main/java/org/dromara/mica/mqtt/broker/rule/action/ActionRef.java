@@ -80,6 +80,136 @@ public final class ActionRef {
 		return props;
 	}
 
+	/**
+	 * 获取字符串属性，缺失返回 {@code null}。
+	 *
+	 * @param key 属性名
+	 * @return 字符串值
+	 */
+	public String getString(String key) {
+		Object v = props.get(key);
+		return v == null ? null : v.toString();
+	}
+
+	/**
+	 * 获取字符串属性，缺失或为 {@code null} 返回默认值。
+	 *
+	 * @param key 属性名
+	 * @param def 默认值
+	 * @return 字符串值
+	 */
+	public String getString(String key, String def) {
+		Object v = props.get(key);
+		return v == null ? def : v.toString();
+	}
+
+	/**
+	 * 获取 int 属性，缺失返回 {@code null}，无法解析抛 {@link NumberFormatException}。
+	 *
+	 * @param key 属性名
+	 * @return 整数值
+	 */
+	public Integer getInt(String key) {
+		Object v = props.get(key);
+		if (v == null) {
+			return null;
+		}
+		if (v instanceof Number) {
+			return ((Number) v).intValue();
+		}
+		return Integer.parseInt(v.toString());
+	}
+
+	/**
+	 * 获取 int 属性，缺失或无法解析时返回默认值。
+	 *
+	 * @param key 属性名
+	 * @param def 默认值
+	 * @return 整数值
+	 */
+	public int getInt(String key, int def) {
+		Object v = props.get(key);
+		if (v == null) {
+			return def;
+		}
+		try {
+			return Integer.parseInt(v.toString());
+		} catch (NumberFormatException nfe) {
+			return def;
+		}
+	}
+
+	/**
+	 * 获取 long 属性，缺失返回 {@code null}，无法解析抛 {@link NumberFormatException}。
+	 *
+	 * @param key 属性名
+	 * @return 长整数值
+	 */
+	public Long getLong(String key) {
+		Object v = props.get(key);
+		if (v == null) {
+			return null;
+		}
+		if (v instanceof Number) {
+			return ((Number) v).longValue();
+		}
+		return Long.parseLong(v.toString());
+	}
+
+	/**
+	 * 获取 long 属性，缺失或无法解析时返回默认值。
+	 *
+	 * @param key 属性名
+	 * @param def 默认值
+	 * @return 长整数值
+	 */
+	public long getLong(String key, long def) {
+		Object v = props.get(key);
+		if (v == null) {
+			return def;
+		}
+		try {
+			return Long.parseLong(v.toString());
+		} catch (NumberFormatException nfe) {
+			return def;
+		}
+	}
+
+	/**
+	 * 获取 boolean 属性，缺失返回 {@code null}，无法解析抛 {@link IllegalArgumentException}。
+	 *
+	 * @param key 属性名
+	 * @return 布尔值
+	 */
+	public Boolean getBoolean(String key) {
+		Object v = props.get(key);
+		if (v == null) {
+			return null;
+		}
+		if (v instanceof Boolean) {
+			return (Boolean) v;
+		}
+		return Boolean.parseBoolean(v.toString());
+	}
+
+	/**
+	 * 获取 boolean 属性，缺失返回默认值。
+	 *
+	 * @param key 属性名
+	 * @param def 默认值
+	 * @return 布尔值
+	 */
+	public boolean getBoolean(String key, boolean def) {
+		Object v = props.get(key);
+		if (v == null) {
+			return def;
+		}
+		if (v instanceof Boolean) {
+			return (Boolean) v;
+		}
+		return Boolean.parseBoolean(v.toString());
+	}
+
 	@Override
 	public boolean equals(Object o) {
 		if (this == o) {

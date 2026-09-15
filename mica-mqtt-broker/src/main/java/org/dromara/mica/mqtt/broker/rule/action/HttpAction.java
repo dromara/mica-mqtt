@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Iterator;
 import java.util.Map;
 
 /**
@@ -83,9 +82,7 @@ public class HttpAction implements Action {
 			}
 			// 透传 mqtt5 user property
 			if (ctx.getHeaders() != null) {
-				Iterator<Map.Entry<String, String>> it = ctx.getHeaders().entrySet().iterator();
-				while (it.hasNext()) {
-					Map.Entry<String, String> e = it.next();
+				for (Map.Entry<String, String> e : ctx.getHeaders().entrySet()) {
 					if (StrUtil.startWith(e.getKey(), "X-Mqtt-")) {
 						conn.setRequestProperty(e.getKey(),
 							e.getValue() == null ? "" : e.getValue());

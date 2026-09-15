@@ -22,7 +22,6 @@ import org.dromara.mica.mqtt.broker.rule.action.Action;
 import org.dromara.mica.mqtt.broker.rule.action.ActionFactory;
 import org.dromara.mica.mqtt.broker.rule.action.ActionRef;
 
-import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -75,7 +74,7 @@ public class StoreTemplateAction implements Action {
 		if (fn != null) {
 			return;
 		}
-		String type = ActionRefs.getString(ref, "storage", "memory");
+		String type = ref.getString("storage", "memory");
 		fn = STORAGE_REGISTRY.get(type);
 		if (fn == null) {
 			fn = FALLBACK.get();
@@ -83,7 +82,7 @@ public class StoreTemplateAction implements Action {
 		if (fn == null) {
 			throw new IllegalStateException("No store registered for type: " + type);
 		}
-		String filterExpr = ActionRefs.getString(ref, "filter");
+		String filterExpr = ref.getString("filter");
 		if (filterExpr != null && !filterExpr.isEmpty()) {
 			filter = new AviatorExprMatcher(filterExpr);
 		}
@@ -116,8 +115,7 @@ public class StoreTemplateAction implements Action {
 		@Override
 		public void put(ActionRef ref, RuleContext ctx) {
 			String key = ref.getName();
-			Integer maxRowsArg = ActionRefs.getInt(ref, "maxRows");
-			int maxRows = maxRowsArg == null ? 10_000 : maxRowsArg;
+			int maxRows = ref.getInt("maxRows", 10_000);
 			Deque<Record> deque = data.computeIfAbsent(key, k -> new ConcurrentLinkedDeque<>());
 			synchronized (deque) {
 				deque.addLast(new Record(System.currentTimeMillis(), ctx.getClientId(),

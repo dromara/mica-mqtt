@@ -28,6 +28,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * alert 模板：触发告警事件。
@@ -63,15 +65,15 @@ public class AlertTemplateAction implements Action {
 		if (center == null) {
 			throw new IllegalStateException("AlertCenter not configured");
 		}
-		String severity = ActionRefs.getString(ref, "severity", "warning");
+		String severity = ref.getString("severity", "warning");
 		String title = interpolate(
 			TemplateRenderer.render(
-				ActionRefs.getString(ref, "title", ctx.getRule().getName()), ctx), ctx);
+				ref.getString("title", ctx.getRule().getName()), ctx), ctx);
 		String message = interpolate(
 			TemplateRenderer.render(
-				ActionRefs.getString(ref, "message", ""), ctx), ctx);
+				ref.getString("message", ""), ctx), ctx);
 		List<String> tags = parseTags(ctx);
-		String dedupeKey = TemplateRenderer.render(ActionRefs.getString(ref, "dedupeKey", ""), ctx);
+		String dedupeKey = TemplateRenderer.render(ref.getString("dedupeKey", ""), ctx);
 		Map<String, Object> extra = parseExtra(ctx);
 		AlertEvent event = new AlertEvent(System.currentTimeMillis(), severity, title, message,
 			tags, dedupeKey, extra);
@@ -82,11 +84,11 @@ public class AlertTemplateAction implements Action {
 	 * 把 {@code ${expr}} 替换为 Aviator 求值结果；普通字面量保持原样。
 	 */
 	private static String interpolate(String template, RuleContext ctx) {
-		if (template == null || template.indexOf("${") < 0) {
+		if (template == null || !template.contains("${")) {
 			return template == null ? "" : template;
 		}
-		java.util.regex.Matcher matcher = java.util.regex.Pattern
-			.compile("\\$\\{([^}]+)\\}").matcher(template);
+		Matcher matcher = Pattern
+			.compile("\\$\\{([^}]+)}").matcher(template);
 		StringBuffer sb = new StringBuffer();
 		while (matcher.find()) {
 			String expr = matcher.group(1);

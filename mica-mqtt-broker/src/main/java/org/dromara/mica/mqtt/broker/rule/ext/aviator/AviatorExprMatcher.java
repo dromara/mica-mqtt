@@ -39,6 +39,7 @@ public class AviatorExprMatcher {
 	private static final AviatorEvaluatorInstance EVAL = AviatorEvaluator.newInstance();
 
 	static {
+		EVAL.enableSandboxMode();
 		try {
 			EVAL.getClass().getMethod("enableSandbox").invoke(EVAL);
 		} catch (Exception ignored) {
@@ -85,7 +86,7 @@ public class AviatorExprMatcher {
 		if (result instanceof Boolean) {
 			return (Boolean) result;
 		}
-		return Boolean.TRUE.equals(result);
+		return false;
 	}
 
 	private static List<String> splitTopic(String topic) {

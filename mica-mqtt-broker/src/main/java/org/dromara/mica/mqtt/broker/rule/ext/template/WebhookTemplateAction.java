@@ -35,6 +35,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * webhook 模板：HTTP 推送 + Aviator 字符串模板插值 + 重试。
@@ -58,22 +60,20 @@ public class WebhookTemplateAction implements Action {
 
 	@Override
 	public void send(RuleContext ctx) throws Exception {
-		String url = ActionRefs.getString(ref, "url");
+		String url = ref.getString("url");
 		if (url == null) {
 			throw new IllegalArgumentException("webhook template requires 'url' prop");
 		}
-		String method = ActionRefs.getString(ref, "method", "POST").toUpperCase();
-		String contentType = ActionRefs.getString(ref, "contentType", "application/json");
-		Integer tmo = ActionRefs.getInt(ref, "timeoutMs");
-		int timeoutMs = tmo == null ? 3000 : tmo;
-		Integer retryArg = ActionRefs.getInt(ref, "retry");
-		int retry = retryArg == null ? 0 : retryArg;
+		String method = ref.getString("method", "POST").toUpperCase();
+		String contentType = ref.getString("contentType", "application/json");
+		int timeoutMs = ref.getInt("timeoutMs", 3000);
+		int retry = ref.getInt("retry", 0);
 		Object hdrObj = ref.getProps().get("headers");
 		@SuppressWarnings("unchecked")
 		Map<String, String> headers = hdrObj instanceof Map
 			? (Map<String, String>) hdrObj
 			: java.util.Collections.emptyMap();
-		String template = ActionRefs.getString(ref, "template");
+		String template = ref.getString("template");
 		String body;
 		if (template != null) {
 			body = interpolate(template, ctx);
@@ -97,8 +97,8 @@ public class WebhookTemplateAction implements Action {
 
 	private String interpolate(String template, RuleContext ctx) {
 		// 简单占位符 ${expr} -> aviator 求值
-		java.util.regex.Matcher matcher = java.util.regex.Pattern
-			.compile("\\$\\{([^}]+)\\}").matcher(template);
+		Matcher matcher = Pattern
+			.compile("\\$\\{([^}]+)}").matcher(template);
 		StringBuffer sb = new StringBuffer();
 		while (matcher.find()) {
 			String expr = matcher.group(1);

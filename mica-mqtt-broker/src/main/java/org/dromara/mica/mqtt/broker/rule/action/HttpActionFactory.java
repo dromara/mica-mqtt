@@ -36,13 +36,13 @@ public class HttpActionFactory implements ActionFactory {
 	@Override
 	public Action create(ActionRef ref) {
 		String name = ref.getName();
-		String url = MqttAction.stringProp(ref, "url");
+		String url = ref.getString("url");
 		if (url == null || url.isEmpty()) {
 			throw new IllegalArgumentException("HttpAction requires 'url' prop");
 		}
-		String method = MqttAction.stringProp(ref, "method");
-		String contentType = MqttAction.stringProp(ref, "contentType");
-		int timeoutMs = MqttAction.intProp(ref, "timeoutMs", 3000);
+		String method = ref.getString("method");
+		String contentType = ref.getString("contentType");
+		int timeoutMs = ref.getInt("timeoutMs", 3000);
 
 		Map<String, String> headers = null;
 		Object h = ref.getProps().get("headers");

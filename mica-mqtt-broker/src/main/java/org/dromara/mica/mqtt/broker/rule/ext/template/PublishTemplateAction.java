@@ -69,15 +69,15 @@ public class PublishTemplateAction implements Action {
 		if (fn == null) {
 			throw new IllegalStateException("publish template requires PublishTemplateAction.setPublisher(...) before use");
 		}
-		String topicTemplate = ActionRefs.getString(ref, "topic");
+		String topicTemplate = ref.getString("topic");
 		if (topicTemplate == null) {
 			throw new IllegalArgumentException("publish template requires 'topic' prop");
 		}
-		Integer qosArg = ActionRefs.getInt(ref, "qos");
+		Integer qosArg = ref.getInt("qos");
 		int qos = qosArg == null
 			? (ctx.getQos() == null ? 0 : ctx.getQos().value())
 			: qosArg;
-		boolean retain = Boolean.TRUE.equals(ActionRefs.getBoolean(ref, "retain"));
+		boolean retain = Boolean.TRUE.equals(ref.getBoolean("retain"));
 		String target = TemplateRenderer.render(topicTemplate, ctx);
 		fn.publish(target, ctx.getPayload(), qos, retain);
 	}
