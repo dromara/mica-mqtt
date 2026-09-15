@@ -56,6 +56,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -74,6 +75,21 @@ import java.util.concurrent.atomic.AtomicLong;
 public class MqttClusterManager {
 	private static final Logger logger = LoggerFactory.getLogger(MqttClusterManager.class);
 
+	/**
+	 * Max attempts for delivering a state sync response while the peer's reverse
+	 * channel is still re-establishing (mica-net reconnects on a 1s timer).
+	 */
+	private static final int STATE_SYNC_MAX_SEND_ATTEMPTS = 10;
+	/**
+	 * Delay between state sync response delivery attempts.
+	 */
+	private static final long STATE_SYNC_RETRY_DELAY_MS = 500L;
+	/**
+	 * Grace period after startup during which the directed state pull is
+	 * skipped: the startup broadcast already covers the normal join case.
+	 */
+	private static final long STATE_SYNC_PULL_GRACE_MS = 10_000L;
+
 	private ClusterApi cluster;
 	private MqttServer mqttServer;
 	private final MqttClusterConfig config;
@@ -86,6 +102,8 @@ public class MqttClusterManager {
 	private final Map<String, TakeoverGrant> takeoverGrants = new ConcurrentHashMap<>();
 	private final Map<String, PendingRetainQuery> pendingRetainQueries = new ConcurrentHashMap<>();
 	private final AtomicLong retainQuerySequence = new AtomicLong();
+	private final AtomicInteger stateSyncResponses = new AtomicInteger();
+	private volatile long clusterStartedAtMillis;
 	private final RetainShardRouter retainShardRouter = new RetainShardRouter();
 	private final Set<String> knownRemoteNodes = ConcurrentHashMap.newKeySet();
 	private final Map<String, Long> lastNodeSeen = new ConcurrentHashMap<>();
@@ -196,6 +214,7 @@ public class MqttClusterManager {
 
 		cluster = new ClusterImpl(clusterConfig);
 		cluster.start();
+		clusterStartedAtMillis = System.currentTimeMillis();
 		BidirectionalClusterClientHandler.install(cluster, this::handleClusterMessage);
 		long monitorInterval = Math.max(1_000L, config.getHeartbeatInterval());
 		pollClusterMembership();
@@ -300,6 +319,7 @@ public class MqttClusterManager {
 			case STATE_SYNC_RESPONSE: {
 				StateSyncResponseMessage ssm = (StateSyncResponseMessage) clusterMsg;
 				sessionManager.syncFullState(ssm.getClientNodeMap(), ssm.getSubscriptionMap());
+				stateSyncResponses.incrementAndGet();
 				logger.info("State sync completed, received {} client mappings", ssm.getClientNodeMap());
 				break;
 			}
@@ -500,12 +520,45 @@ public class MqttClusterManager {
 				return;
 			}
 			Node node = new Node(parts[0], Integer.parseInt(parts[1]));
-			cluster.send(node, data);
-			logger.info("Sent state sync response to node: {}", requestNodeId);
-			rebalanceRetain(requestNodeId, null);
+			sendStateSyncResponse(node, data, requestNodeId, 0);
 		} catch (Exception e) {
 			logger.error("Failed to send state sync response to: {}", requestNodeId, e);
 		}
+	}
+
+	/**
+	 * Delivers a state sync response to the requesting node, retrying while the
+	 * reverse channel is still being re-established.
+	 * <p>
+	 * A restarted seed node broadcasts its state sync request right after its own
+	 * outbound channels come up, which is typically before the peers have
+	 * reconnected back to it (mica-net reconnects on a ~1s timer).  Without the
+	 * retry below the response is silently dropped ({@code ClusterImpl.send}
+	 * returns {@code false} when no channel is registered) and the restarted node
+	 * never learns any remote subscription route, permanently black-holing every
+	 * message published on it.
+	 * </p>
+	 *
+	 * @param node         the requesting node
+	 * @param data         the serialized state sync response
+	 * @param requestNodeId the requesting node id, for logging
+	 * @param attempt      zero-based attempt index
+	 */
+	private void sendStateSyncResponse(Node node, ClusterDataMessage data, String requestNodeId, int attempt) {
+		if (cluster.send(node, data)) {
+			logger.info("Sent state sync response to node: {} (attempt {})", requestNodeId, attempt + 1);
+			rebalanceRetain(requestNodeId, null);
+			return;
+		}
+		if (attempt >= STATE_SYNC_MAX_SEND_ATTEMPTS - 1) {
+			logger.warn("Cluster channel never became available for state sync response to node: {}", requestNodeId);
+			return;
+		}
+		logger.warn("Cluster channel not ready for state sync response to node: {} (attempt {}), retrying in {} ms",
+			requestNodeId, attempt + 1, STATE_SYNC_RETRY_DELAY_MS);
+		membershipMonitorExecutor.schedule(
+			() -> sendStateSyncResponse(node, data, requestNodeId, attempt + 1),
+			STATE_SYNC_RETRY_DELAY_MS, TimeUnit.MILLISECONDS);
 	}
 
 	public boolean sendToNode(String nodeId, ClusterMessage clusterMsg) {
@@ -629,9 +682,41 @@ public class MqttClusterManager {
 		}
 		lastNodeSeen.put(nodeId, System.currentTimeMillis());
 		if (knownRemoteNodes.add(nodeId)) {
+			pullStateFromNewNode(nodeId);
 			rebalanceRetain(nodeId, null);
 			logger.info("[Cluster] Detected joined node: {}", nodeId);
 		}
+	}
+
+	/**
+	 * Asks a newly discovered peer for a directed full-state sync.
+	 * <p>
+	 * The startup broadcast only reaches nodes this node already has channels
+	 * to, and its responses can be lost while reverse channels are still
+	 * re-establishing (e.g. after this node restarted).  Pulling directly from
+	 * each newly seen peer repairs the routing state; with V1 full replication
+	 * any single response carries the whole cluster state.
+	 * </p>
+	 * <p>
+	 * Only pulls while no state sync response has been received yet and the
+	 * startup broadcast grace period has elapsed, so a healthy node does not
+	 * re-sync on every new joiner.
+	 * </p>
+	 */
+	private void pullStateFromNewNode(String nodeId) {
+		if (cluster == null || stateSyncResponses.get() > 0) {
+			return;
+		}
+		long startedAt = clusterStartedAtMillis;
+		if (startedAt > 0L && System.currentTimeMillis() - startedAt < STATE_SYNC_PULL_GRACE_MS) {
+			return;
+		}
+		if (sendToNode(nodeId, new StateSyncRequestMessage())) {
+			return;
+		}
+		// Roll back so the next successful probe re-triggers the pull once a
+		// channel to this node becomes available.
+		knownRemoteNodes.remove(nodeId);
 	}
 
 	private void handleNodeDeparture(String nodeId) {
@@ -797,6 +882,8 @@ public class MqttClusterManager {
 		knownRemoteNodes.clear();
 		lastNodeSeen.clear();
 		pendingRetainQueries.clear();
+		stateSyncResponses.set(0);
+		clusterStartedAtMillis = 0L;
 		if (cluster != null) {
 			NodeLeaveMessage leaveMsg = new NodeLeaveMessage();
 			broadcast(leaveMsg);
