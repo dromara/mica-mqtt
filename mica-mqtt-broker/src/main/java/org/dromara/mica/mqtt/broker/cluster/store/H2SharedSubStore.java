@@ -26,14 +26,18 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * H2 MVStore-backed implementation of {@link SharedSubStore}.
  * <p>
  * Persists each {@link SharedSubStore.SharedSubGroup} under key
- * {@code "shared_sub:<groupName>\u001F<topicFilter>"} in a dedicated {@link org.h2.mvstore.MVMap} inside the
- * shared {@link H2MvStoreImpl} engine.
+ * {@code "shared_sub:<groupName>\u001F<topicFilter>"} in the engine's default map, i.e. the same
+ * namespace used for session records; the {@code "shared_sub:"} key prefix keeps the two
+ * disjoint. ({@link H2InflightStore} instead opens a dedicated map — not a required pattern
+ * here, but worth knowing when reasoning about scans.)
  * </p>
  * <h2>Value format</h2>
  * <pre>
@@ -57,15 +61,10 @@ import java.util.List;
 public class H2SharedSubStore implements SharedSubStore {
 	private static final Logger logger = LoggerFactory.getLogger(H2SharedSubStore.class);
 
-	static final String MAP_NAME = "mica_mqtt_shared_sub";
 	private static final String KEY_PREFIX = "shared_sub:";
 	private static final char KEY_SEPARATOR = '\u001F';
 
 	private final LocalKvStore store;
-
-	public H2SharedSubStore(H2MvStoreImpl engine) {
-		this((LocalKvStore) engine);
-	}
 
 	public H2SharedSubStore(LocalKvStore store) {
 		this.store = store;
@@ -80,7 +79,7 @@ public class H2SharedSubStore implements SharedSubStore {
 		byte[] legacyValue = store.get(legacyKey);
 		if (legacyValue != null) {
 			SharedSubGroup legacy = deserialize(group.getGroupName(), legacyValue);
-			if (legacy != null && java.util.Objects.equals(group.getTopicFilter(), legacy.getTopicFilter())) {
+			if (legacy != null && Objects.equals(group.getTopicFilter(), legacy.getTopicFilter())) {
 				store.delete(legacyKey);
 			}
 		}
@@ -114,7 +113,7 @@ public class H2SharedSubStore implements SharedSubStore {
 		byte[] legacyValue = store.get(legacyKey);
 		if (legacyValue != null) {
 			SharedSubGroup legacy = deserialize(groupName, legacyValue);
-			if (legacy != null && java.util.Objects.equals(topicFilter, legacy.getTopicFilter())) {
+			if (legacy != null && Objects.equals(topicFilter, legacy.getTopicFilter())) {
 				store.delete(legacyKey);
 			}
 		}
@@ -155,7 +154,7 @@ public class H2SharedSubStore implements SharedSubStore {
 			return null;
 		}
 		SharedSubGroup legacy = deserialize(groupName, legacyValue);
-		return legacy != null && java.util.Objects.equals(topicFilter, legacy.getTopicFilter()) ? legacy : null;
+		return legacy != null && Objects.equals(topicFilter, legacy.getTopicFilter()) ? legacy : null;
 	}
 
 	@Override
@@ -186,7 +185,7 @@ public class H2SharedSubStore implements SharedSubStore {
 		try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			 DataOutputStream dos = new DataOutputStream(baos)) {
 			writeNullableString(dos, group.getTopicFilter());
-			List<String> members = group.getMembers() == null ? java.util.Collections.emptyList() : group.getMembers();
+			List<String> members = group.getMembers() == null ? Collections.emptyList() : group.getMembers();
 			dos.writeInt(members.size());
 			for (String m : members) {
 				writeNullableString(dos, m);

@@ -47,28 +47,27 @@ public class LogAction implements Action {
 
 	@Override
 	public void send(RuleContext ctx) {
-		String payload = previewPayload(ctx);
-		String format = "rule {} clientId={} topic={} qos={} retain={} payload={}";
+		logAt(level, "rule {} clientId={} topic={} qos={} retain={} payload={}",
+			ctx.getRule().getId(), ctx.getClientId(), ctx.getTopic(),
+			ctx.getQos(), ctx.isRetain() ? 1 : 0, previewPayload(ctx));
+	}
+
+	/**
+	 * 按 level 单次输出，避免同一份参数在 4 个分支里重复一遍。
+	 */
+	private static void logAt(String level, String format, Object... args) {
 		switch (level) {
 			case "debug":
-				logger.debug(format, ctx.getRule().getId(),
-					ctx.getClientId(), ctx.getTopic(),
-					ctx.getQos(), ctx.isRetain() ? 1 : 0, payload);
+				logger.debug(format, args);
 				break;
 			case "warn":
-				logger.warn(format, ctx.getRule().getId(),
-					ctx.getClientId(), ctx.getTopic(),
-					ctx.getQos(), ctx.isRetain() ? 1 : 0, payload);
+				logger.warn(format, args);
 				break;
 			case "error":
-				logger.error(format, ctx.getRule().getId(),
-					ctx.getClientId(), ctx.getTopic(),
-					ctx.getQos(), ctx.isRetain() ? 1 : 0, payload);
+				logger.error(format, args);
 				break;
 			default:
-				logger.info(format, ctx.getRule().getId(),
-					ctx.getClientId(), ctx.getTopic(),
-					ctx.getQos(), ctx.isRetain() ? 1 : 0, payload);
+				logger.info(format, args);
 				break;
 		}
 	}

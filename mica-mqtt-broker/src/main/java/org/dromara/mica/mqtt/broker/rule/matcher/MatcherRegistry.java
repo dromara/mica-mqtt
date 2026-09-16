@@ -16,6 +16,10 @@
 
 package org.dromara.mica.mqtt.broker.rule.matcher;
 
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,16 +32,31 @@ import java.util.concurrent.ConcurrentMap;
  */
 public class MatcherRegistry {
 
+	private static final Logger logger = LoggerFactory.getLogger(MatcherRegistry.class);
+
 	private final ConcurrentMap<String, RuleMatcherFactory> factories = new ConcurrentHashMap<>();
 	private final ConcurrentMap<String, RuleMatcher> cache = new ConcurrentHashMap<>();
 
 	/**
 	 * 注册工厂。
+	 * <p>
+	 * 与 {@code ActionRegistry#registerFactory} 保持一致：type 为空时告警忽略，
+	 * 重复注册时保留先注册的实现并告警（{@link ConcurrentHashMap} 不接受 null key，
+	 * 早期实现会在这里抛 NPE）。
+	 * </p>
 	 *
 	 * @param factory 工厂
 	 */
 	public void registerFactory(RuleMatcherFactory factory) {
-		factories.putIfAbsent(factory.getType(), factory);
+		String type = factory.getType();
+		if (StrUtil.isBlank(type)) {
+			logger.warn("RuleMatcherFactory type is blank, ignore: {}", factory.getClass().getName());
+			return;
+		}
+		RuleMatcherFactory prev = factories.putIfAbsent(type, factory);
+		if (prev != null && prev.getClass() != factory.getClass()) {
+			logger.warn("Duplicate RuleMatcherFactory type={}, keep existing {}", type, prev.getClass().getName());
+		}
 	}
 
 	/**

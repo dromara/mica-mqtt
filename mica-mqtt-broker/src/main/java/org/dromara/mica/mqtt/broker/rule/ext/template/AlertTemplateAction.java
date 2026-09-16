@@ -17,9 +17,7 @@
 package org.dromara.mica.mqtt.broker.rule.ext.template;
 
 import org.dromara.mica.mqtt.broker.rule.RuleContext;
-import org.dromara.mica.mqtt.broker.rule.ext.aviator.AviatorExprMatcher;
 import org.dromara.mica.mqtt.broker.rule.action.Action;
-import org.dromara.mica.mqtt.broker.rule.action.ActionFactory;
 import org.dromara.mica.mqtt.broker.rule.action.ActionRef;
 
 import java.util.ArrayList;
@@ -27,31 +25,33 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * alert 模板：触发告警事件。
+ *
+ * <p>YAML 配置：
+ * <pre>
+ * - type: alert
+ *   name: overheat
+ *   props:
+ *     severity: critical
+ *     title: "设备 {clientId} 温度过高"
+ *     message: "${payload.temperature}"
+ *     dedupeKey: "{clientId}:overheat"
+ * </pre>
+ *
+ * <p>{@link AlertCenter} 由装配流程通过 {@link TemplateServices} 注入。
  *
  * @author L.cm
  */
 public class AlertTemplateAction implements Action {
 
-	private static final AtomicReference<AlertCenter> CENTER = new AtomicReference<>();
-
 	private final ActionRef ref;
+	private final AlertCenter center;
 
-	public AlertTemplateAction(ActionRef ref) {
+	public AlertTemplateAction(ActionRef ref, AlertCenter center) {
 		this.ref = ref;
-	}
-
-	public static void setCenter(AlertCenter center) {
-		CENTER.set(center);
-	}
-
-	public static AlertCenter getCenter() {
-		return CENTER.get();
+		this.center = center;
 	}
 
 	@Override
@@ -61,63 +61,33 @@ public class AlertTemplateAction implements Action {
 
 	@Override
 	public void send(RuleContext ctx) {
-		AlertCenter center = CENTER.get();
 		if (center == null) {
-			throw new IllegalStateException("AlertCenter not configured");
+			throw new IllegalStateException("alert action is not wired with an AlertCenter");
 		}
 		String severity = ref.getString("severity", "warning");
-		String title = interpolate(
-			TemplateRenderer.render(
-				ref.getString("title", ctx.getRule().getName()), ctx), ctx);
-		String message = interpolate(
-			TemplateRenderer.render(
-				ref.getString("message", ""), ctx), ctx);
+		String title = TemplateExpressions.interpolate(
+			TemplateRenderer.render(ref.getString("title", ctx.getRule().getName()), ctx), ctx);
+		String message = TemplateExpressions.interpolate(
+			TemplateRenderer.render(ref.getString("message", ""), ctx), ctx);
 		List<String> tags = parseTags(ctx);
 		String dedupeKey = TemplateRenderer.render(ref.getString("dedupeKey", ""), ctx);
 		Map<String, Object> extra = parseExtra(ctx);
-		AlertEvent event = new AlertEvent(System.currentTimeMillis(), severity, title, message,
-			tags, dedupeKey, extra);
-		center.trigger(event);
-	}
-
-	/**
-	 * 把 {@code ${expr}} 替换为 Aviator 求值结果；普通字面量保持原样。
-	 */
-	private static String interpolate(String template, RuleContext ctx) {
-		if (template == null || !template.contains("${")) {
-			return template == null ? "" : template;
-		}
-		Matcher matcher = Pattern
-			.compile("\\$\\{([^}]+)}").matcher(template);
-		StringBuffer sb = new StringBuffer();
-		while (matcher.find()) {
-			String expr = matcher.group(1);
-			Object value;
-			try {
-				AviatorExprMatcher m = new AviatorExprMatcher(expr);
-				value = m.execute(AviatorExprMatcher.envOf(ctx));
-			} catch (Exception e) {
-				value = "";
-			}
-			matcher.appendReplacement(sb,
-				java.util.regex.Matcher.quoteReplacement(value == null ? "" : value.toString()));
-		}
-		matcher.appendTail(sb);
-		return sb.toString();
+		center.trigger(new AlertEvent(System.currentTimeMillis(), severity, title, message,
+			tags, dedupeKey, extra));
 	}
 
 	@SuppressWarnings("unchecked")
 	private List<String> parseTags(RuleContext ctx) {
 		Object o = ref.getProps().get("tags");
-		if (o instanceof List) {
-			List<String> raw = (List<String>) o;
-			List<String> rendered = new ArrayList<>(raw.size());
-			for (String s : raw) {
-				rendered.add(TemplateRenderer.render(s, ctx));
-			}
-			return rendered;
+		if (!(o instanceof List)) {
+			return Collections.emptyList();
 		}
-		return Collections.emptyList();
+		List<String> raw = (List<String>) o;
+		List<String> rendered = new ArrayList<>(raw.size());
+		for (String s : raw) {
+			rendered.add(TemplateRenderer.render(s, ctx));
+		}
+		return rendered;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -128,11 +98,7 @@ public class AlertTemplateAction implements Action {
 			Map<String, Object> raw = (Map<String, Object>) o;
 			for (Map.Entry<String, Object> e : raw.entrySet()) {
 				Object v = e.getValue();
-				if (v instanceof String) {
-					extra.put(e.getKey(), TemplateRenderer.render((String) v, ctx));
-				} else {
-					extra.put(e.getKey(), v);
-				}
+				extra.put(e.getKey(), v instanceof String ? TemplateRenderer.render((String) v, ctx) : v);
 			}
 		}
 		Object w = ref.getProps().get("dedupeWindowMs");
@@ -145,15 +111,23 @@ public class AlertTemplateAction implements Action {
 	/**
 	 * ActionFactory：注册 type=alert。
 	 */
-	public static class Factory implements ActionFactory {
+	public static class Factory implements TemplateActionFactory {
+		private volatile TemplateServices services;
+
 		@Override
 		public String getType() {
 			return "alert";
 		}
 
 		@Override
+		public void setTemplateServices(TemplateServices services) {
+			this.services = services;
+		}
+
+		@Override
 		public Action create(ActionRef ref) {
-			return new AlertTemplateAction(ref);
+			TemplateServices current = services;
+			return new AlertTemplateAction(ref, current == null ? null : current.getAlertCenter());
 		}
 	}
 }

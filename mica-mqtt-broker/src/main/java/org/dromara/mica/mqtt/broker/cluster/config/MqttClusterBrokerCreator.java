@@ -22,7 +22,6 @@ import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttMessageStore;
 import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttSessionManager;
 import org.dromara.mica.mqtt.broker.cluster.core.ClusterStorage;
 import org.dromara.mica.mqtt.broker.cluster.core.MqttClusterManager;
-import org.dromara.mica.mqtt.broker.cluster.pipeline.ClusterMessageDispatcher;
 import org.dromara.mica.mqtt.broker.cluster.pipeline.ClusterPublishHandler;
 import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.HashClientStrategy;
 import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.LocalFirstStrategy;
@@ -32,28 +31,27 @@ import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.SharedSubscription
 import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.StickyStrategy;
 import org.dromara.mica.mqtt.broker.rule.RuleEngine;
 import org.dromara.mica.mqtt.broker.rule.RuleManager;
-import org.dromara.mica.mqtt.broker.rule.codec.PayloadCodecFactory;
-import org.dromara.mica.mqtt.broker.rule.codec.JsonPayloadCodecFactory;
-import org.dromara.mica.mqtt.broker.rule.codec.RawPayloadCodecFactory;
-import org.dromara.mica.mqtt.broker.rule.codec.StringPayloadCodecFactory;
-import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcherFactory;
-import org.dromara.mica.mqtt.broker.rule.matcher.TopicRuleMatcherFactory;
-import org.dromara.mica.mqtt.broker.rule.action.HttpActionFactory;
-import org.dromara.mica.mqtt.broker.rule.action.LogActionFactory;
-import org.dromara.mica.mqtt.broker.rule.action.MqttActionFactory;
 import org.dromara.mica.mqtt.broker.rule.action.ActionFactory;
+import org.dromara.mica.mqtt.broker.rule.codec.PayloadCodecFactory;
+import org.dromara.mica.mqtt.broker.rule.ext.template.AlertCenter;
+import org.dromara.mica.mqtt.broker.rule.ext.template.TemplateActionFactory;
+import org.dromara.mica.mqtt.broker.rule.ext.template.TemplateServices;
+import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcherFactory;
 import org.dromara.mica.mqtt.broker.rule.store.InMemoryRuleStore;
+import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
+import org.dromara.mica.mqtt.core.server.event.IMqttMessageListener;
 import org.dromara.mica.mqtt.core.server.func.MqttFunctionManager;
 import org.dromara.mica.mqtt.core.server.func.MqttFunctionMessageListener;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.ServiceLoader;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 /**
  * Builder for creating MQTT broker instances with cluster mode support.
@@ -71,6 +69,7 @@ import java.util.stream.StreamSupport;
  *   <li>Decorates the connect status listener with {@link ClusterMqttConnectStatusListener}</li>
  *   <li>Adds pipeline handlers for message forwarding and dispatching</li>
  * </ol>
+ * 无论是否开启集群模式，都会装配规则引擎。
  *
  * @author L.cm
  * @see MqttServerCreator
@@ -78,6 +77,8 @@ import java.util.stream.StreamSupport;
  * @since 1.0.0
  */
 public class MqttClusterBrokerCreator {
+	private static final Logger logger = LoggerFactory.getLogger(MqttClusterBrokerCreator.class);
+
 	private final MqttServerCreator serverCreator;
 	private MqttClusterConfig clusterConfig;
 	private MqttClusterManager clusterManager;
@@ -85,80 +86,15 @@ public class MqttClusterBrokerCreator {
 	private ClusterStorage clusterStorage;
 	private RuleManager ruleManager;
 	private RuleEngine ruleEngine;
-
-	// SPI 静态缓存，避免每次 build() 重复扫描 ServiceLoader
-	private static volatile List<ActionFactory> CACHED_SINK_FACTORIES;
-	private static volatile List<RuleMatcherFactory> CACHED_MATCHER_FACTORIES;
-	private static volatile List<PayloadCodecFactory> CACHED_CODEC_FACTORIES;
+	private TemplateServices templateServices;
 
 	/**
-	 * 同步加载所有 Rule 相关的 SPI 工厂，仅加载一次。
+	 * SPI 加载的工厂（每次 build 的元素为该实例独有，模板 action 的依赖注入不能跨实例共享）。
 	 */
-	private static synchronized void loadRuleSpi(RuleManager rm) {
-		if (CACHED_SINK_FACTORIES == null) {
-			CACHED_SINK_FACTORIES = StreamSupport
-				.stream(ServiceLoader.load(ActionFactory.class).spliterator(), false)
-				.collect(Collectors.toList());
-		}
-		if (CACHED_MATCHER_FACTORIES == null) {
-			CACHED_MATCHER_FACTORIES = StreamSupport
-				.stream(ServiceLoader.load(RuleMatcherFactory.class).spliterator(), false)
-				.collect(Collectors.toList());
-		}
-		if (CACHED_CODEC_FACTORIES == null) {
-			CACHED_CODEC_FACTORIES = StreamSupport
-				.stream(ServiceLoader.load(PayloadCodecFactory.class).spliterator(), false)
-				.collect(Collectors.toList());
-		}
-		CACHED_SINK_FACTORIES.forEach(rm::registerActionFactory);
-		CACHED_MATCHER_FACTORIES.forEach(rm::registerMatcherFactory);
-		CACHED_CODEC_FACTORIES.forEach(rm::registerCodecFactory);
-	}
+	private final List<ActionFactory> actionFactories = new ArrayList<>();
 
 	/**
-	 * 装配规则引擎：必须在 serverCreator.build() 之前替换 messageListener。
-	 */
-	private void setupRuleEngine() {
-		if (ruleManager != null) {
-			return;
-		}
-		RuleManager rm = new RuleManager();
-		rm.setRuleStore(new InMemoryRuleStore());
-		loadRuleSpi(rm);
-		// 内置工厂兜底（即使没注册 SPI 也能跑）
-		rm.registerActionFactory(new LogActionFactory());
-		rm.registerActionFactory(new MqttActionFactory());
-		rm.registerActionFactory(new HttpActionFactory());
-		rm.registerMatcherFactory(new TopicRuleMatcherFactory());
-		rm.registerCodecFactory(new RawPayloadCodecFactory());
-		rm.registerCodecFactory(new StringPayloadCodecFactory());
-		rm.registerCodecFactory(new JsonPayloadCodecFactory());
-		this.ruleManager = rm;
-
-		// 用新的 MqttFunctionManager 接管 messageListener（关键修正：在 build 之前替换）
-		MqttFunctionManager fnMgr = new MqttFunctionManager();
-		Object prevListener = serverCreator.getMessageListener();
-		if (prevListener != null) {
-			// 老的 listener 透传，注册到 #
-			fnMgr.register(new String[]{"#"},
-				(ctx, clientId, topic, qos, message) -> {
-					try {
-						((org.dromara.mica.mqtt.core.server.event.IMqttMessageListener) prevListener)
-							.onMessage(ctx, clientId, topic, qos, message);
-					} catch (Exception ignore) {
-						// 不影响其它 action
-					}
-				});
-		}
-		serverCreator.messageListener(new MqttFunctionMessageListener(fnMgr));
-
-		RuleEngine engine = new RuleEngine(rm, fnMgr, null);
-		engine.attach();
-		this.ruleEngine = engine;
-	}
-
-	/**
-	 * Constructs a new cluster broker creator wrapping the specified server creator.
+	 * 构造。
 	 *
 	 * @param serverCreator the underlying MQTT server creator
 	 */
@@ -178,6 +114,113 @@ public class MqttClusterBrokerCreator {
 	}
 
 	/**
+	 * 加载规则相关的 SPI 工厂。
+	 * <p>
+	 * SPI（{@code META-INF/services}）是内置工厂的唯一注册来源：早期实现同时做了一份
+	 * 手工注册清单，但那份清单是 SPI 的子集（缺 4 个模板工厂），一旦 SPI 失效不会报错，
+	 * 只会静默丢掉部分 action。需要程序化注册时可调用
+	 * {@link RuleManager#registerActionFactory(ActionFactory)}。
+	 * </p>
+	 */
+	private void loadRuleSpi(RuleManager rm) {
+		for (ActionFactory factory : ServiceLoader.load(ActionFactory.class)) {
+			actionFactories.add(factory);
+			rm.registerActionFactory(factory);
+		}
+		if (actionFactories.isEmpty()) {
+			logger.error("No ActionFactory found via SPI, action rules will fail at runtime. "
+				+ "Check META-INF/services/{}", ActionFactory.class.getName());
+		}
+		int matcherCount = 0;
+		for (RuleMatcherFactory factory : ServiceLoader.load(RuleMatcherFactory.class)) {
+			rm.registerMatcherFactory(factory);
+			matcherCount++;
+		}
+		int codecCount = 0;
+		for (PayloadCodecFactory factory : ServiceLoader.load(PayloadCodecFactory.class)) {
+			rm.registerCodecFactory(factory);
+			codecCount++;
+		}
+		logger.debug("Rule factories loaded: actions={} matchers={} codecs={}",
+			actionFactories.size(), matcherCount, codecCount);
+	}
+
+	/**
+	 * 装配规则引擎：必须在 serverCreator.build() 之前替换 messageListener。
+	 */
+	private void setupRuleEngine() {
+		if (ruleManager != null) {
+			return;
+		}
+		RuleManager rm = new RuleManager();
+		rm.setRuleStore(new InMemoryRuleStore());
+		loadRuleSpi(rm);
+		this.ruleManager = rm;
+
+		// 用新的 MqttFunctionManager 接管 messageListener（关键修正：在 build 之前替换）
+		MqttFunctionManager fnMgr = new MqttFunctionManager();
+		final Object prevListener = serverCreator.getMessageListener();
+		if (prevListener instanceof IMqttMessageListener) {
+			final IMqttMessageListener delegate = (IMqttMessageListener) prevListener;
+			// 老的 listener 透传，注册到 #
+			fnMgr.register(new String[]{"#"},
+				(ctx, clientId, topic, qos, message) -> {
+					try {
+						delegate.onMessage(ctx, clientId, topic, qos, message);
+					} catch (Exception e) {
+						logger.warn("Previous IMqttMessageListener failed for topic: {}", topic, e);
+					}
+				});
+		} else if (prevListener != null) {
+			logger.warn("Ignored previous message listener of unsupported type: {}",
+				prevListener.getClass().getName());
+		}
+		serverCreator.messageListener(new MqttFunctionMessageListener(fnMgr));
+
+		RuleEngine engine = new RuleEngine(rm, fnMgr, null);
+		engine.attach();
+		this.ruleEngine = engine;
+	}
+
+	/**
+	 * 把服务端运行期对象注入模板 action，并注册关闭钩子。
+	 * <p>
+	 * 模板 action 依赖 {@code publish} 函数 / store / 告警中心，必须在服务端构建完成后
+	 * 才能装配；同时规则引擎与 V3 存储的关闭也挂到服务端生命周期上，保证
+	 * {@code MqttServer#stop()} 能释放 MqttAction 持有的 MqttClient 等资源。
+	 * </p>
+	 */
+	private void installRuntimeServices(MqttServer server) {
+		TemplateServices services = new TemplateServices(
+			(topic, payload, qos, retain) -> server.publishAll(topic, payload, MqttQoS.valueOf(qos), retain),
+			null,
+			new AlertCenter());
+		this.templateServices = services;
+		for (ActionFactory factory : actionFactories) {
+			if (factory instanceof TemplateActionFactory) {
+				((TemplateActionFactory) factory).setTemplateServices(services);
+			}
+		}
+		serverCreator.addShutdownHook(this::shutdown);
+	}
+
+	/**
+	 * broker 关闭：释放规则引擎、模板 action 依赖与 V3 存储。
+	 */
+	private void shutdown() {
+		if (ruleEngine != null) {
+			ruleEngine.stop();
+		}
+		if (templateServices != null) {
+			templateServices.close();
+		}
+		ClusterStorage storage = this.clusterStorage;
+		if (storage != null) {
+			storage.stop();
+		}
+	}
+
+	/**
 	 * Builds the MQTT server, applying cluster decorations if cluster mode is enabled.
 	 *
 	 * @return the configured {@link MqttServer} instance
@@ -188,7 +231,7 @@ public class MqttClusterBrokerCreator {
 
 		if (clusterConfig == null || !clusterConfig.isEnabled()) {
 			MqttServer server = serverCreator.build();
-			// 非集群模式：在 server 构建后启动 ruleEngine（ruleManager.start() 会把已加载的 rule 挂到 fnMgr）
+			installRuntimeServices(server);
 			ruleEngine.start();
 			return server;
 		}
@@ -260,9 +303,7 @@ public class MqttClusterBrokerCreator {
 		);
 		serverCreator.addPublishPipelineHandler(publishHandler);
 
-		ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(mqttServer, clusterManager, clusterSessionManager, strategy);
-		serverCreator.addMessagePipelineHandler(dispatcher);
-
+		installRuntimeServices(mqttServer);
 		// 启动规则引擎：把已加载规则挂到 functionManager
 		ruleEngine.start();
 

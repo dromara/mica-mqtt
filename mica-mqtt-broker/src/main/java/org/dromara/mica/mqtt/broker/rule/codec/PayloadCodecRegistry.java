@@ -38,10 +38,10 @@ public class PayloadCodecRegistry {
 	}
 
 	/**
-	 * 按名称查找 codec，未注册时返回 null。
+	 * 按名称查找 codec。
 	 *
-	 * @param name codec 名（可为空表示 raw）
-	 * @return codec 或 null
+	 * @param name codec 名；为 {@code null} 或空串表示不指定 codec
+	 * @return codec；未指定或未注册时返回 {@code null}
 	 */
 	public PayloadCodec get(String name) {
 		if (name == null || name.isEmpty()) {

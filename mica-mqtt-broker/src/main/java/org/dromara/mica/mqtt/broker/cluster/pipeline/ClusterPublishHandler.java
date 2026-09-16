@@ -127,24 +127,28 @@ public class ClusterPublishHandler implements MqttPublishPipelineHandler {
 				}
 				String nodeId = sessionManager.getClientNode(picked.getClientId());
 				if (nodeId == null || nodeId.equals(clusterManager.getLocalNodeId())) {
-					mqttServer.deliverLocal(picked.getClientId(), context.getTopic(), context.getPayload(),
+					// 只有真的投递成功才算完成：nodeId 为 null 时代表路由未知，
+					// 客户端可能既不在本地也不可寻址，必须重新选一个候选
+					if (mqttServer.deliverLocal(picked.getClientId(), context.getTopic(), context.getPayload(),
 						context.getQos(), picked.getMqttQoS(),
-						context.isRetain() && picked.isRetainAsPublished(), context.getProperties());
-					delivered = true;
-					break;
+						context.isRetain() && picked.isRetainAsPublished(), context.getProperties())) {
+						delivered = true;
+						break;
+					}
+				} else {
+					SharedDispatchToClientMessage dispatch = new SharedDispatchToClientMessage();
+					dispatch.setClientId(picked.getClientId());
+					dispatch.setTopic(context.getTopic());
+					dispatch.setGroupName(entry.getKey());
+					dispatch.setMessage(message);
+					if (clusterManager.sendToNode(nodeId, dispatch)) {
+						clusterManager.getMetrics().sharedDispatchSentInc();
+						delivered = true;
+						break;
+					}
 				}
-				SharedDispatchToClientMessage dispatch = new SharedDispatchToClientMessage();
-				dispatch.setClientId(picked.getClientId());
-				dispatch.setTopic(context.getTopic());
-				dispatch.setGroupName(entry.getKey());
-				dispatch.setMessage(message);
-				if (clusterManager.sendToNode(nodeId, dispatch)) {
-					clusterManager.getMetrics().sharedDispatchSentInc();
-					delivered = true;
-					break;
-				}
-				// The transport rejected the send before enqueueing it. Remove this
-				// subscriber and re-pick; no blind retry means no duplicate delivery.
+				// 目标不可达（传输拒绝或本地投递失败）：移除该候选后重选，
+				// 不做盲目重试，因此不会产生重复投递
 				remaining.removeIf(candidate -> picked.getClientId().equals(candidate.getClientId()));
 			}
 			if (!delivered) {

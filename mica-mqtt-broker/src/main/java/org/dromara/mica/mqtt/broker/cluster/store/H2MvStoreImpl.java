@@ -82,6 +82,17 @@ public class H2MvStoreImpl implements LocalKvStore {
 	 */
 	private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
+	/**
+	 * Per-thread transaction nesting depth.
+	 * <p>
+	 * A positive value means the calling thread is inside
+	 * {@link #executeInTransaction(Runnable)}: {@link #put}/{@link #delete}/{@link #commit}
+	 * then mutate the map without committing, so the whole transaction flushes — or is
+	 * rolled back — as one unit.
+	 * </p>
+	 */
+	private final ThreadLocal<int[]> transactionDepth = ThreadLocal.withInitial(() -> new int[1]);
+
 	@Override
 	public void open(Path dataDir) {
 		File dir = dataDir.toFile();
@@ -134,7 +145,7 @@ public class H2MvStoreImpl implements LocalKvStore {
 		lock.writeLock().lock();
 		try {
 			dataMap.put(key, value);
-			store.commit();
+			commitIfOutsideTransaction();
 		} finally {
 			lock.writeLock().unlock();
 		}
@@ -146,7 +157,7 @@ public class H2MvStoreImpl implements LocalKvStore {
 		lock.writeLock().lock();
 		try {
 			dataMap.remove(key);
-			store.commit();
+			commitIfOutsideTransaction();
 		} finally {
 			lock.writeLock().unlock();
 		}
@@ -184,17 +195,53 @@ public class H2MvStoreImpl implements LocalKvStore {
 
 	@Override
 	public void executeInTransaction(Runnable body) {
+		int[] depth = transactionDepth.get();
+		if (depth[0] > 0) {
+			// Nested transaction on the same thread: join the outermost one so that
+			// only the outermost boundary commits or rolls back.
+			body.run();
+			return;
+		}
 		lock.writeLock().lock();
 		try {
-			body.run();
-			store.commit();
-		} catch (RuntimeException e) {
-			// MVStore has no rollback for in-flight changes in the open transaction model;
-			// log the failure and rethrow so callers can take compensating action.
-			logger.error("[H2Store] Transaction body failed, changes may be partially written", e);
-			throw e;
+			depth[0] = 1;
+			try {
+				body.run();
+				commitInternal();
+			} catch (RuntimeException e) {
+				// Writes made inside the body were never committed, so rolling back to the
+				// last committed version discards exactly this transaction's changes.
+				rollbackInternal();
+				throw e;
+			} finally {
+				depth[0] = 0;
+			}
 		} finally {
 			lock.writeLock().unlock();
+			transactionDepth.remove();
+		}
+	}
+
+	/**
+	 * Commits pending changes unless the calling thread is inside a transaction.
+	 */
+	private void commitIfOutsideTransaction() {
+		if (transactionDepth.get()[0] == 0) {
+			commitInternal();
+		}
+	}
+
+	/** Commits without acquiring the lock; callers must already hold the write lock. */
+	private void commitInternal() {
+		if (store != null && !store.isClosed()) {
+			store.commit();
+		}
+	}
+
+	/** Rolls back without acquiring the lock; callers must already hold the write lock. */
+	private void rollbackInternal() {
+		if (store != null && !store.isClosed()) {
+			store.rollback();
 		}
 	}
 
@@ -239,15 +286,15 @@ public class H2MvStoreImpl implements LocalKvStore {
 	 * Commits pending changes to the WAL.
 	 * <p>
 	 * Called by sub-stores (e.g. {@link H2InflightStore}) that share this engine instance
-	 * and need to flush their writes without closing the store.
+	 * and need to flush their writes without closing the store.  When invoked from inside
+	 * {@link #executeInTransaction(Runnable)} the flush is deferred to the transaction
+	 * boundary so the transaction stays atomic.
 	 * </p>
 	 */
 	public void commit() {
 		lock.writeLock().lock();
 		try {
-			if (store != null && !store.isClosed()) {
-				store.commit();
-			}
+			commitIfOutsideTransaction();
 		} finally {
 			lock.writeLock().unlock();
 		}

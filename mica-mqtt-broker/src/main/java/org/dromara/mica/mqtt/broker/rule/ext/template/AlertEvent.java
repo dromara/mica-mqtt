@@ -16,6 +16,7 @@
 
 package org.dromara.mica.mqtt.broker.rule.ext.template;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -45,9 +46,9 @@ public class AlertEvent {
 		this.severity = severity;
 		this.title = title;
 		this.message = message;
-		this.tags = tags == null ? java.util.Collections.emptyList() : tags;
+		this.tags = tags == null ? Collections.emptyList() : tags;
 		this.dedupeKey = dedupeKey;
-		this.extra = extra == null ? java.util.Collections.emptyMap() : extra;
+		this.extra = extra == null ? Collections.emptyMap() : extra;
 	}
 
 	public long getTs() { return ts; }

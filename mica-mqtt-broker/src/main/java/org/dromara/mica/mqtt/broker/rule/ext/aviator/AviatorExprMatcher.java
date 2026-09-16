@@ -21,6 +21,7 @@ import com.googlecode.aviator.AviatorEvaluatorInstance;
 import com.googlecode.aviator.Expression;
 import com.googlecode.aviator.Options;
 import org.dromara.mica.mqtt.broker.rule.RuleContext;
+import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcher;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcherFactory;
 
 import java.util.Arrays;
@@ -40,11 +41,6 @@ public class AviatorExprMatcher {
 
 	static {
 		EVAL.enableSandboxMode();
-		try {
-			EVAL.getClass().getMethod("enableSandbox").invoke(EVAL);
-		} catch (Exception ignored) {
-			// aviator 5.9 在某些构建里没有 enableSandbox（安全沙箱内置），忽略。
-		}
 		EVAL.setOption(Options.MAX_LOOP_COUNT, 1000);
 	}
 
@@ -106,7 +102,7 @@ public class AviatorExprMatcher {
 		}
 
 		@Override
-		public org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcher create(Map<String, String> props) {
+		public RuleMatcher create(Map<String, String> props) {
 			String when = props == null ? null : props.get("when");
 			if (when == null || when.isEmpty()) {
 				throw new IllegalArgumentException("aviator matcher requires 'when' property");

@@ -17,7 +17,6 @@
 package org.dromara.mica.mqtt.broker.rule.store;
 
 import org.dromara.mica.mqtt.broker.rule.Rule;
-import org.dromara.mica.mqtt.broker.rule.RuleChangeListener;
 
 import java.util.List;
 
@@ -56,12 +55,4 @@ public interface RuleStore {
 	 * @return 规则列表
 	 */
 	List<Rule> loadAll();
-
-	/**
-	 * 注册变更监听器（热加载场景），默认实现为空操作。
-	 *
-	 * @param listener 监听器
-	 */
-	default void setListener(RuleChangeListener listener) {
-	}
 }

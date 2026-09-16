@@ -43,6 +43,7 @@ skills-lock.json
 
 ### maven ###
 target/
+mvnc.sh
 *.war
 *.ear
 *.zip

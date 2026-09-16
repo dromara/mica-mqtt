@@ -21,6 +21,12 @@ import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -106,15 +112,15 @@ public class H2SessionStore implements SessionStore {
 	}
 
 	static byte[] serialize(Session session) {
-		try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-			 java.io.DataOutputStream dos = new java.io.DataOutputStream(baos)) {
+		try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			 DataOutputStream dos = new DataOutputStream(baos)) {
 			dos.writeBoolean(session.isCleanSession());
 			dos.writeLong(session.getSessionExpirySeconds());
 			String owner = session.getOwnerNodeId();
 			if (owner == null) {
 				dos.writeShort(-1);
 			} else {
-				byte[] ownerBytes = owner.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+				byte[] ownerBytes = owner.getBytes(StandardCharsets.UTF_8);
 				dos.writeShort(ownerBytes.length);
 				dos.write(ownerBytes);
 			}
@@ -125,14 +131,14 @@ public class H2SessionStore implements SessionStore {
 			}
 			dos.flush();
 			return baos.toByteArray();
-		} catch (java.io.IOException e) {
+		} catch (IOException e) {
 			throw new RuntimeException("Failed to serialize session: " + session.getClientId(), e);
 		}
 	}
 
 	static Session deserialize(String clientId, byte[] value) {
-		try (java.io.ByteArrayInputStream bais = new java.io.ByteArrayInputStream(value);
-			 java.io.DataInputStream dis = new java.io.DataInputStream(bais)) {
+		try (ByteArrayInputStream bais = new ByteArrayInputStream(value);
+			 DataInputStream dis = new DataInputStream(bais)) {
 			Session session = new Session();
 			session.setClientId(clientId);
 			session.setCleanSession(dis.readBoolean());
@@ -141,7 +147,7 @@ public class H2SessionStore implements SessionStore {
 			if (ownerLen >= 0) {
 				byte[] ownerBytes = new byte[ownerLen];
 				dis.readFully(ownerBytes);
-				session.setOwnerNodeId(new String(ownerBytes, java.nio.charset.StandardCharsets.UTF_8));
+				session.setOwnerNodeId(new String(ownerBytes, StandardCharsets.UTF_8));
 			}
 			int subLen = dis.readInt();
 			if (subLen > 0) {
@@ -151,7 +157,7 @@ public class H2SessionStore implements SessionStore {
 				session.setSubscriptions(subs);
 			}
 			return session;
-		} catch (java.io.IOException e) {
+		} catch (IOException e) {
 			logger.warn("[SessionStore] Failed to deserialize session: {}", clientId, e);
 			return null;
 		}

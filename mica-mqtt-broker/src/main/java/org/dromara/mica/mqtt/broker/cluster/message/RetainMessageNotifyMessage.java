@@ -51,6 +51,18 @@ public class RetainMessageNotifyMessage implements ClusterMessage {
 	/** Sender wall-clock timestamp used to observe replication latency. */
 	private long sentAtMillis;
 
+	/**
+	 * Creates a notice stamped with the current wall-clock time.
+	 * <p>
+	 * The timestamp is captured here, not in {@link #toClusterData(Map)}, so serializing
+	 * an instance has no side effects and re-sending the same instance reports the
+	 * original send time instead of silently re-dating it.
+	 * </p>
+	 */
+	public RetainMessageNotifyMessage() {
+		this.sentAtMillis = System.currentTimeMillis();
+	}
+
 	@Override
 	public ClusterMessageType getType() {
 		return ClusterMessageType.RETAIN_MESSAGE;
@@ -60,9 +72,6 @@ public class RetainMessageNotifyMessage implements ClusterMessage {
 	public void toClusterData(Map<String, String> headers) {
 		headers.put(ClusterMessageSerializer.HEADER_TOPIC, topic);
 		headers.put(ClusterMessageSerializer.HEADER_TIMEOUT, String.valueOf(timeout));
-		if (sentAtMillis <= 0L) {
-			sentAtMillis = System.currentTimeMillis();
-		}
 		headers.put(HEADER_SENT_AT, String.valueOf(sentAtMillis));
 	}
 

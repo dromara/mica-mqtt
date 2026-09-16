@@ -47,7 +47,7 @@ public class ClientDisconnectMessage implements ClusterMessage {
 	@Override
 	public void toClusterData(Map<String, String> headers) {
 		headers.put(ClusterMessageSerializer.HEADER_CLIENT_ID, clientId);
-		headers.put("persistentSession", String.valueOf(persistentSession));
+		headers.put(ClusterMessageSerializer.HEADER_PERSISTENT_SESSION, String.valueOf(persistentSession));
 	}
 
 	@Override
@@ -58,7 +58,8 @@ public class ClientDisconnectMessage implements ClusterMessage {
 	@Override
 	public void fromClusterData(ClusterDataMessage message) {
 		this.clientId = message.getHeader(ClusterMessageSerializer.HEADER_CLIENT_ID);
-		this.persistentSession = Boolean.parseBoolean(message.getHeader("persistentSession"));
+		this.persistentSession = Boolean.parseBoolean(
+			message.getHeader(ClusterMessageSerializer.HEADER_PERSISTENT_SESSION));
 	}
 
 	public String getClientId() {

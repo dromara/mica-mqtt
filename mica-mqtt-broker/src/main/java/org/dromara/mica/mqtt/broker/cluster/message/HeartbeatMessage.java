@@ -16,27 +16,16 @@
 
 package org.dromara.mica.mqtt.broker.cluster.message;
 
-import net.dreamlu.mica.net.server.cluster.message.ClusterDataMessage;
-
-import java.util.Map;
-
-/** Lightweight application-level cluster liveness probe. */
-public class HeartbeatMessage implements ClusterMessage {
+/**
+ * Lightweight application-level cluster liveness probe.
+ *
+ * @author L.cm
+ * @see AbstractEmptyClusterMessage
+ * @since 1.0.0
+ */
+public class HeartbeatMessage extends AbstractEmptyClusterMessage {
 	@Override
 	public ClusterMessageType getType() {
 		return ClusterMessageType.HEARTBEAT;
-	}
-
-	@Override
-	public void toClusterData(Map<String, String> headers) {
-	}
-
-	@Override
-	public byte[] toPayload() {
-		return new byte[0];
-	}
-
-	@Override
-	public void fromClusterData(ClusterDataMessage message) {
 	}
 }

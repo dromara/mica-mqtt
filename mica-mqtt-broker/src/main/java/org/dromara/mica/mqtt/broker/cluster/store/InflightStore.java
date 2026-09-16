@@ -75,9 +75,20 @@ public interface InflightStore {
 		}
 	}
 
-	/** Updates an existing QoS 2 record after PUBREC moves it to PUBREL. */
-	default void updatePhase(String clientId, int packetId, int phase) {
-	}
+	/**
+	 * Updates an existing QoS 2 record after PUBREC moves it to PUBREL.
+	 * <p>
+	 * Implementations must persist the phase change: a store that silently drops it would
+	 * replay the message as an unacknowledged PUBLISH after a restart instead of resuming
+	 * at the PUBREL stage, breaking the QoS 2 handshake. This is therefore an abstract
+	 * method rather than a no-op default.
+	 * </p>
+	 *
+	 * @param clientId the MQTT client identifier; never {@code null}
+	 * @param packetId the MQTT packet identifier
+	 * @param phase    the new phase, either {@link #PHASE_PUBLISH} or {@link #PHASE_PUBREL}
+	 */
+	void updatePhase(String clientId, int packetId, int phase);
 
 	/**
 	 * Removes the in-flight record for a specific client and packet.

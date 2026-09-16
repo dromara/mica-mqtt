@@ -110,13 +110,16 @@ public interface LocalKvStore extends AutoCloseable {
 	/**
 	 * Executes {@code body} within a single store transaction.
 	 * <p>
-	 * All {@link #put} and {@link #delete} calls made inside {@code body} are
-	 * committed atomically on normal return, or rolled back if an exception is thrown.
+	 * All {@link #put} and {@link #delete} calls made inside {@code body} are committed
+	 * atomically on normal return, or rolled back if a {@link RuntimeException} is thrown.
+	 * Commits triggered by nested calls are deferred to the outermost transaction boundary,
+	 * so a transaction made of several writes costs a single WAL flush.
 	 * </p>
 	 * <p>
-	 * For implementations that do not support multi-statement transactions (e.g. the
-	 * in-memory implementation), this method is equivalent to simply calling
-	 * {@code body.run()}.
+	 * <strong>Implementations that cannot roll back</strong> (e.g. the in-memory
+	 * implementation, whose mutations are visible to other threads immediately) run
+	 * {@code body} directly and leave partial changes in place on failure. Such
+	 * implementations must document that weakness rather than implying atomicity.
 	 * </p>
 	 *
 	 * @param body the transactional work to execute; must not be {@code null}

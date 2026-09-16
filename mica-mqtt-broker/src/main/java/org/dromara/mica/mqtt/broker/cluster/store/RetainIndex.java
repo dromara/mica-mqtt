@@ -21,6 +21,12 @@ import org.dromara.mica.mqtt.core.server.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -261,8 +267,8 @@ public class RetainIndex {
 		//   [4 bytes] topic length
 		//   [N bytes] topic
 		// A full upgrade would replace this with a dedicated message codec.
-		java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-		java.io.DataOutputStream dos = new java.io.DataOutputStream(baos);
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		DataOutputStream dos = new DataOutputStream(baos);
 		try {
 			dos.writeInt(FORMAT_MAGIC);
 			dos.writeLong(expireAt);
@@ -270,19 +276,19 @@ public class RetainIndex {
 			dos.writeInt(payload.length);
 			dos.write(payload);
 			dos.writeByte(msg.getQos());
-			byte[] topicBytes = (msg.getTopic() == null ? "" : msg.getTopic()).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+			byte[] topicBytes = (msg.getTopic() == null ? "" : msg.getTopic()).getBytes(StandardCharsets.UTF_8);
 			dos.writeInt(topicBytes.length);
 			dos.write(topicBytes);
 			dos.flush();
 			return baos.toByteArray();
-		} catch (java.io.IOException e) {
+		} catch (IOException e) {
 			throw new RuntimeException("Failed to serialize retain message", e);
 		}
 	}
 
 	private static DecodedRetain deserializeMessage(String topic, byte[] value) {
-		try (java.io.ByteArrayInputStream bais = new java.io.ByteArrayInputStream(value);
-			 java.io.DataInputStream dis = new java.io.DataInputStream(bais)) {
+		try (ByteArrayInputStream bais = new ByteArrayInputStream(value);
+			 DataInputStream dis = new DataInputStream(bais)) {
 			int first = dis.readInt();
 			long expireAt = first == FORMAT_MAGIC ? dis.readLong() : 0L;
 			int payloadLen = first == FORMAT_MAGIC ? dis.readInt() : first;
@@ -292,14 +298,14 @@ public class RetainIndex {
 			int topicLen = dis.readInt();
 			byte[] topicBytes = new byte[topicLen];
 			dis.readFully(topicBytes);
-			String innerTopic = new String(topicBytes, java.nio.charset.StandardCharsets.UTF_8);
+			String innerTopic = new String(topicBytes, StandardCharsets.UTF_8);
 			Message msg = new Message();
 			msg.setPayload(payload);
 			msg.setQos(qos);
 			msg.setTopic(innerTopic.isEmpty() ? topic : innerTopic);
 			msg.setRetain(true);
 			return new DecodedRetain(msg, expireAt);
-		} catch (java.io.IOException e) {
+		} catch (IOException e) {
 			logger.warn("[RetainIndex] Failed to deserialize retain for {}", topic, e);
 			return null;
 		}

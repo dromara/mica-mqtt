@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
@@ -66,7 +67,12 @@ public class RuleMetricsRecorder implements RuleMetrics {
 		final LongAdder successCount = new LongAdder();
 		final LongAdder failureCount = new LongAdder();
 		final LongAdder totalLatencyMs = new LongAdder();
-		volatile long maxLatencyMs;
+		/**
+		 * 使用 {@link AtomicLong#accumulateAndGet} 保证并发更新不丢值。
+		 * 早期实现是 volatile 读 + 同步块双重检查（read 在锁外），并发下可能用较小的
+		 * 观测值覆盖已记录的更大值。
+		 */
+		final AtomicLong maxLatencyMs = new AtomicLong();
 
 		Stat(String ruleId, String actionName) {
 			this.ruleId = ruleId;
@@ -74,14 +80,7 @@ public class RuleMetricsRecorder implements RuleMetrics {
 		}
 
 		void recordMax(long costMs) {
-			long cur = maxLatencyMs;
-			if (costMs > cur) {
-				synchronized (this) {
-					if (costMs > maxLatencyMs) {
-						maxLatencyMs = costMs;
-					}
-				}
-			}
+			maxLatencyMs.accumulateAndGet(costMs, Math::max);
 		}
 
 		ActionStat toActionStat() {
@@ -91,7 +90,7 @@ public class RuleMetricsRecorder implements RuleMetrics {
 				successCount.sum(),
 				failureCount.sum(),
 				totalLatencyMs.sum(),
-				maxLatencyMs
+				maxLatencyMs.get()
 			);
 		}
 	}

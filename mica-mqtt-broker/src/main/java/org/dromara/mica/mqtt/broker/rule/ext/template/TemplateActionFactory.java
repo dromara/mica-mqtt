@@ -14,26 +14,26 @@
  * limitations under the License.
  */
 
-package org.dromara.mica.mqtt.broker.cluster.message;
+package org.dromara.mica.mqtt.broker.rule.ext.template;
+
+import org.dromara.mica.mqtt.broker.rule.action.ActionFactory;
 
 /**
- * Request for full state synchronization from a newly joined cluster node.
+ * 需要外部依赖装配的模板 action 工厂。
  * <p>
- * When a new node joins the cluster, it sends this request to all existing nodes
- * to obtain the complete cluster state, including client-to-node mappings and
- * all subscription tables.
+ * 模板 action（{@code publish} / {@code store} / {@code alert} / {@code webhook}）依赖
+ * broker 运行期对象，而 SPI 要求工厂提供无参构造，因此由装配流程在服务端构建完成后
+ * 调用 {@link #setTemplateServices(TemplateServices)} 注入。
  * </p>
  *
  * @author L.cm
- * @see ClusterMessage
- * @see ClusterMessageType#STATE_SYNC_REQUEST
- * @see StateSyncResponseMessage
- * @since 1.0.0
  */
-public class StateSyncRequestMessage extends AbstractEmptyClusterMessage {
+public interface TemplateActionFactory extends ActionFactory {
 
-	@Override
-	public ClusterMessageType getType() {
-		return ClusterMessageType.STATE_SYNC_REQUEST;
-	}
+	/**
+	 * 注入模板 action 的外部依赖。
+	 *
+	 * @param services 依赖集合，非空
+	 */
+	void setTemplateServices(TemplateServices services);
 }

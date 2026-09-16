@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.UnaryOperator;
 
 /**
@@ -48,7 +49,7 @@ public class RuleManager {
 	private final List<RuleLoader> loaders = new CopyOnWriteArrayList<>();
 	private final List<RuleEventListener> listeners = new CopyOnWriteArrayList<>();
 	private RuleStore ruleStore;
-	private volatile boolean started;
+	private final AtomicBoolean started = new AtomicBoolean();
 
 	/**
 	 * 注册 action 工厂。
@@ -98,10 +99,6 @@ public class RuleManager {
 		this.ruleStore = store;
 	}
 
-	public RuleStore getRuleStore() {
-		return ruleStore;
-	}
-
 	/**
 	 * 添加加载器。
 	 *
@@ -118,15 +115,6 @@ public class RuleManager {
 	 */
 	public void addListener(RuleEventListener listener) {
 		this.listeners.add(listener);
-	}
-
-	/**
-	 * 移除规则变更监听器。
-	 *
-	 * @param listener 监听器
-	 */
-	public void removeListener(RuleEventListener listener) {
-		this.listeners.remove(listener);
 	}
 
 	/**
@@ -196,12 +184,15 @@ public class RuleManager {
 
 	/**
 	 * 启动：执行加载器加载 + 监听 hot-reload。
+	 * <p>
+	 * 使用 {@link AtomicBoolean#compareAndSet(boolean, boolean)} 保证并发调用下只会
+	 * 加载/派发一次事件（早期的 check-then-set 非原子，并发 start 会重复 fire ADDED）。
+	 * </p>
 	 */
 	public void start() {
-		if (started) {
+		if (!started.compareAndSet(false, true)) {
 			return;
 		}
-		started = true;
 		// 加载已有规则
 		if (ruleStore != null) {
 			for (Rule r : ruleStore.loadAll()) {
@@ -245,13 +236,12 @@ public class RuleManager {
 	 * 停止：清空所有缓存与注册的监听器、加载器。
 	 */
 	public void stop() {
-		if (!started) {
+		if (!started.compareAndSet(true, false)) {
 			return;
 		}
-		started = false;
 		// 先摘除 listeners，避免 stop 过程中事件回调造成状态不一致
 		listeners.clear();
-		// 关闭各 registry 缓存的资源
+		// 关闭各 registry 缓存的资源（actionRegistry 会关闭 MqttAction 持有的 MqttClient）
 		actionRegistry.clear();
 		matcherRegistry.clear();
 		codecRegistry.clear();

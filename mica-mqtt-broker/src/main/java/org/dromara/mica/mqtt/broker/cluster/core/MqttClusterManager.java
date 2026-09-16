@@ -204,6 +204,7 @@ public class MqttClusterManager {
 		ClusterConfig clusterConfig = new ClusterConfig(
 			config.getClusterHost(),
 			config.getClusterPort(),
+			this::handleClusterMessage,
 			this::handleClusterMessage
 		);
 
@@ -214,12 +215,15 @@ public class MqttClusterManager {
 
 		cluster = new ClusterImpl(clusterConfig);
 		cluster.start();
-		clusterStartedAtMillis = System.currentTimeMillis();
-		BidirectionalClusterClientHandler.install(cluster, this::handleClusterMessage);
 		long monitorInterval = Math.max(1_000L, config.getHeartbeatInterval());
 		pollClusterMembership();
 		membershipMonitorExecutor.scheduleWithFixedDelay(
 			this::pollClusterMembership, monitorInterval, monitorInterval, TimeUnit.MILLISECONDS);
+		// 已授权的会话接管凭据只在 SESSION_MIGRATED_NOTIFY 或失败响应时移除，正常情况下
+		// 可能长期无人回收，这里加一个周期性清理，避免 takeoverGrants 无界增长
+		long grantSweepInterval = Math.max(30_000L, monitorInterval);
+		membershipMonitorExecutor.scheduleWithFixedDelay(
+			this::purgeExpiredTakeoverGrants, grantSweepInterval, grantSweepInterval, TimeUnit.MILLISECONDS);
 
 		logger.info("Mqtt cluster manager started on {}:{} with nodeName {}", config.getClusterHost(), config.getClusterPort(), localNodeId);
 
@@ -231,15 +235,18 @@ public class MqttClusterManager {
 
 	private void handleClusterMessage(ClusterDataMessage message) {
 		try {
-			String messageClusterName = ClusterMessageSerializer.getClusterName(message);
+			// 同一条消息只解一次公共信封：早期实现 getClusterName / fromClusterData /
+			// getSourceNode 各解一次，每次都会分配 header Map 与 payload 字节数组
+			ClusterDataMessage envelope = ClusterMessageSerializer.unwrap(message);
+			String messageClusterName = envelope.getHeader(ClusterMessageSerializer.HEADER_CLUSTER_NAME);
 			if (!Objects.equals(config.getClusterName(), messageClusterName)) {
 				logger.warn("Ignored cluster message from a different or legacy cluster: expected={} actual={}",
 					config.getClusterName(), messageClusterName);
 				return;
 			}
-			ClusterMessage clusterMsg = ClusterMessageSerializer.fromClusterData(message);
+			ClusterMessage clusterMsg = ClusterMessageSerializer.fromClusterDataInternal(envelope);
 			if (clusterMsg != null) {
-				String sourceNode = ClusterMessageSerializer.getSourceNode(message);
+				String sourceNode = envelope.getHeader(ClusterMessageSerializer.HEADER_SOURCE_NODE);
 				markNodeSeen(sourceNode);
 				if (clusterMsg.getType() == ClusterMessageType.HEARTBEAT) {
 					return;
@@ -249,7 +256,7 @@ public class MqttClusterManager {
 				handleClusterMessageInternal(clusterMsg, sourceNode);
 			} else {
 				logger.debug("Skipped unknown or unsupported cluster message, type header: {}",
-					message.getHeader(ClusterMessageSerializer.HEADER_TYPE));
+					envelope.getHeader(ClusterMessageSerializer.HEADER_TYPE));
 			}
 		} catch (Exception e) {
 			logger.error("Error handling cluster message", e);
@@ -257,9 +264,6 @@ public class MqttClusterManager {
 	}
 
 	private void handleClusterMessageInternal(ClusterMessage clusterMsg, String sourceNode) {
-		if (clusterMsg.getType() == ClusterMessageType.HEARTBEAT) {
-			return;
-		}
 		ClusterMqttSessionManager sessionManager = this.sessionManager != null
 			? this.sessionManager
 			: (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
@@ -430,7 +434,7 @@ public class MqttClusterManager {
 		}
 
 		// Narrow to shared subscribers only, group the same way the dispatcher does.
-		java.util.List<Subscribe> groupCandidates = new java.util.ArrayList<>();
+		List<Subscribe> groupCandidates = new ArrayList<>();
 		for (Subscribe sub : candidates) {
 			String topicFilter = sub.getTopicFilter();
 			if (topicFilter == null) {
@@ -458,10 +462,16 @@ public class MqttClusterManager {
 			String rePickedNode = sessionManager.getClientNode(rePicked.getClientId());
 			boolean isLocal = rePickedNode == null || rePickedNode.equals(localNodeId);
 			if (isLocal) {
-				mqttServer.deliverLocal(rePicked.getClientId(), msg.getTopic(),
+				boolean localDelivered = mqttServer.deliverLocal(rePicked.getClientId(), msg.getTopic(),
 					msg.getPayload(), MqttQoS.valueOf(msg.getQos()), rePicked.getMqttQoS(),
 					msg.isRetain() && rePicked.isRetainAsPublished(), msg.getProperties());
-				logger.debug("[Cluster] Re-pick delivered to client={} topic={}", rePicked.getClientId(), topic);
+				if (localDelivered) {
+					logger.debug("[Cluster] Re-pick delivered to client={} topic={}", rePicked.getClientId(), topic);
+				} else {
+					metrics.sharedDispatchDroppedInc();
+					logger.debug("[Cluster] Re-pick target not local, dropping topic={} client={}",
+						topic, rePicked.getClientId());
+				}
 			} else {
 				SharedDispatchToClientMessage retry = new SharedDispatchToClientMessage();
 				retry.setClientId(rePicked.getClientId());
@@ -615,7 +625,12 @@ public class MqttClusterManager {
 	 * @return local and directly connected node ids
 	 */
 	public Set<String> getDirectNodeIds() {
-		Set<String> nodeIds = BidirectionalClusterClientHandler.directMemberIds(cluster);
+		Set<String> nodeIds = new HashSet<>();
+		if (cluster != null) {
+			for (Node node : cluster.getOnlineMembers()) {
+				nodeIds.add(node.getPeerHost());
+			}
+		}
 		nodeIds.add(localNodeId);
 		return nodeIds;
 	}
@@ -898,60 +913,6 @@ public class MqttClusterManager {
 		}
 	}
 
-	public void publish(String topic, byte[] payload, int qos, boolean retain) {
-		if (mqttServer == null) {
-			return;
-		}
-
-		mqttServer.publishAll(topic, payload, MqttQoS.valueOf(qos), retain);
-
-		if (config.isEnabled() && cluster != null) {
-			Set<String> remoteNodes = getRemoteNodesWithSubscriber(topic);
-			if (!remoteNodes.isEmpty()) {
-				PublishForwardMessage clusterMsg = new PublishForwardMessage();
-				Message message = new Message();
-				message.setMessageType(MessageType.UP_STREAM);
-				message.setTopic(topic);
-				message.setPayload(payload);
-				message.setQos(qos);
-				message.setRetain(retain);
-				clusterMsg.setMessage(message);
-
-				for (String node : remoteNodes) {
-					sendToNode(node, clusterMsg);
-				}
-			}
-		}
-	}
-
-	/**
-	 * Returns remote nodes that have subscribers for the given topic.
-	 * Uses searchAllSubscribe which returns all local + remote subscriptions
-	 * due to the full replication strategy (V1).
-	 *
-	 * @param topic the published topic
-	 * @return set of remote node identifiers that have subscribers
-	 */
-	public Set<String> getRemoteNodesWithSubscriber(String topic) {
-		Set<String> remoteNodes = new HashSet<>();
-		if (!config.isEnabled() || cluster == null) {
-			return remoteNodes;
-		}
-		ClusterMqttSessionManager sessionManager = this.sessionManager != null
-			? this.sessionManager
-			: (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
-		List<Subscribe> allSubs = sessionManager.searchAllSubscribe(topic);
-		if (allSubs != null) {
-			for (Subscribe sub : allSubs) {
-				String node = sessionManager.getClientNode(sub.getClientId());
-				if (node != null && !node.equals(localNodeId)) {
-					remoteNodes.add(node);
-				}
-			}
-		}
-		return remoteNodes;
-	}
-
 	public String getLocalNodeId() {
 		return localNodeId;
 	}
@@ -1051,12 +1012,29 @@ public class MqttClusterManager {
 			return false;
 		}
 		long now = System.currentTimeMillis();
+		if (takeoverGrants.size() > 1024) {
+			purgeExpiredTakeoverGrants(now);
+		}
 		long expiresAt = now + Math.max(1L, timeoutMs);
 		TakeoverGrant candidate = new TakeoverGrant(requesterNode, attemptId, expiresAt);
 		TakeoverGrant granted = takeoverGrants.compute(clientId, (key, current) ->
 			current == null || current.expiresAt <= now ? candidate : current);
 		return granted == candidate
 			|| (granted.attemptId == attemptId && granted.requesterNode.equals(requesterNode));
+	}
+
+	/**
+	 * Removes takeover grants whose validity window has elapsed.
+	 */
+	private void purgeExpiredTakeoverGrants() {
+		purgeExpiredTakeoverGrants(System.currentTimeMillis());
+	}
+
+	private void purgeExpiredTakeoverGrants(long now) {
+		if (takeoverGrants.isEmpty()) {
+			return;
+		}
+		takeoverGrants.entrySet().removeIf(entry -> entry.getValue().expiresAt <= now);
 	}
 
 	private void releaseTakeoverGrant(String clientId, String requesterNode, long attemptId) {
@@ -1201,9 +1179,13 @@ public class MqttClusterManager {
 	 */
 	public String toPrometheus() {
 		StringBuilder output = new StringBuilder(metrics.toPrometheus());
-		appendGauge(output, "mqtt_cluster_members", getClusterNodeIds().size());
-		appendGauge(output, "mqtt_cluster_direct_members", getDirectNodeIds().size());
-		appendGauge(output, "mqtt_cluster_topology_healthy", isTopologyHealthy() ? 1L : 0L);
+		// getClusterNodeIds / getDirectNodeIds 每次调用都会新建集合并查一次集群拓扑，
+		// 这里各算一次后复用
+		Set<String> clusterNodes = getClusterNodeIds();
+		Set<String> directNodes = getDirectNodeIds();
+		appendGauge(output, "mqtt_cluster_members", clusterNodes.size());
+		appendGauge(output, "mqtt_cluster_direct_members", directNodes.size());
+		appendGauge(output, "mqtt_cluster_topology_healthy", directNodes.containsAll(clusterNodes) ? 1L : 0L);
 		ClusterStorage storage = clusterStorage;
 		LocalKvStore.StoreStats stats = storage == null
 			? new LocalKvStore.StoreStats(-1L, 0L, false)

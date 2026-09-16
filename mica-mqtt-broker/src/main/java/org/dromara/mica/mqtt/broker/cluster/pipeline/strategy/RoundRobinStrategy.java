@@ -16,12 +16,13 @@
 
 package org.dromara.mica.mqtt.broker.cluster.pipeline.strategy;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -46,18 +47,25 @@ import java.util.concurrent.atomic.AtomicLong;
 public class RoundRobinStrategy implements SharedSubscriptionStrategy {
 
 	/**
-	 * Per-group monotonically increasing counter.
-	 * Using a {@link ConcurrentHashMap} so that different groups are independent
-	 * and do not contend on the same lock.
+	 * Per-group counters, bounded and evicted after 30 minutes without a pick.
+	 * An unbounded {@link ConcurrentHashMap} would grow forever with the number of
+	 * distinct shared groups ever seen (a group name is attacker-controllable).
 	 */
-	private final ConcurrentMap<String, AtomicLong> counters = new ConcurrentHashMap<>();
+	private final Cache<String, AtomicLong> counters = Caffeine.newBuilder()
+		.maximumSize(4096)
+		.expireAfterAccess(30, TimeUnit.MINUTES)
+		.build();
 
 	@Override
 	public Subscribe pick(String groupName, List<Subscribe> candidates, String localNodeId, Message message) {
 		if (candidates == null || candidates.isEmpty()) {
 			return null;
 		}
-		long seq = counters.computeIfAbsent(groupName, k -> new AtomicLong(0L)).getAndIncrement();
+		AtomicLong counter = counters.get(groupName, k -> new AtomicLong(0L));
+		if (counter == null) {
+			return candidates.get(0);
+		}
+		long seq = counter.getAndIncrement();
 		// 使用 & Long.MAX_VALUE 防止溢出后产生负索引
 		int index = (int) ((seq & Long.MAX_VALUE) % candidates.size());
 		return candidates.get(index);

@@ -19,6 +19,7 @@ package org.dromara.mica.mqtt.broker.cluster.store;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -47,13 +48,25 @@ public class MemoryKvStoreImpl implements LocalKvStore {
 
 	@Override
 	public void open(Path dataDir) {
-		data.clear();
+		// Mirrors H2MvStoreImpl.open(): reopening must preserve existing content so that
+		// restart-recovery paths behave identically in tests. Use clear() to reset.
 		open = true;
 	}
 
 	@Override
 	public void close() {
 		open = false;
+	}
+
+	/**
+	 * Removes every entry, resetting the store to its freshly-constructed state.
+	 * <p>
+	 * Provided so tests can explicitly reset state; {@link #open(Path)} deliberately
+	 * preserves content to match the persistent implementation's semantics.
+	 * </p>
+	 */
+	public void clear() {
+		data.clear();
 	}
 
 	@Override
@@ -79,13 +92,13 @@ public class MemoryKvStoreImpl implements LocalKvStore {
 		readOperations.incrementAndGet();
 		List<KeyValue> result = new ArrayList<>();
 		if (prefix == null || prefix.isEmpty()) {
-			for (java.util.Map.Entry<String, byte[]> entry : data.entrySet()) {
+			for (Map.Entry<String, byte[]> entry : data.entrySet()) {
 				result.add(new KeyValue(entry.getKey(), entry.getValue()));
 			}
 		} else {
 			// Use the prefix as an inclusive lower bound; iterate and stop once
 			// a key no longer starts with the prefix (robust for all Unicode characters).
-			for (java.util.Map.Entry<String, byte[]> entry : data.tailMap(prefix).entrySet()) {
+			for (Map.Entry<String, byte[]> entry : data.tailMap(prefix).entrySet()) {
 				if (!entry.getKey().startsWith(prefix)) {
 					break;
 				}
@@ -97,7 +110,8 @@ public class MemoryKvStoreImpl implements LocalKvStore {
 
 	@Override
 	public void executeInTransaction(Runnable body) {
-		// In-memory store: no real transaction support; just run the body.
+		// The in-memory store exposes mutations to other threads immediately, so there is
+		// nothing to roll back. Changes made before a failure remain visible.
 		body.run();
 	}
 

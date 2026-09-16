@@ -17,7 +17,6 @@
 package org.dromara.mica.mqtt.broker.rule.store;
 
 import org.dromara.mica.mqtt.broker.rule.Rule;
-import org.dromara.mica.mqtt.broker.rule.RuleChangeListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,19 +35,10 @@ public class InMemoryRuleStore implements RuleStore {
 	private static final Logger logger = LoggerFactory.getLogger(InMemoryRuleStore.class);
 
 	private final ConcurrentMap<String, Rule> rules = new ConcurrentHashMap<>();
-	private volatile RuleChangeListener listener;
 
 	@Override
 	public void save(Rule rule) {
 		Rule prev = rules.put(rule.getId(), rule);
-		RuleChangeListener l = listener;
-		if (l != null) {
-			try {
-				l.onSaved(rule);
-			} catch (Exception e) {
-				logger.warn("RuleChangeListener.onSaved failed for rule {}", rule.getId(), e);
-			}
-		}
 		if (prev == null) {
 			logger.info("Rule saved: id={}, name={}", rule.getId(), rule.getName());
 		}
@@ -58,14 +48,6 @@ public class InMemoryRuleStore implements RuleStore {
 	public void delete(String id) {
 		Rule prev = rules.remove(id);
 		if (prev != null) {
-			RuleChangeListener l = listener;
-			if (l != null) {
-				try {
-					l.onDeleted(id);
-				} catch (Exception e) {
-					logger.warn("RuleChangeListener.onDeleted failed for rule {}", id, e);
-				}
-			}
 			logger.info("Rule deleted: id={}", id);
 		}
 	}
@@ -78,10 +60,5 @@ public class InMemoryRuleStore implements RuleStore {
 	@Override
 	public List<Rule> loadAll() {
 		return new ArrayList<>(rules.values());
-	}
-
-	@Override
-	public void setListener(RuleChangeListener listener) {
-		this.listener = listener;
 	}
 }

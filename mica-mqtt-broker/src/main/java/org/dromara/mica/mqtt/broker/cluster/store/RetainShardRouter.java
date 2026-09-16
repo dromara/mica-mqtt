@@ -19,29 +19,61 @@ package org.dromara.mica.mqtt.broker.cluster.store;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /** Deterministic rendezvous-hash placement for retained MQTT topics. */
 public class RetainShardRouter {
 
+	/**
+	 * Ranking order for replica selection: highest unsigned score first, ties broken by
+	 * ascending node id so the result is deterministic across nodes.
+	 */
+	private static final Comparator<NodeScore> ORDER = (left, right) -> {
+		int scoreCompare = Long.compareUnsigned(right.score, left.score);
+		return scoreCompare != 0 ? scoreCompare : left.nodeId.compareTo(right.nodeId);
+	};
+
+	/**
+	 * Selects the replica nodes for {@code topic}.
+	 * <p>
+	 * Rather than materialising and sorting every candidate (O(n log n)), this keeps a
+	 * bounded, already-ordered list of the best {@code k} candidates (O(n · k), with k
+	 * typically 1–3). The selection is identical to a full sort because {@link #ORDER} is
+	 * a total order.
+	 * </p>
+	 *
+	 * @param topic             the retained topic being placed; {@code null} yields no replicas
+	 * @param nodeIds           candidate node ids; {@code null} yields no replicas
+	 * @param replicationFactor desired replica count, clamped to {@code [1, nodeIds.size()]}
+	 * @return the selected node ids, best first; never {@code null}, may be empty
+	 */
 	public List<String> replicasOf(String topic, Collection<String> nodeIds, int replicationFactor) {
-		List<NodeScore> scores = new ArrayList<>();
 		if (topic == null || nodeIds == null) {
 			return new ArrayList<>();
 		}
+		int limit = Math.max(1, replicationFactor);
+		List<NodeScore> top = new ArrayList<>(Math.min(limit, 8));
 		for (String nodeId : nodeIds) {
-			if (nodeId != null && !nodeId.isEmpty()) {
-				scores.add(new NodeScore(nodeId, hash(topic, nodeId)));
+			if (nodeId == null || nodeId.isEmpty()) {
+				continue;
+			}
+			NodeScore candidate = new NodeScore(nodeId, hash(topic, nodeId));
+			int position = Collections.binarySearch(top, candidate, ORDER);
+			if (position < 0) {
+				position = -(position + 1);
+			}
+			if (position < limit) {
+				top.add(position, candidate);
+				if (top.size() > limit) {
+					top.remove(top.size() - 1);
+				}
 			}
 		}
-		scores.sort((left, right) -> {
-			int scoreCompare = Long.compareUnsigned(right.score, left.score);
-			return scoreCompare != 0 ? scoreCompare : left.nodeId.compareTo(right.nodeId);
-		});
-		int count = Math.min(Math.max(1, replicationFactor), scores.size());
-		List<String> replicas = new ArrayList<>(count);
-		for (int i = 0; i < count; i++) {
-			replicas.add(scores.get(i).nodeId);
+		List<String> replicas = new ArrayList<>(top.size());
+		for (NodeScore score : top) {
+			replicas.add(score.nodeId);
 		}
 		return replicas;
 	}

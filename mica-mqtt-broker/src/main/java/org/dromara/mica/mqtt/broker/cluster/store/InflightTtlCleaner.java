@@ -44,10 +44,15 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <h2>Accuracy</h2>
  * <p>
- * Records may linger for at most {@code TTL + period} milliseconds before removal
- * (e.g. with a 30 s TTL and 30 s period, a record is removed at most 60 s after
- * it was written).  This is acceptable for MQTT inflight semantics where the exact
- * eviction time is not critical.
+ * Records may linger for at most {@code TTL + period} milliseconds before removal.
+ * This is acceptable for MQTT inflight semantics where the exact eviction time is
+ * not critical.
+ * </p>
+ * <p>
+ * The TTL itself is <em>not</em> owned by this class: it is applied by the store when
+ * records are written, based on {@code MqttStorageConfig.getInflightTtlMs()} (default
+ * {@code 0}, i.e. TTL eviction disabled).  This cleaner only sweeps what has already
+ * expired, and reports its own scan period.
  * </p>
  *
  * @author L.cm
@@ -58,9 +63,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public class InflightTtlCleaner {
 	private static final Logger logger = LoggerFactory.getLogger(InflightTtlCleaner.class);
 	private static final AtomicInteger INSTANCE_COUNTER = new AtomicInteger(0);
-
-	/** Default TTL for inflight messages: 30 seconds. */
-	public static final long DEFAULT_TTL_MS = 30_000L;
 
 	/** Default cleanup period: 30 seconds. */
 	public static final long DEFAULT_PERIOD_MS = 30_000L;
@@ -112,7 +114,7 @@ public class InflightTtlCleaner {
 			return t;
 		});
 		scheduler.scheduleAtFixedRate(this::runCleanup, periodMs, periodMs, TimeUnit.MILLISECONDS);
-		logger.info("[InflightTtlCleaner] Started with period={}ms ttl={}ms", periodMs, DEFAULT_TTL_MS);
+		logger.info("[InflightTtlCleaner] Started with period={}ms", periodMs);
 	}
 
 	/**

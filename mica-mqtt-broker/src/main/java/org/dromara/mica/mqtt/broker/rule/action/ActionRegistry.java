@@ -20,6 +20,8 @@ import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -54,27 +56,33 @@ public class ActionRegistry {
 
 	/**
 	 * 物化 action，按 ActionRef 全量缓存（type + name + props）。
+	 * <p>
+	 * 使用 {@link ConcurrentMap#computeIfAbsent} 保证并发下只有一个线程创建实例：
+	 * 早期实现为 {@code get → create → putIfAbsent}，落败的实例（可能已建立 MqttClient
+	 * 连接）会被直接丢弃且不会关闭，造成连接泄漏。
+	 * </p>
 	 *
 	 * @param ref action 引用
 	 * @return action 实例
 	 */
 	public Action materialize(ActionRef ref) {
-		Action action = cache.get(ref);
-		if (action != null) {
-			return action;
+		Action cached = cache.get(ref);
+		if (cached != null) {
+			return cached;
 		}
-		ActionFactory factory = factories.get(ref.getType());
+		final ActionFactory factory = factories.get(ref.getType());
 		if (factory == null) {
 			throw new IllegalStateException("No ActionFactory for type: " + ref.getType());
 		}
-		Action newAction;
-		try {
-			newAction = factory.create(ref);
-		} catch (Exception e) {
-			throw new RuntimeException("Failed to create action for type: " + ref.getType(), e);
-		}
-		Action existing = cache.putIfAbsent(ref, newAction);
-		return existing != null ? existing : newAction;
+		return cache.computeIfAbsent(ref, key -> {
+			try {
+				return factory.create(key);
+			} catch (RuntimeException e) {
+				throw e;
+			} catch (Exception e) {
+				throw new IllegalStateException("Failed to create action for type: " + key.getType(), e);
+			}
+		});
 	}
 
 	/**
@@ -86,6 +94,27 @@ public class ActionRegistry {
 		Action action = cache.remove(ref);
 		if (action != null) {
 			closeQuietly(action);
+		}
+	}
+
+	/**
+	 * 仅保留仍被引用的 action，其余关闭并移出缓存。
+	 * <p>
+	 * 规则被删除或更新时调用：同一 {@link ActionRef} 可能被多条规则共享，
+	 * 因此必须按「仍存活引用的并集」回收，不能按单条规则盲目失效。
+	 * </p>
+	 *
+	 * @param retained 仍然有效的 action 引用集合
+	 */
+	public void retainAll(Collection<ActionRef> retained) {
+		for (ActionRef ref : new ArrayList<>(cache.keySet())) {
+			if (retained.contains(ref)) {
+				continue;
+			}
+			Action action = cache.remove(ref);
+			if (action != null) {
+				closeQuietly(action);
+			}
 		}
 	}
 

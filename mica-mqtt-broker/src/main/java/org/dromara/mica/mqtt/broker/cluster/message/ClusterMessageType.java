@@ -136,21 +136,19 @@ public enum ClusterMessageType {
 	SHARED_DISPATCH_TO_CLIENT(11),
 
 	/**
-	 * Shared subscription registration notification broadcast.
+	 * Reserved protocol code — no producer.
 	 * <p>
-	 * Sent when a client subscribes to a {@code $share/<group>/<topic>} or
-	 * {@code $queue/<topic>} filter. Other nodes update their shared subscription
-	 * tables to include this client as a candidate for future dispatches.
+	 * Historically meant to broadcast shared-subscription registration.  V2 shared
+	 * subscription state is instead carried by {@link #SUBSCRIBE_NOTIFY} plus the
+	 * full replica table, so this code is kept only to avoid reusing the number.
+	 * Sending it is a no-op: {@code ClusterMessageSerializer} has no message class
+	 * for it and the receiver skips it.
 	 * </p>
 	 */
 	SHARED_SUBSCRIBE_NOTIFY(12),
 
 	/**
-	 * Shared subscription removal notification broadcast.
-	 * <p>
-	 * Sent when a client unsubscribes from a shared topic. Other nodes remove
-	 * the corresponding entry from their shared subscription candidate lists.
-	 * </p>
+	 * Reserved protocol code — no producer.  See {@link #SHARED_SUBSCRIBE_NOTIFY}.
 	 */
 	SHARED_SUBSCRIBE_REMOVE(13),
 
@@ -193,21 +191,18 @@ public enum ClusterMessageType {
 	SESSION_DELETE_NOTIFY(17),
 
 	/**
-	 * Shared subscription state synchronization message between owner and backup nodes.
+	 * Reserved protocol code — no producer.
 	 * <p>
-	 * Used to replicate the authoritative shared subscription membership list from
-	 * the owner node to its designated backup nodes for fault tolerance.
+	 * Historically meant to replicate the shared-subscription membership list from the
+	 * owner node to backup nodes.  V1 full replication already keeps the membership on
+	 * every node, so this code is kept only to avoid reusing the number.  Sending it is
+	 * a no-op: {@code ClusterMessageSerializer} has no message class for it.
 	 * </p>
 	 */
 	SHARED_SUB_STATE_SYNC(18),
 
 	/**
-	 * Shared subscription ownership takeover request.
-	 * <p>
-	 * Sent by a backup node when it detects that the owner node has left the cluster.
-	 * The backup promotes itself to owner and broadcasts this message to establish
-	 * the new ownership, eliminating the message vacuum during owner failover.
-	 * </p>
+	 * Reserved protocol code — no producer.  See {@link #SHARED_SUB_STATE_SYNC}.
 	 */
 	SHARED_SUB_TAKEOVER(19),
 

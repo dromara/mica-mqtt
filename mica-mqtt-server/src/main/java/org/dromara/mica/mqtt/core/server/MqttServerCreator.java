@@ -83,6 +83,13 @@ public class MqttServerCreator {
 	 */
 	private final List<IMqttProtocolListener> listeners = new ArrayList<>();
 	/**
+	 * 关闭钩子，在 {@link MqttServer#stop()} 最开始依次执行。
+	 * <p>
+	 * 供上层扩展（如 broker 的规则引擎）释放自己装配的资源，避免侵入 server 生命周期。
+	 * </p>
+	 */
+	private final List<Runnable> shutdownHooks = new ArrayList<>();
+	/**
 	 * 心跳超时时间(单位: 毫秒 默认: 1000 * 120)，如果用户不希望框架层面做心跳相关工作，请把此值设为0或负数
 	 */
 	private Long heartbeatTimeout;
@@ -655,6 +662,31 @@ public class MqttServerCreator {
 		}
 		this.listeners.add(listener);
 		return this;
+	}
+
+	/**
+	 * 注册关闭钩子，在 {@link MqttServer#stop()} 时依次执行（先于监听器与线程池关闭）。
+	 * <p>
+	 * 用于释放 broker / 上层扩展自己装配的资源，例如规则引擎持有的 MqttClient 与 HTTP 客户端。
+	 * </p>
+	 *
+	 * @param hook 关闭钩子
+	 * @return this
+	 */
+	public MqttServerCreator addShutdownHook(Runnable hook) {
+		if (hook != null) {
+			this.shutdownHooks.add(hook);
+		}
+		return this;
+	}
+
+	/**
+	 * 获取全部关闭钩子。
+	 *
+	 * @return 关闭钩子列表
+	 */
+	public List<Runnable> getShutdownHooks() {
+		return shutdownHooks;
 	}
 
 	public MqttServer build() {

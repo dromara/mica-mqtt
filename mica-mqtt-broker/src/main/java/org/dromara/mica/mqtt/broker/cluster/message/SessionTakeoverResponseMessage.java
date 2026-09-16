@@ -58,7 +58,6 @@ import java.util.Map;
  */
 public class SessionTakeoverResponseMessage implements ClusterMessage {
 	private static final String HEADER_PAYLOAD_FORMAT = "payloadFormat";
-	private static final String PAYLOAD_FORMAT_INFLIGHT_V1 = "session-inflight-v1";
 	private static final String PAYLOAD_FORMAT_INFLIGHT_V2 = "session-inflight-v2";
 	private static final int MAX_INFLIGHT_ENTRIES = 100_000;
 
@@ -108,9 +107,8 @@ public class SessionTakeoverResponseMessage implements ClusterMessage {
 		this.status = message.getHeader("status");
 		byte[] payload = message.getPayload();
 		String payloadFormat = message.getHeader(HEADER_PAYLOAD_FORMAT);
-		if (PAYLOAD_FORMAT_INFLIGHT_V1.equals(payloadFormat) || PAYLOAD_FORMAT_INFLIGHT_V2.equals(payloadFormat)) {
-			decodeTransferPayload(payload == null ? new byte[0] : payload,
-				PAYLOAD_FORMAT_INFLIGHT_V2.equals(payloadFormat));
+		if (PAYLOAD_FORMAT_INFLIGHT_V2.equals(payloadFormat)) {
+			decodeTransferPayload(payload == null ? new byte[0] : payload);
 		} else {
 			this.sessionBytes = payload == null ? new byte[0] : payload;
 			this.inflightEntries = Collections.emptyList();
@@ -189,7 +187,7 @@ public class SessionTakeoverResponseMessage implements ClusterMessage {
 		}
 	}
 
-	private void decodeTransferPayload(byte[] payload, boolean includesPhase) {
+	private void decodeTransferPayload(byte[] payload) {
 		try {
 			DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload));
 			int sessionLength = readLength(in, payload.length);
@@ -205,7 +203,7 @@ public class SessionTakeoverResponseMessage implements ClusterMessage {
 				int packetId = in.readInt();
 				long expireAt = in.readLong();
 				int qos = in.readInt();
-				int phase = includesPhase ? in.readInt() : InflightStore.PHASE_PUBLISH;
+				int phase = in.readInt();
 				int topicLength = readLength(in, in.available());
 				byte[] topic = new byte[topicLength];
 				in.readFully(topic);

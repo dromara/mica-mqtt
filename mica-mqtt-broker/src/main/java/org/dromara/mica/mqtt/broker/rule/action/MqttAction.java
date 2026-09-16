@@ -16,8 +16,8 @@
 
 package org.dromara.mica.mqtt.broker.rule.action;
 
-import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.broker.rule.RuleContext;
+import org.dromara.mica.mqtt.broker.rule.ext.template.TemplateRenderer;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.core.client.MqttClient;
 import org.dromara.mica.mqtt.core.client.MqttClientCreator;
@@ -82,24 +82,39 @@ public class MqttAction implements Action, AutoCloseable {
 		}
 	}
 
+	/**
+	 * 渲染目标 topic 模板。
+	 * <p>
+	 * 复用 {@link TemplateRenderer}，使内置 mqtt action 与扩展模板 action 支持同一组占位符
+	 * （{@code {topic}}、{@code {clientId}}、{@code {rule.name}}、{@code {topicSegments[i]}}）。
+	 * </p>
+	 *
+	 * @param template topic 模板；为空表示沿用原始 topic
+	 * @param ctx      当前规则上下文
+	 * @return 渲染后的 topic
+	 */
 	private static String renderTopic(String template, RuleContext ctx) {
 		if (template == null || template.isEmpty()) {
 			return ctx.getTopic();
 		}
-		String result = StrUtil.replace(template, "{clientId}", safe(ctx.getClientId()));
-		result = StrUtil.replace(result, "{topic}", safe(ctx.getTopic()));
-		return result;
-	}
-
-	private static String safe(String s) {
-		return s == null ? "" : s;
+		return TemplateRenderer.render(template, ctx);
 	}
 
 	/**
 	 * 用于 {@link MqttActionFactory} 物化客户端连接。
+	 * <p>
+	 * 必填属性在创建期校验，避免把错误推迟到首条消息触发时才暴露。
+	 * </p>
+	 *
+	 * @param ref action 配置
+	 * @return 已连接的 mqtt 客户端
 	 */
 	public static MqttClient buildClient(ActionRef ref) {
 		String host = ref.getString("host");
+		if (host == null || host.trim().isEmpty()) {
+			throw new IllegalArgumentException(
+				"mqtt action requires a non-empty 'host' property: " + ref.getName());
+		}
 		int port = ref.getInt("port", 1883);
 		String clientId = ref.getString("clientId");
 		String username = ref.getString("username");

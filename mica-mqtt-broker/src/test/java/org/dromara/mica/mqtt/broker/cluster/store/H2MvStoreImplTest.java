@@ -128,6 +128,56 @@ class H2MvStoreImplTest {
 	}
 
 	@Test
+	void testTransactionRollsBackOnFailure() {
+		store.put("tx:keep", "original".getBytes());
+
+		RuntimeException thrown = assertThrows(RuntimeException.class, () ->
+			store.executeInTransaction(() -> {
+				store.put("tx:keep", "overwritten".getBytes());
+				store.put("tx:new", "inserted".getBytes());
+				store.delete("tx:keep");
+				throw new IllegalStateException("boom");
+			}));
+		assertEquals("boom", thrown.getMessage());
+
+		// The whole transaction is discarded: the pre-existing value survives and the
+		// insert never becomes visible.
+		assertEquals("original", new String(store.get("tx:keep")));
+		assertNull(store.get("tx:new"));
+	}
+
+	@Test
+	void testTransactionRollbackSurvivesReopen() {
+		store.put("tx:keep", "original".getBytes());
+		assertThrows(RuntimeException.class, () ->
+			store.executeInTransaction(() -> {
+				store.put("tx:keep", "overwritten".getBytes());
+				throw new IllegalStateException("boom");
+			}));
+		store.close();
+		store = null;
+
+		H2MvStoreImpl reopened = new H2MvStoreImpl();
+		reopened.open(tempDir);
+		try {
+			assertEquals("original", new String(reopened.get("tx:keep")),
+				"rolled-back write must not reappear after WAL replay");
+		} finally {
+			reopened.close();
+		}
+	}
+
+	@Test
+	void testNestedTransactionCommitsOnce() {
+		store.executeInTransaction(() -> {
+			store.put("tx:outer", "a".getBytes());
+			store.executeInTransaction(() -> store.put("tx:inner", "b".getBytes()));
+		});
+		assertEquals("a", new String(store.get("tx:outer")));
+		assertEquals("b", new String(store.get("tx:inner")));
+	}
+
+	@Test
 	void testStats() {
 		store.put("k", "v".getBytes());
 		store.get("k");

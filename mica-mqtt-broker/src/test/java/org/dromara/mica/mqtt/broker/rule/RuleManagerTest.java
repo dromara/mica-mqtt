@@ -58,16 +58,6 @@ class RuleManagerTest {
 				removedCount.incrementAndGet();
 			}
 		});
-		store.setListener(new RuleChangeListener() {
-			@Override
-			public void onSaved(Rule rule) {
-				// 通过 store.save 时会触发
-			}
-
-			@Override
-			public void onDeleted(String ruleId) {
-			}
-		});
 	}
 
 	@Test

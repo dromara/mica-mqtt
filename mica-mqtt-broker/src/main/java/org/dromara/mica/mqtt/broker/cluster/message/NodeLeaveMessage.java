@@ -16,10 +16,6 @@
 
 package org.dromara.mica.mqtt.broker.cluster.message;
 
-import net.dreamlu.mica.net.server.cluster.message.ClusterDataMessage;
-
-import java.util.Map;
-
 /**
  * Notice broadcast when a cluster node departs or becomes unreachable.
  * <p>
@@ -33,23 +29,10 @@ import java.util.Map;
  * @see ClusterMessageType#NODE_LEAVE
  * @since 1.0.0
  */
-public class NodeLeaveMessage implements ClusterMessage {
+public class NodeLeaveMessage extends AbstractEmptyClusterMessage {
 
 	@Override
 	public ClusterMessageType getType() {
 		return ClusterMessageType.NODE_LEAVE;
-	}
-
-	@Override
-	public void toClusterData(Map<String, String> headers) {
-	}
-
-	@Override
-	public byte[] toPayload() {
-		return new byte[0];
-	}
-
-	@Override
-	public void fromClusterData(ClusterDataMessage message) {
 	}
 }

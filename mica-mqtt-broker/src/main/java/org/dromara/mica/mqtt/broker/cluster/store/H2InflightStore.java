@@ -28,6 +28,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -351,11 +352,11 @@ public class H2InflightStore implements InflightStore {
 			dis.readByte();
 			int phaseOffset = value.length - dis.available();
 			if (dis.available() > 0) {
-				byte[] updated = java.util.Arrays.copyOf(value, value.length);
+				byte[] updated = Arrays.copyOf(value, value.length);
 				updated[phaseOffset] = (byte) phase;
 				return updated;
 			}
-			byte[] updated = java.util.Arrays.copyOf(value, value.length + 1);
+			byte[] updated = Arrays.copyOf(value, value.length + 1);
 			updated[value.length] = (byte) phase;
 			return updated;
 		}

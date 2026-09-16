@@ -17,21 +17,28 @@
 package org.dromara.mica.mqtt.broker.rule;
 
 import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Node;
+import org.dromara.mica.mqtt.broker.rule.action.Action;
+import org.dromara.mica.mqtt.broker.rule.action.ActionRef;
+import org.dromara.mica.mqtt.broker.rule.action.ActionRegistry;
+import org.dromara.mica.mqtt.broker.rule.matcher.MatcherRegistry;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcher;
 import org.dromara.mica.mqtt.broker.rule.metrics.RuleMetrics;
 import org.dromara.mica.mqtt.broker.rule.metrics.RuleMetricsRecorder;
-import org.dromara.mica.mqtt.broker.rule.action.Action;
-import org.dromara.mica.mqtt.broker.rule.action.ActionRef;
 import org.dromara.mica.mqtt.broker.rule.store.RuleEvent;
-import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.server.func.IMqttFunctionMessageListener;
 import org.dromara.mica.mqtt.core.server.func.MqttFunctionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -47,6 +54,8 @@ public class RuleEngine {
 	private final RuleManager ruleManager;
 	private final MqttFunctionManager functionManager;
 	private final RuleMetrics metrics;
+	private final ActionRegistry actionRegistry;
+	private final MatcherRegistry matcherRegistry;
 	private final ConcurrentMap<String, RuleFunctionListener> listenerMap = new ConcurrentHashMap<>();
 
 	/**
@@ -62,6 +71,8 @@ public class RuleEngine {
 		this.ruleManager = ruleManager;
 		this.functionManager = functionManager;
 		this.metrics = metrics == null ? new RuleMetricsRecorder() : metrics;
+		this.actionRegistry = ruleManager.getActionRegistry();
+		this.matcherRegistry = ruleManager.getMatcherRegistry();
 	}
 
 	/**
@@ -72,14 +83,17 @@ public class RuleEngine {
 	}
 
 	/**
-	 * 停止：摘掉所有挂载。
+	 * 停止：摘掉所有挂载并释放 action 资源（MqttClient / HTTP 连接等）。
+	 * <p>
+	 * 由 broker 的关闭流程通过 {@code MqttServerCreator#addShutdownHook} 调用。
+	 * </p>
 	 */
 	public void stop() {
 		for (RuleFunctionListener fn : listenerMap.values()) {
-			Rule r = fn.getRule();
-			functionManager.unregister(r.getTopicFilter(), fn);
+			functionManager.unregister(fn.getRule().getTopicFilter(), fn);
 		}
 		listenerMap.clear();
+		// RuleManager.stop() 内部会 actionRegistry.clear()，释放全部 action
 		ruleManager.stop();
 	}
 
@@ -94,7 +108,6 @@ public class RuleEngine {
 	public RuleManager getRuleManager() {
 		return ruleManager;
 	}
-
 	/**
 	 * 由装配流程调用，注册到 RuleManager。
 	 */
@@ -107,23 +120,20 @@ public class RuleEngine {
 			case ADDED:
 			case UPDATED: {
 				Rule rule = evt.getRule();
-				String oldId = evt.getOldRuleId();
-				if (oldId != null && !oldId.equals(rule.getId())) {
-					RuleFunctionListener old = listenerMap.remove(oldId);
-					if (old != null) {
-						functionManager.unregister(old.getRule().getTopicFilter(), old);
-					}
-				}
-				RuleFunctionListener prev = listenerMap.get(rule.getId());
+				// 先摘掉旧的挂载，再挂新的；旧的 action 在下面按引用并集统一回收
+				RuleFunctionListener prev = listenerMap.remove(rule.getId());
 				if (prev != null) {
 					functionManager.unregister(prev.getRule().getTopicFilter(), prev);
 				}
-				RuleFunctionListener fn = new RuleFunctionListener(rule, ruleManager, metrics);
+				// 预物化 matcher 与 action：热路径不再做 registry 查找与工厂调用，
+				// 配置错误（缺 url/topic 等）也会在挂载期暴露而不是首条消息
+				RuleMatcher matcher = matcherRegistry.get(rule.getMatcherType(), rule.getMatcherProps());
+				List<Action> actions = materializeActions(rule);
+				RuleFunctionListener fn = new RuleFunctionListener(rule, matcher, actions, metrics);
 				listenerMap.put(rule.getId(), fn);
 				functionManager.register(rule.getTopicFilter(), fn);
-				if (logger.isDebugEnabled()) {
-					logger.debug("rule {} attached to {}", rule.getId(), rule.getTopicFilter());
-				}
+				releaseUnusedActions();
+				logger.debug("rule {} attached to {}", rule.getId(), rule.getTopicFilter());
 				break;
 			}
 			case REMOVED: {
@@ -131,9 +141,9 @@ public class RuleEngine {
 				if (fn != null) {
 					functionManager.unregister(fn.getRule().getTopicFilter(), fn);
 				}
-				if (logger.isDebugEnabled()) {
-					logger.debug("rule {} detached", evt.getRuleId());
-				}
+				// 删除规则后回收其 action（MqttAction 持有 MqttClient，不回收会常驻）
+				releaseUnusedActions();
+				logger.debug("rule {} detached", evt.getRuleId());
 				break;
 			}
 			default:
@@ -141,17 +151,42 @@ public class RuleEngine {
 		}
 	}
 
+	private List<Action> materializeActions(Rule rule) {
+		List<ActionRef> refs = rule.getActions();
+		if (refs.isEmpty()) {
+			return Collections.emptyList();
+		}
+		List<Action> actions = new ArrayList<>(refs.size());
+		for (ActionRef ref : refs) {
+			actions.add(actionRegistry.materialize(ref));
+		}
+		return actions;
+	}
+
+	/**
+	 * 回收不再被任何存活规则引用的 action。
+	 */
+	private void releaseUnusedActions() {
+		Set<ActionRef> retained = new LinkedHashSet<>();
+		for (RuleFunctionListener fn : listenerMap.values()) {
+			retained.addAll(fn.getRule().getActions());
+		}
+		actionRegistry.retainAll(retained);
+	}
+
 	/**
 	 * 单条规则的 function 监听器，在 broker IO 线程上同步执行 actions。
 	 */
 	private static final class RuleFunctionListener implements IMqttFunctionMessageListener {
 		private final Rule rule;
-		private final RuleManager ruleManager;
+		private final RuleMatcher matcher;
+		private final List<Action> actions;
 		private final RuleMetrics metrics;
 
-		RuleFunctionListener(Rule rule, RuleManager ruleManager, RuleMetrics metrics) {
+		RuleFunctionListener(Rule rule, RuleMatcher matcher, List<Action> actions, RuleMetrics metrics) {
 			this.rule = rule;
-			this.ruleManager = ruleManager;
+			this.matcher = matcher;
+			this.actions = actions;
 			this.metrics = metrics;
 		}
 
@@ -166,26 +201,25 @@ public class RuleEngine {
 				return;
 			}
 			Map<String, String> headers = extractHeaders(message);
+			Node clientNode = context == null ? null : context.getClientNode();
+			Node serverNode = context == null ? null : context.getServerNode();
 			RuleChannelInfo channelInfo = new RuleChannelInfo(
-				context != null && context.getClientNode() != null ? context.getClientNode().getIp() : null,
-				context != null && context.getClientNode() != null ? context.getClientNode().getPort() : 0,
-				context != null && context.getServerNode() != null ? context.getServerNode().toString() : null
+				clientNode == null ? null : clientNode.getIp(),
+				clientNode == null ? 0 : clientNode.getPort(),
+				serverNode == null ? null : serverNode.toString()
 			);
 			RuleContext ctx = new RuleContext(
 				context, channelInfo, clientId, topic, qos,
 				message.getPayload(), message.fixedHeader().isRetain(), headers, rule
 			);
-			RuleMatcher matcher = ruleManager.getMatcherRegistry()
-				.get(rule.getMatcherType(), rule.getMatcherProps());
 			if (matcher != null && !matcher.matches(ctx)) {
 				return;
 			}
 			boolean stopped = false;
-			for (ActionRef ref : rule.getActions()) {
+			for (Action action : actions) {
 				if (stopped) {
 					break;
 				}
-				Action action = ruleManager.getActionRegistry().materialize(ref);
 				long start = System.nanoTime();
 				try {
 					action.send(ctx);
@@ -201,17 +235,17 @@ public class RuleEngine {
 		}
 	}
 
+	/**
+	 * 提取 MQTT 5.0 User Property 作为 headers。
+	 * <p>
+	 * {@code MqttPublishMessage.getProperties()} 内部使用
+	 * {@code MqttProperties.withEmptyDefaults(...)}，对 MQTT 3.x 报文返回空属性集合，
+	 * 因此无需 try/catch 兜底。
+	 * </p>
+	 */
 	private static Map<String, String> extractHeaders(MqttPublishMessage message) {
-		Map<String, String> headers = new HashMap<>();
-		try {
-			if (message.getProperties() != null) {
-				message.getProperties().getUserProperties()
-					.forEach((up) -> headers.put(up.value().key, up.value().value));
-			}
-		} catch (Exception ignore) {
-			// 旧协议没有 properties，忽略
-		}
-		return headers;
+		Map<String, String> headers = message.getProperties().getUserPropertiesMap();
+		return headers.isEmpty() ? Collections.emptyMap() : headers;
 	}
 
 	private static long costMs(long startNanos) {

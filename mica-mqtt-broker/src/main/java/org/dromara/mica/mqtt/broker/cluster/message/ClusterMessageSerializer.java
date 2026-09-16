@@ -74,6 +74,10 @@ public class ClusterMessageSerializer {
 	 */
 	public static final String HEADER_TIMEOUT = "timeout";
 	public static final String HEADER_CLUSTER_NAME = "clusterName";
+	/**
+	 * Header key indicating whether a disconnecting client owns a persistent session.
+	 */
+	public static final String HEADER_PERSISTENT_SESSION = "persistentSession";
 
 	/**
 	 * Serializes a cluster message into a t-io cluster data message for network transmission.
@@ -111,8 +115,26 @@ public class ClusterMessageSerializer {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ClusterMessage> T fromClusterData(ClusterDataMessage data) {
-		data = unwrapEnvelope(data);
-		int typeCode = Integer.parseInt(data.getHeader(HEADER_TYPE));
+		return fromClusterDataInternal(unwrap(data));
+	}
+
+	/**
+	 * Deserializes an already unwrapped cluster data message. The caller is expected to
+	 * have called {@link #unwrap(ClusterDataMessage)} first, so the public binary
+	 * envelope is decoded exactly once per received message.
+	 *
+	 * @param data the unwrapped cluster data message
+	 * @param <T> the expected cluster message subtype
+	 * @return the deserialized cluster message instance, or {@code null} when the type is unsupported
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ClusterMessage> T fromClusterDataInternal(ClusterDataMessage data) {
+		int typeCode;
+		try {
+			typeCode = Integer.parseInt(data.getHeader(HEADER_TYPE));
+		} catch (NumberFormatException e) {
+			return null;
+		}
 		ClusterMessageType type;
 		try {
 			type = ClusterMessageType.fromCode(typeCode);
@@ -136,11 +158,22 @@ public class ClusterMessageSerializer {
 	 * @return the source node identifier
 	 */
 	public static String getSourceNode(ClusterDataMessage data) {
-		return unwrapEnvelope(data).getHeader(HEADER_SOURCE_NODE);
+		return unwrap(data).getHeader(HEADER_SOURCE_NODE);
 	}
 
 	public static String getClusterName(ClusterDataMessage data) {
-		return unwrapEnvelope(data).getHeader(HEADER_CLUSTER_NAME);
+		return unwrap(data).getHeader(HEADER_CLUSTER_NAME);
+	}
+
+	/**
+	 * Decodes the public binary envelope exactly once, returning a message whose headers
+	 * are directly readable. Idempotent: an already unwrapped message is returned as is.
+	 *
+	 * @param data the received cluster data message
+	 * @return the message with readable headers
+	 */
+	public static ClusterDataMessage unwrap(ClusterDataMessage data) {
+		return unwrapEnvelope(data);
 	}
 
 	private static byte[] encodeEnvelope(Map<String, String> headers, byte[] payload) {
@@ -235,27 +268,22 @@ public class ClusterMessageSerializer {
 				return new RetainMessageNotifyMessage();
 			case SHARED_DISPATCH_TO_CLIENT:
 				return new SharedDispatchToClientMessage();
-			case SHARED_SUBSCRIBE_NOTIFY:
-		case SHARED_SUBSCRIBE_REMOVE:
-		case SHARED_SUB_STATE_SYNC:
-		case SHARED_SUB_TAKEOVER:
-			// V2 shared-subscribe notifications and V3 storage messages that
-			// are still under development; the caller will skip the null return.
-			return null;
 			case RETAIN_QUERY:
 				return new RetainQueryMessage();
 			case HEARTBEAT:
 				return new HeartbeatMessage();
-		case SESSION_TAKEOVER_REQUEST:
-			return new SessionTakeoverRequestMessage();
-		case SESSION_TAKEOVER_RESPONSE:
-			return new SessionTakeoverResponseMessage();
-		case SESSION_MIGRATED_NOTIFY:
-			return new SessionMigratedNotifyMessage();
-		case SESSION_DELETE_NOTIFY:
-			return new SessionDeleteNotifyMessage();
+			case SESSION_TAKEOVER_REQUEST:
+				return new SessionTakeoverRequestMessage();
+			case SESSION_TAKEOVER_RESPONSE:
+				return new SessionTakeoverResponseMessage();
+			case SESSION_MIGRATED_NOTIFY:
+				return new SessionMigratedNotifyMessage();
+			case SESSION_DELETE_NOTIFY:
+				return new SessionDeleteNotifyMessage();
+			// 协议号 12/13/18/19（SHARED_SUBSCRIBE_NOTIFY 等）已保留但当前无生产者，
+			// ClusterMessageType 中标注为 reserved，此处不需要分支。
 			default:
-				throw new IllegalArgumentException("Unknown message type: " + type);
+				return null;
 		}
 	}
 
@@ -521,11 +549,20 @@ public class ClusterMessageSerializer {
 	 * @author L.cm
 	 * @since 1.0.0
 	 */
+	/**
+	 * Immutable carrier for the two maps transferred by a state synchronization response.
+	 * <p>
+	 * Populated only by the deserializer; the setters that used to exist here were never
+	 * called, so the type is a read-only DTO with {@code final} fields.
+	 * </p>
+	 */
 	public static class StateSyncData {
-		private Map<String, String> clientNodeMap;
-		private Map<String, List<Subscribe>> subscriptionMap;
+		private final Map<String, String> clientNodeMap;
+		private final Map<String, List<Subscribe>> subscriptionMap;
 
+		/** Creates an empty snapshot for a zero-length payload. */
 		public StateSyncData() {
+			this(null, null);
 		}
 
 		public StateSyncData(Map<String, String> clientNodeMap, Map<String, List<Subscribe>> subscriptionMap) {
@@ -542,10 +579,6 @@ public class ClusterMessageSerializer {
 			return clientNodeMap;
 		}
 
-		public void setClientNodeMap(Map<String, String> clientNodeMap) {
-			this.clientNodeMap = clientNodeMap;
-		}
-
 		/**
 		 * Returns the mapping of client identifiers to their subscription lists.
 		 *
@@ -553,10 +586,6 @@ public class ClusterMessageSerializer {
 		 */
 		public Map<String, List<Subscribe>> getSubscriptionMap() {
 			return subscriptionMap;
-		}
-
-		public void setSubscriptionMap(Map<String, List<Subscribe>> subscriptionMap) {
-			this.subscriptionMap = subscriptionMap;
 		}
 	}
 }

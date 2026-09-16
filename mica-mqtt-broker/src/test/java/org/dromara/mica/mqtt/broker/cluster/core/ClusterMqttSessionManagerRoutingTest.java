@@ -272,7 +272,10 @@ class ClusterMqttSessionManagerRoutingTest {
 		sessions.applySessionMigration("client-1", "node-1");
 
 		assertEquals(1, sessions.searchSubscribe("devices/a/state").size());
-		assertTrue(sessions.getClientNode("client-1") == null);
+		// 本地客户端的所属节点显式返回本节点 id，null 只表示「路由未知」
+		assertEquals("node-1", sessions.getClientNode("client-1"));
+		assertTrue(sessions.isLocalClient("client-1"));
+		assertTrue(sessions.getClientNode("never-seen") == null);
 	}
 
 	@Test

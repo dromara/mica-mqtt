@@ -18,10 +18,7 @@ package org.dromara.mica.mqtt.broker.rule.ext.template;
 
 import org.dromara.mica.mqtt.broker.rule.RuleContext;
 import org.dromara.mica.mqtt.broker.rule.action.Action;
-import org.dromara.mica.mqtt.broker.rule.action.ActionFactory;
 import org.dromara.mica.mqtt.broker.rule.action.ActionRef;
-
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * publish 模板：把消息重发到 broker 内另一 topic。
@@ -36,26 +33,32 @@ import java.util.concurrent.atomic.AtomicReference;
  *     retain: false
  * </pre>
  *
- * <p>用户须在 broker 启动前注入 {@link PublishFunction}；未注入则抛错。
+ * <p>{@link PublishFunction} 由装配流程通过 {@link TemplateServices} 注入，无需用户手动设置。
  *
  * @author L.cm
  */
 public class PublishTemplateAction implements Action {
 
-	private static final AtomicReference<PublishFunction> PUBLISHER = new AtomicReference<>();
-
 	private final ActionRef ref;
+	private final PublishFunction publisher;
+	private final String topicTemplate;
+	private final Integer qosProp;
+	private final boolean retain;
 
-	public PublishTemplateAction(ActionRef ref) {
+	public PublishTemplateAction(ActionRef ref, PublishFunction publisher) {
 		this.ref = ref;
+		this.publisher = publisher;
+		this.topicTemplate = requireTopic(ref);
+		this.qosProp = ref.getInt("qos");
+		this.retain = Boolean.TRUE.equals(ref.getBoolean("retain"));
 	}
 
-	public static void setPublisher(PublishFunction fn) {
-		PUBLISHER.set(fn);
-	}
-
-	public static PublishFunction getPublisher() {
-		return PUBLISHER.get();
+	private static String requireTopic(ActionRef ref) {
+		String topic = ref.getString("topic");
+		if (topic == null || topic.isEmpty()) {
+			throw new IllegalArgumentException("publish action requires 'topic' prop");
+		}
+		return topic;
 	}
 
 	@Override
@@ -64,22 +67,12 @@ public class PublishTemplateAction implements Action {
 	}
 
 	@Override
-	public void send(RuleContext ctx) throws Exception {
-		PublishFunction fn = PUBLISHER.get();
-		if (fn == null) {
-			throw new IllegalStateException("publish template requires PublishTemplateAction.setPublisher(...) before use");
+	public void send(RuleContext ctx) {
+		if (publisher == null) {
+			throw new IllegalStateException("publish action is not wired with a PublishFunction");
 		}
-		String topicTemplate = ref.getString("topic");
-		if (topicTemplate == null) {
-			throw new IllegalArgumentException("publish template requires 'topic' prop");
-		}
-		Integer qosArg = ref.getInt("qos");
-		int qos = qosArg == null
-			? (ctx.getQos() == null ? 0 : ctx.getQos().value())
-			: qosArg;
-		boolean retain = Boolean.TRUE.equals(ref.getBoolean("retain"));
-		String target = TemplateRenderer.render(topicTemplate, ctx);
-		fn.publish(target, ctx.getPayload(), qos, retain);
+		int qos = qosProp != null ? qosProp : (ctx.getQos() == null ? 0 : ctx.getQos().value());
+		publisher.publish(TemplateRenderer.render(topicTemplate, ctx), ctx.getPayload(), qos, retain);
 	}
 
 	@FunctionalInterface
@@ -90,15 +83,23 @@ public class PublishTemplateAction implements Action {
 	/**
 	 * ActionFactory：注册 type=publish。
 	 */
-	public static class Factory implements ActionFactory {
+	public static class Factory implements TemplateActionFactory {
+		private volatile TemplateServices services;
+
 		@Override
 		public String getType() {
 			return "publish";
 		}
 
 		@Override
+		public void setTemplateServices(TemplateServices services) {
+			this.services = services;
+		}
+
+		@Override
 		public Action create(ActionRef ref) {
-			return new PublishTemplateAction(ref);
+			TemplateServices current = services;
+			return new PublishTemplateAction(ref, current == null ? null : current.getPublisher());
 		}
 	}
 }

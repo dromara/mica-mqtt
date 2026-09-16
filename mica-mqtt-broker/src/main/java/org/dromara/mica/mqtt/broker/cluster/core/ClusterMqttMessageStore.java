@@ -24,6 +24,7 @@ import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -253,7 +254,7 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	}
 
 	@Override
-	public void clean() throws java.io.IOException {
+	public void clean() throws IOException {
 		delegate.clean();
 	}
 }

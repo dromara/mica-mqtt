@@ -66,38 +66,53 @@ class TemplateActionsTest {
 
 	@Test
 	void publishTemplateRequiresPublisher() {
-		// 强制清空 publisher 以验证缺省时抛错
-		PublishTemplateAction.setPublisher(null);
-		ActionRef ref = ActionRef.builder(PublishTemplateAction.class.getSimpleName())
+		// 工厂未注入 TemplateServices 时依赖为空，send 必须快速失败
+		ActionRef ref = ActionRef.builder("publish")
+			.name("reformat")
 			.prop("topic", "x/{topic}").build();
 		try {
 			new PublishTemplateAction.Factory().create(ref).send(ctx("c", "a/b", "{}"));
 			assertTrue(false, "expected IllegalStateException");
 		} catch (IllegalStateException e) {
-			assertTrue(e.getMessage().contains("setPublisher"));
+			assertTrue(e.getMessage().contains("PublishFunction"), e.getMessage());
 		} catch (Exception e) {
 			throw new AssertionError(e);
 		}
 	}
 
 	@Test
+	void publishTemplateRequiresTopic() {
+		// 必填属性在构造期校验，而不是推迟到首条消息
+		ActionRef ref = ActionRef.builder("publish").name("no-topic").build();
+		try {
+			new PublishTemplateAction(ref, (topic, payload, qos, retain) -> {
+			});
+			assertTrue(false, "expected IllegalArgumentException");
+		} catch (IllegalArgumentException e) {
+			assertTrue(e.getMessage().contains("topic"), e.getMessage());
+		}
+	}
+
+	@Test
 	void publishTemplateRender() throws Exception {
-		// 注入 publisher
 		final String[] captured = new String[4];
-		PublishTemplateAction.setPublisher((topic, payload, qos, retain) -> {
-			captured[0] = topic;
-			captured[1] = new String(payload, StandardCharsets.UTF_8);
-			captured[2] = String.valueOf(qos);
-			captured[3] = String.valueOf(retain);
-		});
+		TemplateServices services = new TemplateServices(
+			(topic, payload, qos, retain) -> {
+				captured[0] = topic;
+				captured[1] = new String(payload, StandardCharsets.UTF_8);
+				captured[2] = String.valueOf(qos);
+				captured[3] = String.valueOf(retain);
+			}, null, null);
+		PublishTemplateAction.Factory factory = new PublishTemplateAction.Factory();
+		factory.setTemplateServices(services);
+
 		ActionRef ref = ActionRef.builder("publish")
 			.name("reformat")
 			.prop("topic", "v2/{topicSegments[2]}")
 			.prop("qos", 1)
 			.prop("retain", false)
 			.build();
-		new PublishTemplateAction.Factory().create(ref).send(
-			ctx("dev-007", "sensor/01/temp", "{\"x\":1}"));
+		factory.create(ref).send(ctx("dev-007", "sensor/01/temp", "{\"x\":1}"));
 		assertEquals("v2/temp", captured[0]);
 		assertEquals("{\"x\":1}", captured[1]);
 		assertEquals("1", captured[2]);
@@ -105,14 +120,19 @@ class TemplateActionsTest {
 	}
 
 	@Test
-	void storeTemplateFallback() throws Exception {
+	void storeTemplateUsesMemoryFallback() throws Exception {
 		StoreTemplateAction.MemoryStoreFunction mem = new StoreTemplateAction.MemoryStoreFunction();
-		StoreTemplateAction.setFallback(mem);
+		// 只注册 memory，验证未指定 storage 时回退到内存实现
+		TemplateServices services = new TemplateServices(null,
+			Collections.singletonMap(TemplateServices.MEMORY_STORE, mem), null);
+		StoreTemplateAction.Factory factory = new StoreTemplateAction.Factory();
+		factory.setTemplateServices(services);
+
 		ActionRef ref = ActionRef.builder("store")
 			.name("history")
 			.prop("maxRows", 5)
 			.build();
-		StoreTemplateAction action = (StoreTemplateAction) new StoreTemplateAction.Factory().create(ref);
+		StoreTemplateAction action = (StoreTemplateAction) factory.create(ref);
 		for (int i = 0; i < 8; i++) {
 			action.send(ctx("c", "sensor/x", "{\"i\":" + i + "}"));
 		}
@@ -124,9 +144,30 @@ class TemplateActionsTest {
 	}
 
 	@Test
+	void storeTemplateFilterSkipsNonMatchingMessages() throws Exception {
+		StoreTemplateAction.MemoryStoreFunction mem = new StoreTemplateAction.MemoryStoreFunction();
+		TemplateServices services = new TemplateServices(null,
+			Collections.singletonMap(TemplateServices.MEMORY_STORE, mem), null);
+		StoreTemplateAction.Factory factory = new StoreTemplateAction.Factory();
+		factory.setTemplateServices(services);
+
+		ActionRef ref = ActionRef.builder("store")
+			.name("hot")
+			.prop("filter", "payload.temperature > 80")
+			.build();
+		StoreTemplateAction action = (StoreTemplateAction) factory.create(ref);
+		action.send(ctx("c", "sensor/x", "{\"temperature\":85}"));
+		action.send(ctx("c", "sensor/x", "{\"temperature\":10}"));
+		assertEquals(1, mem.size("hot"));
+	}
+
+	@Test
 	void alertTemplateTrigger() throws Exception {
 		AlertCenter center = new AlertCenter();
-		AlertTemplateAction.setCenter(center);
+		TemplateServices services = new TemplateServices(null, null, center);
+		AlertTemplateAction.Factory factory = new AlertTemplateAction.Factory();
+		factory.setTemplateServices(services);
+
 		final AlertEvent[] received = new AlertEvent[1];
 		center.addNotifier(new AlertNotifier() {
 			@Override
@@ -140,8 +181,7 @@ class TemplateActionsTest {
 		props.put("message", "${payload.value}");
 		props.put("dedupeKey", "{clientId}:v");
 		ActionRef ref = ActionRef.builder("alert").name("a").props(props).build();
-		new AlertTemplateAction.Factory().create(ref).send(
-			ctx("dev-007", "alert/x", "{\"value\":42}"));
+		factory.create(ref).send(ctx("dev-007", "alert/x", "{\"value\":42}"));
 		Thread.sleep(200);
 		assertNotNull(received[0]);
 		assertEquals("alert-dev-007", received[0].getTitle());

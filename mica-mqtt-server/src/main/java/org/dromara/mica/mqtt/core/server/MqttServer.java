@@ -832,6 +832,15 @@ public final class MqttServer {
 	 * @return 是否停止
 	 */
 	public boolean stop() {
+		// 先执行上层扩展的关闭钩子（如规则引擎的 action 资源），确保它们在
+		// 监听器与业务线程池关闭之前释放
+		for (Runnable hook : serverCreator.getShutdownHooks()) {
+			try {
+				hook.run();
+			} catch (Throwable e) {
+				logger.error("MqttServer shutdown hook error.", e);
+			}
+		}
 		// 停止服务
 		boolean result = listeners.stop();
 		// 优雅停止 mqtt 工作线程

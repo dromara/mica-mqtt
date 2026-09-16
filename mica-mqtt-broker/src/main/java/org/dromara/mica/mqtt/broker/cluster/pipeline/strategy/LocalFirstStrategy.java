@@ -57,8 +57,9 @@ public class LocalFirstStrategy implements SharedSubscriptionStrategy {
 	 * Constructs a {@code LocalFirstStrategy} with the supplied node resolver.
 	 *
 	 * @param clientNodeResolver a function that maps a {@code clientId} to its current
-	 *                           node ID; returns {@code null} if the client is local
-	 *                           or its node is unknown
+	 *                           node ID, or {@code null} when the route is unknown.
+	 *                           {@code ClusterMqttSessionManager#getClientNode} 对本地
+	 *                           客户端返回本节点 id，因此 {@code null} 只表示「未知」。
 	 */
 	public LocalFirstStrategy(Function<String, String> clientNodeResolver) {
 		this.clientNodeResolver = clientNodeResolver;
@@ -70,11 +71,13 @@ public class LocalFirstStrategy implements SharedSubscriptionStrategy {
 			return null;
 		}
 
-		// Collect candidates that are local to this node.
+		// Collect candidates that are explicitly owned by this node. Route-unknown
+		// candidates are not treated as local: the caller verifies the actual local
+		// delivery and re-picks when it fails.
 		List<Subscribe> locals = new ArrayList<>();
 		for (Subscribe s : candidates) {
 			String nodeId = clientNodeResolver.apply(s.getClientId());
-			if (nodeId == null || nodeId.equals(localNodeId)) {
+			if (localNodeId.equals(nodeId)) {
 				locals.add(s);
 			}
 		}

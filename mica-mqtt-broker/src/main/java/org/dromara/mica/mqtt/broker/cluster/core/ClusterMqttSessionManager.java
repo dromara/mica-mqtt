@@ -74,11 +74,41 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	private final MqttClusterManager clusterManager;
 	private final ConcurrentHashMap<String, String> clientNodeMap = new ConcurrentHashMap<>();
 	private final Set<String> localClientIds = ConcurrentHashMap.newKeySet();
-	private final ConcurrentHashMap<String, ConcurrentHashMap<String, Subscribe>> routeSubscriptions = new ConcurrentHashMap<>();
+	/**
+	 * 全量复制（V1）的订阅路由表。
+	 * <p>
+	 * 每条记录预先解析好 {@link TopicFilter} 并标记是否共享订阅，避免发布热路径上
+	 * 对每条订阅重复 {@code new TopicFilter(...)}（构造即解析 filter 字符串）以及
+	 * 重复的 {@code startsWith} 判断。
+	 * </p>
+	 * <p>
+	 * 说明：这里与 delegate 的 TrieTopicManager 存在两份订阅表，但暂不能直接用
+	 * {@code delegate.searchSubscribe(topic)} 取代——核心 trie 对 {@code $share}/{@code $queue}
+	 * 组会随机选一个成员，而集群侧需要每个组的完整候选集来做 shared 派发。彻底去掉本表
+	 * 需要先在 {@code IMqttSessionManager} 暴露「不折叠共享组、并带 topicFilter 类型」的检索 API。
+	 * </p>
+	 */
+	private final ConcurrentHashMap<String, ConcurrentHashMap<String, TrackedRoute>> routeSubscriptions
+		= new ConcurrentHashMap<>();
 	private volatile SessionStore sessionStore;
 	private volatile SharedSubStore sharedSubStore;
 	private volatile InflightStore inflightStore;
 	private volatile long inflightTtlMs;
+
+	/**
+	 * 预解析的路由记录：订阅 + 已解析的过滤器 + 是否共享订阅。
+	 */
+	private static final class TrackedRoute {
+		private final Subscribe subscribe;
+		private final TopicFilter filter;
+		private final boolean shared;
+
+		private TrackedRoute(Subscribe subscribe) {
+			this.subscribe = subscribe;
+			this.filter = new TopicFilter(subscribe.getTopicFilter());
+			this.shared = filter.isShared() || filter.isQueue();
+		}
+	}
 
 	/**
 	 * Constructs a cluster session manager wrapping the specified delegate.
@@ -93,12 +123,35 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 	/**
 	 * Returns the cluster node identifier where the specified client is connected.
+	 * <p>
+	 * 本地客户端返回本节点 id，远程客户端返回其所属节点 id；只有「路由未知」的客户端
+	 * 才返回 {@code null}。早期实现让本地客户端也返回 {@code null}，调用方无法区分
+	 * 「确实在本地」与「路由已失效」，会把消息投给不存在的目标或静默丢弃。
+	 * </p>
 	 *
 	 * @param clientId the client identifier
-	 * @return the node identifier, or null if the client is not registered as a remote client
+	 * @return 所属节点 id；路由未知时返回 {@code null}
 	 */
 	public String getClientNode(String clientId) {
-		return clientNodeMap.get(clientId);
+		if (clientId == null) {
+			return null;
+		}
+		String node = clientNodeMap.get(clientId);
+		if (node != null) {
+			return node;
+		}
+		return localClientIds.contains(clientId) ? clusterManager.getLocalNodeId() : null;
+	}
+
+	/**
+	 * 客户端是否连接在本节点。
+	 *
+	 * @param clientId the client identifier
+	 * @return {@code true} 表示已知该客户端属于本节点
+	 */
+	public boolean isLocalClient(String clientId) {
+		String node = getClientNode(clientId);
+		return node != null && node.equals(clusterManager.getLocalNodeId());
 	}
 
 	/**
@@ -159,7 +212,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void removeRemoteClient(String clientId) {
 		localClientIds.remove(clientId);
 		String node = clientNodeMap.remove(clientId);
-		Map<String, Subscribe> removed = routeSubscriptions.remove(clientId);
+		Map<String, TrackedRoute> removed = routeSubscriptions.remove(clientId);
 		delegate.remove(clientId);
 		removeSharedMembership(removed, clientId);
 		logger.debug("[Cluster] Removed remote client: {} from node: {}", clientId, node);
@@ -173,7 +226,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void clearNodeClientsAndSubscriptions(String nodeId) {
 		clientNodeMap.entrySet().removeIf(entry -> {
 			if (entry.getValue().equals(nodeId)) {
-				Map<String, Subscribe> removed = routeSubscriptions.remove(entry.getKey());
+				Map<String, TrackedRoute> removed = routeSubscriptions.remove(entry.getKey());
 				delegate.remove(entry.getKey());
 				removeSharedMembership(removed, entry.getKey());
 				return true;
@@ -304,7 +357,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		while (true) {
 			SharedSubStore.SharedSubGroup current = sharedSubStore.get(groupName, underlyingTopic);
 			long version = current == null ? 0L : current.getVersion();
-			java.util.List<String> members = new java.util.ArrayList<>();
+			List<String> members = new ArrayList<>();
 			if (current != null && current.getMembers() != null) {
 				members.addAll(current.getMembers());
 			}
@@ -343,7 +396,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 			if (current == null || current.getMembers() == null || !current.getMembers().contains(clientId)) {
 				return;
 			}
-			java.util.List<String> members = new java.util.ArrayList<>(current.getMembers());
+			List<String> members = new ArrayList<>(current.getMembers());
 			members.remove(clientId);
 			if (members.isEmpty()) {
 				if (sharedSubStore.deleteIfVersion(groupName, underlyingTopic, current.getVersion())) {
@@ -378,12 +431,12 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		return new String[]{owner, backup};
 	}
 
-	private void removeSharedMembership(Map<String, Subscribe> subscriptions, String clientId) {
+	private void removeSharedMembership(Map<String, TrackedRoute> subscriptions, String clientId) {
 		if (subscriptions == null) {
 			return;
 		}
-		for (Subscribe subscribe : subscriptions.values()) {
-			updateSharedGroupOnUnsubscribe(subscribe.getTopicFilter(), clientId);
+		for (TrackedRoute route : subscriptions.values()) {
+			updateSharedGroupOnUnsubscribe(route.subscribe.getTopicFilter(), clientId);
 		}
 	}
 
@@ -485,31 +538,6 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	}
 
 	/**
-	 * Removes the local subscriptions of a client.  Called by the cluster
-	 * manager when this node loses ownership of a session (handed off to a
-	 * peer via the takeover protocol).
-	 *
-	 * @param clientId the client identifier whose local subscriptions should
-	 *                 be removed; ignored when {@code null}
-	 */
-	public void clearLocalSubscription(String clientId) {
-		if (clientId == null) {
-			return;
-		}
-		List<Subscribe> subs = delegate.getSubscriptions(clientId);
-		if (subs == null) {
-			return;
-		}
-		for (Subscribe s : subs) {
-			delegate.removeSubscribe(s.getTopicFilter(), clientId);
-			// V3 shared-subscription persistence: remove this client from
-			// persistent group membership so the strategy won't pick it.
-			updateSharedGroupOnUnsubscribe(s.getTopicFilter(), clientId);
-		}
-		routeSubscriptions.remove(clientId);
-	}
-
-	/**
 	 * Restores a persisted session into the live local subscription table after
 	 * a successful cross-node takeover. This method deliberately avoids emitting
 	 * subscribe broadcasts because peers already hold the full replicated route;
@@ -575,20 +603,32 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		return findMatchingSubscriptions(topic, true, true);
 	}
 
+	/**
+	 * 按 topic 匹配路由表。
+	 * <p>
+	 * 过滤条件全部走预解析字段：{@link TrackedRoute#filter} 与 {@link TrackedRoute#shared}，
+	 * 因此不再是「每匹配一条就 new TopicFilter + 重新解析」，只保留每个命中客户端一份
+	 * {@link Subscribe} 拷贝（调用方可能会合并/修改）。
+	 * </p>
+	 *
+	 * @param topic         发布的 topic
+	 * @param includeRemote 是否包含远程客户端
+	 * @param includeShared 是否包含共享订阅（{@code $share}/{@code $queue}）
+	 * @return 命中的订阅
+	 */
 	private List<Subscribe> findMatchingSubscriptions(String topic, boolean includeRemote, boolean includeShared) {
 		List<Subscribe> matches = new ArrayList<>();
-		for (Map.Entry<String, ConcurrentHashMap<String, Subscribe>> entry : routeSubscriptions.entrySet()) {
+		for (Map.Entry<String, ConcurrentHashMap<String, TrackedRoute>> entry : routeSubscriptions.entrySet()) {
 			String clientId = entry.getKey();
 			if (!includeRemote && clientNodeMap.containsKey(clientId)) {
 				continue;
 			}
-			for (Subscribe sub : entry.getValue().values()) {
-				TopicFilter filter = new TopicFilter(sub.getTopicFilter());
-				if (!includeShared && (filter.isShared() || filter.isQueue())) {
+			for (TrackedRoute route : entry.getValue().values()) {
+				if (!includeShared && route.shared) {
 					continue;
 				}
-				if (filter.match(topic)) {
-					matches.add(copySubscription(sub));
+				if (route.filter.match(topic)) {
+					matches.add(copySubscription(route.subscribe));
 				}
 			}
 		}
@@ -599,12 +639,13 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		if (subscribe == null || subscribe.getClientId() == null || subscribe.getTopicFilter() == null) {
 			return;
 		}
+		Subscribe copy = copySubscription(subscribe);
 		routeSubscriptions.computeIfAbsent(subscribe.getClientId(), key -> new ConcurrentHashMap<>())
-			.put(subscribe.getTopicFilter(), copySubscription(subscribe));
+			.put(subscribe.getTopicFilter(), new TrackedRoute(copy));
 	}
 
 	private void removeTrackedSubscription(String clientId, String topicFilter) {
-		ConcurrentHashMap<String, Subscribe> subscriptions = routeSubscriptions.get(clientId);
+		ConcurrentHashMap<String, TrackedRoute> subscriptions = routeSubscriptions.get(clientId);
 		if (subscriptions == null) {
 			return;
 		}
@@ -639,17 +680,14 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	}
 
 	/**
-	 * Returns the complete mapping of remote clients to their cluster nodes.
+	 * Returns the complete state of client→node mappings for the whole cluster
+	 * (local clients resolved to this node plus all remote mappings).
 	 * <p>
 	 * This map is used during state synchronization when a new node joins the cluster.
 	 * </p>
 	 *
-	 * @return a copy of the client-to-node mapping
+	 * @return a snapshot of the client-to-node mapping
 	 */
-	public Map<String, String> getRemoteClientNodeMap() {
-		return new HashMap<>(clientNodeMap);
-	}
-
 	public Map<String, String> getStateClientNodeMap() {
 		Map<String, String> state = new HashMap<>(clientNodeMap);
 		String localNodeId = clusterManager.getLocalNodeId();
