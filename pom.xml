@@ -28,7 +28,7 @@
         <tinylog.version>2.7.0</tinylog.version>
         <h2.version>2.2.224</h2.version>
         <aviator.version>5.4.4</aviator.version>
-        <caffeine.version>3.1.8</caffeine.version>
+        <caffeine.version>2.9.3</caffeine.version>
         <snakeyaml.version>2.7</snakeyaml.version>
         <lombok.version>1.18.48</lombok.version>
     </properties>
