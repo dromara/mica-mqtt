@@ -90,8 +90,13 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			case CONNECTION_REFUSED_SERVER_UNAVAILABLE:
 			case CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION:
 			default:
-				String remark = "MqttClient connect error error ReturnCode:" + returnCode;
-				Tio.close(context, remark);
+				// 修复 gitee #IJVOZ7: CONNACK 失败时不主动关闭连接，
+				// 让 broker 主动断开 TCP 后由 mica-net 自然触发重连，
+				// 避免 isAccepted=false 永久阻断 ClientReConnTask 的重连判断。
+				// 注意：broker（emqx）收到错误认证后通常会立即关闭 TCP 连接，
+				// 因此不调用 Tio.close 也能在毫秒级完成资源释放。
+				logger.error("MqttClient contextId:{} 连接失败，原因码:{}，等待 broker 关闭连接后自动重连。",
+					context.getId(), returnCode);
 				break;
 		}
 	}

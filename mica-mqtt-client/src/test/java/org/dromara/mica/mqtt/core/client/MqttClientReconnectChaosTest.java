@@ -109,6 +109,39 @@ class MqttClientReconnectChaosTest {
 		}
 	}
 
+	/**
+	 * 修复回归测试：gitee #IJVOZ7
+	 * 模拟 broker 在 CONNACK 中返回 NOT_AUTHORIZED 后立即断开 TCP，
+	 * 验证客户端在 mica-net 的重连循环里继续尝试，并且最终能在 broker 放行时成功连接。
+	 *
+	 * 关键场景：第一次 broker 拒绝后，mica-net 仍然必须继续重连。
+	 * 否则（修复前的 2.6.8 行为），broker 的后续握手会被永久跳过，
+	 * 表现为"重连 10 小时后停止重连 + publish 全部失败"。
+	 */
+	@Test
+	void shouldReconnectAfterBrokerRefusedAuthThenAccept() throws Exception {
+		CountingConnectListener listener = new CountingConnectListener();
+		MqttClient client = null;
+		// 第一次握手拒绝连接；之后排队等待下一次连接（CONNACK accepted）
+		FakeBroker broker = FakeBroker.create()
+			.next(new RefusedConnAckThenCloseHandler())
+			.next(new ConnAckAndHoldHandler());
+		try {
+			client = newClient(broker.getPort(), listener);
+
+			// broker 必须收到第二次 CONNECT，证明 isAccepted=false 没有阻断重连。
+			Assertions.assertTrue(broker.awaitConnectPackets(2, 5_000),
+				"client must reconnect to the broker after CONNACK refused, but received only " + broker.getConnectPackets() + " CONNECTs");
+			Assertions.assertTrue(listener.awaitConnected(5_000),
+				"client should become accepted after broker accepts the second CONNECT");
+			Assertions.assertTrue(client.isConnected(),
+				"client must report connected once broker sends accepted CONNACK");
+		} finally {
+			stop(client);
+			broker.close();
+		}
+	}
+
 	@Test
 	void shouldPublishSuccessfullyAfterBrokerRestartReconnect() throws Exception {
 		// 可通过 JVM 参数放大复现概率:
@@ -447,8 +480,33 @@ class MqttClientReconnectChaosTest {
 		}
 	}
 
+	/**
+	 * 模拟 gitee #IJVOZ7：emqx 重启期间改密码导致的 CONNACK 失败。
+	 * broker 先返回 CONNACK with reason code 4 = NOT_AUTHORIZED，
+	 * 紧接着关闭 TCP。验证 mica-net 重连不会因为 isAccepted=false 被永久阻断。
+	 */
+	private static final class RefusedConnAckThenCloseHandler implements SocketHandler {
+		@Override
+		public void handle(Socket socket) throws Exception {
+			writeRefusedConnAck(socket.getOutputStream());
+			Thread.sleep(50);
+			socket.setSoLinger(true, 0);
+			socket.close();
+		}
+	}
+
 	private static void writeConnAck(OutputStream outputStream) throws IOException {
 		outputStream.write(new byte[]{0x20, 0x03, 0x00, 0x00, 0x00});
+		outputStream.flush();
+	}
+
+	/**
+	 * 写入一个 CONNACK 报文，reason code = 0x04 (NOT_AUTHORIZED / BAD_USER_NAME_OR_PASSWORD)，
+	 * 模拟 broker 拒绝连接但 CONNACK 报文本身成功到达客户端的场景。
+	 * 报文布局: 0x20 (CONNACK) | remainingLen=3 | sessionPresent=0x00 | returnCode=0x04 | 0x00 (properties len)
+	 */
+	private static void writeRefusedConnAck(OutputStream outputStream) throws IOException {
+		outputStream.write(new byte[]{0x20, 0x03, 0x00, 0x04, 0x00});
 		outputStream.flush();
 	}
 
