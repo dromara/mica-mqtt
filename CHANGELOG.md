@@ -3,10 +3,7 @@
 ## 发行版本
 
 ### v2.6.11 - 2026-09-19
-- 🐛 mqtt-client 修复 CONNACK 认证失败（如密码错误、用户名非法）后 mica-net 重连被永久阻断的问题 (gitee #IJVOZ7)。
-  - 之前版本：CONNACK 拒绝时 `Tio.close` 会触发 `MqttClientAioListener.onBeforeClose` 设置 `isAccepted=false`，导致 `mica-net` 的 `ClientReConnTask` 因 `ReconnConf(this.reInterval, this.retryCount, ChannelContext::isAccepted)` 判断而**不再触发重连**，表现为"运行 10 小时后停止重连 + publish 全部失败"。
-  - 修复方案：CONNACK 失败时不再主动 `Tio.close`，依赖 broker（emqx）关闭 TCP 后由 `mica-net` 自然重连，业务层 `isAccepted` 保持初始 false 不会污染重连判断。
-  - 新增回归测试 `shouldReconnectAfterBrokerRefusedAuthThenAccept` 覆盖此场景。 感谢 `@mydeoschina` `@弹琴锅` 反馈。
+- chore(build): 调整 mica-net 版本为 2.0.16，修复 `ClientReConnTask` 重连时错误判断，调整 `DefaultTimerTaskService` 默认时间轮粒度。
 
 ### v2.6.10 - 2026-09-11
 - feat(client): MqttClientPublish 主题占位符支持方法参数，新增 @TopicParam 参数注解，配合 resolveTopic(Function) 按需取值。 (gitee #IKED1S) 感谢 @humlzy 反馈。
