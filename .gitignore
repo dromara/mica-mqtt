@@ -37,6 +37,7 @@ nbdist/
 .codegraph
 .claude
 .opencode
+.workbuddy
 -p
 skills-lock.json
 
