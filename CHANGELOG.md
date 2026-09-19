@@ -4,7 +4,8 @@
 
 ### v2.6.12 - 开发中
 - 🐛 fix(codec、common): 修复重传时 `SUBSCRIBE`、`UNSUBSCRIBE`、`PUBREL`、`PUBREC` 的固定头 DUP 位被错误置 1，发出 `0x8A`、`0xAA` 等非法报文被严格校验的 broker 断开连接。gitee #IKH0V8 感谢 `@mxyyyy` 反馈。
-- ✨ `MqttFixedHeader` 新增 `setDup(boolean)`，重传时复用原固定头，不再重新构建。
+- ♻️ `MqttEncoder` 编码固定头时按报文类型统一判定 DUP（仅 `PUBLISH(qos > 0)` 生效，其他报文 bit3 强制为 0），调用方误置也不会再发出非法报文。
+- ✨ `MqttFixedHeader` 新增 `setDup(boolean)` 和 `isDupEffected()`，重传时复用原固定头，不再重新构建。
 - 🐛 fix(client): `unSubscribe` 未校验 `getContext()` 判空，断开窗口内调用会 NPE。
 
 ### v2.6.11 - 2026-09-19

@@ -110,6 +110,26 @@ public final class MqttFixedHeader {
 		return headLength + remainingLength;
 	}
 
+	/**
+	 * 编码时 {@code DUP} 标识是否生效。
+	 * <p>
+	 * MQTT 3.1.1 / 5.0 规定只有 PUBLISH 的 bit3 是 {@code DUP}，
+	 * SUBSCRIBE / UNSUBSCRIBE / PUBREL 的 bit3 均为<strong>保留位，必须置 0</strong>，
+	 * 置 1 会被严格校验的 broker（mosquitto、netty-codec-mqtt 等）判定为 malformed 并断开连接。
+	 * 且 PUBLISH 的 {@code DUP} 仅在 qos 大于 0 时有意义。
+	 * <p>
+	 * 由 {@code MqttEncoder} 编码时统一判定，避免调用方误置。
+	 *
+	 * @return 是否编码 DUP 标识
+	 * @see <a href="https://gitee.com/dromara/mica-mqtt/issues/IKH0V8">IKH0V8</a>
+	 */
+	public boolean isDupEffected() {
+		if (MqttMessageType.PUBLISH != messageType) {
+			return false;
+		}
+		return qosLevel.value() > 0;
+	}
+
 	@Override
 	public String toString() {
 		return "MqttFixedHeader[" +

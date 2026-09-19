@@ -551,7 +551,8 @@ public final class MqttEncoder {
 	private static byte getFixedHeaderByte1(MqttFixedHeader header) {
 		int ret = 0;
 		ret |= header.messageType().value() << 4;
-		if (header.isDup()) {
+		// dup 只有 PUBLISH(qos > 0) 生效，SUBSCRIBE、UNSUBSCRIBE、PUBREL 的 bit3 为保留位，必须置 0
+		if (header.isDup() && header.isDupEffected()) {
 			ret |= 0x08;
 		}
 		ret |= header.qosLevel().value() << 1;
