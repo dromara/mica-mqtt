@@ -548,7 +548,17 @@ public final class MqttEncoder {
 		return writeBuffer.toArray();
 	}
 
-	private static byte getFixedHeaderByte1(MqttFixedHeader header) {
+	/**
+	 * 编码固定头的第一个字节。
+	 * <p>
+	 * MQTT 固定头所有「字段 → 字节」的规则都收敛在这里，{@code doEncode} 分派出的
+	 * 各 encodeXxxMessage 共用本方法，方法保持包级可见是为了便于测试直接断言字节，
+	 * 不要在别处再复制一份同样的位运算。
+	 *
+	 * @param header MqttFixedHeader
+	 * @return 固定头第一个字节
+	 */
+	static byte getFixedHeaderByte1(MqttFixedHeader header) {
 		int ret = 0;
 		ret |= header.messageType().value() << 4;
 		// dup 只有 PUBLISH(qos > 0) 生效，SUBSCRIBE、UNSUBSCRIBE、PUBREL 的 bit3 为保留位，必须置 0

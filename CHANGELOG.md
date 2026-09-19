@@ -7,6 +7,7 @@
 - ♻️ `MqttEncoder` 编码固定头时按报文类型统一判定 DUP（仅 `PUBLISH(qos > 0)` 生效，其他报文 bit3 强制为 0），调用方误置也不会再发出非法报文。
 - ✨ `MqttFixedHeader` 新增 `setDup(boolean)` 和 `isDupEffected()`，重传时复用原固定头，不再重新构建。
 - 🐛 fix(client): `unSubscribe` 未校验 `getContext()` 判空，断开窗口内调用会 NPE。
+- ✅ test(codec、common): 补充编解码回归测试，新增 `MqttEncoderFixedHeaderTest`（各报文类型固定头首字节，覆盖 `DUP`/`QoS`/`retain` 组合）与 `MqttCodecRoundTripTest`（`CONNECT`、`PUBLISH` QoS 0/1/2、`SUBSCRIBE`、`UNSUBSCRIBE`、`PINGREQ` 编解码往返）；`RetryProcessorTest` 改为真实驱动 `RetryProcessor` 断言重传行为。
 
 ### v2.6.11 - 2026-09-19
 - chore(build): 调整 mica-net 版本为 2.0.16，修复 `ClientReConnTask` 重连时错误判断，调整 `DefaultTimerTaskService` 默认时间轮粒度。

@@ -1,137 +1,154 @@
 package org.dromara.mica.mqtt.core.common;
 
-import org.dromara.mica.mqtt.codec.MqttMessageType;
+import net.dreamlu.mica.net.utils.timer.SystemTimer;
+import net.dreamlu.mica.net.utils.timer.TimerTask;
+import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
-import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
+
 /**
- * 固定头 DUP 标识编码的测试
+ * RetryProcessor 重传行为的测试
  *
- * <p>反馈：https://gitee.com/dromara/mica-mqtt/issues/IKH0V8</p>
+ * <p>重传时 RetryProcessor 只负责复用原固定头并统一置 {@code dup}，
+ * {@code dup} 是否真正生效由编码层按报文类型判定，编码字节的断言见
+ * {@code org.dromara.mica.mqtt.codec.MqttEncoderFixedHeaderTest}。</p>
+ *
+ * <p>反馈：<a href="https://gitee.com/dromara/mica-mqtt/issues/IKH0V8">IKH0V8</a></p>
  *
  * @author L.cm
  */
 class RetryProcessorTest {
 
 	@Test
-	void publishQos1ShouldEncodeDup() {
+	void retransmitReusesFixedHeaderAndSetsDup() {
 		MqttPublishMessage message = MqttPublishMessage.builder()
 			.topicName("/test/dup")
 			.payload(new byte[]{1})
 			.qos(MqttQoS.QOS1)
 			.messageId(1)
 			.build();
-		// 修复前重传：0x32 -> 0x3A
-		Assertions.assertEquals((byte) 0x32, firstByte(message.fixedHeader()));
-		retransmit(message.fixedHeader());
-		Assertions.assertTrue(message.fixedHeader().isDup());
-		Assertions.assertEquals((byte) 0x3A, firstByte(message.fixedHeader()));
+		MqttFixedHeader original = message.fixedHeader();
+
+		List<MqttFixedHeader> received = retransmit(message);
+
+		Assertions.assertEquals(1, received.size());
+		// 复用原固定头，不再重新 new，避免丢掉 headLength 等字段
+		Assertions.assertSame(original, received.get(0));
+		Assertions.assertTrue(original.isDup());
+		Assertions.assertTrue(original.isDupEffected());
 	}
 
 	@Test
-	void publishQos0ShouldNotEncodeDup() {
+	void retransmitPublishQos0SetsDupIntentButNotEffected() {
 		MqttPublishMessage message = MqttPublishMessage.builder()
 			.topicName("/test/dup")
 			.payload(new byte[]{1})
 			.qos(MqttQoS.QOS0)
 			.build();
-		retransmit(message.fixedHeader());
+
+		List<MqttFixedHeader> received = retransmit(message);
+
+		Assertions.assertSame(message.fixedHeader(), received.get(0));
+		Assertions.assertTrue(message.fixedHeader().isDup());
 		// qos0 的 dup 无意义，编码时必须忽略
 		Assertions.assertFalse(message.fixedHeader().isDupEffected());
-		Assertions.assertEquals((byte) 0x30, firstByte(message.fixedHeader()));
 	}
 
 	@Test
-	void subscribeShouldNotEncodeDup() {
-		MqttSubscribeMessage message = MqttSubscribeMessage.builder()
-			.addSubscription("/test/dup", MqttQoS.QOS1)
-			.messageId(1)
-			.build();
-		retransmit(message.fixedHeader());
-		// SUBSCRIBE 的 bit3 是保留位，修复前会编码成 0x8A
-		Assertions.assertFalse(message.fixedHeader().isDupEffected());
-		Assertions.assertEquals((byte) 0x82, firstByte(message.fixedHeader()));
-	}
-
-	@Test
-	void unSubscribeShouldNotEncodeDup() {
+	void retransmitUnSubscribeSetsDupIntentButNotEffected() {
 		MqttUnSubscribeMessage message = MqttUnSubscribeMessage.builder()
 			.addTopicFilter("/test/dup")
 			.messageId(1)
 			.build();
-		retransmit(message.fixedHeader());
-		// UNSUBSCRIBE 的 bit3 是保留位，修复前会编码成 0xAA，
-		// 严格校验的 broker 会判定 malformed 并断开连接
+
+		List<MqttFixedHeader> received = retransmit(message);
+
+		Assertions.assertSame(message.fixedHeader(), received.get(0));
+		// UNSUBSCRIBE 的 bit3 是保留位，置了 dup 也不能编码出去
+		Assertions.assertTrue(message.fixedHeader().isDup());
 		Assertions.assertFalse(message.fixedHeader().isDupEffected());
-		Assertions.assertEquals((byte) 0xA2, firstByte(message.fixedHeader()));
 	}
 
 	@Test
-	void pubRelShouldNotEncodeDup() {
-		MqttFixedHeader header = new MqttFixedHeader(MqttMessageType.PUBREL, false, MqttQoS.QOS1, false, 0);
-		retransmit(header);
-		// PUBREL 的 bit3 是保留位，修复前会编码成 0x6A
-		Assertions.assertEquals((byte) 0x62, firstByte(header));
+	void startWithoutHandlerFails() {
+		RetryProcessor<MqttMessage> processor = new RetryProcessor<>();
+		processor.setOriginalMessage(MqttMessage.PINGREQ);
+		Assertions.assertThrows(NullPointerException.class,
+			() -> processor.start(new CapturingTimerTaskService()));
 	}
 
 	@Test
-	void pubRecShouldNotEncodeDup() {
-		MqttFixedHeader header = new MqttFixedHeader(MqttMessageType.PUBREC, false, MqttQoS.QOS0, false, 0);
-		retransmit(header);
-		// PUBREC 的 bit3 是保留位，修复前会编码成 0x5A
-		Assertions.assertEquals((byte) 0x50, firstByte(header));
+	void startWithoutTaskServiceFails() {
+		RetryProcessor<MqttMessage> processor = new RetryProcessor<>();
+		processor.setOriginalMessage(MqttMessage.PINGREQ);
+		processor.setHandle((fixedHeader, originalMessage) -> {
+		});
+		Assertions.assertThrows(NullPointerException.class, () -> processor.start(null));
 	}
 
 	@Test
-	void pubAckAndPubCompShouldNotEncodeDup() {
-		MqttFixedHeader pubAck = new MqttFixedHeader(MqttMessageType.PUBACK, false, MqttQoS.QOS0, false, 0);
-		MqttFixedHeader pubComp = new MqttFixedHeader(MqttMessageType.PUBCOMP, false, MqttQoS.QOS0, false, 0);
-		retransmit(pubAck);
-		retransmit(pubComp);
-		Assertions.assertEquals((byte) 0x40, firstByte(pubAck));
-		Assertions.assertEquals((byte) 0x70, firstByte(pubComp));
-	}
-
-	@Test
-	void dupOnRawHeaderIsIgnoredForNonPublish() {
-		// 三方直接构造 fixedHeader 时误置 dup，编码也不应放行
-		MqttFixedHeader header = new MqttFixedHeader(MqttMessageType.UNSUBSCRIBE, true, MqttQoS.QOS1, false, 0);
-		Assertions.assertTrue(header.isDup());
-		Assertions.assertFalse(header.isDupEffected());
-		Assertions.assertEquals((byte) 0xA2, firstByte(header));
+	void stopWithoutStartIsNoop() {
+		new RetryProcessor<MqttMessage>().stop();
 	}
 
 	/**
-	 * 模拟 {@link RetryProcessor} 重传时对固定头的处理
+	 * 驱动一次重传。
+	 * <p>
+	 * RetryProcessor 的重传间隔是 10s，测试里不等定时器，直接用假的 TimerTaskService
+	 * 截获 AckTimerTask 后手动触发一次，保证确定性。
+	 * </p>
 	 *
-	 * @param header MqttFixedHeader
+	 * @param message MqttMessage
+	 * @return 重传时交给 handler 的固定头
 	 */
-	private static void retransmit(MqttFixedHeader header) {
-		header.setDup(true);
+	private static List<MqttFixedHeader> retransmit(MqttMessage message) {
+		RetryProcessor<MqttMessage> processor = new RetryProcessor<>();
+		List<MqttFixedHeader> received = new ArrayList<>();
+		processor.setOriginalMessage(message);
+		processor.setHandle((fixedHeader, originalMessage) -> received.add(fixedHeader));
+		CapturingTimerTaskService taskService = new CapturingTimerTaskService();
+		processor.start(taskService);
+		taskService.task.run();
+		processor.stop();
+		return received;
 	}
 
 	/**
-	 * 按 MQTT 协议计算固定头的第一个字节，和 {@code MqttEncoder} 的编码逻辑保持一致
-	 *
-	 * @param header MqttFixedHeader
-	 * @return 固定头第一个字节
+	 * 截获 AckTimerTask 的 TimerTaskService，任务不会真正被调度。
 	 */
-	private static byte firstByte(MqttFixedHeader header) {
-		int ret = 0;
-		ret |= header.messageType().value() << 4;
-		if (header.isDup() && header.isDupEffected()) {
-			ret |= 0x08;
+	private static class CapturingTimerTaskService implements TimerTaskService {
+		private final SystemTimer systemTimer = new SystemTimer("RetryProcessorTest");
+		private TimerTask task;
+
+		@Override
+		public <T extends TimerTask> T add(T timerTask) {
+			this.task = timerTask;
+			return timerTask;
 		}
-		ret |= header.qosLevel().value() << 1;
-		if (header.isRetain()) {
-			ret |= 0x01;
+
+		@Override
+		public <T extends TimerTask> T addTask(Function<SystemTimer, T> consumer) {
+			T timerTask = consumer.apply(systemTimer);
+			this.task = timerTask;
+			return timerTask;
 		}
-		return (byte) ret;
+
+		@Override
+		public void start() {
+		}
+
+		@Override
+		public void stop() {
+		}
 	}
 
 }
