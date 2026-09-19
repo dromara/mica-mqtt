@@ -2,6 +2,11 @@
 
 ## 发行版本
 
+### v2.6.12 - 开发中
+- 🐛 fix(codec、common): 修复重传时 `SUBSCRIBE`、`UNSUBSCRIBE`、`PUBREL`、`PUBREC` 的固定头 DUP 位被错误置 1，发出 `0x8A`、`0xAA` 等非法报文被严格校验的 broker 断开连接。gitee #IKH0V8 感谢 `@mxyyyy` 反馈。
+- ✨ `MqttFixedHeader` 新增 `setDup(boolean)`，重传时复用原固定头，不再重新构建。
+- 🐛 fix(client): `unSubscribe` 未校验 `getContext()` 判空，断开窗口内调用会 NPE。
+
 ### v2.6.11 - 2026-09-19
 - chore(build): 调整 mica-net 版本为 2.0.16，修复 `ClientReConnTask` 重连时错误判断，调整 `DefaultTimerTaskService` 默认时间轮粒度。
 

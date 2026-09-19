@@ -294,11 +294,14 @@ public final class MqttClient implements IMqttClient {
 		MqttPendingUnSubscription pendingUnSubscription = new MqttPendingUnSubscription(topicFilters, message);
 		ClientChannelContext clientContext = getContext();
 		// 4. 启动取消订阅线程
-		clientSession.addPaddingUnSubscribe(messageId, pendingUnSubscription);
-		pendingUnSubscription.startRetransmissionTimer(taskService, clientContext);
-		// 5. 发送取消订阅的消息
-		boolean result = Tio.send(clientContext, message);
-		logger.info("MQTT Topic:{} messageId:{} unSubscribing result:{}", topicFilters, messageId, result);
+		// mqtt 尚未连接成功时无需发送，本地订阅已经移除，重连后不会再订阅该 topic
+		if (clientContext != null && clientContext.isAccepted()) {
+			clientSession.addPaddingUnSubscribe(messageId, pendingUnSubscription);
+			pendingUnSubscription.startRetransmissionTimer(taskService, clientContext);
+			// 5. 发送取消订阅的消息
+			boolean result = Tio.send(clientContext, message);
+			logger.info("MQTT Topic:{} messageId:{} unSubscribing result:{}", topicFilters, messageId, result);
+		}
 		return this;
 	}
 

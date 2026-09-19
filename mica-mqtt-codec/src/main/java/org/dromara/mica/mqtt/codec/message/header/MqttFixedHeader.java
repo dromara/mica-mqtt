@@ -30,7 +30,7 @@ import java.util.Objects;
 public final class MqttFixedHeader {
 
 	private final MqttMessageType messageType;
-	private final boolean isDup;
+	private volatile boolean isDup;
 	private final boolean isRetain;
 	private final int headLength;
 	private final int remainingLength;
@@ -66,6 +66,21 @@ public final class MqttFixedHeader {
 
 	public boolean isDup() {
 		return isDup;
+	}
+
+	/**
+	 * 设置 {@code DUP} 标识（固定头 bit3）。
+	 * <p>
+	 * 注意：{@code DUP} 只对 {@code PUBLISH(QoS > 0)} 有意义，
+	 * {@code SUBSCRIBE} / {@code UNSUBSCRIBE} / {@code PUBREL} 的 bit3 是保留位必须为 0，
+	 * 否则严格校验的 broker（如 mosquitto、netty-codec-mqtt）会按 malformed 断开连接。
+	 * 仅供重传场景使用。
+	 *
+	 * @param dup 是否重传标识
+	 * @see <a href="https://gitee.com/dromara/mica-mqtt/issues/IKH0V8">IKH0V8</a>
+	 */
+	public void setDup(boolean dup) {
+		this.isDup = dup;
 	}
 
 	public MqttQoS qosLevel() {
