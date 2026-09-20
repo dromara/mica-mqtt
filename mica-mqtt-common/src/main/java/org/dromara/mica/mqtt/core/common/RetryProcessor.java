@@ -28,7 +28,9 @@ public final class RetryProcessor<T extends MqttMessage> {
 	private void startTimer(TimerTaskService taskService) {
 		this.ackTimerTask = taskService.addTask((systemTimer) -> {
 			return new AckTimerTask(systemTimer, () -> {
-				MqttFixedHeader fixedHeader = new MqttFixedHeader(this.originalMessage.fixedHeader().messageType(), true, this.originalMessage.fixedHeader().qosLevel(), this.originalMessage.fixedHeader().isRetain(), this.originalMessage.fixedHeader().remainingLength());
+				// 复用原固定头，重传统一置 dup，是否真正生效由编码时按报文类型判定
+				MqttFixedHeader fixedHeader = this.originalMessage.fixedHeader();
+				fixedHeader.setDup(true);
 				handler.accept(fixedHeader, originalMessage);
 			}, 5, 10);
 		});

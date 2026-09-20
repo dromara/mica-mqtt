@@ -30,7 +30,7 @@ import java.util.Objects;
 public final class MqttFixedHeader {
 
 	private final MqttMessageType messageType;
-	private final boolean isDup;
+	private volatile boolean isDup;
 	private final boolean isRetain;
 	private final int headLength;
 	private final int remainingLength;
@@ -68,6 +68,21 @@ public final class MqttFixedHeader {
 		return isDup;
 	}
 
+	/**
+	 * 设置 {@code DUP} 标识（固定头 bit3）。
+	 * <p>
+	 * 注意：{@code DUP} 只对 {@code PUBLISH(QoS > 0)} 有意义，
+	 * {@code SUBSCRIBE} / {@code UNSUBSCRIBE} / {@code PUBREL} 的 bit3 是保留位必须为 0，
+	 * 否则严格校验的 broker（如 mosquitto、netty-codec-mqtt）会按 malformed 断开连接。
+	 * 仅供重传场景使用。
+	 *
+	 * @param dup 是否重传标识
+	 * @see <a href="https://gitee.com/dromara/mica-mqtt/issues/IKH0V8">IKH0V8</a>
+	 */
+	public void setDup(boolean dup) {
+		this.isDup = dup;
+	}
+
 	public MqttQoS qosLevel() {
 		return qosLevel;
 	}
@@ -93,6 +108,26 @@ public final class MqttFixedHeader {
 
 	public int getMessageLength() {
 		return headLength + remainingLength;
+	}
+
+	/**
+	 * 编码时 {@code DUP} 标识是否生效。
+	 * <p>
+	 * MQTT 3.1.1 / 5.0 规定只有 PUBLISH 的 bit3 是 {@code DUP}，
+	 * SUBSCRIBE / UNSUBSCRIBE / PUBREL 的 bit3 均为<strong>保留位，必须置 0</strong>，
+	 * 置 1 会被严格校验的 broker（mosquitto、netty-codec-mqtt 等）判定为 malformed 并断开连接。
+	 * 且 PUBLISH 的 {@code DUP} 仅在 qos 大于 0 时有意义。
+	 * <p>
+	 * 由 {@code MqttEncoder} 编码时统一判定，避免调用方误置。
+	 *
+	 * @return 是否编码 DUP 标识
+	 * @see <a href="https://gitee.com/dromara/mica-mqtt/issues/IKH0V8">IKH0V8</a>
+	 */
+	public boolean isDupEffected() {
+		if (MqttMessageType.PUBLISH != messageType) {
+			return false;
+		}
+		return qosLevel.value() > 0;
 	}
 
 	@Override

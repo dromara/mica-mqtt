@@ -2,6 +2,16 @@
 
 ## 发行版本
 
+### v2.6.12 - 2026-09-19
+- 🐛 fix(codec、common): 修复重传时 `SUBSCRIBE`、`UNSUBSCRIBE`、`PUBREL`、`PUBREC` 的固定头 DUP 位被错误置 1，发出 `0x8A`、`0xAA` 等非法报文被严格校验的 broker 断开连接。gitee #IKH0V8 感谢 `@mxyyyy` 反馈。
+- ♻️ `MqttEncoder` 编码固定头时按报文类型统一判定 DUP（仅 `PUBLISH(qos > 0)` 生效，其他报文 bit3 强制为 0），调用方误置也不会再发出非法报文。
+- ✨ `MqttFixedHeader` 新增 `setDup(boolean)` 和 `isDupEffected()`，重传时复用原固定头，不再重新构建。
+- 🐛 fix(client): `unSubscribe` 未校验 `getContext()` 判空，断开窗口内调用会 NPE。
+- ✅ test(codec、common): 补充编解码回归测试，新增 `MqttEncoderFixedHeaderTest`（各报文类型固定头首字节，覆盖 `DUP`/`QoS`/`retain` 组合）与 `MqttCodecRoundTripTest`（`CONNECT`、`PUBLISH` QoS 0/1/2、`SUBSCRIBE`、`UNSUBSCRIBE`、`PINGREQ` 编解码往返）；`RetryProcessorTest` 改为真实驱动 `RetryProcessor` 断言重传行为。
+
+### v2.6.11 - 2026-09-18
+- chore(build): 调整 mica-net 版本为 2.0.16，修复 `ClientReConnTask` 重连时错误判断，调整 `DefaultTimerTaskService` 默认时间轮粒度。
+
 ### v2.6.10 - 2026-09-11
 - feat(client): MqttClientPublish 主题占位符支持方法参数，新增 @TopicParam 参数注解，配合 resolveTopic(Function) 按需取值。 (gitee #IKED1S) 感谢 @humlzy 反馈。
 - fix(mica-mqtt-client): getContext() 校验缓存 context 活体，失效时重新获取。
