@@ -20,6 +20,7 @@ public class ClientController {
 		service.publish(body);
 		service.publishHelloInterfaceA(body);
 		service.publishHelloInterfaceB(body);
+		service.publishHelloDefaultInterface(body);
 		return true;
 	}
 

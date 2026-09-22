@@ -29,6 +29,10 @@ import org.dromara.mica.mqtt.core.annotation.TopicParam;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
 
 import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -41,8 +45,39 @@ import java.util.function.Consumer;
  * @author ChangJin Wei (魏昌进)
  */
 public class MqttInvocationHandler<T extends IMqttClient> implements InvocationHandler {
+	private static final Object[] EMPTY_ARGS = new Object[0];
+	private static final int ALLOWED_MODES = MethodHandles.Lookup.PUBLIC
+		| MethodHandles.Lookup.PRIVATE
+		| MethodHandles.Lookup.PROTECTED
+		| MethodHandles.Lookup.PACKAGE;
+	private static final Constructor<MethodHandles.Lookup> LOOKUP_CONSTRUCTOR;
+	private static final Method PRIVATE_LOOKUP_IN_METHOD;
+
+	static {
+		Method privateLookupInMethod;
+		try {
+			privateLookupInMethod = MethodHandles.class.getMethod(
+				"privateLookupIn", Class.class, MethodHandles.Lookup.class
+			);
+		} catch (NoSuchMethodException e) {
+			privateLookupInMethod = null;
+		}
+		PRIVATE_LOOKUP_IN_METHOD = privateLookupInMethod;
+
+		Constructor<MethodHandles.Lookup> lookupConstructor = null;
+		if (PRIVATE_LOOKUP_IN_METHOD == null) {
+			try {
+				lookupConstructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, int.class);
+				lookupConstructor.setAccessible(true);
+			} catch (NoSuchMethodException e) {
+				throw new IllegalStateException("No compatible default method invoker found", e);
+			}
+		}
+		LOOKUP_CONSTRUCTOR = lookupConstructor;
+	}
+
 	private final T mqttClient;
-	private final Map<Method, MethodMetadata> methodCache;
+	private final Map<Method, MqttMethodInvoker> methodCache;
 
 	public MqttInvocationHandler(T mqttClient) {
 		this.mqttClient = mqttClient;
@@ -55,92 +90,101 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 		if (Object.class.equals(method.getDeclaringClass())) {
 			return method.invoke(this, args);
 		}
-		// 其它代理方法
-		MethodMetadata metadata = resolveMethod(method);
+		return cachedInvoker(method).invoke(proxy, method, args, mqttClient);
+	}
 
-		Object payload = metadata.getPayloadIndex() >= 0 ? args[metadata.getPayloadIndex()] : null;
-		boolean retain = metadata.getRetainIndex() >= 0 && Boolean.TRUE.equals(args[metadata.getRetainIndex()]);
-		MqttProperties properties = metadata.getPropertiesIndex() >= 0
-			? (MqttProperties) args[metadata.getPropertiesIndex()]
-			: null;
-		Consumer<MqttPublishBuilder> builder = metadata.getBuilderIndex() >= 0
-			? (Consumer<MqttPublishBuilder>) args[metadata.getBuilderIndex()]
-			: null;
-
-		// 按需取值：先把方法参数按 ${var} 查一次，未匹配再回退到 payload 字段。
-		String topic = TopicUtil.resolveTopic(metadata.getMqttPublish().value(), (fieldName) -> {
-			Integer index = metadata.getVariableParamIndices().get(fieldName);
-			Object value = (index != null && args != null && index < args.length) ? args[index] : null;
-			if (value == null) {
-				value = ClassUtil.getFieldValue(payload, fieldName);
+	private MqttMethodInvoker cachedInvoker(Method method) throws Throwable {
+		try {
+			return CollUtil.computeIfAbsent(methodCache, method, m -> {
+				if (m.isDefault()) {
+					try {
+						return new DefaultMethodInvoker(getMethodHandle(m));
+					} catch (ReflectiveOperationException e) {
+						throw new IllegalStateException("Failed to get default method handle: " + m, e);
+					}
+				}
+				return new PlainMethodInvoker(resolveMethod(m));
+			});
+		} catch (RuntimeException e) {
+			Throwable cause = e.getCause();
+			if (cause instanceof ReflectiveOperationException) {
+				throw cause;
 			}
-			return value;
-		});
-
-		MqttQoS qos = metadata.getMqttPublish().qos();
-		if (topic == null || topic.isEmpty()) {
-			throw new IllegalArgumentException("Resolved topic is null or empty");
-		}
-		MqttClient client = mqttClient.getMqttClient();
-		if (builder == null) {
-			return client.publish(topic, payload, qos, retain, properties);
-		} else {
-			return client.publish(topic, payload, qos, builder);
+			throw e;
 		}
 	}
 
-	private MethodMetadata resolveMethod(Method method) {
-		return CollUtil.computeIfAbsent(methodCache, method, m -> {
-			MqttClientPublish mqttPublish = m.getAnnotation(MqttClientPublish.class);
-			if (mqttPublish == null) {
-				throw new UnsupportedOperationException("Method not annotated with @MqttClientPublish");
-			}
+	private static MethodHandle getMethodHandle(Method method) throws ReflectiveOperationException {
+		if (PRIVATE_LOOKUP_IN_METHOD == null) {
+			return getMethodHandleJava8(method);
+		}
+		return getMethodHandleJava9(method);
+	}
 
-			Annotation[][] paramAnnotations = m.getParameterAnnotations();
-			Class<?>[] paramTypes = m.getParameterTypes();
-			Parameter[] parameters = m.getParameters();
+	private static MethodHandle getMethodHandleJava9(Method method) throws ReflectiveOperationException {
+		Class<?> declaringClass = method.getDeclaringClass();
+		return ((MethodHandles.Lookup) PRIVATE_LOOKUP_IN_METHOD.invoke(null, declaringClass, MethodHandles.lookup()))
+			.findSpecial(declaringClass, method.getName(),
+				MethodType.methodType(method.getReturnType(), method.getParameterTypes()), declaringClass);
+	}
 
-			int payloadIndex = -1;
-			int retainIndex = -1;
-			int propertiesIndex = -1;
-			int builderIndex = -1;
-			Map<String, Integer> variableParamIndices = new LinkedHashMap<>();
+	private static MethodHandle getMethodHandleJava8(Method method) throws ReflectiveOperationException {
+		Class<?> declaringClass = method.getDeclaringClass();
+		return LOOKUP_CONSTRUCTOR.newInstance(declaringClass, ALLOWED_MODES)
+			.findSpecial(declaringClass, method.getName(),
+				MethodType.methodType(method.getReturnType(), method.getParameterTypes()), declaringClass);
+	}
 
-			for (int i = 0; i < paramAnnotations.length; i++) {
-				for (Annotation annotation : paramAnnotations[i]) {
-					if (annotation instanceof MqttPayload) {
-						payloadIndex = i;
-					} else if (annotation instanceof MqttRetain) {
-						retainIndex = i;
-					}
+	private MethodMetadata resolveMethod(Method m) {
+		MqttClientPublish mqttPublish = m.getAnnotation(MqttClientPublish.class);
+		if (mqttPublish == null) {
+			throw new UnsupportedOperationException("Method not annotated with @MqttClientPublish");
+		}
+
+		Annotation[][] paramAnnotations = m.getParameterAnnotations();
+		Class<?>[] paramTypes = m.getParameterTypes();
+		Parameter[] parameters = m.getParameters();
+
+		int payloadIndex = -1;
+		int retainIndex = -1;
+		int propertiesIndex = -1;
+		int builderIndex = -1;
+		Map<String, Integer> variableParamIndices = new LinkedHashMap<>();
+
+		for (int i = 0; i < paramAnnotations.length; i++) {
+			for (Annotation annotation : paramAnnotations[i]) {
+				if (annotation instanceof MqttPayload) {
+					payloadIndex = i;
+				} else if (annotation instanceof MqttRetain) {
+					retainIndex = i;
 				}
 			}
+		}
 
-			for (int i = 0; i < paramTypes.length; i++) {
-				if (propertiesIndex == -1 && MqttProperties.class.isAssignableFrom(paramTypes[i])) {
-					propertiesIndex = i;
-				} else if (builderIndex == -1 && Consumer.class.isAssignableFrom(paramTypes[i])) {
-					builderIndex = i;
-				}
+		for (int i = 0; i < paramTypes.length; i++) {
+			if (propertiesIndex == -1 && MqttProperties.class.isAssignableFrom(paramTypes[i])) {
+				propertiesIndex = i;
+			} else if (builderIndex == -1 && Consumer.class.isAssignableFrom(paramTypes[i])) {
+				builderIndex = i;
 			}
+		}
 
-			// 记录可作为占位符数据源的方法参数。
-			// 1) 优先使用 @TopicParam 显式声明的变量名；
-			// 2) 缺失时回退到编译期参数名（需开启 -parameters / <parameters>true</parameters>）；
-			// 3) 都没拿到就跳过，避免拿到 arg0/arg1 后把 ${productKey} 静默替换成 arg0。
-			for (int i = 0; i < parameters.length; i++) {
-				if (i == payloadIndex || i == retainIndex || i == propertiesIndex || i == builderIndex) {
-					continue;
-				}
-				// 参数名
-				String paramName = resolveParameterName(parameters[i]);
-				if (StrUtil.isNotBlank(paramName)) {
-					variableParamIndices.put(paramName, i);
-				}
+		// 记录可作为占位符数据源的方法参数。
+		// 1) 优先使用 @TopicParam 显式声明的变量名；
+		// 2) 缺失时回退到编译期参数名（需开启 -parameters / <parameters>true</parameters>）；
+		// 3) 都没拿到就跳过，避免拿到 arg0/arg1 后把 ${productKey} 静默替换成 arg0。
+		for (int i = 0; i < parameters.length; i++) {
+			if (i == payloadIndex || i == retainIndex || i == propertiesIndex || i == builderIndex) {
+				continue;
 			}
+			// 参数名
+			String paramName = resolveParameterName(parameters[i]);
+			if (StrUtil.isNotBlank(paramName)) {
+				variableParamIndices.put(paramName, i);
+			}
+		}
 
-			return new MethodMetadata(mqttPublish, payloadIndex, retainIndex, propertiesIndex, builderIndex, variableParamIndices);
-		});
+		return new MethodMetadata(mqttPublish, payloadIndex, retainIndex, propertiesIndex, builderIndex, variableParamIndices);
 	}
 
 	/**
@@ -165,6 +209,72 @@ public class MqttInvocationHandler<T extends IMqttClient> implements InvocationH
 			}
 		}
 		return null;
+	}
+
+	private interface MqttMethodInvoker {
+
+		Object invoke(Object proxy, Method method, Object[] args, IMqttClient mqttClient) throws Throwable;
+	}
+
+	private static class PlainMethodInvoker implements MqttMethodInvoker {
+
+		private final MethodMetadata metadata;
+
+		PlainMethodInvoker(MethodMetadata metadata) {
+			this.metadata = metadata;
+		}
+
+		@SuppressWarnings("unchecked")
+		@Override
+		public Object invoke(Object proxy, Method method, Object[] args, IMqttClient mqttClient) {
+			Object payload = metadata.getPayloadIndex() >= 0 ? args[metadata.getPayloadIndex()] : null;
+			boolean retain = metadata.getRetainIndex() >= 0 && Boolean.TRUE.equals(args[metadata.getRetainIndex()]);
+			MqttProperties properties = metadata.getPropertiesIndex() >= 0
+				? (MqttProperties) args[metadata.getPropertiesIndex()]
+				: null;
+			Consumer<MqttPublishBuilder> builder = metadata.getBuilderIndex() >= 0
+				? (Consumer<MqttPublishBuilder>) args[metadata.getBuilderIndex()]
+				: null;
+
+			// 按需取值：先把方法参数按 ${var} 查一次，未匹配再回退到 payload 字段。
+			String topic = TopicUtil.resolveTopic(metadata.getMqttPublish().value(), (fieldName) -> {
+				Integer index = metadata.getVariableParamIndices().get(fieldName);
+				Object value = (index != null && args != null && index < args.length) ? args[index] : null;
+				if (value == null) {
+					value = ClassUtil.getFieldValue(payload, fieldName);
+				}
+				return value;
+			});
+
+			MqttQoS qos = metadata.getMqttPublish().qos();
+			if (topic == null || topic.isEmpty()) {
+				throw new IllegalArgumentException("Resolved topic is null or empty");
+			}
+			MqttClient client = mqttClient.getMqttClient();
+			if (builder == null) {
+				return client.publish(topic, payload, qos, retain, properties);
+			} else {
+				return client.publish(topic, payload, qos, builder);
+			}
+		}
+	}
+
+	private static class DefaultMethodInvoker implements MqttMethodInvoker {
+
+		private final MethodHandle methodHandle;
+
+		DefaultMethodInvoker(MethodHandle methodHandle) {
+			this.methodHandle = methodHandle;
+		}
+
+		@Override
+		public Object invoke(Object proxy, Method method, Object[] args, IMqttClient mqttClient) throws Throwable {
+			return methodHandle.bindTo(proxy).invokeWithArguments(normalizeArgs(args));
+		}
+	}
+
+	private static Object[] normalizeArgs(Object[] args) {
+		return (args == null) ? EMPTY_ARGS : args;
 	}
 
 	private static class MethodMetadata {
