@@ -47,7 +47,7 @@ import java.util.Map;
 class MqttInvocationHandlerTest {
 
 	/**
-	 * 反射读取 methodCache 的 value，验证 DoorClient 解析时
+	 * 反射读取 MethodMetadata，验证 DoorClient 解析时
 	 * @TopicParam("productKey") / @TopicParam("deviceId") 都映射到正确的 args 索引。
 	 */
 	@Test
@@ -128,6 +128,17 @@ class MqttInvocationHandlerTest {
 		Assertions.assertEquals("/sys//thing", resolved);
 	}
 
+	/**
+	 * 代理接口里的 default 方法应执行接口默认实现，而不是进入 @MqttClientPublish 解析。
+	 */
+	@Test
+	void shouldInvokeInterfaceDefaultMethod() {
+		DefaultMethodClient client = new NoopMqttClient().getInterface(DefaultMethodClient.class);
+
+		Assertions.assertEquals("device-default", client.defaultClientId("device"));
+		Assertions.assertEquals(7, client.defaultQos());
+	}
+
 	// ---------------- 测试夹具 ----------------
 
 	public interface DoorClient {
@@ -151,6 +162,17 @@ class MqttInvocationHandlerTest {
 		void send(@TopicParam("productKey") String pk);
 	}
 
+	public interface DefaultMethodClient {
+
+		default String defaultClientId(String prefix) {
+			return prefix + "-default";
+		}
+
+		default int defaultQos() {
+			return 7;
+		}
+	}
+
 	public static class PayloadBean {
 
 		private String deviceId;
@@ -172,9 +194,7 @@ class MqttInvocationHandlerTest {
 	}
 
 	/**
-	 * 反射读取 MqttInvocationHandler.methodCache，拿到 MethodMetadata 内部状态。
-	 * 这里用一个小技巧：new MqttInvocationHandler 的同时调用一次 resolveMethod 让缓存填充，
-	 * 然后再读取缓存。
+	 * 反射调用 MqttInvocationHandler.resolveMethod，拿到 MethodMetadata 内部状态。
 	 */
 	private static final class MqttMetadataExtractor {
 
@@ -184,13 +204,7 @@ class MqttInvocationHandlerTest {
 			// 通过反射调用 private resolveMethod 触发 MethodMetadata 构建
 			Method resolveMethod = MqttInvocationHandler.class.getDeclaredMethod("resolveMethod", Method.class);
 			resolveMethod.setAccessible(true);
-			resolveMethod.invoke(handler, method);
-
-			Field cacheField = MqttInvocationHandler.class.getDeclaredField("methodCache");
-			cacheField.setAccessible(true);
-			@SuppressWarnings("unchecked")
-			Map<Method, Object> cache = (Map<Method, Object>) cacheField.get(handler);
-			Object metadata = cache.get(method);
+			Object metadata = resolveMethod.invoke(handler, method);
 
 			Field indicesField = metadata.getClass().getDeclaredField("variableParamIndices");
 			indicesField.setAccessible(true);
@@ -212,7 +226,7 @@ class MqttInvocationHandlerTest {
 	}
 
 	/**
-	 * 不会真正被调用的占位 IMqttClient：测试只通过反射读取 handler 内部缓存，
+	 * 不会真正被调用的占位 IMqttClient：测试只通过反射读取 MethodMetadata，
 	 * 不会触发 getMqttClient()。
 	 */
 	private static final class NoopMqttClient implements IMqttClient {
