@@ -27,6 +27,9 @@ public class ClientService {
 	@Autowired
 	private HelloInterfaceB helloInterfaceB;
 
+	@Autowired
+	private HelloDefaultInterface helloDefaultInterface;
+
 	public boolean publish(String body) {
 		client.publish("/test/client", body.getBytes(StandardCharsets.UTF_8));
 		return true;
@@ -44,6 +47,11 @@ public class ClientService {
 
 	public boolean publishHelloInterfaceB(String body) {
 		helloInterfaceB.sayHello(body.getBytes(StandardCharsets.UTF_8));
+		return true;
+	}
+
+	public boolean publishHelloDefaultInterface(String body) {
+		helloDefaultInterface.sayDefaultHello(body);
 		return true;
 	}
 
