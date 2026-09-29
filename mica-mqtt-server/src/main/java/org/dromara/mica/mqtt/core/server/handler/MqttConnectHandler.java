@@ -118,10 +118,19 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			return;
 		}
 		// 3. 认证
-		if (authHandler != null && !authHandler.verifyAuthenticate(context, uniqueId, clientId, userName, password)) {
-			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD,
-				0, false, false, requestProblemInformation, requestResponseInformation);
-			return;
+		if (authHandler != null) {
+			// 账号密码认证
+			MqttConnectReasonCode reasonCode = authHandler.verifyAuthenticate(context, uniqueId, clientId, userName, password);
+			// 兼容用户返回 null 的场景
+			if (reasonCode == null) {
+				reasonCode = MqttConnectReasonCode.CONNECTION_REFUSED_NOT_AUTHORIZED;
+			}
+			// 没有认证成功，返回认证失败
+			if (!reasonCode.isAccepted()) {
+				connAckByReturnCode(clientId, uniqueId, context, reasonCode,
+					0, false, false, requestProblemInformation, requestResponseInformation);
+				return;
+			}
 		}
 		if (hasInvalidReceiveMaximum(context, variableHeader)) {
 			connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_REFUSED_PROTOCOL_ERROR,

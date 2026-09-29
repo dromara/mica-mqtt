@@ -1,6 +1,7 @@
 package org.dromara.mica.mqtt.server.auth;
 
 import net.dreamlu.mica.net.core.ChannelContext;
+import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 import org.springframework.context.annotation.Configuration;
 
@@ -13,9 +14,9 @@ import org.springframework.context.annotation.Configuration;
 public class MqttAuthHandler implements IMqttServerAuthHandler {
 
 	@Override
-	public boolean authenticate(ChannelContext context, String uniqueId, String clientId, String username, String password) {
+	public MqttConnectReasonCode authenticate(ChannelContext context, String uniqueId, String clientId, String username, String password) {
 		// 客户端认证逻辑实现
-		return true;
+		return MqttConnectReasonCode.CONNECTION_ACCEPTED;
 	}
 
 }

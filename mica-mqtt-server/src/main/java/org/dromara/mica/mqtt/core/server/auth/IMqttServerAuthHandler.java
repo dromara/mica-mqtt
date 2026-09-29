@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.server.auth;
 
 import net.dreamlu.mica.net.core.ChannelContext;
+import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,12 +40,12 @@ public interface IMqttServerAuthHandler {
 	 * @param password 密码
 	 * @return 是否认证成功
 	 */
-	default boolean verifyAuthenticate(ChannelContext context, String uniqueId, String clientId, String username, String password) {
+	default MqttConnectReasonCode verifyAuthenticate(ChannelContext context, String uniqueId, String clientId, String username, String password) {
 		try {
 			return authenticate(context, uniqueId, clientId, username, password);
 		} catch (Throwable e) {
 			logger.error("Mqtt client node:{} authenticate error uniqueId:{} clientId:{} username:{} password:{}", context.getClientNode(), uniqueId, clientId, username, password, e);
-			return false;
+			return MqttConnectReasonCode.CONNECTION_REFUSED_NOT_AUTHORIZED;
 		}
 	}
 
@@ -58,6 +59,6 @@ public interface IMqttServerAuthHandler {
 	 * @param password 密码
 	 * @return 是否认证成功
 	 */
-	boolean authenticate(ChannelContext context, String uniqueId, String clientId, String username, String password);
+	MqttConnectReasonCode authenticate(ChannelContext context, String uniqueId, String clientId, String username, String password);
 
 }

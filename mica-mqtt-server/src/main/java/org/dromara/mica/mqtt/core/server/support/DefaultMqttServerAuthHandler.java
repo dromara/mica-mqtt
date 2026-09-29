@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.server.support;
 
 import net.dreamlu.mica.net.core.ChannelContext;
+import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 
 import java.util.Objects;
@@ -36,8 +37,13 @@ public class DefaultMqttServerAuthHandler implements IMqttServerAuthHandler {
 	}
 
 	@Override
-	public boolean authenticate(ChannelContext context, String uniqueId, String clientId, String username, String password) {
-		return authUsername.equals(username) && authPassword.equals(password);
+	public MqttConnectReasonCode authenticate(ChannelContext context, String uniqueId, String clientId, String username, String password) {
+		boolean isAuthenticated = authUsername.equals(username) && authPassword.equals(password);
+		if (isAuthenticated) {
+			return MqttConnectReasonCode.CONNECTION_ACCEPTED;
+		} else {
+			return MqttConnectReasonCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD;
+		}
 	}
 
 }
