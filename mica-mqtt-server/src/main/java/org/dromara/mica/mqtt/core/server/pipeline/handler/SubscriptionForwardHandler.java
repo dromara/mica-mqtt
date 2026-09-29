@@ -19,12 +19,15 @@ package org.dromara.mica.mqtt.core.server.pipeline.handler;
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.core.TioConfig;
+import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttProperty;
 import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
+import org.dromara.mica.mqtt.core.server.enums.MessageType;
+import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.pipeline.MqttPublishPipelineHandler;
 import org.dromara.mica.mqtt.core.server.pipeline.PublishContext;
@@ -42,6 +45,7 @@ import java.util.List;
  *   <li>查找所有匹配 topic 的订阅</li>
  *   <li>MQTT 5.0 属性处理（过期检查、属性重写）</li>
  *   <li>逐一转发给订阅者（遵循 No Local、QoS 降级等规范）</li>
+ *   <li>订阅者离线时按会话持久性入离线队列（spec 4.1 持久会话）</li>
  * </ol>
  * 同步执行，避免二次 submit 到线程池，减少队列积压和内存占用
  *
@@ -51,10 +55,15 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 	private static final Logger logger = LoggerFactory.getLogger(SubscriptionForwardHandler.class);
 	private final IMqttSessionManager sessionManager;
 	private final MqttServer mqttServer;
+	/**
+	 * QoS0 消息是否也进入离线队列
+	 */
+	private final boolean mqueueStoreQos0;
 
 	public SubscriptionForwardHandler(MqttServerCreator serverCreator, MqttServer mqttServer) {
 		this.sessionManager = serverCreator.getSessionManager();
 		this.mqttServer = mqttServer;
+		this.mqueueStoreQos0 = serverCreator.isMqueueStoreQos0();
 	}
 
 	@Override
@@ -152,7 +161,8 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 				}
 				ChannelContext clientContext = Tio.getByBsId(tioConfig, clientId);
 				if (clientContext == null || clientContext.isClosed()) {
-					logger.warn("Mqtt Topic:{} publish to clientId:{} ChannelContext is null may be disconnected.", topic, clientId);
+					// 离线订阅者不再直接丢弃：持久会话按 QoS 进入离线队列，重连后回放
+					queueOfflineMessage(context, clientId, subscribe.getMqttQoS(), properties);
 					continue;
 				}
 				// 发送消息
@@ -162,6 +172,44 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 			}
 		} catch (Throwable e) {
 			logger.error("Subscription forward error", e);
+		}
+	}
+
+	/**
+	 * 订阅者离线时按会话持久性决定入队或丢弃。
+	 * <p>
+	 * QoS1/2 消息始终尝试入队（由 {@code IMqttSessionManager} 判定会话是否持久、容量与 TTL）；
+	 * QoS0 消息默认丢弃，可通过 {@code mqueueStoreQos0} 打开。
+	 */
+	private void queueOfflineMessage(PublishContext context, String subscriberClientId, int subMqttQoS, MqttProperties properties) {
+		// spec 4.3.2：实际投递 QoS 取发布 QoS 与订阅 QoS 的较小值
+		int qosValue = Math.min(context.getQos().value(), subMqttQoS);
+		MqttQoS mqttQoS = MqttQoS.valueOf(qosValue);
+		if (MqttQoS.QOS0 == mqttQoS && !mqueueStoreQos0) {
+			logger.debug("Mqtt Topic:{} subscriber clientId:{} offline, QoS0 message dropped.",
+				context.getTopic(), subscriberClientId);
+			return;
+		}
+		Message offlineMessage = new Message();
+		offlineMessage.setMessageType(MessageType.UP_STREAM);
+		offlineMessage.setTopic(context.getTopic());
+		offlineMessage.setPayload(context.getPayload());
+		offlineMessage.setQos(mqttQoS.value());
+		offlineMessage.setRetain(false);
+		offlineMessage.setDup(false);
+		offlineMessage.setFromClientId(context.getClientId());
+		offlineMessage.setFromUsername(context.getUsername());
+		offlineMessage.setPeerHost(context.getPeerHost());
+		offlineMessage.setNode(context.getNodeName());
+		offlineMessage.setTimestamp(context.getTimestamp());
+		offlineMessage.setPublishReceivedAt(context.getPublishReceivedAt());
+		offlineMessage.setProperties(properties);
+		if (sessionManager.addOfflineMessage(subscriberClientId, offlineMessage)) {
+			logger.debug("Mqtt Topic:{} subscriber clientId:{} offline, message queued qos:{}.",
+				context.getTopic(), subscriberClientId, mqttQoS);
+		} else {
+			logger.debug("Mqtt Topic:{} subscriber clientId:{} offline and session not persistent, message dropped.",
+				context.getTopic(), subscriberClientId);
 		}
 	}
 

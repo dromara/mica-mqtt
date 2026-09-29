@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentMap;
  * <p>到期前若客户端用同一 clientId 重新连接并保留 session（Clean Start = false），
  * 应通过 {@link #cancel(String)} 取消待发任务（由调用方在 CONNECT 处理中完成）。
  *
- * @author L.cm
+ * @author wcmzllx
  */
 public class SessionExpireScheduler {
 	private static final Logger logger = LoggerFactory.getLogger(SessionExpireScheduler.class);
@@ -107,12 +107,20 @@ public class SessionExpireScheduler {
 	/**
 	 * 任务到期回调：通过 {@link IMqttSessionManager#remove(String)} 清理 session。
 	 * <p>
+	 * 回收前必须复核会话是否仍处于「待过期」：定时器到期与客户端重连可能并发，
+	 * 而 {@link #cancel(String)} 拦不住已经开始执行的任务——若期间会话已被重连接管
+	 * （重连会复位过期标记），继续回收会误删刚建立的活跃会话。
+	 * <p>
 	 * 注意：客户端此时已断开连接，不存在 in-flight 流量需要释放（backlog 状态本身
 	 * 也随 session 一起被清理）。
 	 */
 	private void onExpire(String clientId) {
 		try {
 			// spec 3.1.2.11.4: 过期时清理 session；服务端可"丢包"行为由业务方决定。
+			if (!sessionManager.isSessionPendingExpiry(clientId)) {
+				logger.debug("Session expire skipped - clientId:{} session taken over or already cleared.", clientId);
+				return;
+			}
 			sessionManager.remove(clientId);
 			if (logger.isDebugEnabled()) {
 				logger.debug("Session expired - clientId:{} session state cleared.", clientId);

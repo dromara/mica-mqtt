@@ -52,6 +52,7 @@ import org.dromara.mica.mqtt.core.server.pipeline.handler.SubscriptionForwardHan
 import org.dromara.mica.mqtt.core.server.pipeline.message.*;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
+import org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.server.store.InMemoryMqttMessageStore;
 import org.dromara.mica.mqtt.core.server.will.WillDelayScheduler;
@@ -148,11 +149,39 @@ public class MqttServerCreator {
 	/**
 	 * PR9（P2.8）Session Expiry Interval 调度器。
 	 */
-	private org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler sessionExpireScheduler;
+	private SessionExpireScheduler sessionExpireScheduler;
 	/**
 	 * session 管理
 	 */
 	private IMqttSessionManager sessionManager;
+	/**
+	 * 是否启用持久会话（cleanSession=false / MQTT5 Clean Start=false 的会话跨连接保留）
+	 */
+	private boolean enablePersistentSession = true;
+	/**
+	 * 每个会话的离线消息队列上限，&lt;= 0 表示不缓存离线消息
+	 */
+	private int maxOfflineQueueSize = 1000;
+	/**
+	 * 离线消息保存时长（秒），0 表示不限期
+	 */
+	private long offlineMessageTtlSeconds = 0L;
+	/**
+	 * QoS0 消息是否也进入离线队列
+	 */
+	private boolean mqueueStoreQos0 = false;
+	/**
+	 * MQTT5 客户端未携带 Session Expiry Interval 属性时的默认会话过期时间（秒）
+	 */
+	private long sessionExpiryIntervalSeconds = 7200L;
+	/**
+	 * MQTT3.1.1 持久会话空闲过期时间（秒），0 表示不自动过期
+	 */
+	private long v311IdleSessionTimeoutSeconds = 0L;
+	/**
+	 * 每会话在途消息上限，&lt;= 0 表示不限制
+	 */
+	private int maxInflightPerSession = 1000;
 	/**
 	 * session 监听
 	 */
@@ -375,11 +404,11 @@ public class MqttServerCreator {
 		return this;
 	}
 
-	public org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler getSessionExpireScheduler() {
+	public SessionExpireScheduler getSessionExpireScheduler() {
 		return sessionExpireScheduler;
 	}
 
-	public MqttServerCreator sessionExpireScheduler(org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler sessionExpireScheduler) {
+	public MqttServerCreator sessionExpireScheduler(SessionExpireScheduler sessionExpireScheduler) {
 		this.sessionExpireScheduler = sessionExpireScheduler;
 		return this;
 	}
@@ -391,6 +420,92 @@ public class MqttServerCreator {
 	public MqttServerCreator sessionManager(IMqttSessionManager sessionManager) {
 		this.sessionManager = sessionManager;
 		return this;
+	}
+
+	/**
+	 * 是否启用持久会话（cleanSession=false / MQTT5 Clean Start=false 的会话跨连接保留），默认 {@code true}。
+	 * <p>
+	 * 关闭后退化为原行为：连接断开即清理会话，离线消息直接丢弃。
+	 */
+	public MqttServerCreator enablePersistentSession(boolean enablePersistentSession) {
+		this.enablePersistentSession = enablePersistentSession;
+		return this;
+	}
+
+	/**
+	 * 每个会话的离线消息队列上限，&lt;= 0 表示不缓存离线消息，默认 1000。
+	 */
+	public MqttServerCreator maxOfflineQueueSize(int maxOfflineQueueSize) {
+		this.maxOfflineQueueSize = maxOfflineQueueSize;
+		return this;
+	}
+
+	/**
+	 * 离线消息保存时长（秒），0 表示不限期，默认 0。
+	 */
+	public MqttServerCreator offlineMessageTtlSeconds(long offlineMessageTtlSeconds) {
+		this.offlineMessageTtlSeconds = offlineMessageTtlSeconds;
+		return this;
+	}
+
+	/**
+	 * QoS0 消息是否也进入离线队列，默认 {@code false}（QoS0 不保证投递，默认丢弃）。
+	 */
+	public MqttServerCreator mqueueStoreQos0(boolean mqueueStoreQos0) {
+		this.mqueueStoreQos0 = mqueueStoreQos0;
+		return this;
+	}
+
+	/**
+	 * MQTT5 客户端未携带 Session Expiry Interval 属性时的默认会话过期时间（秒），默认 7200。
+	 */
+	public MqttServerCreator sessionExpiryIntervalSeconds(long sessionExpiryIntervalSeconds) {
+		this.sessionExpiryIntervalSeconds = sessionExpiryIntervalSeconds;
+		return this;
+	}
+
+	/**
+	 * MQTT3.1.1 持久会话空闲过期时间（秒），0 表示不自动过期，默认 0。
+	 */
+	public MqttServerCreator v311IdleSessionTimeoutSeconds(long v311IdleSessionTimeoutSeconds) {
+		this.v311IdleSessionTimeoutSeconds = v311IdleSessionTimeoutSeconds;
+		return this;
+	}
+
+	/**
+	 * 每会话在途消息上限，&lt;= 0 表示不限制，默认 1000。
+	 */
+	public MqttServerCreator maxInflightPerSession(int maxInflightPerSession) {
+		this.maxInflightPerSession = maxInflightPerSession;
+		return this;
+	}
+
+	public boolean isEnablePersistentSession() {
+		return enablePersistentSession;
+	}
+
+	public int getMaxOfflineQueueSize() {
+		return maxOfflineQueueSize;
+	}
+
+	public long getOfflineMessageTtlSeconds() {
+		return offlineMessageTtlSeconds;
+	}
+
+	public boolean isMqueueStoreQos0() {
+		return mqueueStoreQos0;
+	}
+
+	public long getSessionExpiryIntervalSeconds() {
+		return sessionExpiryIntervalSeconds;
+	}
+
+	public long getV311IdleSessionTimeoutSeconds() {
+		return v311IdleSessionTimeoutSeconds;
+	}
+
+	public int getMaxInflightPerSession() {
+		return maxInflightPerSession;
 	}
 
 	public IMqttSessionListener getSessionListener() {
@@ -698,7 +813,11 @@ public class MqttServerCreator {
 			this.uniqueIdService = new DefaultMqttServerUniqueIdServiceImpl();
 		}
 		if (this.sessionManager == null) {
-			this.sessionManager = new InMemoryMqttSessionManager();
+			this.sessionManager = new InMemoryMqttSessionManager(
+				this.maxOfflineQueueSize,
+				this.offlineMessageTtlSeconds * 1000L,
+				this.maxInflightPerSession
+			);
 		}
 		if (this.messageStore == null) {
 			this.messageStore = new InMemoryMqttMessageStore();
@@ -735,7 +854,7 @@ public class MqttServerCreator {
 		}
 		// PR9：初始化 Session Expire Scheduler（不依赖 mqttServer，注入操作延迟到 build 末尾）
 		if (this.sessionExpireScheduler == null) {
-			this.sessionExpireScheduler = new org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler(this.sessionManager);
+			this.sessionExpireScheduler = new SessionExpireScheduler(this.sessionManager);
 		}
 		// AckService
 		DefaultMqttServerProcessor serverProcessor = new DefaultMqttServerProcessor(this, this.taskService, mqttExecutor);

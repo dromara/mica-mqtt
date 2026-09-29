@@ -124,6 +124,35 @@ public class MqttServerConfiguration {
 		if (mqttServerProperties.isDebug()) {
 			serverCreator.debug();
 		}
+		// 持久会话与离线消息相关配置，未配置时保持 MqttServerCreator 的默认值
+		Boolean enablePersistentSession = mqttServerProperties.getEnablePersistentSession();
+		if (enablePersistentSession != null) {
+			serverCreator.enablePersistentSession(enablePersistentSession);
+		}
+		Integer maxOfflineQueueSize = mqttServerProperties.getMaxOfflineQueueSize();
+		if (maxOfflineQueueSize != null) {
+			serverCreator.maxOfflineQueueSize(maxOfflineQueueSize);
+		}
+		Long offlineMessageTtlSeconds = mqttServerProperties.getOfflineMessageTtlSeconds();
+		if (offlineMessageTtlSeconds != null) {
+			serverCreator.offlineMessageTtlSeconds(offlineMessageTtlSeconds);
+		}
+		Boolean mqueueStoreQos0 = mqttServerProperties.getMqueueStoreQos0();
+		if (mqueueStoreQos0 != null) {
+			serverCreator.mqueueStoreQos0(mqueueStoreQos0);
+		}
+		Long sessionExpiryIntervalSeconds = mqttServerProperties.getSessionExpiryIntervalSeconds();
+		if (sessionExpiryIntervalSeconds != null) {
+			serverCreator.sessionExpiryIntervalSeconds(sessionExpiryIntervalSeconds);
+		}
+		Long v311IdleSessionTimeoutSeconds = mqttServerProperties.getV311IdleSessionTimeoutSeconds();
+		if (v311IdleSessionTimeoutSeconds != null) {
+			serverCreator.v311IdleSessionTimeoutSeconds(v311IdleSessionTimeoutSeconds);
+		}
+		Integer maxInflightPerSession = mqttServerProperties.getMaxInflightPerSession();
+		if (maxInflightPerSession != null) {
+			serverCreator.maxInflightPerSession(maxInflightPerSession);
+		}
 		// tio 编解码等线程数
 		Integer tioExecutorSize = mqttServerProperties.getTioExecutorSize();
 		if (tioExecutorSize != null && tioExecutorSize > 0) {

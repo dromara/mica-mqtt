@@ -19,8 +19,10 @@ package org.dromara.mica.mqtt.core.server.session;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
+import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -341,6 +343,133 @@ public interface IMqttSessionManager {
 	 * @return 是否成功
 	 */
 	boolean active(String clientId);
+
+	// ----------------- 持久会话（cleanSession=false / MQTT5 Clean Start + Session Expiry Interval）-----------------
+
+	/**
+	 * 绑定会话归属：记录持有该会话的连接、本次声明的会话策略。
+	 * <p>
+	 * 已有实现的默认行为是 {@link #setSessionExpiryInterval(String, int, boolean)}，保持向后兼容。
+	 *
+	 * @param clientId             clientId
+	 * @param connectionId         连接 id（ChannelContext#getId）
+	 * @param cleanStart           CONNECT 中的 Clean Start / Clean Session
+	 * @param persistent           是否持久会话（断开后跨连接保留）
+	 * @param sessionExpirySeconds 会话过期时长（秒），0 表示不自动过期
+	 */
+	default void bindSession(String clientId, String connectionId, boolean cleanStart, boolean persistent, int sessionExpirySeconds) {
+		setSessionExpiryInterval(clientId, sessionExpirySeconds, cleanStart);
+	}
+
+	/**
+	 * 判断会话归属是否仍指向该连接。
+	 * <p>
+	 * 互踢场景下旧连接的关闭回调可能晚于新连接的 CONNECT，通过归属判断避免旧连接误删新会话。
+	 *
+	 * @return true 表示该连接仍是会话归属，或实现未跟踪归属
+	 */
+	default boolean isSessionOwner(String clientId, String connectionId) {
+		return true;
+	}
+
+	/**
+	 * 该 clientId 当前是否为持久会话（仅持久会话才缓存离线消息）。
+	 */
+	default boolean isPersistentSession(String clientId) {
+		return false;
+	}
+
+	/**
+	 * 连接断开后标记会话过期时间（实现内部按绑定时记录的过期时长计算）。
+	 */
+	default void markSessionExpiry(String clientId) {
+	}
+
+	/**
+	 * 会话当前是否仍处于「待过期」状态。
+	 * <p>
+	 * 供 {@code SessionExpireScheduler} 到点回收前复核：期间若客户端已重连（重连会取消过期标记），
+	 * 说明会话已被接管，不应再回收。实现未跟踪过期标记时按「仍待过期」处理，保持既有行为。
+	 *
+	 * @param clientId clientId
+	 * @return true 表示该会话仍可被过期回收
+	 */
+	default boolean isSessionPendingExpiry(String clientId) {
+		return true;
+	}
+
+	/**
+	 * 离线消息入队（仅持久会话可入队，容量与 TTL 由实现约束）。
+	 *
+	 * @param clientId clientId
+	 * @param message  离线消息快照
+	 * @return 是否入队成功
+	 */
+	default boolean addOfflineMessage(String clientId, Message message) {
+		return false;
+	}
+
+	/**
+	 * 取出队首离线消息（TTL 已过的消息被丢弃）。
+	 *
+	 * @param clientId clientId
+	 * @return 离线消息；无则返回 {@code null}
+	 */
+	default Message pollOfflineMessage(String clientId) {
+		return null;
+	}
+
+	/**
+	 * 将消息放回队首（用于发送失败时保持顺序）。
+	 *
+	 * @param clientId clientId
+	 * @param message  离线消息快照
+	 */
+	default void pushOfflineMessageFirst(String clientId, Message message) {
+	}
+
+	/**
+	 * 离线队列当前长度。
+	 *
+	 * @param clientId clientId
+	 * @return 离线队列长度
+	 */
+	default int getOfflineMessageCount(String clientId) {
+		return 0;
+	}
+
+	/**
+	 * 当前在途（未确认）下行消息快照，用于持久会话重连后重发。
+	 *
+	 * @param clientId clientId
+	 * @return 在途消息列表，无则返回空列表
+	 */
+	default List<MqttPendingPublish> getPendingPublishes(String clientId) {
+		return Collections.emptyList();
+	}
+
+	/**
+	 * 标记 QoS2 在途消息已收到 PUBREC（重连后应重发 PUBREL 而不是 PUBLISH）。
+	 * <p>
+	 * 默认转调 {@link #markPendingPublishPubRel(String, int)}，集群实现已重写该方法，转调可保证标记随集群同步。
+	 *
+	 * @param clientId  clientId
+	 * @param messageId packetId
+	 */
+	default void markPubRecReceived(String clientId, int messageId) {
+		markPendingPublishPubRel(clientId, messageId);
+	}
+
+	/**
+	 * 查询 QoS2 在途消息是否已收到 PUBREC。
+	 *
+	 * @param clientId  clientId
+	 * @param messageId packetId
+	 * @return 是否已收到 PUBREC
+	 */
+	default boolean isPubRecReceived(String clientId, int messageId) {
+		return false;
+	}
 
 	/**
 	 * 清除 session

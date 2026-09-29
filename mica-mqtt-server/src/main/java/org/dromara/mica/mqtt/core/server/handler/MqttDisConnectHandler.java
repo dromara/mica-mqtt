@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.core.server.handler;
 
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Tio;
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
@@ -25,6 +26,7 @@ import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttReasonCodeAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler;
+import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.server.will.WillDelayScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +42,7 @@ public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttDisConnectHandler.class);
 	private final WillDelayScheduler willDelayScheduler;
 	private final SessionExpireScheduler sessionExpireScheduler;
+	private final IMqttMessageStore messageStore;
 
 	public MqttDisConnectHandler(MqttServerCreator serverCreator,
 							 ExecutorService executor,
@@ -47,6 +50,7 @@ public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 		super(serverCreator, executor, taskService);
 		this.willDelayScheduler = serverCreator.getWillDelayScheduler();
 		this.sessionExpireScheduler = serverCreator.getSessionExpireScheduler();
+		this.messageStore = serverCreator.getMessageStore();
 	}
 
 	@Override
@@ -67,6 +71,11 @@ public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 		// 正常断开（DISCONNECT reason code = 0）时，will 消息不应发送，需取消任何已调度的延迟任务。
 		if (reasonCode == MqttDisconnectReasonCode.NORMAL.value()) {
 			willDelayScheduler.cancel(clientId);
+			// spec 3.1.3: 正常 DISCONNECT 后遗嘱消息不应再发送，必须清理，
+			// 否则残留的 will 会在后续异常断开时被错发给订阅者。
+			if (StrUtil.isNotBlank(clientId)) {
+				messageStore.clearWillMessage(clientId);
+			}
 		}
 		// PR9（P2.8）：正常断开且未声明 Clean Start、且 Session Expiry Interval > 0 时
 		// 调度会话过期任务；否则立即清理（保持 MQTT 3.x 与 MQTT 5 cleanStart=true 的"立即清理"语义）。
@@ -92,6 +101,7 @@ public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 			return;
 		}
 		// 调度过期任务。sessionExpireScheduler 内部已做旧任务取消与并发安全。
+		serverCreator.getSessionManager().markSessionExpiry(clientId);
 		sessionExpireScheduler.scheduleExpire(clientId, expirySeconds);
 		if (logger.isDebugEnabled()) {
 			logger.debug("Session Expire scheduled - clientId:{} seconds:{}", clientId, expirySeconds);

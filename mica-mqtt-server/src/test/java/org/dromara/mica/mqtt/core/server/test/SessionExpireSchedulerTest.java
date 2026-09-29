@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *     <li>clear() 释放所有任务</li>
  * </ul>
  *
- * @author L.cm
+ * @author wcmzllx
  */
 class SessionExpireSchedulerTest {
 
@@ -161,5 +161,44 @@ class SessionExpireSchedulerTest {
 		InMemoryMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
 		SessionExpireScheduler scheduler = new SessionExpireScheduler(sessionManager);
 		assertNotNull(scheduler);
+	}
+
+	/**
+	 * 回归：定时器到期与重连并发时，已被接管的活跃会话不能被回收。
+	 * <p>
+	 * {@code SessionExpireScheduler#onExpire} 依赖 {@link InMemoryMqttSessionManager#isSessionPendingExpiry(String)}
+	 * 复核；{@code cancel()} 拦不住已开始执行的任务，只有这道复核能避免误删。
+	 */
+	@Test
+	void testPendingExpiryClearedWhenSessionTakenOver() {
+		InMemoryMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		// 断开：持久会话被标记为待过期
+		sessionManager.bindSession("client1", "ctx-1", false, true, 60);
+		sessionManager.markSessionExpiry("client1");
+		assertTrue(sessionManager.isSessionPendingExpiry("client1"),
+			"disconnected persistent session should be pending expiry");
+
+		// 重连接管：bind 复位过期标记
+		sessionManager.bindSession("client1", "ctx-2", false, true, 3600);
+		assertFalse(sessionManager.isSessionPendingExpiry("client1"),
+			"reconnect must clear the pending-expiry mark so a stale timer cannot remove the live session");
+		assertTrue(sessionManager.isPersistentSession("client1"), "taken-over session stays persistent");
+		assertEquals(3600, sessionManager.getSessionExpiryInterval("client1"));
+	}
+
+	@Test
+	void testNeverPendingWhenExpiryIntervalIsZero() {
+		InMemoryMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		// 过期时长 0 = 不自动过期，断开后不应被判为待回收
+		sessionManager.bindSession("client1", "ctx-1", false, true, 0);
+		sessionManager.markSessionExpiry("client1");
+		assertFalse(sessionManager.isSessionPendingExpiry("client1"));
+	}
+
+	@Test
+	void testPendingExpiryFalseForUnknownClient() {
+		InMemoryMqttSessionManager sessionManager = new InMemoryMqttSessionManager();
+		assertFalse(sessionManager.isSessionPendingExpiry("never-seen"),
+			"an unknown clientId has no pending expiry to act on");
 	}
 }

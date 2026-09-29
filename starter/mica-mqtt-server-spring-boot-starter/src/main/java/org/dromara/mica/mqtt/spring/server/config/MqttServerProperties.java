@@ -76,6 +76,34 @@ public class MqttServerProperties {
 	 */
 	private boolean debug = false;
 	/**
+	 * 是否启用持久会话（cleanSession=false / MQTT5 Clean Start=false 的会话跨连接保留），默认：true
+	 */
+	private Boolean enablePersistentSession;
+	/**
+	 * 每个会话的离线消息队列上限，溢出丢最旧，&lt;= 0 表示不缓存，默认：1000
+	 */
+	private Integer maxOfflineQueueSize;
+	/**
+	 * 离线消息保存时长（秒），0 表示不限期，默认：0
+	 */
+	private Long offlineMessageTtlSeconds;
+	/**
+	 * QoS0 消息是否也进入离线队列，默认：false
+	 */
+	private Boolean mqueueStoreQos0;
+	/**
+	 * MQTT5 客户端未携带 Session Expiry Interval 时的默认会话过期时间（秒），默认：7200
+	 */
+	private Long sessionExpiryIntervalSeconds;
+	/**
+	 * MQTT3.1.1 持久会话空闲过期时间（秒），0 表示不自动过期，默认：0
+	 */
+	private Long v311IdleSessionTimeoutSeconds;
+	/**
+	 * 每会话在途消息上限，&lt;= 0 表示不限制，默认：1000
+	 */
+	private Integer maxInflightPerSession;
+	/**
 	 * mqtt 3.1 会校验此参数为 23，为了减少问题设置成了 64
 	 */
 	private int maxClientIdLength = MqttConstant.DEFAULT_MAX_CLIENT_ID_LENGTH;

@@ -77,6 +77,44 @@ mqttServer.publishAll("/test/123", "mica最牛皮".getBytes(StandardCharsets.UTF
 mqttServer.stop();
 ```
 
+## 持久会话与离线消息（2.7.0）
+
+服务端默认支持协议级的持久会话，客户端 `cleanSession=false`（MQTT 5 为 `Clean Start=false`）断开后，
+订阅、在途消息与离线期间的消息都会保留，重连（`CONNACK` 的 `Session Present = 1`）后自动回放。
+
+```java
+MqttServer mqttServer = MqttServer.create()
+    .enableMqtt(1883)
+    // 持久会话总开关，false 时退化为"断开即清理"，默认 true
+    .enablePersistentSession(true)
+    // 每个会话的离线消息队列上限，溢出丢最旧，<= 0 表示不缓存，默认 1000
+    .maxOfflineQueueSize(1000)
+    // 离线消息保存时长（秒），0 表示不限期，默认 0
+    .offlineMessageTtlSeconds(0)
+    // QoS0 消息是否也进入离线队列，默认 false（QoS0 不保证投递）
+    .mqueueStoreQos0(false)
+    // MQTT5 客户端未携带 Session Expiry Interval 时的默认值（秒），默认 7200
+    .sessionExpiryIntervalSeconds(7200)
+    // MQTT3.1.1 持久会话空闲过期时间（秒），0 表示不自动过期，默认 0
+    .v311IdleSessionTimeoutSeconds(0)
+    // 每会话在途消息上限，<= 0 表示不限制，默认 1000
+    .maxInflightPerSession(1000)
+    .start();
+```
+
+会话判定规则（MQTT 5.0 规范 3.1.2.11.4）：
+
+| 场景 | 是否持久会话 | CONNACK Session Present |
+|------|-------------|------------------------|
+| MQTT 3.1.1 `Clean Session = 1` | 否 | 0 |
+| MQTT 3.1.1 `Clean Session = 0` | 是 | 服务端仍有该会话时为 1 |
+| MQTT 5 `Clean Start = 1` | 否（本次丢弃旧会话） | 0 |
+| MQTT 5 `Clean Start = 0`，`Session Expiry Interval > 0` | 是 | 服务端仍有该会话时为 1 |
+| MQTT 5 `Session Expiry Interval = 0` | 否（连接结束即结束） | 0 |
+
+> 离线消息与会话状态由 `IMqttSessionManager` 承载，默认实现 `InMemoryMqttSessionManager` 是进程内存储，
+> 服务重启后会话与离线消息丢失。需要持久化可自行实现 `IMqttSessionManager` 接入 Redis / H2。
+
 ## http 和 websocket 依赖（2.4.2或之前版本需要该步骤）：
 
 开启 http 或 websocket 需要添加 mica-net-http 依赖，如果不需要 http、websocket 把它们可以使用 `.httpEnable(false)` 和 `.websocketEnable(false)` 关掉就不需要该依赖了。

@@ -21,6 +21,7 @@ import net.dreamlu.mica.net.core.intf.Packet;
 import net.dreamlu.mica.net.server.DefaultTioServerListener;
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
+import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.pipeline.IMqttMessagePipeline;
@@ -103,10 +104,19 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		if (isNotNormalDisconnect && !willDelayScheduler.isScheduled(clientId)) {
 			sendWillMessage(clientId);
 		}
-		// 5. 会话清理，互踢已清，不用再清（避免误删刚订阅的 topic）
+		// 5. 会话处理
+		// 归属校验：互踢场景下旧连接的关闭回调可能晚于新连接的 CONNECT，
+		// 只有仍是会话归属的连接才允许改动会话状态，避免误删刚建立的新会话。
 		ChannelContext.CloseCode closeCode = context.getCloseCode();
-		if (closeCode != ChannelContext.CloseCode.KICK_EACH_OTHER) {
-			cleanSession(clientId);
+		if (closeCode != ChannelContext.CloseCode.KICK_EACH_OTHER
+			&& sessionManager.isSessionOwner(clientId, context.getId())) {
+			if (sessionManager.isPersistentSession(clientId)) {
+				// 持久会话：只停掉持有已关闭连接的重传定时器，保留在途消息等重连重发
+				stopRetransmission(clientId);
+				cleanSession(clientId);
+			} else {
+				cleanSession(clientId);
+			}
 		}
 		// 6. 下线事件
 		notify(context, clientId, remark);
@@ -135,10 +145,28 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		}
 	}
 
+	/**
+	 * 停止该会话所有在途消息的重传定时器。
+	 * <p>
+	 * 只停定时器，不删除在途消息：持久会话重连时这些消息需要以 DUP=1 重发。
+	 */
+	private void stopRetransmission(String clientId) {
+		try {
+			for (MqttPendingPublish pendingPublish : sessionManager.getPendingPublishes(clientId)) {
+				pendingPublish.onPubAckReceived();
+				pendingPublish.onPubCompReceived();
+			}
+		} catch (Throwable throwable) {
+			logger.error("Mqtt server clientId:{} stop retransmission error.", clientId, throwable);
+		}
+	}
+
 	private void cleanSession(String clientId) {
 		try {
 			int expirySeconds = sessionManager.getSessionExpiryInterval(clientId);
 			if (!sessionManager.isCleanStart(clientId) && expirySeconds > 0) {
+				// 持久会话：标记过期时间并调度清理，到期后由 SessionExpireScheduler 回收
+				sessionManager.markSessionExpiry(clientId);
 				if (!sessionExpireScheduler.isScheduled(clientId)) {
 					sessionExpireScheduler.scheduleExpire(clientId, expirySeconds);
 				}

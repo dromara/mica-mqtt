@@ -24,16 +24,22 @@ import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
+import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.MqttConnAckMessage;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
+import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
 import org.dromara.mica.mqtt.codec.message.properties.MqttConnectProperties;
 import org.dromara.mica.mqtt.codec.message.properties.MqttConnAckProperties;
 import org.dromara.mica.mqtt.codec.message.properties.MqttWillPublishProperties;
 import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
+import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.MqttServerProperties;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
@@ -43,6 +49,8 @@ import org.dromara.mica.mqtt.core.server.event.IMqttConnectStatusListener;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.pipeline.IMqttMessagePipeline;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
+import org.dromara.mica.mqtt.core.server.session.MqttSessionState;
+import org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.server.will.WillDelayScheduler;
 import org.slf4j.Logger;
@@ -69,7 +77,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 	private final IMqttSessionManager sessionManager;
 	private final IMqttMessagePipeline messagePipeline;
 	private final WillDelayScheduler willDelayScheduler;
-	private final org.dromara.mica.mqtt.core.server.session.SessionExpireScheduler sessionExpireScheduler;
+	private final SessionExpireScheduler sessionExpireScheduler;
 	private final long heartbeatTimeout;
 
 	public MqttConnectHandler(MqttServerCreator serverCreator,
@@ -159,30 +167,16 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			String remark = String.format("uniqueId:[%s] clientId:[%s] 被踢出，请检查是否有相同 clientId 互踢，新 contextId:[%s]",
 				uniqueId, clientId, context.getId());
 			Tio.remove(otherContext, remark, ChannelContext.CloseCode.KICK_EACH_OTHER);
-		} else if (MqttCodecUtil.isMqtt5(context) && cleanStart) {
-			// PR9：MQTT 5 客户端声明 Clean Start=true 且无活跃连接 → 清理可能存在的旧 session 状态。
-			// MQTT 3.x 客户端保持原 cleanSession 行为（默认 true，已通过 cleanSession(uniqueId) 在原代码处理）。
-			// spec 3.1.2.4: MQTT 3.x 的 Clean Session 字段位置不同于 MQTT 5 的 Clean Start；本处理仅针对 5.0。
+		} else if (cleanStart) {
+			// Clean Start=true 无条件丢弃旧会话状态（覆盖「旧连接已断开、仅残留会话」的情况）。
+			// spec 3.1.2.4: MQTT 3.x 的 Clean Session 与 MQTT 5 的 Clean Start 位置不同，但语义一致。
 			cleanSession(uniqueId);
 		}
 		// 4.5 广播上线消息
 		sendConnected(context, uniqueId);
-		// PR9（P2.8）：记录客户端的 Session Expiry Interval + Clean Start；重连接管时取消待发任务
-		if (MqttCodecUtil.isMqtt5(context)) {
-			// 重连覆盖：取消可能存在的旧 session expire 任务
-			sessionExpireScheduler.cancel(uniqueId);
-			MqttConnectProperties connectProps = new MqttConnectProperties(variableHeader.properties());
-			Integer sessionExpirySeconds = connectProps.getSessionExpiryInterval();
-			int sessionExpiryValue = sessionExpirySeconds == null ? 0 : sessionExpirySeconds;
-			sessionManager.setSessionExpiryInterval(uniqueId, sessionExpiryValue, cleanStart);
-		} else {
-			// MQTT 3.x Clean Session=false is a persistent session. Record the same
-			// normalized state used by the cluster layer so disconnect does not erase
-			// its owner and subscriptions on peer nodes.
-			sessionManager.setSessionExpiryInterval(uniqueId,
-				cleanStart ? 0 : Integer.MAX_VALUE, cleanStart);
-		}
-		// 5. 绑定 uniqueId / username
+		// 5. 会话绑定：记录归属连接、是否持久与过期时长
+		bindSession(uniqueId, context.getId(), cleanStart, variableHeader);
+		// 5.5 绑定 uniqueId / username
 		Tio.bindBsId(context, uniqueId);
 		if (StrUtil.isNotBlank(userName)) {
 			Tio.bindUser(context, userName);
@@ -205,12 +199,12 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		if (serverKeepAliveSeconds > 0) {
 			context.setHeartbeatTimeout(serverKeepAliveSeconds * KEEP_ALIVE_UNIT);
 		}
-		// 7. session 处理
-		// Session Expiry Interval + Clean Start 已在上方通过 setSessionExpiryInterval 记录。
+		// 7. 会话处理
+		// 会话归属、持久标志与过期时长已在第 5 步通过 bindSession 记录。
 		// 断开时由 MqttDisConnectHandler（正常 DISCONNECT）与 MqttServerAioListener.onBeforeClose
-		// （底层 channel 断开）根据 cleanStart 与 expiry 决定是立即清理还是调度过期：
-		//   - cleanStart=true 或 expiry=0 → 立即 sessionManager.remove
-		//   - cleanStart=false 且 expiry>0 → SessionExpireScheduler.scheduleExpire，到期后清理
+		// （底层 channel 断开）根据持久标志决定是立即清理还是调度过期：
+		//   - 非持久会话 → 立即 sessionManager.remove
+		//   - 持久会话 → SessionExpireScheduler.scheduleExpire，到期后清理
 		// Session Present 标志已在互踢逻辑前按 spec 3.2.2.1.1 计算并用于 CONNACK。
 		// 8. 存储遗嘱消息
 		boolean willFlag = variableHeader.isWillFlag();
@@ -240,6 +234,17 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		connAckByReturnCode(clientId, uniqueId, context, MqttConnectReasonCode.CONNECTION_ACCEPTED,
 			serverKeepAliveSeconds, assignedClientId, sessionPresent,
 			requestProblemInformation, requestResponseInformation);
+		// 9.5 会话恢复：CONNACK 之后异步重发在途消息并回放离线队列
+		if (sessionPresent) {
+			final String resumeUniqueId = uniqueId;
+			executor.execute(() -> {
+				try {
+					resumeSession(context, resumeUniqueId);
+				} catch (Throwable e) {
+					logger.error("Mqtt server uniqueId:{} session resume error.", resumeUniqueId, e);
+				}
+			});
+		}
 		// 10. 在线通知
 		final String finalUniqueId = uniqueId;
 		executor.execute(() -> {
@@ -466,6 +471,138 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			sessionManager.remove(clientId);
 		} catch (Throwable throwable) {
 			logger.error("Mqtt server clientId:{} session clean error.", clientId, throwable);
+		}
+	}
+
+	/**
+	 * 会话绑定：解析持久会话策略并记录归属连接。
+	 * <p>
+	 * spec 3.1.2.11.4 Session Expiry Interval 决定会话在断开后保留多久：
+	 * <ul>
+	 *     <li>MQTT 5.0：Clean Start 只决定本次是否丢弃旧会话，是否保留由 Session Expiry Interval 决定
+	 *         （0 = 连接结束即结束、0xFFFFFFFF = 不限期、未携带取服务端默认值）；</li>
+	 *     <li>MQTT 3.1.1：只有 Clean Session = false 才是持久会话，保留时长取
+	 *         {@code v311IdleSessionTimeoutSeconds}（0 表示不自动过期）。</li>
+	 * </ul>
+	 *
+	 * @param uniqueId    uniqueId
+	 * @param connectionId 连接 id（ChannelContext#getId）
+	 * @param cleanStart  CONNECT 中的 Clean Start / Clean Session
+	 * @param header      CONNECT 固定头 + 可变头
+	 */
+	private void bindSession(String uniqueId, String connectionId, boolean cleanStart, MqttConnectVariableHeader header) {
+		try {
+			// 重连覆盖：取消上一连接遗留的过期任务
+			sessionExpireScheduler.cancel(uniqueId);
+			MqttVersion mqttVersion = MqttVersion.fromProtocolNameAndLevel(header.name(), (byte) header.version());
+			boolean mqtt5 = MqttVersion.MQTT_5 == mqttVersion;
+			long expirySeconds;
+			if (mqtt5) {
+				Integer declared = new MqttConnectProperties(header.properties()).getSessionExpiryInterval();
+				expirySeconds = declared == null
+					? serverCreator.getSessionExpiryIntervalSeconds()
+					: Integer.toUnsignedLong(declared);
+			} else {
+				expirySeconds = serverCreator.getV311IdleSessionTimeoutSeconds();
+			}
+			// 0xFFFFFFFF 表示不限期，归一化为 0（不调度过期）
+			int normalisedExpiry = (expirySeconds <= 0L || expirySeconds >= MqttSessionState.NEVER_EXPIRE_SECONDS)
+				? 0
+				: (int) expirySeconds;
+			// Clean Start 只决定"本次是否丢弃旧会话"，保留与否由过期时长决定
+			boolean persistent = serverCreator.isEnablePersistentSession() && !cleanStart && expirySeconds != 0L;
+			sessionManager.bindSession(uniqueId, connectionId, cleanStart, persistent, normalisedExpiry);
+			if (logger.isDebugEnabled()) {
+				logger.debug("Connect session bound - clientId:{} mqtt5:{} cleanStart:{} persistent:{} expirySeconds:{}",
+					uniqueId, mqtt5, cleanStart, persistent, normalisedExpiry);
+			}
+		} catch (Throwable throwable) {
+			logger.error("Mqtt server clientId:{} bind session error.", uniqueId, throwable);
+		}
+	}
+
+	/**
+	 * 会话恢复：重发在途消息并回放离线队列，保持消息顺序。
+	 * <ol>
+	 *     <li>在途消息：QoS2 已收 PUBREC 的重发 PUBREL（spec 4.3.3），其余重发 PUBLISH 并置 DUP=1；</li>
+	 *     <li>离线队列：按入队顺序逐条投递，QoS1/2 分配服务端 packetId 并登记在途；
+	 *         发送失败则放回队首并中断，保证顺序不被破坏。</li>
+	 * </ol>
+	 */
+	private void resumeSession(ChannelContext context, String uniqueId) {
+		// 1. 在途消息重发
+		for (MqttPendingPublish pendingPublish : sessionManager.getPendingPublishes(uniqueId)) {
+			MqttPublishMessage origin = pendingPublish.getMessage();
+			if (origin == null) {
+				continue;
+			}
+			int packetId = origin.variableHeader().packetId();
+			if (sessionManager.isPubRecReceived(uniqueId, packetId)) {
+				MqttMessage pubRelMessage = new MqttMessage(
+					new MqttFixedHeader(MqttMessageType.PUBREL, false, MqttQoS.QOS1, false, 0),
+					MqttMessageIdVariableHeader.from(packetId)
+				);
+				pendingPublish.setPubRelMessage(pubRelMessage);
+				// 先启动重传定时器再发送：避免 ack 抢跑后定时器作用在已被移除的条目上（产生无谓重传）
+				pendingPublish.startPubRelRetransmissionTimer(taskService, context);
+				Tio.send(context, pubRelMessage);
+				logger.debug("Session resume - PubRel resend clientId:{} packetId:{}", uniqueId, packetId);
+				continue;
+			}
+			MqttPublishMessage dupMessage = MqttPublishMessage.builder()
+				.topicName(origin.variableHeader().topicName())
+				.payload(origin.payload())
+				.qos(origin.fixedHeader().qosLevel())
+				.isDup(true)
+				.retained(false)
+				.messageId(packetId)
+				.properties(origin.variableHeader().properties())
+				.build();
+			// 先启动重传定时器再发送（同上：避免 ack 抢跑导致孤儿定时器反复重传）
+			pendingPublish.startPublishRetransmissionTimer(taskService, context);
+			boolean result = Tio.send(context, dupMessage);
+			logger.debug("Session resume - Publish dup resend clientId:{} packetId:{} result:{}", uniqueId, packetId, result);
+		}
+		// 2. 离线队列回放
+		int replayCount = 0;
+		while (true) {
+			Message offlineMessage = sessionManager.pollOfflineMessage(uniqueId);
+			if (offlineMessage == null) {
+				break;
+			}
+			MqttQoS mqttQoS = MqttQoS.valueOf(offlineMessage.getQos());
+			boolean isHighQos = MqttQoS.QOS1 == mqttQoS || MqttQoS.QOS2 == mqttQoS;
+			int packetId = isHighQos ? sessionManager.getPacketId(uniqueId) : -1;
+			MqttPublishMessage publishMessage = MqttPublishMessage.builder()
+				.topicName(offlineMessage.getTopic())
+				.payload(offlineMessage.getPayload())
+				.qos(mqttQoS)
+				.retained(false)
+				.messageId(packetId)
+				.properties(offlineMessage.getProperties())
+				.build();
+			// 先登记在途并启动重传，再发送：避免 ack 抢跑导致登记残留 / 定时器成孤儿
+			MqttPendingPublish pendingPublish = null;
+			if (isHighQos) {
+				pendingPublish = new MqttPendingPublish(publishMessage, mqttQoS);
+				sessionManager.addPendingPublish(uniqueId, packetId, pendingPublish);
+				pendingPublish.startPublishRetransmissionTimer(taskService, context);
+			}
+			boolean sent = Tio.send(context, publishMessage);
+			if (!sent) {
+				if (pendingPublish != null) {
+					pendingPublish.onPubAckReceived();
+					sessionManager.removePendingPublish(uniqueId, packetId);
+				}
+				sessionManager.pushOfflineMessageFirst(uniqueId, offlineMessage);
+				logger.warn("Session resume - offline message send failed, keep in queue clientId:{} topic:{}",
+					uniqueId, offlineMessage.getTopic());
+				break;
+			}
+			replayCount++;
+		}
+		if (replayCount > 0) {
+			logger.info("Session resume - offline messages replayed clientId:{} count:{}", uniqueId, replayCount);
 		}
 	}
 }
