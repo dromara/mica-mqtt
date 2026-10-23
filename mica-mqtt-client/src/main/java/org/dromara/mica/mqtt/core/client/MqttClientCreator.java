@@ -20,9 +20,7 @@ import net.dreamlu.mica.net.client.ReconnConf;
 import net.dreamlu.mica.net.client.TioClient;
 import net.dreamlu.mica.net.client.TioClientConfig;
 import net.dreamlu.mica.net.client.intf.TioClientHandler;
-import net.dreamlu.mica.net.client.intf.TioClientListener;
 import net.dreamlu.mica.net.client.task.HeartbeatTimeoutStrategy;
-import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Node;
 import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.core.ssl.SslConfig;
@@ -73,7 +71,7 @@ public final class MqttClientCreator {
 	 */
 	private int port = 1883;
 	/**
-	 * 超时时间，t-io 配置，可为 null，默认为：5秒
+	 * TCP 连接及等待 MQTT CONNACK 的超时时间（秒），可为 null，默认：5秒
 	 */
 	private Integer timeout;
 	/**
@@ -804,11 +802,11 @@ public final class MqttClientCreator {
 		IMqttClientProcessor processor = new DefaultMqttClientProcessor(this);
 		// 4. 初始化 mqtt 处理器
 		TioClientHandler clientAioHandler = new MqttClientAioHandler(this, processor);
-		TioClientListener clientAioListener = new MqttClientAioListener(this);
-		// 5. 重连配置
+		MqttClientAioListener clientAioListener = new MqttClientAioListener(this);
+		// 5. TCP 已连接时等待 CONNACK，由握手超时关闭连接后再重连，避免重复替换 Socket。
 		ReconnConf reconnConf = null;
 		if (this.reconnect) {
-			reconnConf = new ReconnConf(this.reInterval, this.retryCount, ChannelContext::isAccepted);
+			reconnConf = new ReconnConf(this.reInterval, this.retryCount);
 		}
 		// 6. tioConfig
 		TioClientConfig clientConfig = new TioClientConfig(clientAioHandler, clientAioListener, reconnConf, tioExecutor, groupExecutor);
@@ -841,6 +839,7 @@ public final class MqttClientCreator {
 		// 13. tioClient
 		try {
 			TioClient tioClient = new TioClient(clientConfig);
+			clientAioListener.setTioClient(tioClient);
 			return new MqttClient(tioClient, this);
 		} catch (Exception e) {
 			throw new IllegalStateException("Mica mqtt client start fail.", e);
@@ -890,7 +889,7 @@ public final class MqttClientCreator {
 		IMqttClientProcessor processor = new MqttClientConnectTestProcessor(future);
 		// 2. 初始化 mqtt 处理器
 		TioClientHandler clientAioHandler = new MqttClientAioHandler(this, processor);
-		TioClientListener clientAioListener = new MqttClientAioListener(this);
+		MqttClientAioListener clientAioListener = new MqttClientAioListener(this);
 		// 3. tioConfig
 		TioClientConfig tioConfig = new TioClientConfig(clientAioHandler, clientAioListener);
 		tioConfig.setName(this.name);
@@ -899,6 +898,7 @@ public final class MqttClientCreator {
 		TioClient tioClient;
 		try {
 			tioClient = new TioClient(tioConfig);
+			clientAioListener.setTioClient(tioClient);
 			tioClient.asyncConnect(new Node(this.getIp(), this.getPort()), this.bindIp, this.bindPort, this.timeout);
 		} catch (Exception e) {
 			throw new IllegalStateException("Mica mqtt client start fail.", e);

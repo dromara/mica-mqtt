@@ -17,7 +17,9 @@
 package org.dromara.mica.mqtt.core.client;
 
 import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.client.ReconnConf;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -138,6 +140,98 @@ class MqttClientReconnectChaosTest {
 				"client must report connected once broker sends accepted CONNACK");
 		} finally {
 			stop(client);
+			broker.close();
+		}
+	}
+
+	@Test
+	void shouldWaitForDelayedConnAckWithoutOpeningAnotherSocket() throws Exception {
+		CountingConnectListener listener = new CountingConnectListener();
+		CountDownLatch reconnectRead = new CountDownLatch(1);
+		CountDownLatch allowConnAck = new CountDownLatch(1);
+		FakeBroker broker = FakeBroker.create()
+			.next(new ConnAckThenResetHandler(100))
+			.next(socket -> {
+				reconnectRead.countDown();
+				allowConnAck.await(3, TimeUnit.SECONDS);
+				writeConnAck(socket.getOutputStream());
+			});
+		MqttClient client = null;
+		try {
+			client = newClient(broker.getPort(), listener);
+			Assertions.assertTrue(reconnectRead.await(5, TimeUnit.SECONDS));
+			// Multiple close/failure notifications can enqueue tasks for the same context.
+			for (int i = 0; i < 5; i++) {
+				ReconnConf.put(client.getContext());
+			}
+			Assertions.assertFalse(broker.awaitConnectPackets(3, 500),
+				"pending CONNACK must not cause another TCP connection on each reconnect tick");
+			allowConnAck.countDown();
+			Assertions.assertTrue(listener.awaitConnectedCount(2, 3_000));
+			Assertions.assertTrue(client.isConnected());
+			Assertions.assertEquals(2, broker.getConnectPackets());
+		} finally {
+			allowConnAck.countDown();
+			stop(client);
+			broker.close();
+		}
+	}
+
+	@Test
+	void shouldRetryWhenConnAckTimeoutExpires() throws Exception {
+		CountingConnectListener listener = new CountingConnectListener();
+		FakeBroker broker = FakeBroker.create()
+			.next(new HoldAfterConnectHandler(new CountDownLatch(1)))
+			.next(new ConnAckAndHoldHandler());
+		MqttClient client = null;
+		try {
+			client = newClient(broker.getPort(), listener);
+			Assertions.assertTrue(listener.awaitConnected(5_000),
+				"missing CONNACK must close the pending socket and allow reconnect");
+			Assertions.assertEquals(2, broker.getConnectPackets());
+			Assertions.assertTrue(client.isConnected());
+		} finally {
+			stop(client);
+			broker.close();
+		}
+	}
+
+	@Test
+	void shouldNotCloseNewSocketWhenPreviousHandshakeTimeoutExpires() throws Exception {
+		CountingConnectListener listener = new CountingConnectListener();
+		CountDownLatch reconnectRead = new CountDownLatch(1);
+		CountDownLatch allowConnAck = new CountDownLatch(1);
+		FakeBroker broker = FakeBroker.create()
+			.next(new ConnAckThenResetHandler(500))
+			.next(socket -> {
+				reconnectRead.countDown();
+				allowConnAck.await(3, TimeUnit.SECONDS);
+				writeConnAck(socket.getOutputStream());
+			});
+		MqttClient client = null;
+		try {
+			client = newClient(broker.getPort(), listener);
+			Assertions.assertTrue(reconnectRead.await(5, TimeUnit.SECONDS));
+			// Cross the old socket's 1-second deadline while the new socket is awaiting CONNACK.
+			Assertions.assertFalse(broker.awaitConnectPackets(3, 650));
+			allowConnAck.countDown();
+			Assertions.assertTrue(listener.awaitConnectedCount(2, 3_000));
+			Assertions.assertTrue(client.isConnected());
+			Assertions.assertEquals(2, broker.getConnectPackets());
+		} finally {
+			allowConnAck.countDown();
+			stop(client);
+			broker.close();
+		}
+	}
+
+	@Test
+	void shouldStillSupportConnectTest() throws Exception {
+		FakeBroker broker = FakeBroker.create().next(new ConnAckAndHoldHandler());
+		try {
+			Assertions.assertEquals(MqttConnectReasonCode.CONNECTION_ACCEPTED,
+				MqttClient.create().ip("127.0.0.1").port(broker.getPort()).connectTest());
+		} finally {
 			broker.close();
 		}
 	}
