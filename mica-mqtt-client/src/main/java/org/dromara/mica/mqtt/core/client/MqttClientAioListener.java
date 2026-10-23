@@ -17,6 +17,7 @@
 package org.dromara.mica.mqtt.core.client;
 
 import net.dreamlu.mica.net.client.DefaultTioClientListener;
+import net.dreamlu.mica.net.client.TioClient;
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
@@ -30,7 +31,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.channels.AsynchronousSocketChannel;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 
 /**
  * mqtt 客户端监听器
@@ -42,11 +46,16 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 	private final MqttClientCreator clientCreator;
 	private final IMqttClientConnectListener connectListener;
 	private final ExecutorService executor;
+	private TioClient tioClient;
 
 	public MqttClientAioListener(MqttClientCreator clientCreator) {
 		this.clientCreator = clientCreator;
 		this.connectListener = clientCreator.getConnectListener();
 		this.executor = clientCreator.getMqttExecutor();
+	}
+
+	void setTioClient(TioClient tioClient) {
+		this.tioClient = tioClient;
 	}
 
 	@Override
@@ -56,13 +65,34 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 			// 重连时，发送 mqtt 连接消息
 			boolean result = Tio.bSend(context, getConnectMessage(this.clientCreator));
 			logger.info("MqttClient reconnect send connect result:{}", result);
-			if (!result) {
+			if (result) {
+				scheduleConnAckTimeout(context);
+			} else {
 				// 如果重连未成功，直接关闭连接，等待后续重连
 				Tio.close(context, "MqttClient reconnect send fail.");
 			}
 		} else {
 			Tio.close(context, "MqttClient connect fail.");
 		}
+	}
+
+	private void scheduleConnAckTimeout(ChannelContext context) {
+		AsynchronousSocketChannel socket = context.asynchronousSocketChannel;
+		Integer configuredTimeout = clientCreator.getTimeout();
+		long timeoutSeconds = configuredTimeout == null || configuredTimeout <= 0 ? 5 : configuredTimeout;
+		tioClient.scheduleOnce(() -> {
+			Lock lock = context.closeLock.writeLock();
+			lock.lock();
+			try {
+				// 已完成握手或已替换的连接，不能由旧超时任务关闭。
+				if (context.asynchronousSocketChannel == socket
+					&& !context.isClosed() && !context.isRemoved() && !context.isAccepted()) {
+					Tio.close(context, "MqttClient CONNACK timeout.");
+				}
+			} finally {
+				lock.unlock();
+			}
+		}, TimeUnit.SECONDS.toMillis(timeoutSeconds));
 	}
 
 	@Override
