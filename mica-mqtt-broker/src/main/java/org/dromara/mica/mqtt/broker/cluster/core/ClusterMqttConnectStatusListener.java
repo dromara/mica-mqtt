@@ -70,6 +70,10 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 
 	@Override
 	public void online(ChannelContext context, String clientId, String username) {
+		if (context != null && (!context.isAccepted() || context.isClosed() || context.isRemoved())) {
+			return;
+		}
+		String previousOwner = sessionManager == null ? null : sessionManager.registerLocalClient(clientId);
 		if (delegate != null) {
 			delegate.online(context, clientId, username);
 		}
@@ -79,7 +83,6 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 		// responds with a SessionTakeoverResponse carrying the persisted session
 		// bytes; the new owner then broadcasts SessionMigratedNotify to all
 		// peers to update routing.
-		String previousOwner = lookupPreviousOwner(clientId);
 		if (previousOwner != null && !previousOwner.isEmpty()) {
 			logger.info("[Cluster] online() detected previous owner {} for client {}, requesting takeover",
 				previousOwner, clientId);
@@ -97,15 +100,18 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 			delegate.offline(context, clientId, username, reason);
 		}
 
+		// A displaced socket no longer owns this clientId. Its offline notification
+		// must not erase the replacement's subscriptions on other nodes.
+		String owner = sessionManager == null ? null : sessionManager.getClientNode(clientId);
+		if (owner != null && !owner.equals(clusterManager.getLocalNodeId())) {
+			return;
+		}
+		if (context != null && context.getCloseCode() == ChannelContext.CloseCode.KICK_EACH_OTHER) {
+			return;
+		}
 		ClientDisconnectMessage msg = new ClientDisconnectMessage();
 		msg.setClientId(clientId);
 		clusterManager.broadcast(msg);
 	}
 
-	private String lookupPreviousOwner(String clientId) {
-		if (sessionManager == null) {
-			return null;
-		}
-		return sessionManager.getClientNodeMap().get(clientId);
-	}
 }

@@ -17,6 +17,8 @@
 package org.dromara.mica.mqtt.broker.cluster.core;
 
 import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.server.cluster.core.ClusterApi;
 import net.dreamlu.mica.net.server.cluster.core.ClusterConfig;
 import net.dreamlu.mica.net.server.cluster.core.ClusterImpl;
@@ -117,6 +119,15 @@ public class MqttClusterManager {
 	 */
 	public void setMqttServer(MqttServer mqttServer) {
 		this.mqttServer = mqttServer;
+	}
+
+	private ChannelContext localClientContext(String clientId) {
+		return mqttServer == null ? null : Tio.getByBsId(mqttServer.getServerConfig(), clientId);
+	}
+
+	boolean hasLocalClient(String clientId) {
+		ChannelContext context = localClientContext(clientId);
+		return context != null && context.isAccepted() && !context.isClosed() && !context.isRemoved();
 	}
 
 	/**
@@ -229,12 +240,19 @@ public class MqttClusterManager {
 			}
 			case CLIENT_CONNECT: {
 				ClientConnectMessage ccm = (ClientConnectMessage) clusterMsg;
+				ChannelContext previous = localClientContext(ccm.getClientId());
 				sessionManager.registerRemoteClient(ccm.getClientId(), sourceNode);
+				if (previous != null && previous.isAccepted() && !previous.isClosed()) {
+					// Publish ownership before closing: the old socket's cleanup must not
+					// remove the new route or broadcast a disconnect for the replacement.
+					Tio.remove(previous, "MQTT session taken over by cluster node " + sourceNode,
+						ChannelContext.CloseCode.KICK_EACH_OTHER);
+				}
 				break;
 			}
 			case CLIENT_DISCONNECT: {
 				ClientDisconnectMessage cdm = (ClientDisconnectMessage) clusterMsg;
-				sessionManager.removeRemoteClient(cdm.getClientId());
+				sessionManager.removeRemoteClient(cdm.getClientId(), sourceNode);
 				break;
 			}
 			case STATE_SYNC_REQUEST:

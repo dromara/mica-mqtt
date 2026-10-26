@@ -103,6 +103,36 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	}
 
 	/**
+	 * Removes a remote session only if the disconnect still belongs to its owner.
+	 * A delayed disconnect from a previous node must not remove a replacement session.
+	 *
+	 * @param clientId the client identifier
+	 * @param nodeId the node sending the disconnect
+	 */
+	public void removeRemoteClient(String clientId, String nodeId) {
+		clientNodeMap.computeIfPresent(clientId, (id, owner) -> {
+			if (!owner.equals(nodeId)) {
+				return owner;
+			}
+			// A new local CONNECT may precede its asynchronous online notification.
+			if (!clusterManager.hasLocalClient(clientId)) {
+				delegate.remove(clientId);
+			}
+			return null;
+		});
+	}
+
+	/**
+	 * Marks a client as local and returns its previous remote owner, if any.
+	 *
+	 * @param clientId the client identifier
+	 * @return the previous remote node
+	 */
+	public String registerLocalClient(String clientId) {
+		return clientNodeMap.remove(clientId);
+	}
+
+	/**
 	 * Clears all clients and their subscriptions associated with a departing node.
 	 *
 	 * @param nodeId the identifier of the node that has left the cluster
@@ -509,12 +539,18 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void remove(String clientId) {
-		clientNodeMap.remove(clientId);
-		delegate.remove(clientId);
-		// V3 session persistence: clear the persistent record on disconnect.
-		if (sessionStore != null) {
-			sessionStore.delete(clientId);
-		}
+		clientNodeMap.compute(clientId, (id, owner) -> {
+			// The old local socket can finish closing after a remote CONNECT took over.
+			if (owner != null && !owner.equals(clusterManager.getLocalNodeId())) {
+				return owner;
+			}
+			delegate.remove(clientId);
+			// V3 session persistence: clear the persistent record on disconnect.
+			if (sessionStore != null) {
+				sessionStore.delete(clientId);
+			}
+			return null;
+		});
 	}
 
 	@Override
