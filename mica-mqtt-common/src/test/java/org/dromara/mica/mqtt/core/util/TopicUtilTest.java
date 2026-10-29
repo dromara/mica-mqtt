@@ -106,6 +106,15 @@ class TopicUtilTest {
 	}
 
 	@Test
+	void rejectsMultiLevelWildcardInsideTopicLevel() {
+		Assertions.assertThrows(IllegalArgumentException.class, () -> TopicUtil.validateTopicFilter("sport#"));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> TopicUtil.validateTopicFilter("sport/a#"));
+		Assertions.assertDoesNotThrow(() -> TopicUtil.validateTopicFilter("#"));
+		Assertions.assertDoesNotThrow(() -> TopicUtil.validateTopicFilter("sport/#"));
+		Assertions.assertDoesNotThrow(() -> TopicUtil.validateTopicFilter("sport/+/#"));
+	}
+
+	@Test
 	void test4() {
 		String test1 = "Hello, ${name}!";
 		String test2 = "No variable here";
