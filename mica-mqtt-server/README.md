@@ -47,23 +47,8 @@ MqttServer mqttServer = MqttServer.create()
 
         }
     })
-    // 自定义消息转发，可用 mq 广播实现集群化处理
-    .messageDispatcher(new IMqttMessageDispatcher() {
-        @Override
-        public void config(MqttServer mqttServer) {
-
-        }
-
-        @Override
-        public boolean send(Message message) {
-            return false;
-        }
-
-        @Override
-        public boolean send(String clientId, Message message) {
-            return false;
-        }
-    })
+    // 自定义消息处理可用 .addInterceptor(IMqttMessageInterceptor) 扩展
+    // 集群消息转发（跨节点分发）见 mica-mqtt-broker 模块的 ClusterMessageDispatcher
     .debug() // 开启 debug 信息日志
     .start();
 

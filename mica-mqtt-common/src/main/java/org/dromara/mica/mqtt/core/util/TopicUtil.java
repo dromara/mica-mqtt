@@ -72,15 +72,33 @@ public final class TopicUtil {
 				logger.warn("注意：topic:[{}] 中包含空白字符串:[{}]，请检查是否正确", topicFilter, ch);
 			} else if (ch == MqttCodecUtil.TOPIC_WILDCARDS_MORE) {
 				// 校验: # 必须单独占据最后一级
-				if (i < topicFilterIdxEnd || (i > 0 && topicFilterChars[i - 1] != MqttCodecUtil.TOPIC_LAYER)) {
-					throw new IllegalArgumentException("Mqtt subscribe topicFilter illegal:" + topicFilter);
-				}
+				validateMultiLevelWildcard(topicFilter, topicFilterChars, i, topicFilterIdxEnd);
 			} else if (ch == MqttCodecUtil.TOPIC_WILDCARDS_ONE) {
 				// 校验: 单独 + 是允许的，判断 + 号前一位是否为 /，如果有后一位也必须为 /
 				if ((i > 0 && topicFilterChars[i - 1] != MqttCodecUtil.TOPIC_LAYER) || (i < topicFilterIdxEnd && topicFilterChars[i + 1] != MqttCodecUtil.TOPIC_LAYER)) {
 					throw new IllegalArgumentException("Mqtt subscribe topicFilter illegal:" + topicFilter);
 				}
 			}
+		}
+	}
+
+	/**
+	 * 校验 topicFilter 中的多级通配符（#）位置。
+	 *
+	 * <p>
+	 * MQTT 规范要求多级通配符必须独占最后一级：只能是 topicFilter 的首字符，
+	 * 或者紧跟在层级分隔符 {@code /} 之后，并且必须是最后一个字符。
+	 * </p>
+	 *
+	 * @param topicFilter topicFilter
+	 * @param topicFilterChars topicFilter 的字符数组
+	 * @param idx 多级通配符所在下标
+	 * @param topicFilterIdxEnd topicFilter 的最后一个下标
+	 */
+	private static void validateMultiLevelWildcard(String topicFilter, char[] topicFilterChars, int idx, int topicFilterIdxEnd) {
+		// 校验: # 必须单独占据最后一级
+		if (idx < topicFilterIdxEnd || (idx > 0 && topicFilterChars[idx - 1] != MqttCodecUtil.TOPIC_LAYER)) {
+			throw new IllegalArgumentException("Mqtt subscribe topicFilter illegal:" + topicFilter);
 		}
 	}
 
@@ -164,10 +182,8 @@ public final class TopicUtil {
 		for (int i = 0; i < topicFilterLength; i++) {
 			ch = topicFilterChars[i];
 			if (ch == MqttCodecUtil.TOPIC_WILDCARDS_MORE) {
-				// 校验: # 通配符只能在最后一位
-				if (i < topicFilterIdxEnd) {
-					throw new IllegalArgumentException("Mqtt subscribe topicFilter illegal:" + topicFilter);
-				}
+				// 校验: # 必须单独占据最后一级
+				validateMultiLevelWildcard(topicFilter, topicFilterChars, i, topicFilterIdxEnd);
 				return true;
 			} else if (ch == MqttCodecUtil.TOPIC_WILDCARDS_ONE) {
 				// 校验: 单独 + 是允许的，判断 + 号前一位是否为 /，如果有后一位也必须为 /

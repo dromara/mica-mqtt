@@ -114,6 +114,60 @@ class TopicUtilTest {
 		Assertions.assertDoesNotThrow(() -> TopicUtil.validateTopicFilter("sport/+/#"));
 	}
 
+	/**
+	 * match 与 validateTopicFilter 必须共用同一套多级通配符规则，
+	 * 避免一个入口拒绝、另一个入口把 sport# 当成 catch-all 放行。
+	 *
+	 * <p>
+	 * match 在逐字符比对过程中顺带校验（与 + 的处理方式一致），
+	 * 字面量前缀不匹配会提前返回，所以这里的 topicName 取 # 之前的字面量前缀，
+	 * 确保能走到 # 的校验分支。
+	 * </p>
+	 */
+	@Test
+	void matchMustRejectMultiLevelWildcardInsideTopicLevel() {
+		Assertions.assertThrows(IllegalArgumentException.class, () -> TopicUtil.match("sport#", "sport/1"));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> TopicUtil.match("sport/a#", "sport/a/1"));
+		Assertions.assertThrows(IllegalArgumentException.class, () -> TopicUtil.match("a/#b", "a/b"));
+		Assertions.assertTrue(TopicUtil.match("#", "/iot/test"));
+		Assertions.assertTrue(TopicUtil.match("sport/#", "sport/1"));
+		Assertions.assertTrue(TopicUtil.match("/iot/test/#", "/iot/test"));
+	}
+
+	/**
+	 * 共享订阅去掉 $share/{group}/ 前缀后，仍要遵守同一套规则。
+	 */
+	@Test
+	void sharedSubscriptionMustFollowTheSameMultiLevelWildcardRule() {
+		Assertions.assertThrows(IllegalArgumentException.class,
+			() -> TopicFilterType.getType("$share/g1/sport#").match("$share/g1/sport#", "sport/1"));
+		Assertions.assertTrue(TopicFilterType.getType("$share/g1/sport/#").match("$share/g1/sport/#", "sport/1"));
+	}
+
+	/**
+	 * validateTopicFilter 与 match 对同一个 topicFilter 的判定必须一致。
+	 */
+	@Test
+	void validateAndMatchMustShareTheSameMultiLevelWildcardRule() {
+		String[] filters = {"#", "/#", "sport/#", "sport//#", "sport#", "sport/a#", "a/#b", "#/a"};
+		for (String filter : filters) {
+			// topicName 取 # 之前的字面量前缀，确保 match 能走到 # 的校验分支
+			String topicName = filter.substring(0, filter.indexOf('#'));
+			Assertions.assertEquals(isRejected(() -> TopicUtil.validateTopicFilter(filter)),
+				isRejected(() -> TopicUtil.match(filter, topicName)),
+				"topicFilter: " + filter);
+		}
+	}
+
+	private static boolean isRejected(Runnable action) {
+		try {
+			action.run();
+			return false;
+		} catch (IllegalArgumentException e) {
+			return true;
+		}
+	}
+
 	@Test
 	void test4() {
 		String test1 = "Hello, ${name}!";
