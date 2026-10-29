@@ -70,12 +70,17 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 
 	@Override
 	public void online(ChannelContext context, String clientId, String username) {
-		if (context != null && (!context.isAccepted() || context.isClosed() || context.isRemoved())) {
-			return;
-		}
-		String previousOwner = sessionManager == null ? null : sessionManager.registerLocalClient(clientId);
 		if (delegate != null) {
 			delegate.online(context, clientId, username);
+		}
+		// 先登记本地所有权：即使连接已失效，也必须清掉 clientId 的远端归属。
+		// 否则 offline() 会读到陈旧的远端 owner，把这次下线误判成「别的节点接管」而漏广播，
+		// 导致集群既没收到上线也没收到下线，其它节点会一直把消息路由到已失效的 clientId。
+		String previousOwner = sessionManager == null ? null : sessionManager.registerLocalClient(clientId);
+		// 连接已失效时不再广播上线事件，避免集群把一个已断开的连接当成在线。
+		if (context != null && (!context.isAccepted() || context.isClosed() || context.isRemoved())) {
+			logger.info("[Cluster] online() skipped, connection is not alive, clientId:{}", clientId);
+			return;
 		}
 
 		// V3 takeover: if the clientId is already mapped to another node, request

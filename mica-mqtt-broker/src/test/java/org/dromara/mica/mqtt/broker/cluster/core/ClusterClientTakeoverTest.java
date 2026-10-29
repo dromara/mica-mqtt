@@ -16,9 +16,13 @@
 
 package org.dromara.mica.mqtt.broker.cluster.core;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+import net.dreamlu.mica.net.core.Node;
+import net.dreamlu.mica.net.server.TioServerConfig;
 import org.dromara.mica.mqtt.broker.cluster.MqttBroker;
 import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterBrokerCreator;
 import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterConfig;
+import org.dromara.mica.mqtt.broker.cluster.message.ClientConnectMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClientDisconnectMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessage;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
@@ -33,6 +37,7 @@ import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.channels.AsynchronousSocketChannel;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
@@ -42,6 +47,32 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ClusterClientTakeoverTest {
+
+	private static final TioServerConfig TEST_CONFIG = new TioServerConfig("cluster-takeover-test", null, null);
+
+	/**
+	 * 连接已失效时 online() 不广播上线，但必须仍然登记本地所有权。
+	 * 否则随后的 offline() 会读到陈旧的远端 owner，把这次下线误判成「别的节点接管」而漏广播，
+	 * 集群既没收到上线也没收到下线，其它节点会一直把消息路由到已失效的 clientId。
+	 */
+	@Test
+	void staleOnlineMustStillClaimLocalOwnershipSoOfflineIsBroadcast() {
+		RecordingManager manager = new RecordingManager("local");
+		ClusterMqttSessionManager sessions = sessions(manager);
+		sessions.registerRemoteClient("device", "old-owner");
+		ClusterMqttConnectStatusListener listener = new ClusterMqttConnectStatusListener(null, manager);
+		listener.setSessionManager(sessions);
+
+		listener.online(deadContext(), "device", "user");
+		// 连接已失效，不广播上线
+		assertEquals(0, manager.connects.get());
+		// 但本地所有权必须被登记，远端归属要清掉
+		assertNull(sessions.getClientNode("device"));
+
+		listener.offline(deadContext(), "device", "user", "closed");
+		assertEquals(1, manager.disconnects.get());
+	}
+
 	@Test
 	void lateDisconnectFromPreviousNodeMustNotRemoveNewOwnerSubscriptions() throws Exception {
 		RecordingManager manager = new RecordingManager("observer");
@@ -203,12 +234,31 @@ class ClusterClientTakeoverTest {
 		handler.setAccessible(true); handler.invoke(manager, message, source);
 	}
 
+	/**
+	 * 虚拟 context 默认 closed=true，模拟连接已失效。
+	 */
+	private static ChannelContext deadContext() {
+		return new TestChannelContext(TEST_CONFIG, "dead-context");
+	}
+
+	private static final class TestChannelContext extends ChannelContext {
+		TestChannelContext(TioServerConfig tioConfig, String id) {
+			super(tioConfig, id);
+		}
+		@Override protected Node createClientNode(AsynchronousSocketChannel asynchronousSocketChannel) {
+			return new Node("127.0.0.1", 1883);
+		}
+		@Override public boolean isServer() { return true; }
+	}
+
 	private static final class RecordingManager extends MqttClusterManager {
+		private final AtomicInteger connects = new AtomicInteger();
 		private final AtomicInteger disconnects = new AtomicInteger();
 		private boolean localClient;
 		private RecordingManager(String nodeId) { super(new MqttClusterConfig().enabled(true), nodeId); }
 		@Override boolean hasLocalClient(String clientId) { return localClient; }
 		@Override public void broadcast(ClusterMessage message) {
+			if (message instanceof ClientConnectMessage) connects.incrementAndGet();
 			if (message instanceof ClientDisconnectMessage) disconnects.incrementAndGet();
 		}
 	}

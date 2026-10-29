@@ -2,6 +2,11 @@
 
 ## 发行版本
 
+### v2.6.14 - 未发布
+- 🐛 fix(common): 修正 MQTT 多级通配符位置校验，`TopicUtil.match()` 与 `validateTopicFilter()` 共用同一套规则，`sport#` 这类非法过滤器不再被当成 catch-all 放行。(gitee #32) 感谢 @moon_hunter 贡献。
+- 🐛 fix(client): 修复等待 CONNACK 期间重复重连、重复打开 Socket 的问题。重连判定由 MQTT 握手态改为 TCP 连接态，并新增 CONNACK 握手超时（复用 `timeout` 配置，默认 5 秒，不单独提供配置项）。(github #222) 感谢 @xuewenquan 贡献。
+- 🐛 fix(broker): 修复集群跨节点 ClientId 接管时旧连接未关闭、过期下线误清理新连接订阅的问题。(github #223) 感谢 @xuewenquan 贡献。
+
 ### v2.6.13 - 2026-09-27
 - ✨ mica-mqtt-client 接口支持 Default Method (github #217) 感谢 @galaxy-sea 贡献。
 

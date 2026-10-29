@@ -34,7 +34,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
 
 /**
  * mqtt 客户端监听器
@@ -81,16 +80,15 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 		Integer configuredTimeout = clientCreator.getTimeout();
 		long timeoutSeconds = configuredTimeout == null || configuredTimeout <= 0 ? 5 : configuredTimeout;
 		tioClient.scheduleOnce(() -> {
-			Lock lock = context.closeLock.writeLock();
-			lock.lock();
-			try {
-				// 已完成握手或已替换的连接，不能由旧超时任务关闭。
-				if (context.asynchronousSocketChannel == socket
-					&& !context.isClosed() && !context.isRemoved() && !context.isAccepted()) {
-					Tio.close(context, "MqttClient CONNACK timeout.");
-				}
-			} finally {
-				lock.unlock();
+			// 已完成握手或已替换的连接，不能由旧超时任务关闭。
+			// socket 身份比对 + isClosed 一起保证不会误关新连接：重连只在连接已关闭时才会发起，
+			// 而 socket 的替换发生在 setClosed(false) 之前，因此 isClosed=false 时不存在正在进行的 socket 替换。
+			// 这里不再额外加锁：Tio.close 内部已用 closeLock.writeLock().tryLock() 做了保护，
+			// 抢不到锁说明正在重连（届时新 socket 自带超时任务），直接放弃即可，
+			// 避免阻塞单线程的定时器（ClientReConnTask 同步重连时最长持有该锁 2 秒）。
+			if (context.asynchronousSocketChannel == socket
+				&& !context.isClosed() && !context.isRemoved() && !context.isAccepted()) {
+				Tio.close(context, "MqttClient CONNACK timeout.");
 			}
 		}, TimeUnit.SECONDS.toMillis(timeoutSeconds));
 	}
