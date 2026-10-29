@@ -71,8 +71,8 @@ public final class TopicUtil {
 			if (Character.isWhitespace(ch)) {
 				logger.warn("注意：topic:[{}] 中包含空白字符串:[{}]，请检查是否正确", topicFilter, ch);
 			} else if (ch == MqttCodecUtil.TOPIC_WILDCARDS_MORE) {
-				// 校验: # 通配符只能在最后一位
-				if (i < topicFilterIdxEnd) {
+				// 校验: # 必须单独占据最后一级
+				if (i < topicFilterIdxEnd || (i > 0 && topicFilterChars[i - 1] != MqttCodecUtil.TOPIC_LAYER)) {
 					throw new IllegalArgumentException("Mqtt subscribe topicFilter illegal:" + topicFilter);
 				}
 			} else if (ch == MqttCodecUtil.TOPIC_WILDCARDS_ONE) {
