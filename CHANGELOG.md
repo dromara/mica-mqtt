@@ -2,6 +2,14 @@
 
 ## 发行版本
 
+### v2.6.14 - 2026-11-01
+- 🐛 fix(server): 同一 clientId 互踢时，按 MQTT 5.0 规范向被踢客户端下发 `DISCONNECT(0x8E Session taken over)`，客户端可区分「被顶号」与「网络异常」，避免盲目重连后再次互踢；报文写出后延迟 200ms 再关闭连接，确保客户端能读到该报文。
+- ✨ feat(server): `MqttServerCreator#uniqueIdAppendSourceAddress(true)` 开启后，uniqueId 追加客户端来源 IP，同一 clientId 从不同来源地址接入不再互踢（多实例部署、固定 clientId 场景）。
+- ✨ feat(client): `MqttClientCreator#rebuildClientIdOnSessionTakenOver(true)` 开启后，收到 `0x8E` 时自动重建 clientId 再重连，避免与顶掉自己的连接再次互踢。
+- ✨ feat(client): 客户端支持解析服务端下发的 `DISCONNECT` 报文（新增 `IMqttClientProcessor#processDisconnect`），并按 MQTT 5.0 要求关闭网络连接。
+- ♻️ chore(build): 显式声明 `maven-surefire-plugin` 3.5.2，父 pom 的 2.12.4 不支持 JUnit 5，会导致单元测试被静默跳过。
+- ✅ test: 新增 `MqttSessionTakenOverTest`、`MqttSessionTakenOverWireTest`、`DefaultMqttServerUniqueIdServiceImplTest`、`DefaultMqttClientProcessorDisconnectTest`。
+
 ### v2.6.13 - 2026-09-27
 - ✨ mica-mqtt-client 接口支持 Default Method (github #217) 感谢 @galaxy-sea 贡献。
 
