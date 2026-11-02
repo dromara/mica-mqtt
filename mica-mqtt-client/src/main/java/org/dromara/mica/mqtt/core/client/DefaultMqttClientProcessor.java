@@ -20,16 +20,19 @@ import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Node;
 import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.utils.hutool.CollUtil;
+import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
+import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.*;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnAckVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
 import org.dromara.mica.mqtt.codec.message.header.MqttPublishVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.MqttReasonCodeAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttSubAckPayload;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
@@ -405,6 +408,59 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		}
 		pendingPublish.onPubCompReceived();
 		clientSession.removePendingPublish(packetId);
+	}
+
+	@Override
+	public void processDisconnect(ChannelContext context, MqttMessage message) {
+		byte reasonCode = extractReasonCode(message);
+		String reason = describeReasonCode(reasonCode);
+		logger.info("MqttClient received DISCONNECT from server, reasonCode:{}", reason);
+		if (reasonCode == MqttDisconnectReasonCode.SESSION_TAKEN_OVER.value()
+			&& mqttClientCreator.isRebuildClientIdOnSessionTakenOver()) {
+			// 会话被同 clientId 的新连接顶掉，换一个 clientId 重连，避免反复互踢
+			rebuildClientId();
+		}
+		// MQTT 5.0 规定：客户端收到服务端 DISCONNECT 后必须关闭网络连接
+		Tio.close(context, "服务端主动断开连接，原因码:" + reason);
+	}
+
+	/**
+	 * 提取 DISCONNECT 的原因码，没有 variable header 时按正常断开（0x00）处理
+	 *
+	 * @param message MqttMessage
+	 * @return 原因码
+	 */
+	private static byte extractReasonCode(MqttMessage message) {
+		Object variableHeader = message.variableHeader();
+		if (variableHeader instanceof MqttReasonCodeAndPropertiesVariableHeader) {
+			return ((MqttReasonCodeAndPropertiesVariableHeader) variableHeader).reasonCode();
+		}
+		return MqttDisconnectReasonCode.NORMAL.value();
+	}
+
+	/**
+	 * 把原因码转成可读文案，未知原因码用十六进制展示
+	 *
+	 * @param reasonCode 原因码
+	 * @return 文案
+	 */
+	private static String describeReasonCode(byte reasonCode) {
+		try {
+			MqttDisconnectReasonCode code = MqttDisconnectReasonCode.valueOf(reasonCode);
+			return code.name() + "(0x" + String.format("%02X", reasonCode) + ")";
+		} catch (Throwable e) {
+			return "0x" + String.format("%02X", reasonCode);
+		}
+	}
+
+	/**
+	 * 重新生成 clientId，避免与顶掉自己的连接使用同一个 clientId
+	 */
+	private void rebuildClientId() {
+		String oldClientId = mqttClientCreator.getClientId();
+		String newClientId = oldClientId + "-" + StrUtil.getNanoId();
+		mqttClientCreator.clientId(newClientId);
+		logger.info("MqttClient clientId rebuilt after session taken over, old:{} new:{}", oldClientId, newClientId);
 	}
 
 	/**
