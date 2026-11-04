@@ -26,15 +26,15 @@ public enum MqttPubAckReasonCode implements MqttReasonCode {
 	/**
 	 * PubAck ReasonCode
 	 */
-	SUCCESS((byte) 0x0),
-	NO_MATCHING_SUBSCRIBERS((byte) 0x10),
-	UNSPECIFIED_ERROR((byte) 0x80),
-	IMPLEMENTATION_SPECIFIC_ERROR((byte) 0x83),
-	NOT_AUTHORIZED((byte) 0x87),
-	TOPIC_NAME_INVALID((byte) 0x90),
-	PACKET_IDENTIFIER_IN_USE((byte) 0x91),
-	QUOTA_EXCEEDED((byte) 0x97),
-	PAYLOAD_FORMAT_INVALID((byte) 0x99);
+	SUCCESS((byte) 0x0, "成功"),
+	NO_MATCHING_SUBSCRIBERS((byte) 0x10, "没有匹配的订阅者"),
+	UNSPECIFIED_ERROR((byte) 0x80, "未指明的错误"),
+	IMPLEMENTATION_SPECIFIC_ERROR((byte) 0x83, "实现特定错误"),
+	NOT_AUTHORIZED((byte) 0x87, "未经授权"),
+	TOPIC_NAME_INVALID((byte) 0x90, "主题名无效"),
+	PACKET_IDENTIFIER_IN_USE((byte) 0x91, "报文标识符已被占用"),
+	QUOTA_EXCEEDED((byte) 0x97, "超出配额"),
+	PAYLOAD_FORMAT_INVALID((byte) 0x99, "有效负载格式无效");
 
 	private static final MqttPubAckReasonCode[] VALUES = new MqttPubAckReasonCode[0x9A];
 
@@ -43,9 +43,11 @@ public enum MqttPubAckReasonCode implements MqttReasonCode {
 	}
 
 	private final byte byteValue;
+	private final String message;
 
-	MqttPubAckReasonCode(byte byteValue) {
+	MqttPubAckReasonCode(byte byteValue, String message) {
 		this.byteValue = byteValue;
+		this.message = message;
 	}
 
 	public static MqttPubAckReasonCode valueOf(byte b) {
@@ -55,6 +57,11 @@ public enum MqttPubAckReasonCode implements MqttReasonCode {
 	@Override
 	public byte value() {
 		return byteValue;
+	}
+
+	@Override
+	public String toString() {
+		return "[0x" + String.format("%02X", this.byteValue & 0xFF) + "] " + this.name().toLowerCase().replace('_', ' ') + " (" + this.message + ')';
 	}
 
 }

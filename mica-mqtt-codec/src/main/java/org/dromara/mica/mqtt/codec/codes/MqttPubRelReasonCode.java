@@ -26,13 +26,15 @@ public enum MqttPubRelReasonCode implements MqttReasonCode {
 	/**
 	 * PubRel ReasonCode
 	 */
-	SUCCESS((byte) 0x0),
-	PACKET_IDENTIFIER_NOT_FOUND((byte) 0x92);
+	SUCCESS((byte) 0x0, "成功"),
+	PACKET_IDENTIFIER_NOT_FOUND((byte) 0x92, "报文标识符未找到");
 
 	private final byte byteValue;
+	private final String message;
 
-	MqttPubRelReasonCode(byte byteValue) {
+	MqttPubRelReasonCode(byte byteValue, String message) {
 		this.byteValue = byteValue;
+		this.message = message;
 	}
 
 	public static MqttPubRelReasonCode valueOf(byte b) {
@@ -48,5 +50,10 @@ public enum MqttPubRelReasonCode implements MqttReasonCode {
 	@Override
 	public byte value() {
 		return byteValue;
+	}
+
+	@Override
+	public String toString() {
+		return "[0x" + String.format("%02X", this.byteValue & 0xFF) + "] " + this.name().toLowerCase().replace('_', ' ') + " (" + this.message + ')';
 	}
 }

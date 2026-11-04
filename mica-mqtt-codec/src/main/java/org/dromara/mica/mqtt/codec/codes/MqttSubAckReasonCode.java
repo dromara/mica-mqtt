@@ -27,24 +27,26 @@ import org.dromara.mica.mqtt.codec.MqttVersion;
 public enum MqttSubAckReasonCode implements MqttReasonCode {
 
 	//All MQTT versions
-	GRANTED_QOS0((byte) 0x0),
-	GRANTED_QOS1((byte) 0x1),
-	GRANTED_QOS2((byte) 0x2),
-	UNSPECIFIED_ERROR((byte) 0x80),
+	GRANTED_QOS0((byte) 0x0, "授权 QoS 0"),
+	GRANTED_QOS1((byte) 0x1, "授权 QoS 1"),
+	GRANTED_QOS2((byte) 0x2, "授权 QoS 2"),
+	UNSPECIFIED_ERROR((byte) 0x80, "未指明的错误"),
 	//MQTT5 or higher
-	IMPLEMENTATION_SPECIFIC_ERROR((byte) 0x83),
-	NOT_AUTHORIZED((byte) 0x87),
-	TOPIC_FILTER_INVALID((byte) 0x8F),
-	PACKET_IDENTIFIER_IN_USE((byte) 0x91),
-	QUOTA_EXCEEDED((byte) 0x97),
-	SHARED_SUBSCRIPTIONS_NOT_SUPPORTED((byte) 0x9E),
-	SUBSCRIPTION_IDENTIFIERS_NOT_SUPPORTED((byte) 0xA1),
-	WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED((byte) 0xA2);
+	IMPLEMENTATION_SPECIFIC_ERROR((byte) 0x83, "实现特定错误"),
+	NOT_AUTHORIZED((byte) 0x87, "未经授权"),
+	TOPIC_FILTER_INVALID((byte) 0x8F, "主题过滤器无效"),
+	PACKET_IDENTIFIER_IN_USE((byte) 0x91, "报文标识符已被占用"),
+	QUOTA_EXCEEDED((byte) 0x97, "超出配额"),
+	SHARED_SUBSCRIPTIONS_NOT_SUPPORTED((byte) 0x9E, "不支持共享订阅"),
+	SUBSCRIPTION_IDENTIFIERS_NOT_SUPPORTED((byte) 0xA1, "不支持订阅标识符"),
+	WILDCARD_SUBSCRIPTIONS_NOT_SUPPORTED((byte) 0xA2, "不支持通配符订阅");
 
 	private final byte byteValue;
+	private final String message;
 
-	MqttSubAckReasonCode(byte byteValue) {
+	MqttSubAckReasonCode(byte byteValue, String message) {
 		this.byteValue = byteValue;
+		this.message = message;
 	}
 
 	public static MqttSubAckReasonCode qosGranted(MqttQoS qos) {
@@ -73,5 +75,10 @@ public enum MqttSubAckReasonCode implements MqttReasonCode {
 		} else {
 			return this;
 		}
+	}
+
+	@Override
+	public String toString() {
+		return "[0x" + String.format("%02X", this.byteValue & 0xFF) + "] " + this.name().toLowerCase().replace('_', ' ') + " (" + this.message + ')';
 	}
 }

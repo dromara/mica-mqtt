@@ -10,22 +10,24 @@ public enum MqttAuthReasonCode implements MqttReasonCode {
 	/**
 	 * Success
 	 */
-	SUCCESS((byte) 0x0),
+	SUCCESS((byte) 0x0, "成功"),
 
 	/**
 	 * Continue Authentication
 	 */
-	CONTINUE_AUTHENTICATION((byte) 0x18),
+	CONTINUE_AUTHENTICATION((byte) 0x18, "继续认证"),
 
 	/**
 	 * Re-Authenticate
 	 */
-	RE_AUTHENTICATE((byte) 0x19);
+	RE_AUTHENTICATE((byte) 0x19, "重新认证");
 
 	private final byte byteValue;
+	private final String message;
 
-	MqttAuthReasonCode(byte byteValue) {
+	MqttAuthReasonCode(byte byteValue, String message) {
 		this.byteValue = byteValue;
+		this.message = message;
 	}
 
 	public static MqttAuthReasonCode valueOf(byte code) {
@@ -43,5 +45,10 @@ public enum MqttAuthReasonCode implements MqttReasonCode {
 	@Override
 	public byte value() {
 		return byteValue;
+	}
+
+	@Override
+	public String toString() {
+		return "[0x" + String.format("%02X", this.byteValue & 0xFF) + "] " + this.name().toLowerCase().replace('_', ' ') + " (" + this.message + ')';
 	}
 }

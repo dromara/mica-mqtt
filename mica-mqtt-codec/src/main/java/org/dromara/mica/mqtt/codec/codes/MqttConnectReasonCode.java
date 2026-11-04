@@ -90,7 +90,7 @@ public enum MqttConnectReasonCode implements MqttReasonCode {
 
 	@Override
 	public String toString() {
-		return this.name().toLowerCase().replace('_', ' ') + " (" + this.message + ')';
+		return "[0x" + String.format("%02X", this.byteValue & 0xFF) + "] " + this.name().toLowerCase().replace('_', ' ') + " (" + this.message + ')';
 	}
 
 }
