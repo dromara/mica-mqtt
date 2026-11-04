@@ -68,7 +68,9 @@ public class MqttServerAioHandler implements TioServerHandler {
 			return mqttDecoder.doDecode(context, buffer, readableLength);
 		} catch (DecoderException e) {
 			processFailure(context, e);
-			throw new TioDecodeException(e);
+			// 只把可读的错误信息带给上层，避免日志里出现 "解码异常:xxx.exception.DecoderException: ..."
+			String message = e.getMessage() != null ? e.getMessage() : e.toString();
+			throw new TioDecodeException(message, e);
 		}
 	}
 
