@@ -160,9 +160,17 @@ public final class MqttDecoder {
 	 */
 	private static MqttFixedHeader decodeFixedHeader(ChannelContext ctx, ByteBuffer buffer) {
 		short b1 = ByteBufferUtil.readUnsignedByte(buffer);
-		MqttMessageType messageType = MqttMessageType.valueOf(b1 >> 4);
+		MqttMessageType messageType;
+		try {
+			messageType = MqttMessageType.valueOf(b1 >> 4);
+		} catch (IllegalArgumentException e) {
+			throw new DecoderException("invalid MQTT message type, first byte: " + hex(b1));
+		}
 		boolean dup = (b1 & 0x08) == 0x08;
-		MqttQoS qos = MqttQoS.valueOf((b1 & 0x06) >> 1);
+		// 注意：QoS 只在 PUBLISH 消息中有意义，其它消息类型的 bit1~bit2 是保留位。
+		// 此处只取值、不查枚举，避免明文端口收到非 MQTT 流量（如 TLS ClientHello 的 0x16、HTTP GET 的 0x47）
+		// 时被误报成 "invalid QoS: 3"。
+		int qosValue = (b1 & 0x06) >> 1;
 		boolean retain = (b1 & 0x01) != 0;
 		int remainingLength = 0;
 		int multiplier = 1;
@@ -182,60 +190,91 @@ public final class MqttDecoder {
 			throw new DecoderException("remaining length exceeds 4 digits (" + messageType + ')');
 		}
 		int headLength = 1 + loops;
-		return resetAndValidateFixedHeader(ctx, messageType, dup, qos, retain, headLength, remainingLength);
+		return resetAndValidateFixedHeader(ctx, messageType, dup, qosValue, retain, headLength, remainingLength, b1);
 	}
 
+	/**
+	 * 校验并规整固定头的标志位。
+	 *
+	 * <p>MQTT 3.1.1 / 5.0 规定：只有 PUBLISH 使用 DUP/QoS/RETAIN 三个标志位，
+	 * 其它消息类型对应位置为保留位，必须为 0（PUBREL/SUBSCRIBE/UNSUBSCRIBE 固定为 0b0010），
+	 * 违规时接收方必须关闭网络连接。
+	 *
+	 * @param qosValue 首字节 bit1~bit2 的原始值（0~3），仅 PUBLISH 才表示 QoS
+	 */
 	private static MqttFixedHeader resetAndValidateFixedHeader(ChannelContext ctx, MqttMessageType messageType,
-															   boolean dup, MqttQoS qos, boolean retain,
-															   int headLength, int remainingLength) {
-		// === 内联 resetUnusedFields 逻辑 ===
+															   boolean dup, int qosValue, boolean retain,
+															   int headLength, int remainingLength, short b1) {
+		MqttQoS qos;
 		switch (messageType) {
-			case CONNECT:
-			case CONNACK:
-			case PUBACK:
-			case PUBREC:
-			case PUBCOMP:
-			case SUBACK:
-			case UNSUBACK:
-			case PINGREQ:
-			case PINGRESP:
-			case DISCONNECT:
-				if (dup || qos != MqttQoS.QOS0 || retain) {
-					dup = false;
-					qos = MqttQoS.QOS0;
-					retain = false;
+			case PUBLISH:
+				// 只有 PUBLISH 的该字段才是 QoS
+				if (qosValue > 2) {
+					throw new DecoderException("invalid QoS: " + qosValue + " in PUBLISH, first byte: " + hex(b1));
 				}
+				qos = MqttQoS.valueOf(qosValue);
 				break;
 			case PUBREL:
 			case SUBSCRIBE:
 			case UNSUBSCRIBE:
-				if (retain) {
-					retain = false;
+				// 固定头标志位固定为 0b0010。
+				// 注：DUP 位在历史实现中重传时可能被置 1（如 EMQX 等 broker 忽略该位），
+				// 这里不做强制要求，只校验 QoS 位与 RETAIN 位。
+				if (qosValue != 1 || retain) {
+					throw new DecoderException(messageType.name()
+						+ " message flags must be 0b0010, first byte: " + hex(b1));
 				}
+				qos = MqttQoS.QOS1;
 				break;
 			default:
-				// 其他类型不做额外处理
+				// 其余消息类型的保留位必须为 0
+				if (dup || qosValue != 0 || retain) {
+					throw new DecoderException(messageType.name()
+						+ " message reserved flags must be 0, first byte: " + hex(b1));
+				}
+				qos = MqttQoS.QOS0;
 				break;
 		}
+		// 保留位校验通过后，非 PUBLISH 消息的 DUP/RETAIN 必然为 false
+		if (messageType != MqttMessageType.PUBLISH) {
+			dup = false;
+			retain = false;
+		}
 		// === 内联 validateFixedHeader 逻辑 ===
-		switch (messageType) {
-			case PUBREL:
-			case SUBSCRIBE:
-			case UNSUBSCRIBE:
-				if (qos != MqttQoS.QOS1) {
-					throw new DecoderException(messageType.name() + " message must have QoS 1");
-				}
-				break;
-			case AUTH:
-				if (MqttVersion.MQTT_5 != MqttCodecUtil.getMqttVersion(ctx)) {
-					throw new DecoderException("AUTH message requires at least MQTT 5");
-				}
-				break;
-			default:
-				break;
+		if (messageType == MqttMessageType.AUTH
+			&& MqttVersion.MQTT_5 != MqttCodecUtil.getMqttVersion(ctx)) {
+			throw new DecoderException("AUTH message requires at least MQTT 5");
 		}
 		// 消息头
 		return new MqttFixedHeader(messageType, dup, qos, retain, headLength, remainingLength);
+	}
+
+	/**
+	 * 首字节的十六进制表示，用于错误信息，便于识别非 MQTT 流量（如 TLS ClientHello 的 0x16）
+	 */
+	private static String hex(short b) {
+		return "0x" + Integer.toHexString(b & 0xFF);
+	}
+
+	/**
+	 * SUBSCRIBE 订阅选项中的请求 QoS，3 为保留值。
+	 * 非法时抛 DecoderException，避免 IllegalArgumentException 绕过服务端的错误处理路径。
+	 */
+	private static MqttQoS toSubscribeQos(int value) {
+		if (value > 2) {
+			throw new DecoderException("invalid QoS: " + value + " in SUBSCRIBE options");
+		}
+		return MqttQoS.valueOf(value);
+	}
+
+	/**
+	 * SUBSCRIBE 订阅选项中的 Retain Handling，3 为保留值。
+	 */
+	private static MqttSubscriptionOption.RetainedHandlingPolicy toRetainHandlingPolicy(int value) {
+		if (value > 2) {
+			throw new DecoderException("invalid RetainHandlingPolicy: " + value + " in SUBSCRIBE options");
+		}
+		return MqttSubscriptionOption.RetainedHandlingPolicy.valueOf(value);
 	}
 
 	private static MqttMessageIdVariableHeader decodePacketIdAndPropertiesVariableHeader(
@@ -469,11 +508,11 @@ public final class MqttDecoder {
 				throw new DecoderException("SUBSCRIBE option reserved bits must be 0");
 			}
 
-			MqttQoS qos = MqttQoS.valueOf(optionByte & 0x03);
+			MqttQoS qos = toSubscribeQos(optionByte & 0x03);
 			boolean noLocal = ((optionByte & 0x04) >> 2) == 1;
 			boolean retainAsPublished = ((optionByte & 0x08) >> 3) == 1;
 			MqttSubscriptionOption.RetainedHandlingPolicy retainHandling =
-				MqttSubscriptionOption.RetainedHandlingPolicy.valueOf((optionByte & 0x30) >> 4);
+				toRetainHandlingPolicy((optionByte & 0x30) >> 4);
 
 			final MqttSubscriptionOption subscriptionOption = MqttSubscriptionOption.from(qos,
 				noLocal, retainAsPublished, retainHandling);
