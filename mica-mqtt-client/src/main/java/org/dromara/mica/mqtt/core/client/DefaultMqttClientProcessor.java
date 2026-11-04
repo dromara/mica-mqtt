@@ -24,12 +24,10 @@ import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
+import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.*;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
-import org.dromara.mica.mqtt.codec.message.header.MqttConnAckVariableHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttFixedHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttMessageIdVariableHeader;
-import org.dromara.mica.mqtt.codec.message.header.MqttPublishVariableHeader;
+import org.dromara.mica.mqtt.codec.message.header.*;
 import org.dromara.mica.mqtt.codec.message.payload.MqttSubAckPayload;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
@@ -405,6 +403,29 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		}
 		pendingPublish.onPubCompReceived();
 		clientSession.removePendingPublish(packetId);
+	}
+
+	@Override
+	public void processDisconnect(ChannelContext context, MqttMessage message) {
+		MqttDisconnectReasonCode reasonCode = getReasonCode(message);
+		// MQTT 5.0 规定：客户端收到服务端 DISCONNECT 后必须关闭网络连接
+		Tio.close(context, "服务端主动断开连接，原因码:" + reasonCode);
+	}
+
+	/**
+	 * 提取 DISCONNECT 的原因码，没有 variable header 时按正常断开（0x00）处理
+	 *
+	 * @param message MqttMessage
+	 * @return 原因码
+	 */
+	private static MqttDisconnectReasonCode getReasonCode(MqttMessage message) {
+		Object variableHeader = message.variableHeader();
+		if (variableHeader instanceof MqttReasonCodeAndPropertiesVariableHeader) {
+			byte reasonCodeValue = ((MqttReasonCodeAndPropertiesVariableHeader) variableHeader).reasonCode();
+			return MqttDisconnectReasonCode.valueOf(reasonCodeValue);
+		} else {
+			return MqttDisconnectReasonCode.NORMAL;
+		}
 	}
 
 	/**

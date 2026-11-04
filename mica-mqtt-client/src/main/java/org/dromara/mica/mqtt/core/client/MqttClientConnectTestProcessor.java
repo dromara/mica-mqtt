@@ -78,4 +78,9 @@ public class MqttClientConnectTestProcessor implements IMqttClientProcessor {
 
 	}
 
+	@Override
+	public void processDisconnect(ChannelContext context, MqttMessage message) {
+
+	}
+
 }
