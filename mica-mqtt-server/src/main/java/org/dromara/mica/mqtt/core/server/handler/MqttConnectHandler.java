@@ -55,10 +55,9 @@ import java.util.concurrent.ExecutorService;
 public class MqttConnectHandler extends AbstractMqttMessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MqttConnectHandler.class);
 	/**
-	 * 2 倍客户端 keepAlive 时间
+	 * 客户端 keepAlive 单位，不再 x 2，mica-net 里已经处理
 	 */
-	private static final long KEEP_ALIVE_UNIT = 2000L;
-
+	private static final long KEEP_ALIVE_UNIT = 1000L;
 	private final IMqttServerUniqueIdService uniqueIdService;
 	private final IMqttServerAuthHandler authHandler;
 	private final IMqttConnectStatusListener connectStatusListener;
