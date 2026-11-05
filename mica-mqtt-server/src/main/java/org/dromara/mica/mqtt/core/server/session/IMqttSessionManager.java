@@ -177,6 +177,20 @@ public interface IMqttSessionManager {
 	void remove(String clientId);
 
 	/**
+	 * 只清除客户端的连接态数据（未确认的 QoS 消息、包 id 等），保留订阅关系。
+	 * <p>
+	 * 默认退化为 {@link #remove(String)}，即连同订阅一起清除。集群场景下需要保留订阅：
+	 * 旧 owner 节点把 clientId 移交出去后，本地连接虽然失效，但订阅副本仍要留着，
+	 * 否则本节点就不再把该 clientId 的消息转发给新的 owner（消息丢失）。
+	 * </p>
+	 *
+	 * @param clientId clientId
+	 */
+	default void removeSessionState(String clientId) {
+		remove(clientId);
+	}
+
+	/**
 	 * 清理
 	 */
 	void clean();

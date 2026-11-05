@@ -236,6 +236,65 @@ class MqttClientReconnectChaosTest {
 		}
 	}
 
+	/**
+	 * connAckTimeout 关闭（<= 0）时，握手卡死不应主动断开连接。
+	 */
+	@Test
+	void shouldNotCloseConnectionWhenConnAckTimeoutDisabled() throws Exception {
+		CountingConnectListener listener = new CountingConnectListener();
+		CountDownLatch connectRead = new CountDownLatch(1);
+		FakeBroker broker = FakeBroker.create()
+			.next(new HoldAfterConnectHandler(connectRead));
+		MqttClient client = null;
+		try {
+			client = MqttClient.create()
+				.name("Mqtt-Reconnect-Chaos-Test")
+				.ip("127.0.0.1")
+				.port(broker.getPort())
+				.connAckTimeout(0)
+				.reInterval(100)
+				.keepAliveSecs(120)
+				.clientId("chaos-test-" + System.nanoTime())
+				.connectListener(listener)
+				.connectSync();
+			Assertions.assertTrue(connectRead.await(5, TimeUnit.SECONDS), "broker should receive MQTT CONNECT");
+			// 握手超时已关闭，等待期间不应断开，也不应重连
+			Thread.sleep(3000);
+			Assertions.assertEquals(0, listener.disconnectedCount.get(),
+				"connAckTimeout=0 must not close the connection while waiting for CONNACK");
+			Assertions.assertEquals(1, broker.getConnectPackets(),
+				"connAckTimeout=0 must not trigger a reconnect while waiting for CONNACK");
+		} finally {
+			stop(client);
+			broker.close();
+		}
+	}
+
+	/**
+	 * connectTest 自带等待期限，不应被 connAckTimeout 截断：
+	 * connAckTimeout(2s) 短于 broker 回 CONNACK 的时间(6s)，但 connectTest 给了 12s，
+	 * 期望拿到真实的原因码，而不是「服务器不可用」。
+	 */
+	@Test
+	void shouldNotTruncateConnectTestByConnAckTimeout() throws Exception {
+		FakeBroker broker = FakeBroker.create()
+			.next(socket -> {
+				Thread.sleep(6000L);
+				writeConnAck(socket.getOutputStream());
+			});
+		try {
+			Assertions.assertEquals(MqttConnectReasonCode.CONNECTION_ACCEPTED,
+				MqttClient.create()
+					.ip("127.0.0.1")
+					.port(broker.getPort())
+					.connAckTimeout(2)
+					.connectTest(12, TimeUnit.SECONDS),
+				"connectTest deadline must not be truncated by connAckTimeout");
+		} finally {
+			broker.close();
+		}
+	}
+
 	@Test
 	void shouldPublishSuccessfullyAfterBrokerRestartReconnect() throws Exception {
 		// 可通过 JVM 参数放大复现概率:
@@ -376,6 +435,7 @@ class MqttClientReconnectChaosTest {
 			.ip("127.0.0.1")
 			.port(port)
 			.timeout(1)
+			.connAckTimeout(1)
 			.reInterval(100)
 			.keepAliveSecs(1)
 			.clientId("chaos-test-" + System.nanoTime())

@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Cluster-aware session manager that decorates an underlying {@link IMqttSessionManager}.
@@ -95,7 +96,10 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * Removes a remote client registration and cleans up its session.
 	 *
 	 * @param clientId the client identifier
+	 * @deprecated use {@link #removeRemoteClient(String, String)} so that a delayed
+	 * disconnect cannot wipe a replacement session.
 	 */
+	@Deprecated
 	public void removeRemoteClient(String clientId) {
 		String node = clientNodeMap.remove(clientId);
 		delegate.remove(clientId);
@@ -130,6 +134,22 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 */
 	public String registerLocalClient(String clientId) {
 		return clientNodeMap.remove(clientId);
+	}
+
+	/**
+	 * Clears the local connection state of a client whose ownership has been handed
+	 * over to another node, keeping the replicated subscriptions intact.
+	 * <p>
+	 * The subscriptions of a remote client are replicated on every node (V1 full
+	 * replication); they are what tells this node to forward the client's messages
+	 * to its owner. Only the connection state (unacknowledged QoS messages, packet
+	 * id counter) belongs to the connection that just went away.
+	 * </p>
+	 *
+	 * @param clientId the client identifier
+	 */
+	public void removeLocalSessionState(String clientId) {
+		delegate.removeSessionState(clientId);
 	}
 
 	/**
@@ -539,18 +559,38 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void remove(String clientId) {
+		// 用 compute 原子地裁决归属，避免与并发的 registerRemoteClient 抢跑；
+		// lambda 内只记录结论，真正的清理放到锁外执行（sessionStore.delete 可能落盘）。
+		AtomicBoolean remoteOwned = new AtomicBoolean(false);
 		clientNodeMap.compute(clientId, (id, owner) -> {
 			// The old local socket can finish closing after a remote CONNECT took over.
 			if (owner != null && !owner.equals(clusterManager.getLocalNodeId())) {
+				remoteOwned.set(true);
 				return owner;
-			}
-			delegate.remove(clientId);
-			// V3 session persistence: clear the persistent record on disconnect.
-			if (sessionStore != null) {
-				sessionStore.delete(clientId);
 			}
 			return null;
 		});
+		if (remoteOwned.get()) {
+			// 归属已移交远端：本地连接态失效，但订阅副本要留着——
+			// V1 全量复制下，它正是本节点把消息转发给新 owner 的依据。
+			delegate.removeSessionState(clientId);
+			return;
+		}
+		delegate.remove(clientId);
+		// V3 session persistence: clear the persistent record on disconnect.
+		if (sessionStore != null) {
+			sessionStore.delete(clientId);
+		}
+	}
+
+	/**
+	 * 只清除本地连接态，保留订阅副本。归属已移交远端时使用。
+	 *
+	 * @param clientId the client identifier
+	 */
+	@Override
+	public void removeSessionState(String clientId) {
+		delegate.removeSessionState(clientId);
 	}
 
 	@Override

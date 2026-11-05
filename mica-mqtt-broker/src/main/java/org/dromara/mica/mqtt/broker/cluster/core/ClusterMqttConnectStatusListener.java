@@ -70,17 +70,20 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 
 	@Override
 	public void online(ChannelContext context, String clientId, String username) {
-		if (delegate != null) {
-			delegate.online(context, clientId, username);
-		}
-		// 先登记本地所有权：即使连接已失效，也必须清掉 clientId 的远端归属。
-		// 否则 offline() 会读到陈旧的远端 owner，把这次下线误判成「别的节点接管」而漏广播，
-		// 导致集群既没收到上线也没收到下线，其它节点会一直把消息路由到已失效的 clientId。
-		String previousOwner = sessionManager == null ? null : sessionManager.registerLocalClient(clientId);
-		// 连接已失效时不再广播上线事件，避免集群把一个已断开的连接当成在线。
+		// 连接已失效时不接管归属、不广播上线。
+		// clientNodeMap 里的远端归属由 CLIENT_CONNECT / CLIENT_DISCONNECT 广播维护，是当前事实：
+		// 若此时清掉它，本节点会误以为该 client 归自己，getRemoteNodesWithSubscriber 便不再把它
+		// 当作远端订阅者，导致本节点发布的消息不再转发给真正的 owner（消息丢失）。
+		// 归属仍归远端时漏广播下线也是对的 —— 远端会在自己的客户端断开时广播下线。
 		if (context != null && (!context.isAccepted() || context.isClosed() || context.isRemoved())) {
 			logger.info("[Cluster] online() skipped, connection is not alive, clientId:{}", clientId);
 			return;
+		}
+		// 接管本地归属：清掉 clientId 残留的远端归属，并记下原 owner 用于 session takeover。
+		// 先登记再回调 delegate，保证 delegate 抛异常时归属依然自洽。
+		String previousOwner = sessionManager == null ? null : sessionManager.registerLocalClient(clientId);
+		if (delegate != null) {
+			delegate.online(context, clientId, username);
 		}
 
 		// V3 takeover: if the clientId is already mapped to another node, request
@@ -107,10 +110,13 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 
 		// A displaced socket no longer owns this clientId. Its offline notification
 		// must not erase the replacement's subscriptions on other nodes.
+		// 归属判据：clientNodeMap 里记录的是「当前 owner」，本机不是 owner 时不广播下线，
+		// 否则新 owner 的订阅会被旧连接的迟到下线清掉。
 		String owner = sessionManager == null ? null : sessionManager.getClientNode(clientId);
 		if (owner != null && !owner.equals(clusterManager.getLocalNodeId())) {
 			return;
 		}
+		// 被顶替下线的连接（互踢 / 跨节点接管）不广播下线：新连接上线时会广播上线。
 		if (context != null && context.getCloseCode() == ChannelContext.CloseCode.KICK_EACH_OTHER) {
 			return;
 		}

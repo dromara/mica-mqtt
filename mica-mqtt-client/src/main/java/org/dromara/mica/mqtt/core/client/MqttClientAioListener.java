@@ -45,12 +45,21 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 	private final MqttClientCreator clientCreator;
 	private final IMqttClientConnectListener connectListener;
 	private final ExecutorService executor;
+	/**
+	 * 是否启用 CONNACK 握手超时，connectTest 自带等待期限，不需要握手超时
+	 */
+	private final boolean connAckTimeoutEnabled;
 	private TioClient tioClient;
 
 	public MqttClientAioListener(MqttClientCreator clientCreator) {
+		this(clientCreator, true);
+	}
+
+	MqttClientAioListener(MqttClientCreator clientCreator, boolean connAckTimeoutEnabled) {
 		this.clientCreator = clientCreator;
 		this.connectListener = clientCreator.getConnectListener();
 		this.executor = clientCreator.getMqttExecutor();
+		this.connAckTimeoutEnabled = connAckTimeoutEnabled;
 	}
 
 	void setTioClient(TioClient tioClient) {
@@ -76,9 +85,19 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 	}
 
 	private void scheduleConnAckTimeout(ChannelContext context) {
+		if (!connAckTimeoutEnabled) {
+			// connectTest 自带等待期限，由调用方决定等多久，不启用握手超时
+			return;
+		}
+		Integer connAckTimeout = clientCreator.getConnAckTimeout();
+		if (connAckTimeout == null) {
+			connAckTimeout = MqttClientCreator.DEFAULT_CONN_ACK_TIMEOUT;
+		}
+		if (connAckTimeout <= 0) {
+			// 不等待 broker 响应，握手卡死时也不会主动断开连接
+			return;
+		}
 		AsynchronousSocketChannel socket = context.asynchronousSocketChannel;
-		Integer configuredTimeout = clientCreator.getTimeout();
-		long timeoutSeconds = configuredTimeout == null || configuredTimeout <= 0 ? 5 : configuredTimeout;
 		tioClient.scheduleOnce(() -> {
 			// 已完成握手或已替换的连接，不能由旧超时任务关闭。
 			// socket 身份比对 + isClosed 一起保证不会误关新连接：重连只在连接已关闭时才会发起，
@@ -86,11 +105,10 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 			// 这里不再额外加锁：Tio.close 内部已用 closeLock.writeLock().tryLock() 做了保护，
 			// 抢不到锁说明正在重连（届时新 socket 自带超时任务），直接放弃即可，
 			// 避免阻塞单线程的定时器（ClientReConnTask 同步重连时最长持有该锁 2 秒）。
-			if (context.asynchronousSocketChannel == socket
-				&& !context.isClosed() && !context.isRemoved() && !context.isAccepted()) {
+			if (context.asynchronousSocketChannel == socket && !context.isClosed() && !context.isRemoved() && !context.isAccepted()) {
 				Tio.close(context, "MqttClient CONNACK timeout.");
 			}
-		}, TimeUnit.SECONDS.toMillis(timeoutSeconds));
+		}, TimeUnit.SECONDS.toMillis(connAckTimeout));
 	}
 
 	@Override

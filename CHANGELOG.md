@@ -5,7 +5,8 @@
 ### v2.6.14 - 2026-11-05
 - ✨ feat(client): 客户端支持解析服务端下发的 `DISCONNECT` 报文（新增 `IMqttClientProcessor#processDisconnect`），按 MQTT 5.0 要求关闭网络连接，并输出断开原因码。(github #226) 感谢 @wjpdream 贡献。
 - 🐛 fix(common): 修正 MQTT 多级通配符位置校验，`TopicUtil.match()` 与 `validateTopicFilter()` 共用同一套规则，`sport#` 这类非法过滤器不再被当成 catch-all 放行。(gitee #32) 感谢 @moon_hunter 贡献。
-- 🐛 fix(client): 修复等待 CONNACK 期间重复重连、重复打开 Socket 的问题。重连判定由 MQTT 握手态改为 TCP 连接态，并新增 CONNACK 握手超时（复用 `timeout` 配置，默认 5 秒，不单独提供配置项）。(github #222) 感谢 @xuewenquan 贡献。
+- 🐛 fix(client): 修复等待 CONNACK 期间重复重连、重复打开 Socket 的问题。重连判定由 MQTT 握手态改为 TCP 连接态，并新增 CONNACK 握手超时，超时后关闭连接并触发重连。(github #222) 感谢 @xuewenquan 贡献。
+- ✨ feat(client): 新增 `connAckTimeout` 配置项（秒，默认 10），控制等待 MQTT CONNACK 的超时时间，小于等于 0 表示不等待；`timeout` 配置仅控制 TCP 连接超时。
 - 🐛 fix(broker): 修复集群跨节点 ClientId 接管时旧连接未关闭、过期下线误清理新连接订阅的问题。(github #223) 感谢 @xuewenquan 贡献。
 - 🐛 fix(codec): 修复明文端口收到非 MQTT 流量（如 TLS ClientHello、HTTP 请求）时被误报为 `invalid QoS: 3` 的问题。(github #226) 感谢 @wjpdream 贡献。
 - ♻️ 各种 MQTT 原因码枚举补齐中文描述并增强 `toString` 输出，异常与日志更易读。

@@ -59,6 +59,10 @@ public final class MqttClientCreator {
 	 */
 	public static final int DEFAULT_KEEP_ALIVE_SECS = 60;
 	/**
+	 * 等待 MQTT CONNACK 的默认超时时间（秒）
+	 */
+	public static final int DEFAULT_CONN_ACK_TIMEOUT = 10;
+	/**
 	 * 名称
 	 */
 	private String name = "Mica-Mqtt-Client";
@@ -71,9 +75,17 @@ public final class MqttClientCreator {
 	 */
 	private int port = 1883;
 	/**
-	 * TCP 连接及等待 MQTT CONNACK 的超时时间（秒），可为 null，默认：5秒
+	 * TCP 连接超时时间（秒），可为 null，默认：5 秒。仅同步连接（connectSync）生效，异步连接由操作系统控制
 	 */
 	private Integer timeout;
+	/**
+	 * 等待 MQTT CONNACK 的超时时间（秒），默认：10 秒。
+	 * <p>
+	 * TCP 连接建立后，客户端发送 CONNECT 并等待 broker 返回 CONNACK，超过该时间仍未收到则关闭连接并触发重连。
+	 * 建议取值小于 keepAliveSecs 的一半，避免心跳包早于 CONNACK 发出。
+	 * 小于等于 0 表示不等待，握手卡死时不会主动断开连接。
+	 */
+	private Integer connAckTimeout = DEFAULT_CONN_ACK_TIMEOUT;
 	/**
 	 * 绑定 ip，绑定网卡，用于多网卡，默认为 null
 	 */
@@ -246,6 +258,10 @@ public final class MqttClientCreator {
 		return timeout;
 	}
 
+	public Integer getConnAckTimeout() {
+		return connAckTimeout;
+	}
+
 	public String getBindIp() {
 		return bindIp;
 	}
@@ -403,6 +419,17 @@ public final class MqttClientCreator {
 
 	public MqttClientCreator timeout(Integer timeout) {
 		this.timeout = timeout;
+		return this;
+	}
+
+	/**
+	 * 设置等待 MQTT CONNACK 的超时时间（秒）
+	 *
+	 * @param connAckTimeout 超时时间，小于等于 0 表示不等待
+	 * @return this
+	 */
+	public MqttClientCreator connAckTimeout(Integer connAckTimeout) {
+		this.connAckTimeout = connAckTimeout;
 		return this;
 	}
 
@@ -730,6 +757,7 @@ public final class MqttClientCreator {
 			.ip(this.ip)
 			.port(this.port)
 			.timeout(this.timeout)
+			.connAckTimeout(this.connAckTimeout)
 			.bindIp(this.bindIp)
 			.readBufferSize(this.readBufferSize)
 			.maxBytesInMessage(this.maxBytesInMessage)
@@ -889,7 +917,9 @@ public final class MqttClientCreator {
 		IMqttClientProcessor processor = new MqttClientConnectTestProcessor(future);
 		// 2. 初始化 mqtt 处理器
 		TioClientHandler clientAioHandler = new MqttClientAioHandler(this, processor);
-		MqttClientAioListener clientAioListener = new MqttClientAioListener(this);
+		// connectTest 自带等待期限（timeout 参数），不启用 CONNACK 握手超时，
+		// 避免握手超时先于调用方的期限触发，把真实原因码掩盖成「服务器不可用」
+		MqttClientAioListener clientAioListener = new MqttClientAioListener(this, false);
 		// 3. tioConfig
 		TioClientConfig tioConfig = new TioClientConfig(clientAioHandler, clientAioListener);
 		tioConfig.setName(this.name);
