@@ -2,10 +2,14 @@
 
 ## 发行版本
 
-### v2.6.14 - 未发布
+### v2.6.14 - 2026-11-05
+- ✨ feat(client): 客户端支持解析服务端下发的 `DISCONNECT` 报文（新增 `IMqttClientProcessor#processDisconnect`），按 MQTT 5.0 要求关闭网络连接，并输出断开原因码。(github #226) 感谢 @wjpdream 贡献。
 - 🐛 fix(common): 修正 MQTT 多级通配符位置校验，`TopicUtil.match()` 与 `validateTopicFilter()` 共用同一套规则，`sport#` 这类非法过滤器不再被当成 catch-all 放行。(gitee #32) 感谢 @moon_hunter 贡献。
 - 🐛 fix(client): 修复等待 CONNACK 期间重复重连、重复打开 Socket 的问题。重连判定由 MQTT 握手态改为 TCP 连接态，并新增 CONNACK 握手超时（复用 `timeout` 配置，默认 5 秒，不单独提供配置项）。(github #222) 感谢 @xuewenquan 贡献。
 - 🐛 fix(broker): 修复集群跨节点 ClientId 接管时旧连接未关闭、过期下线误清理新连接订阅的问题。(github #223) 感谢 @xuewenquan 贡献。
+- 🐛 fix(codec): 修复明文端口收到非 MQTT 流量（如 TLS ClientHello、HTTP 请求）时被误报为 `invalid QoS: 3` 的问题。(github #226) 感谢 @wjpdream 贡献。
+- ♻️ 各种 MQTT 原因码枚举补齐中文描述并增强 `toString` 输出，异常与日志更易读。
+- ⬆️ 升级 mica-net 到 2.0.17 修复 MQTT 客户端传递的 keepalive 系数 heartbeatBackoff 代码中没有 `*2` 感谢 gitee @jundo 贡献。
 
 ### v2.6.13 - 2026-09-27
 - ✨ mica-mqtt-client 接口支持 Default Method (github #217) 感谢 @galaxy-sea 贡献。
