@@ -407,9 +407,16 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 
 	@Override
 	public void processDisconnect(ChannelContext context, MqttMessage message) {
-		MqttDisconnectReasonCode reasonCode = getReasonCode(message);
+		// 获取端口原因
+		String reasonMessage = getReason(message);
+		String remark;
+		if (reasonMessage != null) {
+			remark = "服务端主动断开连接，原因:" + reasonMessage;
+		} else {
+			remark = "服务端主动断开连接";
+		}
 		// MQTT 5.0 规定：客户端收到服务端 DISCONNECT 后必须关闭网络连接
-		Tio.close(context, "服务端主动断开连接，原因码:" + reasonCode);
+		Tio.close(context, remark);
 	}
 
 	/**
@@ -418,13 +425,17 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 	 * @param message MqttMessage
 	 * @return 原因码
 	 */
-	private static MqttDisconnectReasonCode getReasonCode(MqttMessage message) {
+	private static String getReason(MqttMessage message) {
 		Object variableHeader = message.variableHeader();
 		if (variableHeader instanceof MqttReasonCodeAndPropertiesVariableHeader) {
 			byte reasonCodeValue = ((MqttReasonCodeAndPropertiesVariableHeader) variableHeader).reasonCode();
-			return MqttDisconnectReasonCode.valueOf(reasonCodeValue);
+			try {
+				return MqttDisconnectReasonCode.valueOf(reasonCodeValue).toString();
+			} catch (IllegalArgumentException e) {
+				return e.getMessage();
+			}
 		} else {
-			return MqttDisconnectReasonCode.NORMAL;
+			return null;
 		}
 	}
 

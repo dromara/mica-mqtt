@@ -57,8 +57,6 @@ public enum MqttSubAckReasonCode implements MqttReasonCode {
 				return MqttSubAckReasonCode.GRANTED_QOS1;
 			case QOS2:
 				return MqttSubAckReasonCode.GRANTED_QOS2;
-			case FAILURE:
-				return MqttSubAckReasonCode.UNSPECIFIED_ERROR;
 			default:
 				return MqttSubAckReasonCode.UNSPECIFIED_ERROR;
 		}
