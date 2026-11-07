@@ -2,6 +2,10 @@
 
 ## 发行版本
 
+### v2.6.15 - 未发布
+- ♻️ chore(build): 显式声明 `maven-surefire-plugin` 3.5.2，避免低版本 Maven（3.8 及更早默认绑定 2.12.4，不支持 JUnit 5）静默跳过单元测试。(github #225) 感谢 @wjpdream 贡献。
+- ℹ️ 说明: PR #225 未采纳 —— 服务端互踢下发 `DISCONNECT(0x8E Session taken over)`、客户端被顶号后自动重建 clientId、`uniqueId` 追加来源地址三项均未合入本分支：前者收益依赖客户端配套改造、集群跨节点接管场景也覆盖不到，后两者与「clientId 唯一、为空时由服务端兜底分配」的设计冲突。提交与贡献记录保留在 git 历史中。
+
 ### v2.6.14 - 2026-11-05
 - ✨ feat(client): 客户端支持解析服务端下发的 `DISCONNECT` 报文（新增 `IMqttClientProcessor#processDisconnect`），按 MQTT 5.0 要求关闭网络连接，并输出断开原因码。(github #226) 感谢 @wjpdream 贡献。
 - 🐛 fix(common): 修正 MQTT 多级通配符位置校验，`TopicUtil.match()` 与 `validateTopicFilter()` 共用同一套规则，`sport#` 这类非法过滤器不再被当成 catch-all 放行。(gitee #32) 感谢 @moon_hunter 贡献。
@@ -11,10 +15,6 @@
 - 🐛 fix(codec): 修复明文端口收到非 MQTT 流量（如 TLS ClientHello、HTTP 请求）时被误报为 `invalid QoS: 3` 的问题。(github #226) 感谢 @wjpdream 贡献。
 - ♻️ 各种 MQTT 原因码枚举补齐中文描述并增强 `toString` 输出，异常与日志更易读。
 - ⬆️ 升级 mica-net 到 2.0.17 keepalive 系数 heartbeatBackoff `x2` 逻辑下沉到 mica-net。
-
-### v2.6.15 - 未发布
-- ♻️ chore(build): 显式声明 `maven-surefire-plugin` 3.5.2，避免低版本 Maven（3.8 及更早默认绑定 2.12.4，不支持 JUnit 5）静默跳过单元测试。(github #225) 感谢 @wjpdream 贡献。
-- ℹ️ 说明: PR #225 未采纳 —— 服务端互踢下发 `DISCONNECT(0x8E Session taken over)`、客户端被顶号后自动重建 clientId、`uniqueId` 追加来源地址三项均未合入本分支：前者收益依赖客户端配套改造、集群跨节点接管场景也覆盖不到，后两者与「clientId 唯一、为空时由服务端兜底分配」的设计冲突。提交与贡献记录保留在 git 历史中。
 
 ### v2.6.13 - 2026-09-27
 - ✨ mica-mqtt-client 接口支持 Default Method (github #217) 感谢 @galaxy-sea 贡献。
