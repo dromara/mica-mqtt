@@ -185,6 +185,13 @@
 
     <build>
         <plugins>
+            <!-- 显式固定 surefire 版本：Maven 3.8 及更早默认绑定 2.12.4，不支持 JUnit 5，
+                 单元测试会被静默跳过；Maven 3.9+ 默认已是 3.x，统一声明避免各环境行为不一致。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.2</version>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
