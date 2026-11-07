@@ -87,17 +87,4 @@ public interface IMqttClientProcessor {
 	 */
 	void processPubComp(MqttMessage message);
 
-	/**
-	 * 处理服务端发来的 DISCONNECT 报文。
-	 * <p>
-	 * MQTT 5.0 规定客户端收到服务端 DISCONNECT 后必须关闭网络连接；
-	 * 原因码 0x8E（Session taken over）表示会话已被同 clientId 的新连接接管。
-	 * </p>
-	 *
-	 * @param context ChannelContext
-	 * @param message MqttMessage
-	 */
-	default void processDisconnect(ChannelContext context, MqttMessage message) {
-	}
-
 }

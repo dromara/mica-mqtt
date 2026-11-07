@@ -21,16 +21,13 @@ import net.dreamlu.mica.net.core.Node;
 import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
-import net.dreamlu.mica.net.utils.timer.TimerTask;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
-import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.MqttConnAckMessage;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
-import org.dromara.mica.mqtt.codec.message.builder.MqttDisconnectBuilder;
 import org.dromara.mica.mqtt.codec.message.header.MqttConnectVariableHeader;
 import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
 import org.dromara.mica.mqtt.codec.message.properties.MqttConnectProperties;
@@ -61,10 +58,6 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 	 * 2 倍客户端 keepAlive 时间
 	 */
 	private static final long KEEP_ALIVE_UNIT = 2000L;
-	/**
-	 * 踢人时，DISCONNECT 报文发出后延迟关闭连接的毫秒数
-	 */
-	private static final long KICK_DELAY_MS = 200L;
 
 	private final IMqttServerUniqueIdService uniqueIdService;
 	private final IMqttServerAuthHandler authHandler;
@@ -131,11 +124,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			cleanSession(uniqueId);
 			String remark = String.format("uniqueId:[%s] clientId:[%s] 被踢出，请检查是否有相同 clientId 互踢，新 contextId:[%s]",
 				uniqueId, clientId, context.getId());
-			// 踢人前先按 MQTT 5.0 规范告知被踢客户端断开原因（0x8E Session taken over），
-			// 让它知道是被同 clientId 的新连接顶掉，而不是网络异常，避免盲目重连后再次互踢。
-			// 报文发出后延迟关闭，给客户端留出读取并处理 DISCONNECT 的时间。
-			sendSessionTakenOver(otherContext);
-			delayRemove(otherContext, remark);
+			Tio.remove(otherContext, remark, ChannelContext.CloseCode.KICK_EACH_OTHER);
 		}
 		// 4.5 广播上线消息
 		sendConnected(context, uniqueId);
@@ -280,54 +269,6 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			sessionManager.remove(clientId);
 		} catch (Throwable throwable) {
 			logger.error("Mqtt server clientId:{} session clean error.", clientId, throwable);
-		}
-	}
-
-	/**
-	 * 延迟关闭被踢的连接。
-	 * <p>
-	 * DISCONNECT 报文写出后立刻关闭 socket，客户端可能只读到 EOF 而读不到报文内容，
-	 * 从而误判为「对方关闭了连接」。这里延迟一小段时间再真正踢掉连接。
-	 * </p>
-	 *
-	 * @param otherContext 被踢的连接
-	 * @param remark       关闭原因
-	 */
-	private void delayRemove(ChannelContext otherContext, String remark) {
-		taskService.addTask(systemTimer -> new TimerTask(KICK_DELAY_MS) {
-			@Override
-			public void run() {
-				try {
-					Tio.remove(otherContext, remark, ChannelContext.CloseCode.KICK_EACH_OTHER);
-				} catch (Throwable e) {
-					logger.warn("Mqtt server remove kicked client failed uniqueId:{}", remark, e);
-				}
-			}
-		});
-	}
-
-	/**
-	 * 通知被踢的客户端：会话已被同 clientId 的新连接接管。
-	 * <p>
-	 * MQTT 3.x 没有服务端到客户端的 DISCONNECT 报文，因此只对 5.0 客户端下发；
-	 * 这里使用阻塞发送，确保报文在连接被关闭之前写出去。
-	 * </p>
-	 *
-	 * @param otherContext 被踢的连接
-	 */
-	private void sendSessionTakenOver(ChannelContext otherContext) {
-		if (!MqttCodecUtil.isMqtt5(otherContext)) {
-			return;
-		}
-		try {
-			MqttMessage message = new MqttDisconnectBuilder()
-				.reasonCode(MqttDisconnectReasonCode.SESSION_TAKEN_OVER)
-				.build();
-			boolean result = Tio.bSend(otherContext, message);
-			logger.info("Mqtt server send DISCONNECT(0x8E) to kicked client uniqueId:{} result:{}",
-				otherContext.getBsId(), result);
-		} catch (Throwable e) {
-			logger.warn("Mqtt server send DISCONNECT(0x8E) failed uniqueId:{}", otherContext.getBsId(), e);
 		}
 	}
 }

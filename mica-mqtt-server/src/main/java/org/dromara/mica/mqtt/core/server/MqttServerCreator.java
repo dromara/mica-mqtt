@@ -198,14 +198,6 @@ public class MqttServerCreator {
 	 * 开启代理协议支持
 	 */
 	private boolean proxyProtocolOn = false;
-	/**
-	 * uniqueId 是否追加来源地址，默认 false。
-	 * <p>
-	 * 开启后，相同 clientId 从不同来源地址接入会被视为不同会话，不会互相踢下线；
-	 * 适用于多实例部署且 clientId 固定（无法保证全局唯一）的场景。
-	 * </p>
-	 */
-	private boolean uniqueIdAppendSourceAddress = false;
 
 	private MqttSerializer mqttSerializer;
 	/**
@@ -529,21 +521,6 @@ public class MqttServerCreator {
 		return this;
 	}
 
-	/**
-	 * uniqueId 是否追加来源地址。
-	 * <p>
-	 * 默认 false，即 uniqueId 直接使用 clientId，相同 clientId 重复接入会互踢（MQTT 规范行为）。
-	 * 开启后 uniqueId 为 clientId@来源地址，同一 clientId 从不同来源接入互不影响。
-	 * </p>
-	 *
-	 * @param uniqueIdAppendSourceAddress 是否追加来源地址
-	 * @return MqttServerCreator
-	 */
-	public MqttServerCreator uniqueIdAppendSourceAddress(boolean uniqueIdAppendSourceAddress) {
-		this.uniqueIdAppendSourceAddress = uniqueIdAppendSourceAddress;
-		return this;
-	}
-
 	public MqttSerializer getMqttSerializer() {
 		return mqttSerializer;
 	}
@@ -643,7 +620,7 @@ public class MqttServerCreator {
 			this.nodeName = StrUtil.getNanoId();
 		}
 		if (this.uniqueIdService == null) {
-			this.uniqueIdService = new DefaultMqttServerUniqueIdServiceImpl(this.uniqueIdAppendSourceAddress);
+			this.uniqueIdService = new DefaultMqttServerUniqueIdServiceImpl();
 		}
 		if (this.sessionManager == null) {
 			this.sessionManager = new InMemoryMqttSessionManager();

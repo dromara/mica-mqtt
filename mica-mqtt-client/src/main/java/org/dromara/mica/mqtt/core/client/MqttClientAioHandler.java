@@ -92,9 +92,6 @@ public class MqttClientAioHandler implements TioClientHandler {
 			case PUBCOMP:
 				processor.processPubComp(message);
 				break;
-			case DISCONNECT:
-				processor.processDisconnect(context, message);
-				break;
 			default:
 				break;
 		}

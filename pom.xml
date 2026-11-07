@@ -185,12 +185,6 @@
 
     <build>
         <plugins>
-            <!-- 父 pom 的 surefire 2.12.4 不支持 JUnit 5，需显式升级，否则测试会被静默跳过 -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.2</version>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

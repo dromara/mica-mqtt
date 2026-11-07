@@ -131,14 +131,6 @@ public final class MqttClientCreator {
 	 */
 	private String clientId;
 	/**
-	 * 收到服务端 DISCONNECT(0x8E Session taken over) 时，是否重新生成 clientId，默认 false。
-	 * <p>
-	 * 开启后，被同 clientId 的新连接顶掉后会自动换一个 clientId 重连，
-	 * 避免用同一个 clientId 反复重连造成互踢循环。关闭时由业务自行决定如何处理。
-	 * </p>
-	 */
-	private boolean rebuildClientIdOnSessionTakenOver = false;
-	/**
 	 * mqtt 协议，默认：MQTT_5
 	 */
 	private MqttVersion version = MqttVersion.MQTT_5;
@@ -308,15 +300,6 @@ public final class MqttClientCreator {
 
 	public String getClientId() {
 		return clientId;
-	}
-
-	/**
-	 * 收到服务端 DISCONNECT(0x8E Session taken over) 时是否重新生成 clientId
-	 *
-	 * @return 是否重新生成 clientId
-	 */
-	public boolean isRebuildClientIdOnSessionTakenOver() {
-		return rebuildClientIdOnSessionTakenOver;
 	}
 
 	public MqttVersion getVersion() {
@@ -519,17 +502,6 @@ public final class MqttClientCreator {
 
 	public MqttClientCreator clientId(String clientId) {
 		this.clientId = clientId;
-		return this;
-	}
-
-	/**
-	 * 收到服务端 DISCONNECT(0x8E Session taken over) 时是否重新生成 clientId，默认 false。
-	 *
-	 * @param rebuildClientIdOnSessionTakenOver 是否重新生成 clientId
-	 * @return MqttClientCreator
-	 */
-	public MqttClientCreator rebuildClientIdOnSessionTakenOver(boolean rebuildClientIdOnSessionTakenOver) {
-		this.rebuildClientIdOnSessionTakenOver = rebuildClientIdOnSessionTakenOver;
 		return this;
 	}
 
