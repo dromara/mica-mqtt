@@ -25,8 +25,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 鸿蒙 NEXT（NETSTACK）WebSocket 协议层心跳模拟测试，对应 gitee issue #IKTN7P。
@@ -82,8 +81,7 @@ class WebSocketPingPongTest {
 				int len = frame[1] & 0x7F;
 				byte[] pongPayload = new byte[len];
 				System.arraycopy(frame, 2, pongPayload, 0, len);
-				assertTrue(java.util.Arrays.equals(payload, pongPayload),
-					"Pong 负载应与 Ping 一致");
+				assertArrayEquals(payload, pongPayload, "Pong 负载应与 Ping 一致");
 			}
 
 			// 4. 连接应保持稳定（未出现鸿蒙端 The link is down 类断连）
@@ -189,8 +187,12 @@ class WebSocketPingPongTest {
 		byte[] frame = new byte[2 + len];
 		frame[0] = (byte) b1;
 		frame[1] = (byte) b2;
-		int read = in.readNBytes(frame, 2, len);
-		assertEquals(len, read, "帧负载不完整");
+		int offset = 2;
+		while (offset < frame.length) {
+			int read = in.read(frame, offset, frame.length - offset);
+			assertTrue(read != -1, "帧负载不完整，连接被提前关闭");
+			offset += read;
+		}
 		return frame;
 	}
 
