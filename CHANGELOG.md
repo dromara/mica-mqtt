@@ -2,7 +2,7 @@
 
 ## 发行版本
 
-### v2.6.15 - 未发布
+### v2.6.15 - 2026-11-11
 - ♻️ chore(build): 显式声明 `maven-surefire-plugin` 3.5.2，避免低版本 Maven（3.8 及更早默认绑定 2.12.4，不支持 JUnit 5）静默跳过单元测试。(github #225) 感谢 @wjpdream 贡献。
 - ℹ️ 说明: PR #225 未采纳 —— 服务端互踢下发 `DISCONNECT(0x8E Session taken over)`、客户端被顶号后自动重建 clientId、`uniqueId` 追加来源地址三项均未合入本分支：前者收益依赖客户端配套改造、集群跨节点接管场景也覆盖不到，后两者与「clientId 唯一、为空时由服务端兜底分配」的设计冲突。提交与贡献记录保留在 git 历史中。
 - ⬆️ 升级 mica-net 到 2.0.18 gitee #IKTN7P websocket 握手按 RFC 6455 重写，优化 SSL。感谢 @zhanghaiyang 反馈和 @wjpdream 贡献。
