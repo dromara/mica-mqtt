@@ -24,6 +24,8 @@ import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.header.MqttReasonCodeAndPropertiesVariableHeader;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
+import org.dromara.mica.mqtt.core.server.MqttServerAioListener;
+import org.dromara.mica.mqtt.core.server.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +61,10 @@ public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 		}
 		boolean sendWill = reasonCode == MqttDisconnectReasonCode.WITH_WILL_MESSAGE.value();
 		if (!sendWill) {
-			serverCreator.getMessageStore().clearWillMessage(clientId);
+			Message willMessage = context.get(MqttServerAioListener.WILL_MESSAGE_KEY);
+			if (willMessage != null) {
+				serverCreator.getMessageStore().clearWillMessage(clientId, willMessage);
+			}
 		}
 		context.setBizStatus(!sendWill);
 		Tio.remove(context, "Mqtt DisConnect");

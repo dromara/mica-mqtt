@@ -89,6 +89,11 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	}
 
 	@Override
+	public boolean clearWillMessage(String clientId, Message expected) {
+		return delegate.clearWillMessage(clientId, expected);
+	}
+
+	@Override
 	public Message getWillMessage(String clientId) {
 		return delegate.getWillMessage(clientId);
 	}

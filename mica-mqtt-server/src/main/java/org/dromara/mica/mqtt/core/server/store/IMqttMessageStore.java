@@ -46,6 +46,22 @@ public interface IMqttMessageStore {
 	boolean clearWillMessage(String clientId);
 
 	/**
+	 * 仅当当前遗嘱仍属于指定连接时清除。并发存储实现应覆盖此方法以保证原子性。
+	 *
+	 * @param clientId 客户端标识
+	 * @param expected 连接持有的遗嘱消息
+	 * @return 是否清除
+	 */
+	default boolean clearWillMessage(String clientId, Message expected) {
+		synchronized (this) {
+			if (getWillMessage(clientId) != expected) {
+				return false;
+			}
+			return clearWillMessage(clientId);
+		}
+	}
+
+	/**
 	 * 获取 will 消息
 	 *
 	 * @param clientId clientId

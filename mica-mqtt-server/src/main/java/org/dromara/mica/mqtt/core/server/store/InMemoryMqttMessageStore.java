@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * message store
@@ -62,6 +63,22 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 	public boolean clearWillMessage(String clientId) {
 		willStore.remove(clientId);
 		return true;
+	}
+
+	@Override
+	public boolean clearWillMessage(String clientId, Message expected) {
+		if (expected == null) {
+			return false;
+		}
+		AtomicBoolean removed = new AtomicBoolean();
+		willStore.computeIfPresent(clientId, (key, current) -> {
+			if (current == expected) {
+				removed.set(true);
+				return null;
+			}
+			return current;
+		});
+		return removed.get();
 	}
 
 	@Override

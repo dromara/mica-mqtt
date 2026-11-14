@@ -32,6 +32,7 @@ import org.dromara.mica.mqtt.codec.message.payload.MqttConnectPayload;
 import org.dromara.mica.mqtt.codec.message.properties.MqttConnectProperties;
 import org.dromara.mica.mqtt.codec.message.properties.MqttConnAckProperties;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
+import org.dromara.mica.mqtt.core.server.MqttServerAioListener;
 import org.dromara.mica.mqtt.core.server.MqttServerProperties;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerAuthHandler;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerUniqueIdService;
@@ -124,6 +125,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		sendConnected(context, uniqueId);
 		// 5. 绑定 uniqueId / username
 		Tio.bindBsId(context, uniqueId);
+		context.set(MqttServerAioListener.WILL_CLIENT_ID_KEY, uniqueId);
 		if (StrUtil.isNotBlank(userName)) {
 			Tio.bindUser(context, userName);
 		}
@@ -173,6 +175,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			Node clientNode = context.getClientNode();
 			willMessage.setPeerHost(clientNode.getPeerHost());
 			willMessage.setNode(serverCreator.getNodeName());
+			context.set(MqttServerAioListener.WILL_MESSAGE_KEY, willMessage);
 			messageStore.addWillMessage(uniqueId, willMessage);
 		}
 		// 9. 返回 ack

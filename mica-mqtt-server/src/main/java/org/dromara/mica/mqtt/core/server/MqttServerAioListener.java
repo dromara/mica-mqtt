@@ -39,6 +39,8 @@ import java.util.concurrent.ExecutorService;
  */
 public class MqttServerAioListener extends DefaultTioServerListener {
 	private static final Logger logger = LoggerFactory.getLogger(MqttServerAioListener.class);
+	public static final String WILL_MESSAGE_KEY = MqttServerAioListener.class.getName() + ".will";
+	public static final String WILL_CLIENT_ID_KEY = MqttServerAioListener.class.getName() + ".clientId";
 	private final ExecutorService executor;
 	private final IMqttMessageStore messageStore;
 	private final IMqttSessionManager sessionManager;
@@ -73,6 +75,9 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		context.setAccepted(false);
 		// 1. 业务 id
 		String clientId = context.getBsId();
+		if (StrUtil.isBlank(clientId)) {
+			clientId = context.get(WILL_CLIENT_ID_KEY);
+		}
 		// 2. 判断是否正常断开
 		boolean isNotNormalDisconnect = !context.isBizStatus();
 		context.setBizStatus(false);
@@ -92,7 +97,9 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		}
 		// 4. 对于异常断开连接，处理遗嘱消息
 		if (isNotNormalDisconnect) {
-			sendWillMessage(clientId);
+			Message willMessage = context.get(WILL_MESSAGE_KEY);
+			context.remove(WILL_MESSAGE_KEY);
+			sendWillMessage(clientId, willMessage);
 		}
 		// 5. 会话清理，互踢已清，不用再清（避免误删刚订阅的 topic）
 		ChannelContext.CloseCode closeCode = context.getCloseCode();
@@ -103,15 +110,14 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		notify(context, clientId, remark);
 	}
 
-	private void sendWillMessage(String clientId) {
+	private void sendWillMessage(String clientId, Message willMessage) {
 		// 发送遗嘱消息
 		try {
-			Message willMessage = messageStore.getWillMessage(clientId);
 			if (willMessage == null) {
 				return;
 			}
 			// 提交异步任务前清除当前遗嘱，避免任务执行时清除新连接的遗嘱
-			messageStore.clearWillMessage(clientId);
+			messageStore.clearWillMessage(clientId, willMessage);
 			// 异步处理遗嘱消息，避免阻塞断连流程和级联影响
 			executor.execute(() -> {
 				try {
