@@ -44,6 +44,7 @@ import org.dromara.mica.mqtt.core.server.listener.MqttProtocolListeners;
 import org.dromara.mica.mqtt.core.server.model.ClientInfo;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
+import org.dromara.mica.mqtt.core.server.pipeline.PublishContext;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.dromara.mica.mqtt.core.util.TopicUtil;
@@ -54,6 +55,7 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -71,6 +73,7 @@ public final class MqttServer {
 	private final IMqttSessionManager sessionManager;
 	private final IMqttMessageStore messageStore;
 	private final MqttSerializer mqttSerializer;
+	private volatile Function<PublishContext, Boolean> publishAllRouter;
 
 	MqttServer(MqttServerCreator serverCreator,
 	           TioServerConfig serverConfig,
@@ -82,6 +85,15 @@ public final class MqttServer {
 		this.sessionManager = serverCreator.getSessionManager();
 		this.messageStore = serverCreator.getMessageStore();
 		this.mqttSerializer = serverCreator.getMqttSerializer();
+	}
+
+	/**
+	 * 设置服务端广播消息的路由器，集群模式用于统一选择共享订阅者。
+	 *
+	 * @param publishAllRouter 广播消息路由器，null 表示使用本地订阅查询
+	 */
+	public void setPublishAllRouter(Function<PublishContext, Boolean> publishAllRouter) {
+		this.publishAllRouter = publishAllRouter;
 	}
 
 	public static MqttServerCreator create() {
@@ -282,6 +294,13 @@ public final class MqttServer {
 			}
 			topic = retainPair.getValue();
 			this.saveRetainMessage(topic, timeOut, qos, payload);
+		}
+		Function<PublishContext, Boolean> router = publishAllRouter;
+		if (router != null) {
+			byte[] bytes = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
+			PublishContext context = PublishContext.builder().topic(topic).payload(bytes).qos(qos)
+				.timestamp(System.currentTimeMillis()).build();
+			return router.apply(context);
 		}
 		// 查找订阅该 topic 的客户端
 		List<Subscribe> subscribeList = sessionManager.searchSubscribe(topic);

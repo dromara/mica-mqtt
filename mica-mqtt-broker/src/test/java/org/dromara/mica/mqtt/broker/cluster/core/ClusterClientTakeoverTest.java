@@ -26,8 +26,11 @@ import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterConfig;
 import org.dromara.mica.mqtt.broker.cluster.message.ClientConnectMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClientDisconnectMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.SharedDispatchToClientMessage;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.server.MqttServer;
+import org.dromara.mica.mqtt.core.server.enums.MessageType;
+import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
 import org.junit.jupiter.api.Test;
@@ -41,6 +44,7 @@ import java.lang.reflect.Method;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -244,6 +248,102 @@ class ClusterClientTakeoverTest {
 			if (second.getClusterManager() != null) second.getClusterManager().stop();
 			if (first.getClusterManager() != null) first.getClusterManager().stop();
 		}
+	}
+
+	@Test
+	@Timeout(90)
+	void sharedSubscribersAcrossNodesReceiveExactlyOneMessagePerGroup() throws Exception {
+		int mqtt1 = freePort(), mqtt2 = freePort(), cluster1 = freePort(), cluster2 = freePort();
+		MqttClusterBrokerCreator first = MqttBroker.create(MqttServer.create().enableMqtt(mqtt1))
+			.clusterConfig(new MqttClusterConfig().enabled(true).clusterHost("127.0.0.1")
+				.clusterPort(cluster1).seedMembers(Arrays.asList("127.0.0.1:" + cluster2)).sharedSubStrategy("round_robin"));
+		MqttClusterBrokerCreator second = broker(mqtt2, cluster2, cluster1);
+		try {
+			start(first);
+			start(second);
+			awaitClusterLink(first.getClusterManager());
+			awaitClusterLink(second.getClusterManager());
+			try (Socket publisher = connect(mqtt1, "publisher");
+				 Socket local = connect(mqtt1, "local-shared");
+				 Socket remote = connect(mqtt2, "remote-shared");
+				 Socket otherLocal = connect(mqtt1, "local-other");
+				 Socket otherRemote = connect(mqtt2, "remote-other");
+				 Socket queueLocal = connect(mqtt1, "local-queue");
+				 Socket queueRemote = connect(mqtt2, "remote-queue");
+				 Socket normal = connect(mqtt2, "remote-normal")) {
+				subscribe(local, "$share/group/cluster/test");
+				subscribe(remote, "$share/group/cluster/test");
+				subscribe(otherLocal, "$share/other/cluster/test");
+				subscribe(otherRemote, "$share/other/cluster/test");
+				subscribe(queueLocal, "$queue/cluster/test");
+				subscribe(queueRemote, "$queue/cluster/test");
+				subscribe(normal, "cluster/test");
+				await(() -> first.getClusterSessionManager().searchAllSubscribe("cluster/test").size() == 7);
+				await(() -> second.getClusterSessionManager().searchAllSubscribe("cluster/test").size() == 7);
+				int localCount = 0;
+				int remoteCount = 0;
+				for (int i = 0; i < 4; i++) {
+					if ((i & 1) == 0) {
+						ByteArrayOutputStream body = new ByteArrayOutputStream();
+						DataOutputStream data = new DataOutputStream(body);
+						data.writeUTF("cluster/test");
+						data.writeByte(i);
+						publisher.getOutputStream().write(0x30);
+						publisher.getOutputStream().write(body.size());
+						publisher.getOutputStream().write(body.toByteArray());
+						publisher.getOutputStream().flush();
+					} else {
+						first.getClusterManager().publish("cluster/test", new byte[]{(byte) i}, 0, false);
+					}
+					int localReceived = readPublish(local, 800);
+					int remoteReceived = readPublish(remote, 800);
+					assertEquals(1, localReceived + remoteReceived, "每条消息应由组内一个订阅者收到");
+					assertEquals(1, readPublish(otherLocal, 800) + readPublish(otherRemote, 800), "另一共享组应收到一次");
+					assertEquals(1, readPublish(queueLocal, 800) + readPublish(queueRemote, 800), "队列订阅应收到一次");
+					assertEquals(1, readPublish(normal, 1500), "普通订阅者应收到每条消息");
+					localCount += localReceived;
+					remoteCount += remoteReceived;
+				}
+				assertTrue(localCount > 0 && remoteCount > 0, "轮询策略应覆盖两个节点");
+				for (Socket subscriber : Arrays.asList(local, remote, otherLocal, otherRemote, queueLocal, queueRemote, normal)) {
+					assertEquals(0, readPublish(subscriber, 200), "不应残留重复消息");
+				}
+				Message message = new Message();
+				message.setMessageType(MessageType.UP_STREAM);
+				message.setTopic("cluster/test");
+				message.setPayload(new byte[]{9});
+				message.setQos(0);
+				SharedDispatchToClientMessage dispatch = new SharedDispatchToClientMessage();
+				dispatch.setClientId("already-disconnected");
+				dispatch.setGroupKey("$share/group");
+				dispatch.setTopic("cluster/test");
+				dispatch.setMessage(message);
+				first.getClusterManager().sendToNode(second.getServerCreator().getNodeName(), dispatch);
+				assertEquals(1, readPublish(remote, 2000), "目标失效后应在原组重选");
+				assertEquals(0, readPublish(otherLocal, 300) + readPublish(otherRemote, 300)
+					+ readPublish(queueLocal, 300) + readPublish(queueRemote, 300), "重选不能投递到其他组");
+			}
+		} finally {
+			if (second.getClusterManager() != null) second.getClusterManager().stop();
+			if (first.getClusterManager() != null) first.getClusterManager().stop();
+		}
+	}
+
+	private static int readPublish(Socket socket, int timeout) throws Exception {
+		socket.setSoTimeout(timeout);
+		InputStream input = socket.getInputStream();
+		int header;
+		try {
+			header = input.read();
+		} catch (SocketTimeoutException e) {
+			return 0;
+		}
+		assertEquals(0x30, header);
+		int remaining = input.read();
+		while (remaining-- > 0) {
+			assertTrue(input.read() >= 0);
+		}
+		return 1;
 	}
 
 	private static MqttClusterBrokerCreator broker(int mqttPort, int clusterPort, int peerPort) {

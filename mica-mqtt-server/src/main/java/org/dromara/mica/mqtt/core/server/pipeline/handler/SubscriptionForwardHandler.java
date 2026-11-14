@@ -59,7 +59,10 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 
 	@Override
 	public boolean handle(PublishContext context) {
-		List<Subscribe> subscribeList = sessionManager.searchSubscribe(context.getTopic());
+		List<Subscribe> subscribeList = context.getSelectedSubscribers();
+		if (subscribeList == null) {
+			subscribeList = sessionManager.searchSubscribe(context.getTopic());
+		}
 		if (subscribeList == null || subscribeList.isEmpty()) {
 			return true;
 		}
@@ -89,7 +92,7 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 	 * @param properties 原始 MQTT 5.0 属性（非 null 且非空）
 	 * @return 重写后的属性；null 表示消息已过期，应丢弃
 	 */
-	private MqttProperties rewriteProperties(PublishContext context, MqttProperties properties) {
+	public static MqttProperties rewriteProperties(PublishContext context, MqttProperties properties) {
 		Long receivedAt = context.getPublishReceivedAt();
 		if (receivedAt == null) {
 			receivedAt = context.getTimestamp();

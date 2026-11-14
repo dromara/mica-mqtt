@@ -16,6 +16,8 @@
 
 package org.dromara.mica.mqtt.broker.cluster.pipeline;
 
+import net.dreamlu.mica.net.core.ChannelContext;
+
 import org.dromara.mica.mqtt.broker.cluster.core.ClusterMqttSessionManager;
 import org.dromara.mica.mqtt.broker.cluster.core.MqttClusterManager;
 import org.dromara.mica.mqtt.broker.cluster.message.PublishForwardMessage;
@@ -26,6 +28,9 @@ import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+import org.dromara.mica.mqtt.core.server.pipeline.PublishContext;
+import org.dromara.mica.mqtt.core.server.pipeline.handler.SubscriptionForwardHandler;
 import org.dromara.mica.mqtt.core.server.pipeline.message.BaseMessageHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,6 +111,110 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 		this.clusterManager = clusterManager;
 		this.clusterSessionManager = clusterSessionManager;
 		this.sharedStrategy = sharedStrategy;
+	}
+
+	/**
+	 * 为客户端发布消息选择本地订阅者，并向远端节点转发普通订阅和选中的共享订阅。
+	 *
+	 * @param context 发布上下文
+	 * @return 本节点需要投递的订阅
+	 */
+	public List<Subscribe> selectLocalSubscribers(PublishContext context) {
+		String topic = context.getTopic();
+		MqttProperties properties = context.getProperties();
+		if (properties != null && !properties.isEmpty()) {
+			properties = SubscriptionForwardHandler.rewriteProperties(context, properties);
+			if (properties == null) {
+				return new ArrayList<>();
+			}
+		}
+		// 属性中的剩余有效期已扣除本地耗时，远端从转发时刻继续计算
+		long forwardedAt = System.currentTimeMillis();
+		String localNodeId = clusterManager.getLocalNodeId();
+		List<Subscribe> local = new ArrayList<>();
+		List<Subscribe> normal = new ArrayList<>();
+		Map<String, List<Subscribe>> groups = new HashMap<>();
+		for (Subscribe sub : clusterSessionManager.searchAllSubscribe(topic)) {
+			if (sub.isNoLocal() && sub.getClientId().equals(context.getClientId())) {
+				continue;
+			}
+			String filter = sub.getTopicFilter();
+			String group = null;
+			if (filter != null && filter.startsWith(TopicFilterType.SHARE_GROUP_PREFIX)) {
+				group = TopicFilterType.SHARE_GROUP_PREFIX + TopicFilterType.getShareGroupName(filter);
+			} else if (filter != null && filter.startsWith(TopicFilterType.SHARE_QUEUE_PREFIX)) {
+				group = TopicFilterType.SHARE_QUEUE_PREFIX;
+			}
+			if (group != null) {
+				groups.computeIfAbsent(group, key -> new ArrayList<>()).add(sub);
+			} else {
+				normal.add(sub);
+				String node = clusterSessionManager.getClientNode(sub.getClientId());
+				if (node == null || node.equals(localNodeId)) {
+					local.add(sub);
+				}
+			}
+		}
+		Message message = new Message();
+		message.setMessageType(MessageType.UP_STREAM);
+		message.setFromClientId(context.getClientId());
+		message.setFromUsername(context.getUsername());
+		message.setTopic(topic);
+		message.setPayload(context.getPayload());
+		message.setQos(context.getQos().value());
+		message.setProperties(properties);
+		message.setTimestamp(forwardedAt);
+		message.setPublishReceivedAt(forwardedAt);
+		deliverNormal(topic, message, localNodeId, normal);
+		for (Map.Entry<String, List<Subscribe>> entry : groups.entrySet()) {
+			String groupName = entry.getKey().equals(TopicFilterType.SHARE_QUEUE_PREFIX) ? "$queue"
+				: entry.getKey().substring(TopicFilterType.SHARE_GROUP_PREFIX.length());
+			Subscribe selected = sharedStrategy.pick(groupName, entry.getValue(), localNodeId, message);
+			if (selected == null) {
+				continue;
+			}
+			String node = clusterSessionManager.getClientNode(selected.getClientId());
+			if (node == null || node.equals(localNodeId)) {
+				local.add(selected);
+			} else {
+				Message selectedMessage = new Message();
+				selectedMessage.setMessageType(MessageType.UP_STREAM);
+				selectedMessage.setFromClientId(context.getClientId());
+				selectedMessage.setTopic(topic);
+				selectedMessage.setPayload(context.getPayload());
+				selectedMessage.setQos(Math.min(context.getQos().value(), selected.getMqttQoS()));
+				selectedMessage.setProperties(properties);
+				selectedMessage.setTimestamp(forwardedAt);
+				selectedMessage.setPublishReceivedAt(forwardedAt);
+				SharedDispatchToClientMessage dispatch = new SharedDispatchToClientMessage();
+				dispatch.setClientId(selected.getClientId());
+				dispatch.setGroupKey(entry.getKey());
+				dispatch.setTopic(topic);
+				dispatch.setMessage(selectedMessage);
+				clusterManager.sendToNode(node, dispatch);
+			}
+		}
+		return local;
+	}
+
+	/**
+	 * 路由服务端主动广播的消息，复用客户端发布时的共享订阅选择规则。
+	 *
+	 * @param context 发布上下文
+	 * @return 是否存在匹配订阅
+	 */
+	public boolean routePublishAll(PublishContext context) {
+		if (clusterSessionManager.searchAllSubscribe(context.getTopic()).isEmpty()) {
+			return false;
+		}
+		for (Subscribe sub : selectLocalSubscribers(context)) {
+			ChannelContext channel = mqttServer.getChannelContext(sub.getClientId());
+			if (channel != null && !channel.isClosed()) {
+				mqttServer.publish(channel, sub.getClientId(), context.getTopic(), context.getPayload(),
+					context.getQos(), sub.getMqttQoS(), false, context.getProperties());
+			}
+		}
+		return true;
 	}
 
 	@Override

@@ -162,7 +162,8 @@ public class MqttClusterBrokerCreator {
 		clusterManager.setSharedStrategy(strategy);
 
 		ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(mqttServer, clusterManager, clusterSessionManager, strategy);
-		serverCreator.addMessagePipelineHandler(dispatcher);
+		publishHandler.setDispatcher(dispatcher);
+		mqttServer.setPublishAllRouter(dispatcher::routePublishAll);
 
 		return mqttServer;
 	}

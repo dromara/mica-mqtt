@@ -20,8 +20,10 @@ import net.dreamlu.mica.net.core.ChannelContext;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+import org.dromara.mica.mqtt.core.server.model.Subscribe;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * 发布消息上下文，承载完整的发布消息信息（包括 MQTT5 properties）
@@ -91,6 +93,10 @@ public class PublishContext implements Serializable {
 	 * PUBLISH 消息到达 Broker 的时间 (ms)
 	 */
 	private final Long publishReceivedAt;
+	/**
+	 * 集群已选定的本地订阅者；null 表示由默认处理器查询
+	 */
+	private transient List<Subscribe> selectedSubscribers;
 
 	public PublishContext(MqttPublishMessage publishMessage,
 						  ChannelContext context,
@@ -186,6 +192,24 @@ public class PublishContext implements Serializable {
 
 	public Long getPublishReceivedAt() {
 		return publishReceivedAt;
+	}
+
+	/**
+	 * 获取集群选定的本地订阅者。
+	 *
+	 * @return 本地订阅列表；null 表示尚未指定
+	 */
+	public List<Subscribe> getSelectedSubscribers() {
+		return selectedSubscribers;
+	}
+
+	/**
+	 * 设置集群选定的本地订阅者，供后续转发处理器使用。
+	 *
+	 * @param selectedSubscribers 本地订阅列表
+	 */
+	public void setSelectedSubscribers(List<Subscribe> selectedSubscribers) {
+		this.selectedSubscribers = selectedSubscribers;
 	}
 
 	/**

@@ -30,11 +30,14 @@ import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.SharedSubscription
 import org.dromara.mica.mqtt.broker.cluster.store.InflightStore;
 import org.dromara.mica.mqtt.broker.cluster.store.SessionStore;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
+import org.dromara.mica.mqtt.core.server.pipeline.PublishContext;
+import org.dromara.mica.mqtt.core.server.pipeline.handler.SubscriptionForwardHandler;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -220,7 +223,7 @@ public class MqttClusterManager {
 				// retain 存储由 RETAIN_MESSAGE 单独同步，此处仅投递给本地订阅者，避免通过
 				// ClusterMqttMessageStore 再次广播导致无限循环
 				Message fwdMsg = pfm.getMessage();
-				mqttServer.publishAll(fwdMsg.getTopic(), fwdMsg.getPayload(), MqttQoS.valueOf(fwdMsg.getQos()), false);
+				deliverForwardedNormal(fwdMsg, sessionManager);
 				// V3 inflight persistence (P2.3): record QoS 1/2 forwards so the TTL
 				// cleaner can detect stuck deliveries even before per-client ACK is wired.
 				recordInflightForward(fwdMsg, sourceNode);
@@ -325,6 +328,53 @@ public class MqttClusterManager {
 	}
 
 	/**
+	 * 远端节点只投递普通订阅；共享订阅由发布节点单独选择。
+	 */
+	private void deliverForwardedNormal(Message message, ClusterMqttSessionManager sessions) {
+		MqttProperties properties = forwardedProperties(message);
+		if (message.getProperties() != null && properties == null) {
+			return;
+		}
+		for (Subscribe sub : sessions.searchAllSubscribe(message.getTopic())) {
+			String filter = sub.getTopicFilter();
+			if ((filter != null && (filter.startsWith(TopicFilterType.SHARE_GROUP_PREFIX)
+				|| filter.startsWith(TopicFilterType.SHARE_QUEUE_PREFIX)))
+				|| (sub.isNoLocal() && sub.getClientId().equals(message.getFromClientId()))) {
+				continue;
+			}
+			String node = sessions.getClientNode(sub.getClientId());
+			if (node != null && !node.equals(localNodeId)) {
+				continue;
+			}
+			ChannelContext context = mqttServer.getChannelContext(sub.getClientId());
+			if (context != null && !context.isClosed()) {
+				mqttServer.publish(context, sub.getClientId(), message.getTopic(), message.getPayload(),
+					MqttQoS.valueOf(message.getQos()), sub.getMqttQoS(), false, properties);
+			}
+		}
+	}
+
+	/**
+	 * 重写跨节点消息属性并检查消息是否过期。
+	 *
+	 * @param message 集群转发消息
+	 * @return 可转发的属性；null 也可能表示消息已过期
+	 */
+	private MqttProperties forwardedProperties(Message message) {
+		MqttProperties properties = message.getProperties();
+		if (properties == null || properties.isEmpty()) {
+			return properties;
+		}
+		PublishContext context = PublishContext.builder()
+			.properties(properties)
+			.timestamp(message.getTimestamp())
+			.publishReceivedAt(message.getPublishReceivedAt())
+			.topic(message.getTopic())
+			.build();
+		return SubscriptionForwardHandler.rewriteProperties(context, properties);
+	}
+
+	/**
 	 * Handles a SHARED_DISPATCH_TO_CLIENT message received from another node.
 	 * <p>
 	 * The publisher's node has already selected this client as the single recipient
@@ -348,9 +398,16 @@ public class MqttClusterManager {
 			return;
 		}
 
+		MqttProperties properties = forwardedProperties(msg);
+		if (msg.getProperties() != null && properties == null) {
+			return;
+		}
 		// Try to deliver to the selected client locally.
-		boolean delivered = mqttServer.publish(clientId, msg.getTopic(),
-			msg.getPayload(), MqttQoS.valueOf(msg.getQos()));
+		ChannelContext target = mqttServer.getChannelContext(clientId);
+		Byte subscriptionQos = sessionManager.searchSubscribe(topic, clientId);
+		boolean delivered = target != null && !target.isClosed() && subscriptionQos != null
+			&& mqttServer.publish(target, clientId, topic, msg.getPayload(), MqttQoS.valueOf(msg.getQos()),
+				subscriptionQos, false, properties);
 
 		if (delivered) {
 			logger.debug("[Cluster] Shared dispatch delivered to client={} topic={}", clientId, topic);
@@ -361,7 +418,7 @@ public class MqttClusterManager {
 		logger.warn("[Cluster] Shared dispatch target client={} not found on this node for topic={}, re-picking",
 			clientId, topic);
 
-		if (sharedStrategy == null) {
+		if (sharedStrategy == null || sdm.getGroupKey() == null || sdm.getRetryCount() >= 3) {
 			logger.debug("[Cluster] No shared strategy configured, dropping re-pick for topic={}", topic);
 			return;
 		}
@@ -373,34 +430,47 @@ public class MqttClusterManager {
 		}
 
 		// Narrow to shared subscribers only, group the same way the dispatcher does.
-		java.util.Map<String, java.util.List<Subscribe>> sharedGroups = new java.util.HashMap<>();
+		Map<String, List<Subscribe>> sharedGroups = new HashMap<>();
 		for (Subscribe sub : candidates) {
+			if (clientId.equals(sub.getClientId()) || (sub.isNoLocal() && sub.getClientId().equals(msg.getFromClientId()))) {
+				continue;
+			}
 			String topicFilter = sub.getTopicFilter();
 			if (topicFilter == null) {
 				continue;
 			}
 			if (topicFilter.startsWith(TopicFilterType.SHARE_GROUP_PREFIX)) {
-				String groupName = TopicFilterType.getShareGroupName(topicFilter);
-				sharedGroups.computeIfAbsent(groupName, k -> new java.util.ArrayList<>()).add(sub);
+				String groupName = TopicFilterType.SHARE_GROUP_PREFIX + TopicFilterType.getShareGroupName(topicFilter);
+				sharedGroups.computeIfAbsent(groupName, k -> new ArrayList<>()).add(sub);
 			} else if (topicFilter.startsWith(TopicFilterType.SHARE_QUEUE_PREFIX)) {
-				sharedGroups.computeIfAbsent("$queue", k -> new java.util.ArrayList<>()).add(sub);
+				sharedGroups.computeIfAbsent(TopicFilterType.SHARE_QUEUE_PREFIX, k -> new ArrayList<>()).add(sub);
 			}
 		}
 
-		for (java.util.Map.Entry<String, java.util.List<Subscribe>> entry : sharedGroups.entrySet()) {
-			Subscribe rePicked = sharedStrategy.pick(entry.getKey(), entry.getValue(), localNodeId, msg);
+		for (Map.Entry<String, List<Subscribe>> entry : sharedGroups.entrySet()) {
+			if (!entry.getKey().equals(sdm.getGroupKey())) {
+				continue;
+			}
+			String groupName = entry.getKey().equals(TopicFilterType.SHARE_QUEUE_PREFIX) ? "$queue"
+				: entry.getKey().substring(TopicFilterType.SHARE_GROUP_PREFIX.length());
+			Subscribe rePicked = sharedStrategy.pick(groupName, entry.getValue(), localNodeId, msg);
 			if (rePicked == null) {
 				continue;
 			}
 			String rePickedNode = sessionManager.getClientNode(rePicked.getClientId());
 			boolean isLocal = rePickedNode == null || rePickedNode.equals(localNodeId);
 			if (isLocal) {
-				mqttServer.publish(rePicked.getClientId(), msg.getTopic(),
-					msg.getPayload(), MqttQoS.valueOf(msg.getQos()));
+				ChannelContext channel = mqttServer.getChannelContext(rePicked.getClientId());
+				if (channel != null && !channel.isClosed()) {
+					mqttServer.publish(channel, rePicked.getClientId(), topic, msg.getPayload(),
+						MqttQoS.valueOf(msg.getQos()), rePicked.getMqttQoS(), false, properties);
+				}
 				logger.debug("[Cluster] Re-pick delivered to client={} topic={}", rePicked.getClientId(), topic);
 			} else {
 				SharedDispatchToClientMessage retry = new SharedDispatchToClientMessage();
 				retry.setClientId(rePicked.getClientId());
+				retry.setGroupKey(sdm.getGroupKey());
+				retry.setRetryCount(sdm.getRetryCount() + 1);
 				retry.setTopic(topic);
 				retry.setMessage(msg);
 				sendToNode(rePickedNode, retry);
@@ -488,28 +558,8 @@ public class MqttClusterManager {
 	}
 
 	public void publish(String topic, byte[] payload, int qos, boolean retain) {
-		if (mqttServer == null) {
-			return;
-		}
-
-		mqttServer.publishAll(topic, payload, MqttQoS.valueOf(qos), retain);
-
-		if (config.isEnabled() && cluster != null) {
-			Set<String> remoteNodes = getRemoteNodesWithSubscriber(topic);
-			if (!remoteNodes.isEmpty()) {
-				PublishForwardMessage clusterMsg = new PublishForwardMessage();
-				Message message = new Message();
-				message.setMessageType(MessageType.UP_STREAM);
-				message.setTopic(topic);
-				message.setPayload(payload);
-				message.setQos(qos);
-				message.setRetain(retain);
-				clusterMsg.setMessage(message);
-
-				for (String node : remoteNodes) {
-					sendToNode(node, clusterMsg);
-				}
-			}
+		if (mqttServer != null) {
+			mqttServer.publishAll(topic, payload, MqttQoS.valueOf(qos), retain);
 		}
 	}
 

@@ -44,9 +44,19 @@ public class ClusterPublishHandler implements MqttPublishPipelineHandler {
 	private static final Logger logger = LoggerFactory.getLogger(ClusterPublishHandler.class);
 
 	private final MqttClusterManager clusterManager;
+	private ClusterMessageDispatcher dispatcher;
 
 	public ClusterPublishHandler(MqttClusterManager clusterManager) {
 		this.clusterManager = clusterManager;
+	}
+
+	/**
+	 * 设置集群共享订阅分发器。
+	 *
+	 * @param dispatcher 消息分发器
+	 */
+	public void setDispatcher(ClusterMessageDispatcher dispatcher) {
+		this.dispatcher = dispatcher;
 	}
 
 	@Override
@@ -55,6 +65,10 @@ public class ClusterPublishHandler implements MqttPublishPipelineHandler {
 			return true;
 		}
 
+		if (dispatcher != null) {
+			context.setSelectedSubscribers(dispatcher.selectLocalSubscribers(context));
+			return true;
+		}
 		String topic = context.getTopic();
 		String localNodeId = clusterManager.getLocalNodeId();
 
