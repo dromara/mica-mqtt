@@ -177,7 +177,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			.addSubscriptions(topicSubscriptionList)
 			.messageId(packetId)
 			.build();
-		MqttPendingSubscription pendingSubscription = new MqttPendingSubscription(reSubscriptionList, message);
+		MqttPendingSubscription pendingSubscription = new MqttPendingSubscription(new ArrayList<>(reSubscriptionList), message);
 		pendingSubscription.startRetransmitTimer(taskService, context);
 		clientSession.addPaddingSubscribe(packetId, pendingSubscription);
 		// gitee issues #IB72L6 先添加并启动重试，再发送订阅

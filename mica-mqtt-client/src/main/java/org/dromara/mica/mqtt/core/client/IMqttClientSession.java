@@ -221,6 +221,17 @@ public interface IMqttClientSession {
 	void addPendingPublishMessage(MqttPublishMessage message);
 
 	/**
+	 * Attempts to enqueue a publish. Custom sessions should override this when their queue is bounded.
+	 *
+	 * @param message message to enqueue
+	 * @return whether the message was accepted
+	 */
+	default boolean offerPendingPublishMessage(MqttPublishMessage message) {
+		addPendingPublishMessage(message);
+		return true;
+	}
+
+	/**
 	 * 获取并清除所有待发送的发布消息
 	 *
 	 * @return 待发送的消息列表

@@ -413,7 +413,10 @@ public final class MqttClient implements IMqttClient {
 		if (clientContext == null || !clientContext.isAccepted()) {
 			// 只有开启待发送队列功能时才添加消息到队列
 			if (config.isPendingPublishQueueEnabled()) {
-				clientSession.addPendingPublishMessage(message);
+				if (!clientSession.offerPendingPublishMessage(message)) {
+					logger.warn("MQTT pending publish queue is full, topic:{}", topic);
+					return false;
+				}
 				int queueSize = clientSession.getPendingPublishMessageCount();
 				if (queueSize > 0) {
 					logger.warn("MQTT 尚未连接成功, 消息添加到待发布队列, 队列大小:{}", queueSize);
@@ -611,6 +614,9 @@ public final class MqttClient implements IMqttClient {
 		}
 		// 2. 停止 tio
 		boolean result = tioClient.stop();
+		if (config.isTaskServiceOwner()) {
+			taskService.stop();
+		}
 		// 3. 优雅停止 mqtt 工作线程
 		result &= ThreadUtils.shutdownExecutor(mqttExecutor, config.getShutdownTimeoutSec(), "mqttExecutor");
 		logger.info("MqttClient stop result:{}", result);

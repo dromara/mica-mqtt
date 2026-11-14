@@ -203,9 +203,12 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 
 	@Override
 	public void addPendingPublishMessage(MqttPublishMessage message) {
-		if (pendingPublishQueue != null) {
-			pendingPublishQueue.offer(message);
-		}
+		offerPendingPublishMessage(message);
+	}
+
+	@Override
+	public boolean offerPendingPublishMessage(MqttPublishMessage message) {
+		return pendingPublishQueue != null && pendingPublishQueue.offer(message);
 	}
 
 	@Override

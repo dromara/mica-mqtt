@@ -214,6 +214,7 @@ public final class MqttClientCreator {
 	 * taskService
 	 */
 	private TimerTaskService taskService;
+	private boolean taskServiceOwner;
 	/**
 	 * TioConfig 自定义配置
 	 */
@@ -380,6 +381,10 @@ public final class MqttClientCreator {
 
 	public ExecutorService getMqttExecutor() {
 		return mqttExecutor;
+	}
+
+	boolean isTaskServiceOwner() {
+		return taskServiceOwner;
 	}
 
 	public TimerTaskService getTaskService() {
@@ -667,6 +672,7 @@ public final class MqttClientCreator {
 
 	public MqttClientCreator taskService(TimerTaskService taskService) {
 		this.taskService = taskService;
+		this.taskServiceOwner = false;
 		return this;
 	}
 
@@ -819,6 +825,7 @@ public final class MqttClientCreator {
 		// taskService
 		if (this.taskService == null) {
 			this.taskService = new DefaultTimerTaskService();
+			this.taskServiceOwner = true;
 		}
 		// heartbeatMode
 		if (this.heartbeatMode == null) {
@@ -838,6 +845,7 @@ public final class MqttClientCreator {
 		}
 		// 6. tioConfig
 		TioClientConfig clientConfig = new TioClientConfig(clientAioHandler, clientAioListener, reconnConf, tioExecutor, groupExecutor);
+		clientConfig.setTaskService(this.taskService);
 		clientConfig.setName(this.name);
 		clientConfig.setShutdownTimeoutSec(this.shutdownTimeoutSec);
 		// 7. 心跳超时时间
