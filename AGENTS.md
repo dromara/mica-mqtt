@@ -150,6 +150,7 @@ mvn clean deploy -P release
 - Topic wildcards exclude `$` topics at the first level; `#` can match zero levels after `+`.
 - A connection retains its own will; conditional will removal must not clear a replacement connection’s will. Custom message stores should make conditional removal atomic.
 - In cluster mode the default message store is cluster-aware, and broker shutdown closes cluster storage.
+- In cluster mode, the publisher node selects one subscriber per shared group from the complete replicated candidate set; normal subscriptions are forwarded separately. Server broadcasts use the same routing path.
 
 ### Thread Safety & Async I/O
 
