@@ -87,12 +87,23 @@ public final class MqttDecoder {
 		ctx.remove(MQTT_FIXED_HEADER_KEY);
 		// 3. 判断是否 ping 消息，ping 只有消息类型
 		MqttMessageType messageType = mqttFixedHeader.messageType();
-		if (MqttMessageType.PINGREQ == messageType) {
-			return MqttMessage.PINGREQ;
-		} else if (MqttMessageType.PINGRESP == messageType) {
-			return MqttMessage.PINGRESP;
+		if (MqttMessageType.PINGREQ == messageType || MqttMessageType.PINGRESP == messageType) {
+			if (mqttFixedHeader.remainingLength() != 0) {
+				throw new DecoderException("PING remaining length must be zero");
+			}
+			return MqttMessageType.PINGREQ == messageType ? MqttMessage.PINGREQ : MqttMessage.PINGRESP;
 		}
-		return decodeMqttMessage(ctx, buffer, messageType, mqttFixedHeader);
+		int originalLimit = buffer.limit();
+		int packetEnd = buffer.position() + mqttFixedHeader.remainingLength();
+		if (packetEnd > originalLimit) {
+			throw new DecoderException("MQTT packet exceeds available bytes");
+		}
+		buffer.limit(packetEnd);
+		try {
+			return decodeMqttMessage(ctx, buffer, messageType, mqttFixedHeader);
+		} finally {
+			buffer.limit(originalLimit);
+		}
 	}
 
 	private MqttMessage decodeMqttMessage(ChannelContext ctx, ByteBuffer buffer, MqttMessageType messageType,
@@ -651,87 +662,96 @@ public final class MqttDecoder {
 			return MqttProperties.NO_PROPERTIES;
 		}
 
-		MqttProperties decodedProperties = new MqttProperties();
-		int consumedWithinProperties = 0;
-		IntValue tempBytesConsumed = new IntValue();
-
-		while (consumedWithinProperties < totalPropertiesLength) {
-			long propertyIdVBI = decodeVariableByteInteger(buffer);
-			final int propertyIdValue = unpackA(propertyIdVBI);
-			consumedWithinProperties += unpackB(propertyIdVBI);
-			MqttPropertyType propertyType = MqttPropertyType.valueOf(propertyIdValue);
-			switch (propertyType) {
-				case PAYLOAD_FORMAT_INDICATOR:
-				case REQUEST_PROBLEM_INFORMATION:
-				case REQUEST_RESPONSE_INFORMATION:
-				case MAXIMUM_QOS:
-				case RETAIN_AVAILABLE:
-				case WILDCARD_SUBSCRIPTION_AVAILABLE:
-				case SUBSCRIPTION_IDENTIFIER_AVAILABLE:
-				case SHARED_SUBSCRIPTION_AVAILABLE: {
-					final int b1 = ByteBufferUtil.readUnsignedByte(buffer);
-					consumedWithinProperties += 1;
-					decodedProperties.add(new IntegerProperty(propertyIdValue, b1));
-					break;
-				}
-				case SERVER_KEEP_ALIVE:
-				case RECEIVE_MAXIMUM:
-				case TOPIC_ALIAS_MAXIMUM:
-				case TOPIC_ALIAS: {
-					final int int2BytesResult = decodeMsbLsb(buffer);
-					consumedWithinProperties += 2;
-					decodedProperties.add(new IntegerProperty(propertyIdValue, int2BytesResult));
-					break;
-				}
-				case MESSAGE_EXPIRY_INTERVAL:
-				case SESSION_EXPIRY_INTERVAL:
-				case WILL_DELAY_INTERVAL:
-				case MAXIMUM_PACKET_SIZE: {
-					final int maxPacketSize = buffer.getInt();
-					consumedWithinProperties += 4;
-					decodedProperties.add(new IntegerProperty(propertyIdValue, maxPacketSize));
-					break;
-				}
-				case SUBSCRIPTION_IDENTIFIER: {
-					long vbIntegerResult = decodeVariableByteInteger(buffer);
-					consumedWithinProperties += unpackB(vbIntegerResult);
-					decodedProperties.add(new IntegerProperty(propertyIdValue, unpackA(vbIntegerResult)));
-					break;
-				}
-				case CONTENT_TYPE:
-				case RESPONSE_TOPIC:
-				case ASSIGNED_CLIENT_IDENTIFIER:
-				case AUTHENTICATION_METHOD:
-				case RESPONSE_INFORMATION:
-				case SERVER_REFERENCE:
-				case REASON_STRING: {
-					final String stringValue = decodeString(buffer, tempBytesConsumed);
-					consumedWithinProperties += tempBytesConsumed.value;
-					decodedProperties.add(new StringProperty(propertyIdValue, stringValue));
-					break;
-				}
-				case USER_PROPERTY: {
-					final String keyValue = decodeString(buffer, tempBytesConsumed);
-					consumedWithinProperties += tempBytesConsumed.value;
-					final String valueValue = decodeString(buffer, tempBytesConsumed);
-					consumedWithinProperties += tempBytesConsumed.value;
-					decodedProperties.add(new UserProperty(keyValue, valueValue));
-					break;
-				}
-				case CORRELATION_DATA:
-				case AUTHENTICATION_DATA: {
-					final byte[] binaryDataResult = decodeByteArray(buffer);
-					consumedWithinProperties += binaryDataResult.length + 2;
-					decodedProperties.add(new BinaryProperty(propertyIdValue, binaryDataResult));
-					break;
-				}
-				default:
-					//shouldn't reach here
-					throw new DecoderException("Unknown property type: " + propertyType);
-			}
+		if (totalPropertiesLength > buffer.remaining()) {
+			throw new DecoderException("MQTT properties exceed packet boundary");
 		}
-		bytesConsumed.value = lengthFieldBytes + consumedWithinProperties;
-		return decodedProperties;
+		int originalLimit = buffer.limit();
+		buffer.limit(buffer.position() + totalPropertiesLength);
+		try {
+			MqttProperties decodedProperties = new MqttProperties();
+			int consumedWithinProperties = 0;
+			IntValue tempBytesConsumed = new IntValue();
+
+			while (consumedWithinProperties < totalPropertiesLength) {
+				long propertyIdVBI = decodeVariableByteInteger(buffer);
+				final int propertyIdValue = unpackA(propertyIdVBI);
+				consumedWithinProperties += unpackB(propertyIdVBI);
+				MqttPropertyType propertyType = MqttPropertyType.valueOf(propertyIdValue);
+				switch (propertyType) {
+					case PAYLOAD_FORMAT_INDICATOR:
+					case REQUEST_PROBLEM_INFORMATION:
+					case REQUEST_RESPONSE_INFORMATION:
+					case MAXIMUM_QOS:
+					case RETAIN_AVAILABLE:
+					case WILDCARD_SUBSCRIPTION_AVAILABLE:
+					case SUBSCRIPTION_IDENTIFIER_AVAILABLE:
+					case SHARED_SUBSCRIPTION_AVAILABLE: {
+						final int b1 = ByteBufferUtil.readUnsignedByte(buffer);
+						consumedWithinProperties += 1;
+						decodedProperties.add(new IntegerProperty(propertyIdValue, b1));
+						break;
+					}
+					case SERVER_KEEP_ALIVE:
+					case RECEIVE_MAXIMUM:
+					case TOPIC_ALIAS_MAXIMUM:
+					case TOPIC_ALIAS: {
+						final int int2BytesResult = decodeMsbLsb(buffer);
+						consumedWithinProperties += 2;
+						decodedProperties.add(new IntegerProperty(propertyIdValue, int2BytesResult));
+						break;
+					}
+					case MESSAGE_EXPIRY_INTERVAL:
+					case SESSION_EXPIRY_INTERVAL:
+					case WILL_DELAY_INTERVAL:
+					case MAXIMUM_PACKET_SIZE: {
+						final int maxPacketSize = buffer.getInt();
+						consumedWithinProperties += 4;
+						decodedProperties.add(new IntegerProperty(propertyIdValue, maxPacketSize));
+						break;
+					}
+					case SUBSCRIPTION_IDENTIFIER: {
+						long vbIntegerResult = decodeVariableByteInteger(buffer);
+						consumedWithinProperties += unpackB(vbIntegerResult);
+						decodedProperties.add(new IntegerProperty(propertyIdValue, unpackA(vbIntegerResult)));
+						break;
+					}
+					case CONTENT_TYPE:
+					case RESPONSE_TOPIC:
+					case ASSIGNED_CLIENT_IDENTIFIER:
+					case AUTHENTICATION_METHOD:
+					case RESPONSE_INFORMATION:
+					case SERVER_REFERENCE:
+					case REASON_STRING: {
+						final String stringValue = decodeString(buffer, tempBytesConsumed);
+						consumedWithinProperties += tempBytesConsumed.value;
+						decodedProperties.add(new StringProperty(propertyIdValue, stringValue));
+						break;
+					}
+					case USER_PROPERTY: {
+						final String keyValue = decodeString(buffer, tempBytesConsumed);
+						consumedWithinProperties += tempBytesConsumed.value;
+						final String valueValue = decodeString(buffer, tempBytesConsumed);
+						consumedWithinProperties += tempBytesConsumed.value;
+						decodedProperties.add(new UserProperty(keyValue, valueValue));
+						break;
+					}
+					case CORRELATION_DATA:
+					case AUTHENTICATION_DATA: {
+						final byte[] binaryDataResult = decodeByteArray(buffer);
+						consumedWithinProperties += binaryDataResult.length + 2;
+						decodedProperties.add(new BinaryProperty(propertyIdValue, binaryDataResult));
+						break;
+					}
+					default:
+						//shouldn't reach here
+						throw new DecoderException("Unknown property type: " + propertyType);
+				}
+			}
+			bytesConsumed.value = lengthFieldBytes + consumedWithinProperties;
+			return decodedProperties;
+		} finally {
+			buffer.limit(originalLimit);
+		}
 	}
 
 

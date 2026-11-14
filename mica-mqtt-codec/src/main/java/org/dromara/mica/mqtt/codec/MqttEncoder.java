@@ -300,7 +300,7 @@ public final class MqttEncoder {
 		buf.putShort((short) message.variableHeader().messageId());
 		buf.put(propertiesBytes);
 		for (Short code : message.payload().reasonCodes()) {
-			buf.put(code.byteValue());
+			buf.put(mqttVersion != MqttVersion.MQTT_5 && (code & 0xff) > 2 ? (byte) 0x80 : code.byteValue());
 		}
 		return buf;
 	}

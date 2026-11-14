@@ -38,6 +38,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MqttDecoderValidationTest {
 
 	@Test
+	void propertyValueCannotConsumeBytesBeyondPropertySection() {
+		// A four-byte expiry value is declared inside a one-byte property section.
+		assertThrows(RuntimeException.class, () -> MqttDecoder.decodeProperties(new byte[]{1, 2, 0, 0, 0, 1}));
+	}
+
+	@Test
 	void decodeStringSupportsDirectByteBuffer() throws Exception {
 		byte[] value = "mqtt".getBytes(StandardCharsets.UTF_8);
 		ByteBuffer buffer = ByteBuffer.allocateDirect(value.length + 2);

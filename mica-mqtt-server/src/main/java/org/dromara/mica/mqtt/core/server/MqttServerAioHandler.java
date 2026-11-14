@@ -119,14 +119,14 @@ public class MqttServerAioHandler implements TioServerHandler {
 	 * @param cause   DecoderException
 	 */
 	private void processFailure(ChannelContext context, DecoderException cause) {
-		if (cause instanceof MqttUnacceptableProtocolVersionException) {
+		if (cause instanceof MqttUnacceptableProtocolVersionException || cause.getCause() instanceof MqttUnacceptableProtocolVersionException) {
 			// 不支持的协议版本
 			MqttConnAckMessage message = MqttConnAckMessage.builder()
 				.returnCode(MqttConnectReasonCode.CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION)
 				.sessionPresent(false)
 				.build();
 			Tio.bSend(context, message);
-		} else if (cause instanceof MqttIdentifierRejectedException) {
+		} else if (cause instanceof MqttIdentifierRejectedException || cause.getCause() instanceof MqttIdentifierRejectedException) {
 			// 不合格的 clientId
 			MqttConnAckMessage message = MqttConnAckMessage.builder()
 				.returnCode(MqttConnectReasonCode.CONNECTION_REFUSED_IDENTIFIER_REJECTED)

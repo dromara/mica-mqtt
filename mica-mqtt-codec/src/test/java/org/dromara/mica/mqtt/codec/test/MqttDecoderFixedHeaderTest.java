@@ -98,6 +98,12 @@ class MqttDecoderFixedHeaderTest {
 	}
 
 	@Test
+	void rejectsPingWithBodyAndPacketIdBeyondPacketBoundary() {
+		assertThrows(DecoderException.class, () -> decode(new byte[]{(byte) 0xC0, 0x03, 1, 2, 3}));
+		assertThrows(DecoderException.class, () -> decode(new byte[]{0x40, 0x01, 0x00, (byte) 0xC0, 0x00}));
+	}
+
+	@Test
 	void legitConnectStillDecodes() {
 		assertDoesNotThrow(() -> decode(new byte[]{0x10, 0x0E, 0x00, 0x04, 'M', 'Q', 'T', 'T',
 			0x04, 0x02, 0x00, 0x3c, 0x00, 0x02, 'a', 'b'}));
