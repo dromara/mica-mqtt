@@ -44,6 +44,14 @@ public class WillMessageNotifyMessage implements ClusterMessage {
 	 * The will message to be stored as a backup on remote nodes.
 	 */
 	private Message willMessage;
+	/**
+	 * 遗嘱版本标识，用于区分同一客户端的不同连接
+	 */
+	private String willToken;
+	/**
+	 * 是否为清理通知
+	 */
+	private boolean clear;
 
 	@Override
 	public ClusterMessageType getType() {
@@ -53,6 +61,12 @@ public class WillMessageNotifyMessage implements ClusterMessage {
 	@Override
 	public void toClusterData(Map<String, String> headers) {
 		headers.put(ClusterMessageSerializer.HEADER_CLIENT_ID, clientId);
+		if (willToken != null) {
+			headers.put("willToken", willToken);
+		}
+		if (clear) {
+			headers.put("willClear", "true");
+		}
 	}
 
 	@Override
@@ -66,10 +80,48 @@ public class WillMessageNotifyMessage implements ClusterMessage {
 	@Override
 	public void fromClusterData(ClusterDataMessage message) {
 		this.clientId = message.getHeader(ClusterMessageSerializer.HEADER_CLIENT_ID);
+		this.willToken = message.getHeader("willToken");
+		this.clear = "true".equals(message.getHeader("willClear"));
 		byte[] payload = message.getPayload();
 		if (payload != null && payload.length > 0) {
 			this.willMessage = DefaultMessageSerializer.INSTANCE.deserialize(payload);
 		}
+	}
+
+	/**
+	 * 获取遗嘱版本标识。
+	 *
+	 * @return 遗嘱版本标识
+	 */
+	public String getWillToken() {
+		return willToken;
+	}
+
+	/**
+	 * 设置遗嘱版本标识。
+	 *
+	 * @param willToken 遗嘱版本标识
+	 */
+	public void setWillToken(String willToken) {
+		this.willToken = willToken;
+	}
+
+	/**
+	 * 判断是否为清理通知。
+	 *
+	 * @return 是否清理遗嘱
+	 */
+	public boolean isClear() {
+		return clear;
+	}
+
+	/**
+	 * 设置通知类型。
+	 *
+	 * @param clear 是否清理遗嘱
+	 */
+	public void setClear(boolean clear) {
+		this.clear = clear;
 	}
 
 	public String getClientId() {

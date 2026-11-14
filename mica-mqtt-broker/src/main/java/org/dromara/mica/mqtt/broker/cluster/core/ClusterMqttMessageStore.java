@@ -26,6 +26,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Decorator for {@link IMqttMessageStore} that synchronizes will and retained messages across cluster nodes.
@@ -53,11 +56,17 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 
 	private final IMqttMessageStore delegate;
 	private final MqttClusterManager clusterManager;
+	private final ConcurrentMap<String, String> willTokens = new ConcurrentHashMap<>();
+	// 按客户端分片，保证同一连接的保存和清理通知顺序
+	private final Object[] willLocks = new Object[64];
 	private volatile RetainIndex retainIndex;
 
 	public ClusterMqttMessageStore(IMqttMessageStore delegate, MqttClusterManager clusterManager) {
 		this.delegate = delegate;
 		this.clusterManager = clusterManager;
+		for (int i = 0; i < willLocks.length; i++) {
+			willLocks[i] = new Object();
+		}
 	}
 
 	/**
@@ -72,25 +81,63 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 
 	@Override
 	public boolean addWillMessage(String clientId, Message message) {
-		delegate.addWillMessage(clientId, message);
-		if (clusterManager.isClusterEnabled()) {
-			WillMessageNotifyMessage willMsg = new WillMessageNotifyMessage();
-			willMsg.setClientId(clientId);
-			willMsg.setWillMessage(message);
-			clusterManager.broadcast(willMsg);
-			logger.debug("[Cluster] Broadcasted will message for clientId: {}", clientId);
+		synchronized (willLock(clientId)) {
+			boolean added = delegate.addWillMessage(clientId, message);
+			if (added) {
+				String token = UUID.randomUUID().toString();
+				willTokens.put(clientId, token);
+				broadcastWill(clientId, message, token, false);
+			}
+			return added;
 		}
-		return true;
 	}
 
 	@Override
 	public boolean clearWillMessage(String clientId) {
-		return delegate.clearWillMessage(clientId);
+		synchronized (willLock(clientId)) {
+			String token = willTokens.remove(clientId);
+			boolean removed = delegate.clearWillMessage(clientId);
+			if (token != null) {
+				broadcastWill(clientId, null, token, true);
+			}
+			return removed;
+		}
 	}
 
 	@Override
 	public boolean clearWillMessage(String clientId, Message expected) {
-		return delegate.clearWillMessage(clientId, expected);
+		synchronized (willLock(clientId)) {
+			boolean removed = delegate.clearWillMessage(clientId, expected);
+			if (removed) {
+				String token = willTokens.remove(clientId);
+				if (token != null) {
+					broadcastWill(clientId, null, token, true);
+				}
+			}
+			return removed;
+		}
+	}
+
+	/**
+	 * 获取客户端对应的遗嘱操作锁。
+	 *
+	 * @param clientId 客户端标识
+	 * @return 分片锁
+	 */
+	private Object willLock(String clientId) {
+		return willLocks[(clientId.hashCode() & Integer.MAX_VALUE) % willLocks.length];
+	}
+
+	private void broadcastWill(String clientId, Message message, String token, boolean clear) {
+		if (!clusterManager.isClusterEnabled()) {
+			return;
+		}
+		WillMessageNotifyMessage notification = new WillMessageNotifyMessage();
+		notification.setClientId(clientId);
+		notification.setWillMessage(message);
+		notification.setWillToken(token);
+		notification.setClear(clear);
+		clusterManager.broadcast(notification);
 	}
 
 	@Override
@@ -157,7 +204,35 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	 * @return 是否成功
 	 */
 	public boolean addWillMessageLocal(String clientId, Message message) {
-		return delegate.addWillMessage(clientId, message);
+		synchronized (willLock(clientId)) {
+			willTokens.remove(clientId);
+			return delegate.addWillMessage(clientId, message);
+		}
+	}
+
+	/**
+	 * 应用远端遗嘱通知；清理时仅移除版本匹配的副本。
+	 *
+	 * @param notification 远端遗嘱通知
+	 */
+	public void applyWillMessageLocal(WillMessageNotifyMessage notification) {
+		String clientId = notification.getClientId();
+		String token = notification.getWillToken();
+		synchronized (willLock(clientId)) {
+			if (notification.isClear()) {
+				if (token != null && token.equals(willTokens.get(clientId))) {
+					delegate.clearWillMessage(clientId);
+					willTokens.remove(clientId);
+				}
+			} else if (notification.getWillMessage() != null) {
+				delegate.addWillMessage(clientId, notification.getWillMessage());
+				if (token == null) {
+					willTokens.remove(clientId);
+				} else {
+					willTokens.put(clientId, token);
+				}
+			}
+		}
 	}
 
 	/**
@@ -167,7 +242,10 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	 * @return 是否成功
 	 */
 	public boolean clearWillMessageLocal(String clientId) {
-		return delegate.clearWillMessage(clientId);
+		synchronized (willLock(clientId)) {
+			willTokens.remove(clientId);
+			return delegate.clearWillMessage(clientId);
+		}
 	}
 
 	/**

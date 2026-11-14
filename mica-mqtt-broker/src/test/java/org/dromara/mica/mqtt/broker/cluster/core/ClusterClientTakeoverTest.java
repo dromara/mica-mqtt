@@ -27,12 +27,14 @@ import org.dromara.mica.mqtt.broker.cluster.message.ClientConnectMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClientDisconnectMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.SharedDispatchToClientMessage;
+import org.dromara.mica.mqtt.broker.cluster.message.WillMessageNotifyMessage;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
+import org.dromara.mica.mqtt.core.server.store.InMemoryMqttMessageStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -52,6 +54,7 @@ import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ClusterClientTakeoverTest {
@@ -248,6 +251,86 @@ class ClusterClientTakeoverTest {
 			if (second.getClusterManager() != null) second.getClusterManager().stop();
 			if (first.getClusterManager() != null) first.getClusterManager().stop();
 		}
+	}
+
+	@Test
+	void 延迟的旧遗嘱清理通知不删除新副本() {
+		ClusterMqttMessageStore store = new ClusterMqttMessageStore(new InMemoryMqttMessageStore(), new RecordingManager("local"));
+		Message oldWill = new Message();
+		Message newWill = new Message();
+		WillMessageNotifyMessage oldAdd = new WillMessageNotifyMessage();
+		oldAdd.setClientId("device");
+		oldAdd.setWillToken("old");
+		oldAdd.setWillMessage(oldWill);
+		store.applyWillMessageLocal(oldAdd);
+		WillMessageNotifyMessage newAdd = new WillMessageNotifyMessage();
+		newAdd.setClientId("device");
+		newAdd.setWillToken("new");
+		newAdd.setWillMessage(newWill);
+		store.applyWillMessageLocal(newAdd);
+		WillMessageNotifyMessage oldClear = new WillMessageNotifyMessage();
+		oldClear.setClientId("device");
+		oldClear.setWillToken("old");
+		oldClear.setClear(true);
+		store.applyWillMessageLocal(oldClear);
+		assertSame(newWill, store.getWillMessage("device"));
+	}
+
+	@Test
+	@Timeout(90)
+	void 跨节点无遗嘱重连后异常断开不发布旧遗嘱() throws Exception {
+		int mqtt1 = freePort(), mqtt2 = freePort(), cluster1 = freePort(), cluster2 = freePort();
+		MqttClusterBrokerCreator first = broker(mqtt1, cluster1, cluster2);
+		MqttClusterBrokerCreator second = broker(mqtt2, cluster2, cluster1);
+		try {
+			start(first);
+			start(second);
+			awaitClusterLink(first.getClusterManager());
+			awaitClusterLink(second.getClusterManager());
+			try (Socket observer = connect(mqtt1, "will-observer")) {
+				subscribe(observer, "will/topic");
+				try (Socket old = connectWithWill(mqtt1, "will-device")) {
+					await(() -> second.getServerCreator().getMessageStore().getWillMessage("will-device") != null);
+					old.getOutputStream().write(new byte[]{(byte) 0xe0, 0});
+					old.getOutputStream().flush();
+					await(() -> first.getServerCreator().getMessageStore().getWillMessage("will-device") == null);
+					await(() -> second.getServerCreator().getMessageStore().getWillMessage("will-device") == null);
+				}
+				try (Socket replacement = connect(mqtt2, "will-device")) {
+					await(() -> second.getServerCreator().getNodeName().equals(
+						first.getClusterSessionManager().getClientNode("will-device")));
+					replacement.setSoLinger(true, 0);
+				}
+				await(() -> first.getClusterSessionManager().getClientNode("will-device") == null);
+				assertEquals(0, readPublish(observer, 1500), "无遗嘱连接异常断开时不能发布旧遗嘱");
+			}
+		} finally {
+			if (second.getClusterManager() != null) second.getClusterManager().stop();
+			if (first.getClusterManager() != null) first.getClusterManager().stop();
+		}
+	}
+
+	private static Socket connectWithWill(int port, String id) throws Exception {
+		Socket socket = new Socket("127.0.0.1", port);
+		socket.setSoTimeout(3000);
+		ByteArrayOutputStream body = new ByteArrayOutputStream();
+		DataOutputStream data = new DataOutputStream(body);
+		data.writeUTF("MQTT");
+		data.writeByte(4);
+		data.writeByte(6);
+		data.writeShort(60);
+		data.writeUTF(id);
+		data.writeUTF("will/topic");
+		data.writeUTF("old-will");
+		socket.getOutputStream().write(0x10);
+		socket.getOutputStream().write(body.size());
+		socket.getOutputStream().write(body.toByteArray());
+		InputStream input = socket.getInputStream();
+		assertEquals(0x20, input.read());
+		assertEquals(2, input.read());
+		assertEquals(0, input.read());
+		assertEquals(0, input.read());
+		return socket;
 	}
 
 	@Test

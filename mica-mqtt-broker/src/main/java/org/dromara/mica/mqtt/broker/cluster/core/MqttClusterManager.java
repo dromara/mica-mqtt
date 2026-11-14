@@ -294,9 +294,9 @@ public class MqttClusterManager {
 				WillMessageNotifyMessage wmm = (WillMessageNotifyMessage) clusterMsg;
 				IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
 				// 使用 Local 方法直接存储到 delegate，避免通过 ClusterMqttMessageStore 再次广播
-				if (messageStore instanceof ClusterMqttMessageStore && wmm.getWillMessage() != null) {
-					((ClusterMqttMessageStore) messageStore).addWillMessageLocal(wmm.getClientId(), wmm.getWillMessage());
-					logger.debug("[Cluster] Received and stored will message for clientId: {} from node: {}", wmm.getClientId(), sourceNode);
+				if (messageStore instanceof ClusterMqttMessageStore) {
+					((ClusterMqttMessageStore) messageStore).applyWillMessageLocal(wmm);
+					logger.debug("[Cluster] Applied will notification for clientId: {} from node: {}", wmm.getClientId(), sourceNode);
 				}
 				break;
 			}
@@ -419,7 +419,8 @@ public class MqttClusterManager {
 			clientId, topic);
 
 		if (sharedStrategy == null || sdm.getGroupKey() == null || sdm.getRetryCount() >= 3) {
-			logger.debug("[Cluster] No shared strategy configured, dropping re-pick for topic={}", topic);
+			logger.debug("[Cluster] Cannot re-pick shared subscriber, group={} retries={} topic={}",
+				sdm.getGroupKey(), sdm.getRetryCount(), topic);
 			return;
 		}
 
