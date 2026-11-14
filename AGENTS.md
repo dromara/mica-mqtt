@@ -141,6 +141,14 @@ mvn clean deploy -P release
 4. **Strategy Pattern**: Pluggable auth (`IMqttServerAuthHandler`), serialization (`MqttSerializer`)
 5. **Decorator Pattern**: `ClusterMqttSessionManager` wraps `IMqttSessionManager` for session sync
 
+### Reliability and protocol behavior
+
+- The default client timer is shared with t-io and stopped with the client; a caller-provided timer remains caller-owned.
+- A full default pending-publish queue causes `publish` to return `false`.
+- Retained publishes preserve the `$retain/{ttl}/` lifetime and are delivered at no more than the subscription QoS.
+- Topic wildcards exclude `$` topics at the first level; `#` can match zero levels after `+`.
+- In cluster mode the default message store is cluster-aware, and broker shutdown closes cluster storage.
+
 ### Thread Safety & Async I/O
 
 - Built on **t-io** framework - avoid blocking operations in I/O callback threads
