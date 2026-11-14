@@ -159,9 +159,8 @@ public class ClientInfo implements Serializable {
 		if (context.heartbeatTimeout == null) {
 			return 60L;
 		} else {
-			float keepAliveBackoff = serverCreator.getKeepaliveBackoff();
-			long keepAliveTs = (long) (context.heartbeatTimeout / (keepAliveBackoff * 2));
-			return TimeUnit.MILLISECONDS.toSeconds(keepAliveTs);
+			long keepAliveTs = context.heartbeatTimeout;
+			return keepAliveTs == Long.MAX_VALUE / 2 ? 0 : TimeUnit.MILLISECONDS.toSeconds(keepAliveTs);
 		}
 	}
 
