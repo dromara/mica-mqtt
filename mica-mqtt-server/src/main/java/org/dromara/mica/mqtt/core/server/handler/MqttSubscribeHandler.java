@@ -128,6 +128,13 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 		}
 	}
 
+	/**
+	 * 向订阅者补发匹配的保留消息，投递 QoS 不超过订阅授予的 QoS
+	 *
+	 * @param context         订阅连接
+	 * @param topic           订阅的主题过滤器
+	 * @param subscriptionQos 订阅授予的 QoS
+	 */
 	private void sendRetainMessage(ChannelContext context, String topic, MqttQoS subscriptionQos) {
 		List<Message> retainMessageList = messageStore.getRetainMessage(topic);
 		if (retainMessageList == null || retainMessageList.isEmpty()) {

@@ -137,7 +137,7 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			serverKeepAliveSeconds = configuredKeepAlive;
 		}
 		long keepAliveTimeout = keepAliveSeconds * KEEP_ALIVE_UNIT;
-		// A zero keep alive disables the MQTT heartbeat deadline for this connection.
+		// keepAlive 为 0 时使用足够大的连接级超时，避免回退到服务端默认心跳超时
 		context.setHeartbeatTimeout(keepAliveSeconds == 0 ? Long.MAX_VALUE / 2 : keepAliveTimeout);
 		// mqtt 5.0 Server Keep Alive：当服务端实际接管心跳时，覆盖 heartbeatTimeout
 		if (serverKeepAliveSeconds > 0) {

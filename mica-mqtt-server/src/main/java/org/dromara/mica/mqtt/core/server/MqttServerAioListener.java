@@ -110,7 +110,7 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 			if (willMessage == null) {
 				return;
 			}
-			// Remove before dispatch so a later connection's will is not cleared by the task.
+			// 提交异步任务前清除当前遗嘱，避免任务执行时清除新连接的遗嘱
 			messageStore.clearWillMessage(clientId);
 			// 异步处理遗嘱消息，避免阻塞断连流程和级联影响
 			executor.execute(() -> {

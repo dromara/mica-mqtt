@@ -221,10 +221,11 @@ public interface IMqttClientSession {
 	void addPendingPublishMessage(MqttPublishMessage message);
 
 	/**
-	 * Attempts to enqueue a publish. Custom sessions should override this when their queue is bounded.
+	 * 尝试将待发送的发布消息加入队列。
+	 * 默认实现兼容已有会话实现，调用添加方法后返回 true；自定义有界队列应重写此方法以报告入队失败。
 	 *
-	 * @param message message to enqueue
-	 * @return whether the message was accepted
+	 * @param message 待发送的发布消息
+	 * @return 是否成功加入队列
 	 */
 	default boolean offerPendingPublishMessage(MqttPublishMessage message) {
 		addPendingPublishMessage(message);

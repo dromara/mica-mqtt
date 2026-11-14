@@ -614,6 +614,7 @@ public final class MqttClient implements IMqttClient {
 		}
 		// 2. 停止 tio
 		boolean result = tioClient.stop();
+		// 仅关闭客户端创建的定时任务服务，外部传入的服务可能被共享
 		if (config.isTaskServiceOwner()) {
 			taskService.stop();
 		}

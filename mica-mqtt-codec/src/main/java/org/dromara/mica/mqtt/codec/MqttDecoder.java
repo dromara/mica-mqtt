@@ -93,6 +93,7 @@ public final class MqttDecoder {
 			}
 			return MqttMessageType.PINGREQ == messageType ? MqttMessage.PINGREQ : MqttMessage.PINGRESP;
 		}
+		// 限制当前报文的读取范围，避免畸形报文读取后续报文的数据
 		int originalLimit = buffer.limit();
 		int packetEnd = buffer.position() + mqttFixedHeader.remainingLength();
 		if (packetEnd > originalLimit) {
@@ -665,6 +666,7 @@ public final class MqttDecoder {
 		if (totalPropertiesLength > buffer.remaining()) {
 			throw new DecoderException("MQTT properties exceed packet boundary");
 		}
+		// 属性值不能越过属性段边界读取后续载荷
 		int originalLimit = buffer.limit();
 		buffer.limit(buffer.position() + totalPropertiesLength);
 		try {

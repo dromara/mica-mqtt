@@ -39,7 +39,7 @@ class MqttDecoderValidationTest {
 
 	@Test
 	void propertyValueCannotConsumeBytesBeyondPropertySection() {
-		// A four-byte expiry value is declared inside a one-byte property section.
+		// 属性段长度仅为一个字节，不足以容纳四字节的过期时间值
 		assertThrows(RuntimeException.class, () -> MqttDecoder.decodeProperties(new byte[]{1, 2, 0, 0, 0, 1}));
 	}
 

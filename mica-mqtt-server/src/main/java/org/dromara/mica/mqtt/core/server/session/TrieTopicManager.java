@@ -530,7 +530,7 @@ public class TrieTopicManager {
 		Node nodeOne = index == 0 && topicParts[0].startsWith("$") ? null : node.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_ONE);
 		if (nodeOne != null) {
 			if (index == topicPartLen) {
-				// +/# also matches when # consumes zero levels.
+				// +/# 中的 # 匹配零层时，也要收集其订阅
 				Node childMore = nodeOne.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_MORE);
 				if (childMore != null && childMore.subscriptions != null) {
 					for (Map.Entry<String, Byte> entry : childMore.subscriptions.entrySet()) {

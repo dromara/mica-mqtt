@@ -47,6 +47,7 @@ public class RetainMessageHandler implements MqttPublishPipelineHandler {
 		if (!context.isRetain()) {
 			return true;
 		}
+		// 原始发布主题保留了 $retain/{ttl}/ 前缀，实际主题已在发布处理阶段去除该前缀
 		String topicName = context.getPublishMessage() == null ? context.getTopic()
 			: context.getPublishMessage().variableHeader().topicName();
 		IntPair<String> retainPair = TopicUtil.retainTopicName(topicName);

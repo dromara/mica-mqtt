@@ -214,6 +214,9 @@ public final class MqttClientCreator {
 	 * taskService
 	 */
 	private TimerTaskService taskService;
+	/**
+	 * 定时任务服务是否由客户端创建，外部传入的服务由调用方管理
+	 */
 	private boolean taskServiceOwner;
 	/**
 	 * TioConfig 自定义配置
@@ -383,6 +386,11 @@ public final class MqttClientCreator {
 		return mqttExecutor;
 	}
 
+	/**
+	 * 判断定时任务服务是否由客户端创建
+	 *
+	 * @return 是否由客户端管理生命周期
+	 */
 	boolean isTaskServiceOwner() {
 		return taskServiceOwner;
 	}
