@@ -22,6 +22,7 @@ import org.dromara.mica.mqtt.codec.message.builder.MqttSubscriptionOption;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -188,6 +189,16 @@ public interface IMqttClientSession {
 	 * @return MqttPendingPublish
 	 */
 	MqttPendingPublish removePendingPublish(int messageId);
+
+	/**
+	 * 获取等待确认的发布消息快照，用于连接恢复后重传。
+	 * 自定义会话实现应覆盖此方法以支持 inflight 恢复。
+	 *
+	 * @return 等待确认的发布消息
+	 */
+	default List<MqttPendingPublish> getPendingPublishes() {
+		return Collections.emptyList();
+	}
 
 	/**
 	 * 添加 qos2 过程消息

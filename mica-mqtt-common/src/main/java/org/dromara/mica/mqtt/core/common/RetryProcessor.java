@@ -22,6 +22,7 @@ public final class RetryProcessor<T extends MqttMessage> {
 
 	public void start(TimerTaskService taskService) {
 		Objects.requireNonNull(this.handler, "RetryProcessor handler is null.");
+		stop();
 		this.startTimer(Objects.requireNonNull(taskService, "RetryProcessor taskService is null."));
 	}
 

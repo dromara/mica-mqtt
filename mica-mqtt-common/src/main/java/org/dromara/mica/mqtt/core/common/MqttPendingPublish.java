@@ -20,6 +20,7 @@ public final class MqttPendingPublish {
 	private static final Logger logger = LoggerFactory.getLogger(MqttPendingPublish.class);
 	private final MqttPublishMessage message;
 	private final MqttQoS qos;
+	private MqttMessage pubRelMessage;
 	private final RetryProcessor<MqttPublishMessage> pubRetryProcessor = new RetryProcessor<>();
 	private final RetryProcessor<MqttMessage> pubRelRetryProcessor = new RetryProcessor<>();
 
@@ -55,6 +56,7 @@ public final class MqttPendingPublish {
 	}
 
 	public void setPubRelMessage(MqttMessage pubRelMessage) {
+		this.pubRelMessage = pubRelMessage;
 		this.pubRelRetryProcessor.setOriginalMessage(pubRelMessage);
 	}
 
@@ -68,6 +70,27 @@ public final class MqttPendingPublish {
 			}
 		});
 		this.pubRelRetryProcessor.start(taskService);
+	}
+
+	/**
+	 * 重连后按服务端会话状态恢复当前 QoS 发布阶段。
+	 *
+	 * @param taskService 定时任务服务
+	 * @param context 新连接上下文
+	 * @param sessionPresent 服务端是否恢复了原会话
+	 */
+	public void retransmit(TimerTaskService taskService, ChannelContext context, boolean sessionPresent) {
+		pubRetryProcessor.stop();
+		pubRelRetryProcessor.stop();
+		if (sessionPresent && pubRelMessage != null) {
+			startPubRelRetransmissionTimer(taskService, context);
+			Tio.send(context, pubRelMessage);
+		} else {
+			pubRelMessage = null;
+			message.fixedHeader().setDup(true);
+			startPublishRetransmissionTimer(taskService, context);
+			Tio.send(context, message);
+		}
 	}
 
 	public void onPubCompReceived() {

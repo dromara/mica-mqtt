@@ -49,7 +49,7 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 	private final MultiValueMap<String, MqttClientSubscription> subscriptions = new MultiValueMap<>(new ConcurrentHashMap<>());
 	private final IntObjectMap<MqttPendingSubscription> pendingSubscriptions = new IntObjectHashMap<>();
 	private final IntObjectMap<MqttPendingUnSubscription> pendingUnSubscriptions = new IntObjectHashMap<>();
-	private final IntObjectMap<MqttPendingPublish> pendingPublishData = new IntObjectHashMap<>();
+	private final Map<Integer, MqttPendingPublish> pendingPublishData = new ConcurrentHashMap<>();
 	private final IntObjectMap<MqttPendingQos2Publish> pendingQos2PublishData = new IntObjectHashMap<>();
 	/**
 	 * MQTT 连接成功前的待发送发布消息队列
@@ -184,6 +184,11 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 	@Override
 	public MqttPendingPublish removePendingPublish(int messageId) {
 		return pendingPublishData.remove(messageId);
+	}
+
+	@Override
+	public List<MqttPendingPublish> getPendingPublishes() {
+		return new ArrayList<>(pendingPublishData.values());
 	}
 
 	@Override

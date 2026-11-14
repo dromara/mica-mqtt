@@ -69,11 +69,22 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		MqttConnectReasonCode returnCode = connAckVariableHeader.connectReturnCode();
 		switch (returnCode) {
 			case CONNECTION_ACCEPTED:
+				// 在标记连接可用前获取快照，避免重发并发提交的新消息
+				List<MqttPendingPublish> pendingPublishes = clientSession.getPendingPublishes();
 				// 1. 连接成功的日志
 				context.setAccepted(true);
 				if (logger.isInfoEnabled()) {
 					Node node = context.getServerNode();
 					logger.info("MqttClient contextId:{} connection:{}:{} succeeded!", context.getId(), node.getIp(), node.getPort());
+				}
+				// 连接恢复后先重发未确认消息，再处理连接前排队的消息
+				for (MqttPendingPublish pending : pendingPublishes) {
+					synchronized (pending) {
+						int packetId = pending.getMessage().variableHeader().packetId();
+						if (clientSession.getPendingPublish(packetId) == pending) {
+							pending.retransmit(taskService, context, connAckVariableHeader.isSessionPresent());
+						}
+					}
 				}
 				// 2. 发布连接通知
 				publishConnectEvent(context);
@@ -345,8 +356,10 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			String topicName = pendingPublish.getMessage().variableHeader().topicName();
 			logger.info("MQTT Topic:{} successfully PubAck packetId:{}", topicName, packetId);
 		}
-		pendingPublish.onPubAckReceived();
-		clientSession.removePendingPublish(packetId);
+		synchronized (pendingPublish) {
+			pendingPublish.onPubAckReceived();
+			clientSession.removePendingPublish(packetId);
+		}
 	}
 
 	@Override
@@ -357,18 +370,20 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		if (pendingPublish == null) {
 			return;
 		}
-		pendingPublish.onPubAckReceived();
+		synchronized (pendingPublish) {
+			pendingPublish.onPubAckReceived();
 
-		MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBREL, false, MqttQoS.QOS1, false, 0);
-		MqttMessageIdVariableHeader variableHeader = (MqttMessageIdVariableHeader) message.variableHeader();
-		MqttMessage pubRelMessage = new MqttMessage(fixedHeader, variableHeader);
+			MqttFixedHeader fixedHeader = new MqttFixedHeader(MqttMessageType.PUBREL, false, MqttQoS.QOS1, false, 0);
+			MqttMessageIdVariableHeader variableHeader = (MqttMessageIdVariableHeader) message.variableHeader();
+			MqttMessage pubRelMessage = new MqttMessage(fixedHeader, variableHeader);
 
-		pendingPublish.setPubRelMessage(pubRelMessage);
-		pendingPublish.startPubRelRetransmissionTimer(taskService, context);
+			pendingPublish.setPubRelMessage(pubRelMessage);
+			pendingPublish.startPubRelRetransmissionTimer(taskService, context);
 
-		// 发送消息
-		boolean result = Tio.send(context, pubRelMessage);
-		logger.debug("Publish - PubRec send packetId:{} result:{}", packetId, result);
+			// 发送消息
+			boolean result = Tio.send(context, pubRelMessage);
+			logger.debug("Publish - PubRec send packetId:{} result:{}", packetId, result);
+		}
 	}
 
 	@Override
@@ -401,8 +416,10 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			String topicName = pendingPublish.getMessage().variableHeader().topicName();
 			logger.info("MQTT Topic:{} successfully PubComp", topicName);
 		}
-		pendingPublish.onPubCompReceived();
-		clientSession.removePendingPublish(packetId);
+		synchronized (pendingPublish) {
+			pendingPublish.onPubCompReceived();
+			clientSession.removePendingPublish(packetId);
+		}
 	}
 
 	@Override
