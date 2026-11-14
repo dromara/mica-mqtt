@@ -19,7 +19,6 @@ package org.dromara.mica.mqtt.core.server.handler;
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Node;
 import net.dreamlu.mica.net.core.Tio;
-import net.dreamlu.mica.net.core.TioConfig;
 import net.dreamlu.mica.net.utils.hutool.StrUtil;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttCodecUtil;
@@ -64,7 +63,6 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 	private final IMqttMessageStore messageStore;
 	private final IMqttSessionManager sessionManager;
 	private final IMqttMessagePipeline messagePipeline;
-	private final long heartbeatTimeout;
 
 	public MqttConnectHandler(MqttServerCreator serverCreator,
 						 ExecutorService executor,
@@ -76,9 +74,6 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		this.messageStore = serverCreator.getMessageStore();
 		this.sessionManager = serverCreator.getSessionManager();
 		this.messagePipeline = serverCreator.getMessagePipeline();
-		this.heartbeatTimeout = serverCreator.getHeartbeatTimeout() == null
-			? TioConfig.DEFAULT_HEARTBEAT_TIMEOUT
-			: serverCreator.getHeartbeatTimeout();
 	}
 
 	@Override
@@ -142,9 +137,8 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 			serverKeepAliveSeconds = configuredKeepAlive;
 		}
 		long keepAliveTimeout = keepAliveSeconds * KEEP_ALIVE_UNIT;
-		if (keepAliveSeconds > 0 && heartbeatTimeout != keepAliveTimeout) {
-			context.setHeartbeatTimeout(keepAliveTimeout);
-		}
+		// A zero keep alive disables the MQTT heartbeat deadline for this connection.
+		context.setHeartbeatTimeout(keepAliveSeconds == 0 ? Long.MAX_VALUE / 2 : keepAliveTimeout);
 		// mqtt 5.0 Server Keep Alive：当服务端实际接管心跳时，覆盖 heartbeatTimeout
 		if (serverKeepAliveSeconds > 0) {
 			context.setHeartbeatTimeout(serverKeepAliveSeconds * KEEP_ALIVE_UNIT);
@@ -161,7 +155,9 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 //		}
 		// 8. 存储遗嘱消息
 		boolean willFlag = variableHeader.isWillFlag();
-		if (willFlag) {
+		if (!willFlag) {
+			messageStore.clearWillMessage(uniqueId);
+		} else {
 			Message willMessage = new Message();
 			willMessage.setMessageType(MessageType.DOWN_STREAM);
 			willMessage.setFromClientId(uniqueId);

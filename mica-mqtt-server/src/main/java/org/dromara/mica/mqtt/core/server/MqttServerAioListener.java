@@ -110,13 +110,13 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 			if (willMessage == null) {
 				return;
 			}
+			// Remove before dispatch so a later connection's will is not cleared by the task.
+			messageStore.clearWillMessage(clientId);
 			// 异步处理遗嘱消息，避免阻塞断连流程和级联影响
 			executor.execute(() -> {
 				try {
 					boolean result = messagePipeline.handle(willMessage);
 					logger.debug("Mqtt server clientId:{} send willMessage result:{}.", clientId, result);
-					// 清理遗嘱消息
-					messageStore.clearWillMessage(clientId);
 				} catch (Throwable e) {
 					logger.error("Mqtt server clientId:{} send willMessage async error.", clientId, e);
 				}

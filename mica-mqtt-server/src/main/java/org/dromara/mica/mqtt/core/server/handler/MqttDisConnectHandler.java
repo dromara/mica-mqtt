@@ -57,7 +57,11 @@ public class MqttDisConnectHandler extends AbstractMqttMessageHandler {
 		} else {
 			logger.warn("DisConnect - clientId:{} contextId:{} reasonCode:0x{}", clientId, context.getId(), Integer.toHexString(reasonCode & 0xFF));
 		}
-		context.setBizStatus(true);
+		boolean sendWill = reasonCode == MqttDisconnectReasonCode.WITH_WILL_MESSAGE.value();
+		if (!sendWill) {
+			serverCreator.getMessageStore().clearWillMessage(clientId);
+		}
+		context.setBizStatus(!sendWill);
 		Tio.remove(context, "Mqtt DisConnect");
 	}
 
