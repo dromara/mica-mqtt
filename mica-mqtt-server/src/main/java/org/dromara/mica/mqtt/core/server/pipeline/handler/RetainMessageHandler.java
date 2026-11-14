@@ -47,7 +47,8 @@ public class RetainMessageHandler implements MqttPublishPipelineHandler {
 		if (!context.isRetain()) {
 			return true;
 		}
-		String topicName = context.getTopic();
+		String topicName = context.getPublishMessage() == null ? context.getTopic()
+			: context.getPublishMessage().variableHeader().topicName();
 		IntPair<String> retainPair = TopicUtil.retainTopicName(topicName);
 		int timeOut = retainPair.getKey();
 		if (timeOut < 0) {

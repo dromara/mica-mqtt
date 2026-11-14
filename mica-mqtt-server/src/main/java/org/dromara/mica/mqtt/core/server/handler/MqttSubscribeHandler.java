@@ -30,6 +30,7 @@ import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
+import org.dromara.mica.mqtt.core.common.TopicFilterType;
 import org.dromara.mica.mqtt.core.server.auth.IMqttServerSubscribeValidator;
 import org.dromara.mica.mqtt.core.server.event.IMqttSessionListener;
 import org.dromara.mica.mqtt.core.server.model.Message;
@@ -79,11 +80,21 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 		List<MqttTopicSubscription> topicSubscriptionList = message.payload().topicSubscriptions();
 		List<MqttSubAckReasonCode> reasonCodeList = new ArrayList<>();
 		List<String> subscribedTopicList = new ArrayList<>();
+		List<MqttTopicSubscription> acceptedSubscriptions = new ArrayList<>();
 		boolean enableSubscribeValidator = subscribeValidator != null;
 		for (MqttTopicSubscription subscription : topicSubscriptionList) {
 			String topicFilter = subscription.topicFilter();
 			try {
 				TopicUtil.validateTopicFilter(topicFilter);
+				if (topicFilter.startsWith(TopicFilterType.SHARE_GROUP_PREFIX)) {
+					String group = TopicFilterType.getShareGroupName(topicFilter);
+					int topicStart = TopicFilterType.SHARE_GROUP_PREFIX.length() + group.length() + 1;
+					if (group.isEmpty() || group.indexOf('+') >= 0 || group.indexOf('#') >= 0 || topicStart >= topicFilter.length()) {
+						throw new IllegalArgumentException("Invalid shared subscription: " + topicFilter);
+					}
+				} else if (topicFilter.equals(TopicFilterType.SHARE_QUEUE_PREFIX)) {
+					throw new IllegalArgumentException("Invalid queue subscription: " + topicFilter);
+				}
 			} catch (IllegalArgumentException e) {
 				// SUBACK reason code 数量必须与 SUBSCRIBE topic filter 数量保持一致。
 				reasonCodeList.add(MqttSubAckReasonCode.TOPIC_FILTER_INVALID);
@@ -99,6 +110,7 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 			} else {
 				reasonCodeList.add(MqttSubAckReasonCode.qosGranted(mqttQoS));
 				subscribedTopicList.add(topicFilter);
+				acceptedSubscriptions.add(subscription);
 				sessionManager.addSubscribe(new TopicFilter(topicFilter), clientId, mqttQoS.value(), noLocal);
 				logger.info("Subscribe - clientId:{} topicFilter:{} mqttQoS:{} noLocal:{} packetId:{}", clientId, topicFilter, mqttQoS, noLocal, packetId);
 				publishSubscribedEvent(context, clientId, topicFilter, mqttQoS);
@@ -110,20 +122,20 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 			.build();
 		boolean result = Tio.send(context, subAckMessage);
 		logger.info("Subscribe - SubAck send clientId:{} subscribedTopicList:{} packetId:{} result:{}", clientId, subscribedTopicList, packetId, result);
-		for (String topic : subscribedTopicList) {
+		for (MqttTopicSubscription subscription : acceptedSubscriptions) {
 			// 只有成功写入 session 的订阅才触发保留消息补发，失败项不能收到 retained publish。
-			executor.submit(() -> sendRetainMessage(context, topic));
+			executor.submit(() -> sendRetainMessage(context, subscription.topicFilter(), subscription.qualityOfService()));
 		}
 	}
 
-	private void sendRetainMessage(ChannelContext context, String topic) {
+	private void sendRetainMessage(ChannelContext context, String topic, MqttQoS subscriptionQos) {
 		List<Message> retainMessageList = messageStore.getRetainMessage(topic);
 		if (retainMessageList == null || retainMessageList.isEmpty()) {
 			return;
 		}
 		String clientId = context.getBsId();
 		for (Message retainMessage : retainMessageList) {
-			MqttQoS mqttQoS = MqttQoS.valueOf(retainMessage.getQos());
+			MqttQoS mqttQoS = MqttQoS.valueOf(Math.min(retainMessage.getQos(), subscriptionQos.value()));
 			boolean isHighLevelQoS = MqttQoS.QOS1 == mqttQoS || MqttQoS.QOS2 == mqttQoS;
 			int messageId = isHighLevelQoS ? sessionManager.getPacketId(clientId) : -1;
 			MqttPublishMessage publishMessage = MqttPublishMessage.builder()
