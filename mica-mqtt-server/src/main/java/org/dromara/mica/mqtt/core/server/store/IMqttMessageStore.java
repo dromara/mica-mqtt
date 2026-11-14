@@ -53,6 +53,9 @@ public interface IMqttMessageStore {
 	 * @return 是否清除
 	 */
 	default boolean clearWillMessage(String clientId, Message expected) {
+		if (expected == null) {
+			return false;
+		}
 		synchronized (this) {
 			if (getWillMessage(clientId) != expected) {
 				return false;
