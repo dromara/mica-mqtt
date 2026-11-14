@@ -105,7 +105,7 @@ public class TokenAuthFilter implements HttpFilter {
 		try {
 			authenticated = tokenValidator.validate(request, token);
 		} catch (Throwable e) {
-			logger.error("{} auth error, {}: {}", schemePrefix.trim(), headerName, token, e);
+			logger.error("{} auth error, header: {}", schemePrefix.trim(), headerName, e);
 			return unauthorized(request);
 		}
 		if (authenticated) {
