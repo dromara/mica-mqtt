@@ -30,6 +30,7 @@ import org.dromara.mica.mqtt.codec.message.payload.*;
 import org.dromara.mica.mqtt.codec.properties.*;
 
 import java.nio.ByteBuffer;
+import java.nio.BufferUnderflowException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -101,7 +102,13 @@ public final class MqttDecoder {
 		}
 		buffer.limit(packetEnd);
 		try {
-			return decodeMqttMessage(ctx, buffer, messageType, mqttFixedHeader);
+			MqttMessage message = decodeMqttMessage(ctx, buffer, messageType, mqttFixedHeader);
+			if (buffer.position() != packetEnd) {
+				throw new DecoderException("MQTT packet contains unexpected trailing bytes");
+			}
+			return message;
+		} catch (BufferUnderflowException e) {
+			throw new DecoderException("MQTT packet is truncated", e);
 		} finally {
 			buffer.limit(originalLimit);
 		}

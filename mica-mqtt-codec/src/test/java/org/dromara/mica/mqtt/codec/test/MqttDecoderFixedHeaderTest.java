@@ -104,6 +104,13 @@ class MqttDecoderFixedHeaderTest {
 	}
 
 	@Test
+	void rejectsTrailingBytesAndTruncatedPayload() {
+		assertThrows(DecoderException.class, () -> decode(new byte[]{0x40, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00}));
+		assertThrows(DecoderException.class, () -> decode(new byte[]{0x10, 0x0d, 0x00, 0x04, 'M', 'Q', 'T', 'T',
+			0x04, 0x02, 0x00, 0x3c, 0x00, 0x02, 'a'}));
+	}
+
+	@Test
 	void legitConnectStillDecodes() {
 		assertDoesNotThrow(() -> decode(new byte[]{0x10, 0x0E, 0x00, 0x04, 'M', 'Q', 'T', 'T',
 			0x04, 0x02, 0x00, 0x3c, 0x00, 0x02, 'a', 'b'}));
