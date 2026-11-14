@@ -149,6 +149,7 @@ mvn clean deploy -P release
 - Retained publishes preserve the `$retain/{ttl}/` lifetime and are delivered at no more than the subscription QoS.
 - Topic wildcards exclude `$` topics at the first level; `#` can match zero levels after `+`.
 - A connection retains its own will; conditional will removal must not clear a replacement connection’s will. Custom message stores should make conditional removal atomic.
+- Cluster will notifications carry a per-will token so a delayed clear only removes its matching replica.
 - In cluster mode the default message store is cluster-aware, and broker shutdown closes cluster storage.
 - In cluster mode, the publisher node selects one subscriber per shared group from the complete replicated candidate set; normal subscriptions are forwarded separately. Server broadcasts use the same routing path.
 
