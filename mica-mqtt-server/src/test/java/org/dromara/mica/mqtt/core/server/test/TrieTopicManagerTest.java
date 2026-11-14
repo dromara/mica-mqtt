@@ -111,6 +111,22 @@ class TrieTopicManagerTest {
 	}
 
 	@Test
+	void 查询共享订阅时保留全部候选者和组标识() {
+		TrieTopicManager manager = new TrieTopicManager();
+		manager.addSubscribe("$share/g/a/#", "first", 1);
+		manager.addSubscribe("$share/g/a/+", "second", 0);
+		manager.addSubscribe("$share/other/a/#", "third", 0);
+		manager.addSubscribe("$queue/a/#", "queue", 0);
+		manager.addSubscribe("a/b", "normal", 0);
+		List<Subscribe> all = manager.searchAllSubscribe("a/b");
+		Assertions.assertEquals(5, all.size());
+		Assertions.assertEquals(2, all.stream().filter(sub -> sub.getTopicFilter() != null
+			&& sub.getTopicFilter().startsWith("$share/g/")).count());
+		Assertions.assertEquals(1, all.stream().filter(sub -> sub.getTopicFilter() != null
+			&& sub.getTopicFilter().startsWith("$queue/")).count());
+	}
+
+	@Test
 	void testMatchGroup() {
 		Assertions.assertTrue(match("$queue/123", "123"));
 		Assertions.assertFalse(match("$queue/123", "/123"));

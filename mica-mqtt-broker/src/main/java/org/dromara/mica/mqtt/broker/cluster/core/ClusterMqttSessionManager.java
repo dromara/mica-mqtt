@@ -448,8 +448,9 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @param topic the topic to search subscriptions for
 	 * @return the list of all subscribers, or null if no subscriptions exist
 	 */
+	@Override
 	public List<Subscribe> searchAllSubscribe(String topic) {
-		return delegate.searchSubscribe(topic);
+		return delegate.searchAllSubscribe(topic);
 	}
 
 	/**

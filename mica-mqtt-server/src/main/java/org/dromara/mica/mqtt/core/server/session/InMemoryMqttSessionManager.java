@@ -75,6 +75,11 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 	}
 
 	@Override
+	public List<Subscribe> searchAllSubscribe(String topicName) {
+		return topicManager.searchAllSubscribe(topicName);
+	}
+
+	@Override
 	public List<Subscribe> getSubscriptions(String clientId) {
 		return topicManager.getSubscriptions(clientId);
 	}

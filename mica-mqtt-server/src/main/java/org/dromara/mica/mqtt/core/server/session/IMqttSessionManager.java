@@ -77,6 +77,17 @@ public interface IMqttSessionManager {
 	List<Subscribe> searchSubscribe(String topicName);
 
 	/**
+	 * 获取匹配的全部订阅，包括共享组中的所有候选者。
+	 * 自定义会话管理器应覆盖此方法，以支持集群共享订阅选路。
+	 *
+	 * @param topicName 发布主题
+	 * @return 匹配的订阅
+	 */
+	default List<Subscribe> searchAllSubscribe(String topicName) {
+		return searchSubscribe(topicName);
+	}
+
+	/**
 	 * 获取设备订阅
 	 *
 	 * @param clientId clientId

@@ -505,6 +505,32 @@ public class TrieTopicManager {
 	}
 
 	/**
+	 * 查询所有匹配订阅，不提前对共享组进行随机选择。
+	 *
+	 * @param topicName 发布主题
+	 * @return 普通订阅及各共享组的候选订阅
+	 */
+	public List<Subscribe> searchAllSubscribe(String topicName) {
+		String[] parts = TopicUtil.getTopicParts(topicName);
+		Map<String, SubscribeData> normal = new HashMap<>(32);
+		mergeExactSubscriptions(topicName, normal);
+		searchSubscribeRecursively(wildcardRoot, normal, parts, 0);
+		List<Subscribe> result = new ArrayList<>();
+		normal.forEach((clientId, data) -> result.add(new Subscribe(clientId, data.qos, data.noLocal)));
+		Map<String, SubscribeData> candidates = new HashMap<>();
+		searchSubscribeRecursively(queue, candidates, parts, 0);
+		candidates.forEach((clientId, data) -> result.add(new Subscribe(
+			TopicFilterType.SHARE_QUEUE_PREFIX + topicName, clientId, data.qos, data.noLocal)));
+		for (Map.Entry<String, Node> entry : share.entrySet()) {
+			candidates.clear();
+			searchSubscribeRecursively(entry.getValue(), candidates, parts, 0);
+			String filter = TopicFilterType.SHARE_GROUP_PREFIX + entry.getKey() + "/" + topicName;
+			candidates.forEach((clientId, data) -> result.add(new Subscribe(filter, clientId, data.qos, data.noLocal)));
+		}
+		return result;
+	}
+
+	/**
 	 * 合并同一 client 的多条匹配订阅（如同时命中精确 topic 与通配 filter）
 	 */
 	private static SubscribeData mergeSubscribeData(SubscribeData old, SubscribeData val) {
