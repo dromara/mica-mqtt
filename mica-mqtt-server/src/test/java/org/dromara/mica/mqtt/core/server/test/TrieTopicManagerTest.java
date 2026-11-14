@@ -66,6 +66,15 @@ class TrieTopicManagerTest {
 	}
 
 	@Test
+	void wildcardMatchesZeroTrailingLevelsAndExcludesSystemTopics() {
+		Assertions.assertTrue(match("a/+/#", "a/b"));
+		Assertions.assertTrue(match("+/#", "a"));
+		Assertions.assertFalse(match("#", "$SYS/a"));
+		Assertions.assertFalse(match("+/a", "$SYS/a"));
+		Assertions.assertTrue(match("$SYS/#", "$SYS/a"));
+	}
+
+	@Test
 	void testMatch() {
 		// gitee issues #I56BTC /iot/test/# 无法匹配到 /iot/test 和 /iot/test/
 		Assertions.assertFalse(match("+", "/iot/test"));

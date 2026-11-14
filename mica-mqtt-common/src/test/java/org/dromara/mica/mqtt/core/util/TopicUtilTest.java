@@ -35,6 +35,15 @@ import org.junit.jupiter.api.Test;
 class TopicUtilTest {
 
 	@Test
+	void wildcardMatchesZeroTrailingLevelsAndExcludesSystemTopics() {
+		Assertions.assertTrue(TopicUtil.match("a/+/#", "a/b"));
+		Assertions.assertTrue(TopicUtil.match("+/#", "a"));
+		Assertions.assertFalse(TopicUtil.match("#", "$SYS/a"));
+		Assertions.assertFalse(TopicUtil.match("+/a", "$SYS/a"));
+		Assertions.assertTrue(TopicUtil.match("$SYS/#", "$SYS/a"));
+	}
+
+	@Test
 	void test() {
 		// gitee issues #I56BTC /iot/test/# 无法匹配到 /iot/test 和 /iot/test/
 		Assertions.assertFalse(TopicUtil.match("+", "/iot/test"));
@@ -537,7 +546,7 @@ class TopicUtilTest {
 
 		// + 和 # 组合
 		Assertions.assertTrue(TopicUtil.match("/+/#", "/test/data/more"));
-		Assertions.assertFalse(TopicUtil.match("/+/#", "/test"));
+		Assertions.assertTrue(TopicUtil.match("/+/#", "/test"));
 
 		// 长路径匹配
 		Assertions.assertTrue(TopicUtil.match("/a/b/c/d/e", "/a/b/c/d/e"));

@@ -252,9 +252,11 @@ public class TrieTopicManager {
 		} else if (TopicFilterType.SHARE == topicFilterType) {
 			int prefixLen = TopicFilterType.SHARE_GROUP_PREFIX.length();
 			String groupName = TopicFilterType.getShareGroupName(topic);
-			Node groupNode = share.computeIfAbsent(groupName, k -> Node.getRoot());
-			prefixLen = prefixLen + groupName.length() + 1;
-			removeSubscribe(groupNode, topic.substring(prefixLen), clientId);
+			Node groupNode = share.get(groupName);
+			if (groupNode != null) {
+				prefixLen = prefixLen + groupName.length() + 1;
+				removeSubscribe(groupNode, topic.substring(prefixLen), clientId);
+			}
 		}
 	}
 
@@ -516,7 +518,7 @@ public class TrieTopicManager {
 			return;
 		}
 		// # 匹配当前层级及后续所有层级，无需继续向下递归
-		Node nodeMore = node.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_MORE);
+		Node nodeMore = index == 0 && topicParts[0].startsWith("$") ? null : node.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_MORE);
 		if (nodeMore != null && nodeMore.subscriptions != null) {
 			for (Map.Entry<String, Byte> entry : nodeMore.subscriptions.entrySet()) {
 				SubscribeData data = SubscribeData.decode(entry.getValue());
@@ -525,9 +527,17 @@ public class TrieTopicManager {
 		}
 		int topicPartLen = topicParts.length - 1;
 		// + 匹配当前层级任意一个 part
-		Node nodeOne = node.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_ONE);
+		Node nodeOne = index == 0 && topicParts[0].startsWith("$") ? null : node.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_ONE);
 		if (nodeOne != null) {
 			if (index == topicPartLen) {
+				// +/# also matches when # consumes zero levels.
+				Node childMore = nodeOne.findNodeByPart(TopicUtil.TOPIC_WILDCARDS_MORE);
+				if (childMore != null && childMore.subscriptions != null) {
+					for (Map.Entry<String, Byte> entry : childMore.subscriptions.entrySet()) {
+						SubscribeData data = SubscribeData.decode(entry.getValue());
+						subscribeMap.merge(entry.getKey(), data, TrieTopicManager::mergeSubscribeData);
+					}
+				}
 				// + 在 filter 末尾：匹配 topic 的最后一个 part
 				if (nodeOne.subscriptions != null) {
 					for (Map.Entry<String, Byte> entry : nodeOne.subscriptions.entrySet()) {

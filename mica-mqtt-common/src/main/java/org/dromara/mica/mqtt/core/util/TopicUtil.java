@@ -168,77 +168,26 @@ public final class TopicUtil {
 	 * @return 是否匹配
 	 */
 	public static boolean match(String topicFilter, String topicName) {
-		char[] topicFilterChars = topicFilter.toCharArray();
-		char[] topicNameChars = topicName.toCharArray();
-		int topicFilterLength = topicFilterChars.length;
-		int topicNameLength = topicNameChars.length;
-		int topicFilterIdxEnd = topicFilterLength - 1;
-		int topicNameIdxEnd = topicNameLength - 1;
-		char ch;
-		// 是否进入 + 号层级通配符
-		boolean inLayerWildcard = false;
-		int wildcardCharLen = 0;
-		topicFilterLoop:
-		for (int i = 0; i < topicFilterLength; i++) {
-			ch = topicFilterChars[i];
-			if (ch == MqttCodecUtil.TOPIC_WILDCARDS_MORE) {
-				// 校验: # 必须单独占据最后一级
-				validateMultiLevelWildcard(topicFilter, topicFilterChars, i, topicFilterIdxEnd);
-				return true;
-			} else if (ch == MqttCodecUtil.TOPIC_WILDCARDS_ONE) {
-				// 校验: 单独 + 是允许的，判断 + 号前一位是否为 /，如果有后一位也必须为 /
-				if ((i > 0 && topicFilterChars[i - 1] != MqttCodecUtil.TOPIC_LAYER) || (i < topicFilterIdxEnd && topicFilterChars[i + 1] != MqttCodecUtil.TOPIC_LAYER)) {
-					throw new IllegalArgumentException("Mqtt subscribe topicFilter illegal:" + topicFilter);
-				}
-				// 如果 + 是最后一位，判断 topicName 中是否还存在层级 /
-				// topicName index
-				int topicNameIdx = i + wildcardCharLen;
-				if (i == topicFilterIdxEnd && topicNameLength > topicNameIdx) {
-					for (int j = topicNameIdx; j < topicNameLength; j++) {
-						if (topicNameChars[j] == MqttCodecUtil.TOPIC_LAYER) {
-							return false;
-						}
-					}
-					return true;
-				}
-				inLayerWildcard = true;
-			} else if (ch == MqttCodecUtil.TOPIC_LAYER) {
-				if (inLayerWildcard) {
-					inLayerWildcard = false;
-				}
-				// 预读下一位，如果是 #，并且 topicName 位数已经不足
-				int next = i + 1;
-				if ((topicFilterLength > next) && topicFilterChars[next] == MqttCodecUtil.TOPIC_WILDCARDS_MORE && topicNameLength < next) {
-					return true;
-				}
-			}
-			// topicName 长度不够了
-			if (topicNameIdxEnd < i) {
-				return false;
-			}
-			// 进入通配符
-			if (inLayerWildcard) {
-				for (int j = i + wildcardCharLen; j < topicNameLength; j++) {
-					if (topicNameChars[j] == MqttCodecUtil.TOPIC_LAYER) {
-						wildcardCharLen--;
-						continue topicFilterLoop;
-					} else {
-						wildcardCharLen++;
-					}
-				}
-			}
-			// topicName index
-			int topicNameIdx = i + wildcardCharLen;
-			// topic 已经完成，topicName 还有数据
-			if (topicNameIdx > topicNameIdxEnd) {
-				return false;
-			}
-			if (ch != topicNameChars[topicNameIdx]) {
-				return false;
-			}
+		validateTopicFilter(topicFilter);
+		if (topicName.isEmpty() && !"#".equals(topicFilter)) {
+			return false;
 		}
-		// 判断 topicName 是否还有数据
-		return topicFilterLength + wildcardCharLen + 1 > topicNameLength;
+		if (topicName.startsWith("$") && (topicFilter.startsWith("#") || topicFilter.startsWith("+"))) {
+			return false;
+		}
+		String[] filters = topicFilter.split("/", -1);
+		String[] levels = topicName.split("/", -1);
+		int index = 0;
+		for (String filter : filters) {
+			if ("#".equals(filter)) {
+				return true;
+			}
+			if (index >= levels.length || (!"+".equals(filter) && !filter.equals(levels[index]))) {
+				return false;
+			}
+			index++;
+		}
+		return index == levels.length;
 	}
 
 	/**
