@@ -482,6 +482,9 @@ public class MqttClusterManager {
 			mqttServer.stop();
 			logger.info("MQTT Server stopped");
 		}
+		if (clusterStorage != null) {
+			clusterStorage.stop();
+		}
 	}
 
 	public void publish(String topic, byte[] payload, int qos, boolean retain) {

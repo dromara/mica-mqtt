@@ -34,6 +34,8 @@ import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
+import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
+import org.dromara.mica.mqtt.core.server.store.InMemoryMqttMessageStore;
 
 /**
  * Builder for creating MQTT broker instances with cluster mode support.
@@ -130,9 +132,13 @@ public class MqttClusterBrokerCreator {
 			clusterSessionManager.setSharedSubStore(clusterStorage.getSharedSubStore());
 		}
 
-		if (serverCreator.getMessageStore() != null) {
+		{
+			IMqttMessageStore delegateStore = serverCreator.getMessageStore();
+			if (delegateStore == null) {
+				delegateStore = new InMemoryMqttMessageStore();
+			}
 			ClusterMqttMessageStore clusterMessageStore = new ClusterMqttMessageStore(
-				serverCreator.getMessageStore(), clusterManager
+				delegateStore, clusterManager
 			);
 			if (clusterStorage != null) {
 				clusterMessageStore.setRetainIndex(clusterStorage.getRetainIndex());
