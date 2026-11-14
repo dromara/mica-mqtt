@@ -17,11 +17,16 @@
 package org.dromara.mica.mqtt.broker.cluster.core;
 
 import org.dromara.mica.mqtt.broker.cluster.config.MqttStorageConfig;
+import org.dromara.mica.mqtt.broker.cluster.MqttBroker;
+import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterBrokerCreator;
+import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterConfig;
 import org.dromara.mica.mqtt.broker.cluster.store.SharedSubStore;
+import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.net.ServerSocket;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -37,6 +42,34 @@ class ClusterStorageTest {
 
 	@TempDir
 	Path tempDir;
+
+	@Test
+	void serverStopClosesStorageAndBuildIsIdempotent() throws Exception {
+		int mqttPort;
+		int clusterPort;
+		try (ServerSocket socket = new ServerSocket(0)) {
+			mqttPort = socket.getLocalPort();
+		}
+		try (ServerSocket socket = new ServerSocket(0)) {
+			clusterPort = socket.getLocalPort();
+		}
+		MqttStorageConfig storageConfig = new MqttStorageConfig().enabled(true).dataDir(tempDir.toString());
+		MqttClusterBrokerCreator creator = MqttBroker.create(MqttServer.create().enableMqtt(mqttPort))
+			.clusterConfig(new MqttClusterConfig().enabled(true).clusterHost("127.0.0.1")
+				.clusterPort(clusterPort).storageConfig(storageConfig));
+		MqttServer server = creator.build();
+		assertSame(server, creator.build());
+		assertSame(server, creator.start());
+		creator.getClusterManager().getClusterStorage().getEngine().put("test", new byte[]{1});
+		server.stop();
+		ClusterStorage reopened = new ClusterStorage(storageConfig);
+		assertTrue(reopened.start());
+		try {
+			assertArrayEquals(new byte[]{1}, reopened.getEngine().get("test"));
+		} finally {
+			reopened.stop();
+		}
+	}
 
 	@Test
 	void disabledConfigReturnsInactive() {

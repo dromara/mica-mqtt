@@ -74,6 +74,7 @@ public final class MqttServer {
 	private final IMqttMessageStore messageStore;
 	private final MqttSerializer mqttSerializer;
 	private volatile Function<PublishContext, Boolean> publishAllRouter;
+	private volatile Runnable stopListener;
 
 	MqttServer(MqttServerCreator serverCreator,
 	           TioServerConfig serverConfig,
@@ -635,7 +636,20 @@ public final class MqttServer {
 		} catch (Throwable e) {
 			logger.error("MqttServer stop message store clean error.", e);
 		}
+		Runnable listener = stopListener;
+		if (listener != null) {
+			listener.run();
+		}
 		return result;
+	}
+
+	/**
+	 * 设置服务停止后的资源清理回调。
+	 *
+	 * @param listener 清理回调
+	 */
+	public void setStopListener(Runnable listener) {
+		this.stopListener = listener;
 	}
 
 }

@@ -65,6 +65,7 @@ public class MqttClusterBrokerCreator {
 	private MqttClusterManager clusterManager;
 	private ClusterMqttSessionManager clusterSessionManager;
 	private ClusterStorage clusterStorage;
+	private MqttServer mqttServer;
 
 	/**
 	 * Constructs a new cluster broker creator wrapping the specified server creator.
@@ -91,9 +92,13 @@ public class MqttClusterBrokerCreator {
 	 *
 	 * @return the configured {@link MqttServer} instance
 	 */
-	public MqttServer build() {
+	public synchronized MqttServer build() {
+		if (mqttServer != null) {
+			return mqttServer;
+		}
 		if (clusterConfig == null || !clusterConfig.isEnabled()) {
-			return serverCreator.build();
+			mqttServer = serverCreator.build();
+			return mqttServer;
 		}
 
 		// nodeId 为 host:port 格式，用于节点间点对点通信寻址，如果为空，设置成集群节点
@@ -155,8 +160,9 @@ public class MqttClusterBrokerCreator {
 		ClusterPublishHandler publishHandler = new ClusterPublishHandler(clusterManager);
 		serverCreator.addPublishPipelineHandler(publishHandler);
 
-		MqttServer mqttServer = serverCreator.build();
+		mqttServer = serverCreator.build();
 		clusterManager.setMqttServer(mqttServer);
+		mqttServer.setStopListener(clusterManager::stopCluster);
 
 		SharedSubscriptionStrategy strategy = createStrategy(clusterConfig, clusterSessionManager);
 		clusterManager.setSharedStrategy(strategy);

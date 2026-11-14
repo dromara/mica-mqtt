@@ -43,6 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Manager for MQTT broker cluster operations and inter-node communication.
@@ -68,6 +69,7 @@ public class MqttClusterManager {
 	private ClusterStorage clusterStorage;
 	private ClusterMqttSessionManager sessionManager;
 	private final ClusterMetrics metrics = new ClusterMetrics();
+	private final AtomicBoolean stopped = new AtomicBoolean();
 
 	/**
 	 * Constructs a new cluster manager with the specified configuration.
@@ -541,20 +543,32 @@ public class MqttClusterManager {
 	}
 
 	public void stop() {
-		if (cluster != null) {
-			NodeLeaveMessage leaveMsg = new NodeLeaveMessage();
-			broadcast(leaveMsg);
-
-			cluster.stop();
-			logger.info("Mqtt cluster manager stopped");
-		}
-
 		if (mqttServer != null) {
 			mqttServer.stop();
-			logger.info("MQTT Server stopped");
+		} else {
+			stopCluster();
 		}
-		if (clusterStorage != null) {
-			clusterStorage.stop();
+	}
+
+	/**
+	 * 停止集群连接并关闭持久化存储。
+	 */
+	public void stopCluster() {
+		if (!stopped.compareAndSet(false, true)) {
+			return;
+		}
+		try {
+			if (cluster != null) {
+				NodeLeaveMessage leaveMsg = new NodeLeaveMessage();
+				broadcast(leaveMsg);
+
+				cluster.stop();
+				logger.info("Mqtt cluster manager stopped");
+			}
+		} finally {
+			if (clusterStorage != null) {
+				clusterStorage.stop();
+			}
 		}
 	}
 
