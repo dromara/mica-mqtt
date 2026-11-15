@@ -19,6 +19,7 @@ package org.dromara.mica.mqtt.core.server.pipeline.message;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
+import org.dromara.mica.mqtt.core.server.pipeline.MqttMessageDeliveryHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +28,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author L.cm
  */
-public class UpStreamMessageHandler extends BaseMessageHandler {
+public class UpStreamMessageHandler extends BaseMessageHandler implements MqttMessageDeliveryHandler {
 	private static final Logger logger = LoggerFactory.getLogger(UpStreamMessageHandler.class);
 
 	public UpStreamMessageHandler(MqttServer mqttServer) {

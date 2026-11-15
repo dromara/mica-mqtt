@@ -17,8 +17,10 @@
 package org.dromara.mica.mqtt.core.server;
 
 import org.dromara.mica.mqtt.core.server.model.Message;
+import org.dromara.mica.mqtt.core.server.pipeline.MqttMessageDeliveryHandler;
 import org.dromara.mica.mqtt.core.server.store.InMemoryMqttMessageStore;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.lang.reflect.Method;
 import java.util.concurrent.CountDownLatch;
@@ -32,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Timeout(10)
 class MqttWillDeliveryTest {
 	@Test
 	void retainsWillWhenAllDeliveryAttemptsFail() throws Exception {
@@ -85,6 +88,90 @@ class MqttWillDeliveryTest {
 			executor.shutdown();
 			assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
 			assertEquals(3, attempts.get());
+			assertNull(store.getWillMessage("client"));
+		} finally {
+			executor.shutdownNow();
+			store.clean();
+		}
+	}
+
+	@Test
+	void deliveryFailureBeforeAnyDeliveryHandlerKeepsWill() throws Exception {
+		InMemoryMqttMessageStore store = new InMemoryMqttMessageStore();
+		Message will = new Message();
+		store.addWillMessage("client", will);
+		AtomicInteger deliveries = new AtomicInteger();
+		ExecutorService executor = Executors.newSingleThreadExecutor();
+		try {
+			MqttServerCreator creator = MqttServer.create().mqttExecutor(executor).messageStore(store);
+			// 前置 handler 主动中断，投递 handler 永远不会执行
+			creator.getMessagePipeline().addHandler(new MqttMessageDeliveryHandler() {
+				@Override
+				public boolean handle(Message message) {
+					deliveries.incrementAndGet();
+					return true;
+				}
+
+				@Override
+				public int getOrder() {
+					return 200;
+				}
+			});
+			creator.getMessagePipeline().addHandler(message -> false);
+			MqttServerAioListener listener = new MqttServerAioListener(creator);
+			Method send = MqttServerAioListener.class.getDeclaredMethod("sendWillMessage", String.class, Message.class);
+			send.setAccessible(true);
+			send.invoke(listener, "client", will);
+			executor.shutdown();
+			assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
+			assertEquals(0, deliveries.get());
+			assertSame(will, store.getWillMessage("client"));
+		} finally {
+			executor.shutdownNow();
+			store.clean();
+		}
+	}
+
+	@Test
+	void postDeliveryHandlerFailureMustNotRepublishWill() throws Exception {
+		InMemoryMqttMessageStore store = new InMemoryMqttMessageStore();
+		Message will = new Message();
+		store.addWillMessage("client", will);
+		AtomicInteger deliveries = new AtomicInteger();
+		ExecutorService executor = Executors.newSingleThreadExecutor();
+		try {
+			MqttServerCreator creator = MqttServer.create().mqttExecutor(executor).messageStore(store);
+			creator.getMessagePipeline().addHandler(new MqttMessageDeliveryHandler() {
+				@Override
+				public boolean handle(Message message) {
+					deliveries.incrementAndGet();
+					return true;
+				}
+
+				@Override
+				public int getOrder() {
+					return 100;
+				}
+			});
+			// 投递已成功，后置 handler 的异常不应被当成投递失败
+			creator.getMessagePipeline().addHandler(new org.dromara.mica.mqtt.core.server.pipeline.MqttMessageHandler() {
+				@Override
+				public boolean handle(Message message) {
+					throw new IllegalStateException("post delivery failure");
+				}
+
+				@Override
+				public int getOrder() {
+					return 200;
+				}
+			});
+			MqttServerAioListener listener = new MqttServerAioListener(creator);
+			Method send = MqttServerAioListener.class.getDeclaredMethod("sendWillMessage", String.class, Message.class);
+			send.setAccessible(true);
+			send.invoke(listener, "client", will);
+			executor.shutdown();
+			assertTrue(executor.awaitTermination(3, TimeUnit.SECONDS));
+			assertEquals(1, deliveries.get());
 			assertNull(store.getWillMessage("client"));
 		} finally {
 			executor.shutdownNow();
