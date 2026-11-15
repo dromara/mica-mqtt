@@ -11,7 +11,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * MqttPendingSubscription，参考于 netty-mqtt-client
@@ -19,15 +22,31 @@ import java.util.Objects;
 final class MqttPendingSubscription {
 	private static final Logger logger = LoggerFactory.getLogger(MqttPendingSubscription.class);
 	private final List<MqttClientSubscription> subscriptionList;
+	private final Set<String> cancelledTopicFilters = new HashSet<>();
 	private final RetryProcessor<MqttSubscribeMessage> retryProcessor = new RetryProcessor<>();
 
 	MqttPendingSubscription(List<MqttClientSubscription> subscriptionList, MqttSubscribeMessage message) {
-		this.subscriptionList = subscriptionList;
+		this.subscriptionList = new ArrayList<>(subscriptionList);
 		this.retryProcessor.setOriginalMessage(message);
 	}
 
 	public List<MqttClientSubscription> getSubscriptionList() {
 		return subscriptionList;
+	}
+
+	/**
+	 * 标记取消的主题，保留原订阅顺序以对应 SUBACK 返回码。
+	 *
+	 * @param topicFilters 待取消的主题过滤器
+	 * @return 是否全部取消
+	 */
+	boolean cancelSubscriptions(List<String> topicFilters) {
+		cancelledTopicFilters.addAll(topicFilters);
+		return subscriptionList.stream().allMatch(subscription -> isCancelled(subscription.getTopicFilter()));
+	}
+
+	boolean isCancelled(String topicFilter) {
+		return cancelledTopicFilters.contains(topicFilter);
 	}
 
 	void startRetransmitTimer(TimerTaskService taskService, ChannelContext context) {

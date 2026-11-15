@@ -18,7 +18,6 @@ package org.dromara.mica.mqtt.core.client;
 
 import net.dreamlu.mica.net.utils.collection.IntObjectHashMap;
 import net.dreamlu.mica.net.utils.collection.IntObjectMap;
-import net.dreamlu.mica.net.utils.collection.MultiValueMap;
 import org.dromara.mica.mqtt.codec.MqttQoS;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
@@ -28,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -46,9 +46,9 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 	/**
 	 * 订阅的数据承载
 	 */
-	private final MultiValueMap<String, MqttClientSubscription> subscriptions = new MultiValueMap<>(new ConcurrentHashMap<>());
-	private final IntObjectMap<MqttPendingSubscription> pendingSubscriptions = new IntObjectHashMap<>();
-	private final IntObjectMap<MqttPendingUnSubscription> pendingUnSubscriptions = new IntObjectHashMap<>();
+	private final Map<String, Set<MqttClientSubscription>> subscriptions = new ConcurrentHashMap<>();
+	private final Map<Integer, MqttPendingSubscription> pendingSubscriptions = new ConcurrentHashMap<>();
+	private final Map<Integer, MqttPendingUnSubscription> pendingUnSubscriptions = new ConcurrentHashMap<>();
 	private final Map<Integer, MqttPendingPublish> pendingPublishData = new ConcurrentHashMap<>();
 	private final IntObjectMap<MqttPendingQos2Publish> pendingQos2PublishData = new IntObjectHashMap<>();
 	/**
@@ -73,21 +73,14 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 
 	@Override
 	public void removePaddingSubscribes(List<String> topicFilters) {
-		Set<Integer> needToRemove = new HashSet<>();
 		pendingSubscriptions.forEach((messageId, pendingSubscription) -> {
-			List<MqttClientSubscription> subscriptionList = pendingSubscription.getSubscriptionList();
-			if (subscriptionList != null) {
-				subscriptionList.removeIf(subscription -> topicFilters.contains(subscription.getTopicFilter()));
-			}
-			// 如果已经被删到为空
-			if (subscriptionList == null || subscriptionList.isEmpty()) {
-				// 停止线程
-				pendingSubscription.onSubAckReceived();
-				needToRemove.add(messageId);
+			synchronized (pendingSubscription) {
+				if (pendingSubscription.cancelSubscriptions(topicFilters)) {
+					pendingSubscription.onSubAckReceived();
+					pendingSubscriptions.remove(messageId, pendingSubscription);
+				}
 			}
 		});
-		// 清除 messageId 的过程订阅
-		needToRemove.forEach(pendingSubscriptions::remove);
 	}
 
 	@Override
@@ -97,7 +90,7 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 
 	@Override
 	public void addSubscription(MqttClientSubscription subscription) {
-		subscriptions.add(subscription.getTopicFilter(), subscription);
+		subscriptions.computeIfAbsent(subscription.getTopicFilter(), key -> new CopyOnWriteArraySet<>()).add(subscription);
 	}
 
 	@Override
@@ -123,7 +116,7 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 			if (subQos.value() >= mqttQoS.value()) {
 				// 5. 监听器不相同则直接添加
 				if (subListener != listener) {
-					subscriptions.add(topicFilter, clientSubscription);
+					addSubscription(clientSubscription);
 					logger.warn("MQTT Topic:{} mqttQoS:{} listener:{} has a higher level qos, added directly.", topicFilter, mqttQoS, listener);
 				} else {
 					logger.error("MQTT Topic:{} mqttQoS:{} listener:{} has a higher level qos, duplicate subscription.", topicFilter, mqttQoS, listener);

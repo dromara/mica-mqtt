@@ -188,7 +188,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			.addSubscriptions(topicSubscriptionList)
 			.messageId(packetId)
 			.build();
-		MqttPendingSubscription pendingSubscription = new MqttPendingSubscription(new ArrayList<>(reSubscriptionList), message);
+		MqttPendingSubscription pendingSubscription = new MqttPendingSubscription(reSubscriptionList, message);
 		pendingSubscription.startRetransmitTimer(taskService, context);
 		clientSession.addPaddingSubscribe(packetId, pendingSubscription);
 		// gitee issues #IB72L6 先添加并启动重试，再发送订阅
@@ -233,7 +233,17 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		if (paddingSubscribe == null) {
 			return;
 		}
-		List<MqttClientSubscription> subscriptionList = paddingSubscribe.getSubscriptionList();
+		synchronized (paddingSubscribe) {
+			if (clientSession.getPaddingSubscribe(packetId) != paddingSubscribe) {
+				return;
+			}
+			processPendingSubAck(context, message, packetId, paddingSubscribe);
+		}
+	}
+
+	private void processPendingSubAck(ChannelContext context, MqttSubAckMessage message, int packetId,
+									  MqttPendingSubscription paddingSubscribe) {
+		List<MqttClientSubscription> subscriptionList = new ArrayList<>(paddingSubscribe.getSubscriptionList());
 		MqttSubAckPayload subAckPayload = message.payload();
 		List<Short> reasonCodeList = subAckPayload.reasonCodes();
 		// reasonCodes 为空
@@ -265,6 +275,7 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 				}
 			}
 		}
+		subscribedList.removeIf(subscription -> paddingSubscribe.isCancelled(subscription.getTopicFilter()));
 		// 判断订阅结果，对于没有订阅成功的，使其触发重试
 		if (subscribedList.isEmpty()) {
 			logger.error("MqttClient subscriptionList:{} subscribe failed packetId:{}", subscriptionList, packetId);
