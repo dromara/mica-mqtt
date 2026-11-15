@@ -53,6 +53,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -251,6 +252,15 @@ class ClusterClientTakeoverTest {
 			if (second.getClusterManager() != null) second.getClusterManager().stop();
 			if (first.getClusterManager() != null) first.getClusterManager().stop();
 		}
+	}
+
+	@Test
+	void 忽略没有客户端标识的遗嘱操作() {
+		ClusterMqttMessageStore store = new ClusterMqttMessageStore(new InMemoryMqttMessageStore(), new RecordingManager("local"));
+		assertFalse(store.addWillMessage(null, new Message()));
+		assertFalse(store.clearWillMessage(""));
+		assertNull(store.getWillMessage(null));
+		store.applyWillMessageLocal(new WillMessageNotifyMessage());
 	}
 
 	@Test

@@ -81,6 +81,9 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 
 	@Override
 	public boolean addWillMessage(String clientId, Message message) {
+		if (clientId == null || clientId.isEmpty()) {
+			return false;
+		}
 		synchronized (willLock(clientId)) {
 			boolean added = delegate.addWillMessage(clientId, message);
 			if (added) {
@@ -94,6 +97,9 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 
 	@Override
 	public boolean clearWillMessage(String clientId) {
+		if (clientId == null || clientId.isEmpty()) {
+			return false;
+		}
 		synchronized (willLock(clientId)) {
 			String token = willTokens.remove(clientId);
 			boolean removed = delegate.clearWillMessage(clientId);
@@ -106,6 +112,9 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 
 	@Override
 	public boolean clearWillMessage(String clientId, Message expected) {
+		if (clientId == null || clientId.isEmpty()) {
+			return false;
+		}
 		synchronized (willLock(clientId)) {
 			boolean removed = delegate.clearWillMessage(clientId, expected);
 			if (removed) {
@@ -142,6 +151,9 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 
 	@Override
 	public Message getWillMessage(String clientId) {
+		if (clientId == null || clientId.isEmpty()) {
+			return null;
+		}
 		return delegate.getWillMessage(clientId);
 	}
 
@@ -204,6 +216,9 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	 * @return 是否成功
 	 */
 	public boolean addWillMessageLocal(String clientId, Message message) {
+		if (clientId == null || clientId.isEmpty()) {
+			return false;
+		}
 		synchronized (willLock(clientId)) {
 			willTokens.remove(clientId);
 			return delegate.addWillMessage(clientId, message);
@@ -217,6 +232,9 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	 */
 	public void applyWillMessageLocal(WillMessageNotifyMessage notification) {
 		String clientId = notification.getClientId();
+		if (clientId == null || clientId.isEmpty()) {
+			return;
+		}
 		String token = notification.getWillToken();
 		synchronized (willLock(clientId)) {
 			if (notification.isClear()) {
@@ -242,6 +260,9 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	 * @return 是否成功
 	 */
 	public boolean clearWillMessageLocal(String clientId) {
+		if (clientId == null || clientId.isEmpty()) {
+			return false;
+		}
 		synchronized (willLock(clientId)) {
 			willTokens.remove(clientId);
 			return delegate.clearWillMessage(clientId);
