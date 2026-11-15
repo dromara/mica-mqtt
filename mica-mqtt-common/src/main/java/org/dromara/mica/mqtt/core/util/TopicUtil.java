@@ -62,20 +62,19 @@ public final class TopicUtil {
 		if (StrUtil.isEmpty(topicFilter)) {
 			throw new IllegalArgumentException("TopicFilter is empty:" + topicFilter);
 		}
-		char[] topicFilterChars = topicFilter.toCharArray();
-		int topicFilterLength = topicFilterChars.length;
+		int topicFilterLength = topicFilter.length();
 		int topicFilterIdxEnd = topicFilterLength - 1;
 		char ch;
 		for (int i = 0; i < topicFilterLength; i++) {
-			ch = topicFilterChars[i];
+			ch = topicFilter.charAt(i);
 			if (Character.isWhitespace(ch)) {
 				logger.warn("注意：topic:[{}] 中包含空白字符串:[{}]，请检查是否正确", topicFilter, ch);
 			} else if (ch == MqttCodecUtil.TOPIC_WILDCARDS_MORE) {
 				// 校验: # 必须单独占据最后一级
-				validateMultiLevelWildcard(topicFilter, topicFilterChars, i, topicFilterIdxEnd);
+				validateMultiLevelWildcard(topicFilter, i, topicFilterIdxEnd);
 			} else if (ch == MqttCodecUtil.TOPIC_WILDCARDS_ONE) {
 				// 校验: 单独 + 是允许的，判断 + 号前一位是否为 /，如果有后一位也必须为 /
-				if ((i > 0 && topicFilterChars[i - 1] != MqttCodecUtil.TOPIC_LAYER) || (i < topicFilterIdxEnd && topicFilterChars[i + 1] != MqttCodecUtil.TOPIC_LAYER)) {
+				if ((i > 0 && topicFilter.charAt(i - 1) != MqttCodecUtil.TOPIC_LAYER) || (i < topicFilterIdxEnd && topicFilter.charAt(i + 1) != MqttCodecUtil.TOPIC_LAYER)) {
 					throw new IllegalArgumentException("Mqtt subscribe topicFilter illegal:" + topicFilter);
 				}
 			}
@@ -91,13 +90,12 @@ public final class TopicUtil {
 	 * </p>
 	 *
 	 * @param topicFilter topicFilter
-	 * @param topicFilterChars topicFilter 的字符数组
 	 * @param idx 多级通配符所在下标
 	 * @param topicFilterIdxEnd topicFilter 的最后一个下标
 	 */
-	private static void validateMultiLevelWildcard(String topicFilter, char[] topicFilterChars, int idx, int topicFilterIdxEnd) {
+	private static void validateMultiLevelWildcard(String topicFilter, int idx, int topicFilterIdxEnd) {
 		// 校验: # 必须单独占据最后一级
-		if (idx < topicFilterIdxEnd || (idx > 0 && topicFilterChars[idx - 1] != MqttCodecUtil.TOPIC_LAYER)) {
+		if (idx < topicFilterIdxEnd || (idx > 0 && topicFilter.charAt(idx - 1) != MqttCodecUtil.TOPIC_LAYER)) {
 			throw new IllegalArgumentException("Mqtt subscribe topicFilter illegal:" + topicFilter);
 		}
 	}
@@ -168,6 +166,9 @@ public final class TopicUtil {
 	 * @return 是否匹配
 	 */
 	public static boolean match(String topicFilter, String topicName) {
+		if (topicFilter == null || topicFilter.isEmpty() || topicName == null) {
+			return false;
+		}
 		validateTopicFilter(topicFilter);
 		if (topicName.isEmpty() && !"#".equals(topicFilter)) {
 			return false;
@@ -175,19 +176,30 @@ public final class TopicUtil {
 		if (topicName.startsWith("$") && (topicFilter.startsWith("#") || topicFilter.startsWith("+"))) {
 			return false;
 		}
-		String[] filters = topicFilter.split("/", -1);
-		String[] levels = topicName.split("/", -1);
-		int index = 0;
-		for (String filter : filters) {
-			if ("#".equals(filter)) {
+		int filterStart = 0;
+		int topicStart = 0;
+		while (true) {
+			int filterEnd = topicFilter.indexOf('/', filterStart);
+			int topicEnd = topicName.indexOf('/', topicStart);
+			filterEnd = filterEnd < 0 ? topicFilter.length() : filterEnd;
+			topicEnd = topicEnd < 0 ? topicName.length() : topicEnd;
+			int filterLength = filterEnd - filterStart;
+			if (filterLength == 1 && topicFilter.charAt(filterStart) == '#') {
 				return true;
 			}
-			if (index >= levels.length || (!"+".equals(filter) && !filter.equals(levels[index]))) {
+			if (!(filterLength == 1 && topicFilter.charAt(filterStart) == '+')
+				&& (filterLength != topicEnd - topicStart || !topicFilter.regionMatches(filterStart, topicName, topicStart, filterLength))) {
 				return false;
 			}
-			index++;
+			if (filterEnd == topicFilter.length()) {
+				return topicEnd == topicName.length();
+			}
+			if (topicEnd == topicName.length()) {
+				return filterEnd + 2 == topicFilter.length() && topicFilter.charAt(filterEnd + 1) == '#';
+			}
+			filterStart = filterEnd + 1;
+			topicStart = topicEnd + 1;
 		}
-		return index == levels.length;
 	}
 
 	/**

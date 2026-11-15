@@ -37,6 +37,7 @@ class TopicUtilTest {
 	@Test
 	void wildcardMatchesZeroTrailingLevelsAndExcludesSystemTopics() {
 		Assertions.assertTrue(TopicUtil.match("a/+/#", "a/b"));
+		Assertions.assertFalse(TopicUtil.match("", "a"));
 		Assertions.assertTrue(TopicUtil.match("+/#", "a"));
 		Assertions.assertFalse(TopicUtil.match("#", "$SYS/a"));
 		Assertions.assertFalse(TopicUtil.match("+/a", "$SYS/a"));
