@@ -819,19 +819,19 @@ public final class MqttClientCreator {
 			this.clientSession.initPendingPublishQueue(this.pendingPublishQueueSize);
 		}
 		// tioExecutor
-		if (this.tioExecutor == null) {
+		if (this.tioExecutor == null || this.tioExecutor.isShutdown()) {
 			this.tioExecutor = ThreadUtils.getTioExecutor(3);
 		}
 		// groupExecutor
-		if (this.groupExecutor == null) {
+		if (this.groupExecutor == null || this.groupExecutor.isShutdown()) {
 			this.groupExecutor = ThreadUtils.getGroupExecutor(4);
 		}
 		// mqttExecutor
-		if (this.mqttExecutor == null) {
+		if (this.mqttExecutor == null || this.mqttExecutor.isShutdown()) {
 			this.mqttExecutor = ThreadUtils.getBizExecutor(Math.max(2, ThreadUtils.CORE_POOL_SIZE));
 		}
 		// taskService
-		if (this.taskService == null) {
+		if (this.taskService == null || this.taskServiceOwner) {
 			this.taskService = new DefaultTimerTaskService();
 			this.taskServiceOwner = true;
 		}

@@ -62,6 +62,7 @@ public final class MqttClient implements IMqttClient {
 	private final TioClientConfig clientTioConfig;
 	private final IMqttClientSession clientSession;
 	private final TimerTaskService taskService;
+	private final boolean taskServiceOwner;
 	private final ExecutorService mqttExecutor;
 	private final MqttSerializer mqttSerializer;
 	private ClientChannelContext context;
@@ -75,6 +76,7 @@ public final class MqttClient implements IMqttClient {
 		this.config = config;
 		this.clientTioConfig = tioClient.getClientConfig();
 		this.taskService = config.getTaskService();
+		this.taskServiceOwner = config.isTaskServiceOwner();
 		this.mqttExecutor = config.getMqttExecutor();
 		this.clientSession = config.getClientSession();
 		this.mqttSerializer = config.getMqttSerializer();
@@ -615,7 +617,7 @@ public final class MqttClient implements IMqttClient {
 		// 2. 停止 tio
 		boolean result = tioClient.stop();
 		// 仅关闭客户端创建的定时任务服务，外部传入的服务可能被共享
-		if (config.isTaskServiceOwner()) {
+		if (taskServiceOwner) {
 			taskService.stop();
 		}
 		// 3. 优雅停止 mqtt 工作线程

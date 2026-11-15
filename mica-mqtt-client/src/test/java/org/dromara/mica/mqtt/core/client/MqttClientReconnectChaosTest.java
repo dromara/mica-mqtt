@@ -49,6 +49,30 @@ import java.util.concurrent.atomic.AtomicInteger;
 class MqttClientReconnectChaosTest {
 
 	@Test
+	void creatorCanConnectAgainAfterClientStops() throws Exception {
+		CountingConnectListener listener = new CountingConnectListener();
+		FakeBroker broker = FakeBroker.create()
+			.next(new ConnAckAndHoldHandler())
+			.next(new ConnAckAndHoldHandler());
+		MqttClient first = null;
+		MqttClient second = null;
+		try {
+			MqttClientCreator creator = MqttClient.create().ip("127.0.0.1").port(broker.getPort())
+				.timeout(1).connAckTimeout(1).connectListener(listener);
+			first = creator.connectSync();
+			Assertions.assertTrue(listener.awaitConnectedCount(1, 3000));
+			first.stop();
+			first = null;
+			second = creator.connectSync();
+			Assertions.assertTrue(listener.awaitConnectedCount(2, 3000));
+		} finally {
+			stop(second);
+			stop(first);
+			broker.close();
+		}
+	}
+
+	@Test
 	void shouldRemainDisconnectedWhenBrokerNeverSendsConnAck() throws Exception {
 		CountDownLatch connectReadLatch = new CountDownLatch(1);
 		CountingConnectListener listener = new CountingConnectListener();
