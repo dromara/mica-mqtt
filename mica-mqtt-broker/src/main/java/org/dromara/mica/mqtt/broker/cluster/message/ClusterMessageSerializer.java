@@ -65,6 +65,11 @@ public class ClusterMessageSerializer {
 	 * Header key for timeout value in milliseconds.
 	 */
 	public static final String HEADER_TIMEOUT = "timeout";
+	/**
+	 * Header key marking a NODE_LEAVE as detected by failure monitoring
+	 * (as opposed to a graceful shutdown of the leaving node).
+	 */
+	public static final String HEADER_FAILOVER = "failover";
 
 	/**
 	 * Serializes a cluster message into a t-io cluster data message for network transmission.

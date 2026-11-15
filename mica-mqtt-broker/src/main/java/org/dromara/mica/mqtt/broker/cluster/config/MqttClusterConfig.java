@@ -89,6 +89,16 @@ public class MqttClusterConfig {
 	private long nodeTimeout = 15000;
 
 	/**
+	 * Time in milliseconds to retain cleared will-version tombstones.
+	 * <p>
+	 * Tombstones suppress late-arriving will adds from older connections. A value
+	 * shorter than the maximum inter-node message delay (or partition recovery
+	 * window) allows an old will to be resurrected. Defaults to 30 minutes.
+	 * </p>
+	 */
+	private long willTombstoneTtlMs = 30 * 60 * 1000L;
+
+	/**
 	 * Shared subscription dispatch strategy name.
 	 * <p>
 	 * Controls how one subscriber is selected from a shared-subscription group when
@@ -202,6 +212,19 @@ public class MqttClusterConfig {
 
 	public MqttClusterConfig nodeTimeout(long nodeTimeout) {
 		this.nodeTimeout = nodeTimeout;
+		return this;
+	}
+
+	public long getWillTombstoneTtlMs() {
+		return willTombstoneTtlMs;
+	}
+
+	public void setWillTombstoneTtlMs(long willTombstoneTtlMs) {
+		this.willTombstoneTtlMs = willTombstoneTtlMs;
+	}
+
+	public MqttClusterConfig willTombstoneTtlMs(long willTombstoneTtlMs) {
+		this.willTombstoneTtlMs = willTombstoneTtlMs;
 		return this;
 	}
 

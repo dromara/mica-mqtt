@@ -127,7 +127,10 @@ class RetainIndexTest {
 		engine.open(tempDir);
 		retainIndex = new RetainIndex(engine);
 		retainIndex.loadFromStore();
-		Thread.sleep(1200);
+		long deadline = System.currentTimeMillis() + 5000;
+		while (!retainIndex.match("timed").isEmpty() && System.currentTimeMillis() < deadline) {
+			Thread.sleep(50);
+		}
 		assertTrue(retainIndex.match("timed").isEmpty());
 		engine.close();
 		engine = new H2MvStoreImpl();

@@ -34,6 +34,21 @@ import java.util.Map;
  * @since 1.0.0
  */
 public class NodeLeaveMessage implements ClusterMessage {
+	/**
+	 * 实际离开集群的节点标识。
+	 * <p>
+	 * 正常下线时由离开节点广播，该值为空，接收方回退到消息来源节点；
+	 * 故障检测时由存活节点代播，必须显式携带真正的失效节点，否则接收方
+	 * 会把「检测者」当成离开者，清理错对象。
+	 */
+	private String nodeId;
+	/**
+	 * 是否为故障检测触发的下线。
+	 * <p>
+	 * 正常下线时离开节点还有机会自行投递遗嘱；只有故障下线才需要由存活节点
+	 * 代发备份遗嘱，避免正常停机时重复发布。
+	 */
+	private boolean failover;
 
 	@Override
 	public ClusterMessageType getType() {
@@ -42,6 +57,12 @@ public class NodeLeaveMessage implements ClusterMessage {
 
 	@Override
 	public void toClusterData(Map<String, String> headers) {
+		if (nodeId != null && !nodeId.isEmpty()) {
+			headers.put(ClusterMessageSerializer.HEADER_NODE_ID, nodeId);
+		}
+		if (failover) {
+			headers.put(ClusterMessageSerializer.HEADER_FAILOVER, Boolean.TRUE.toString());
+		}
 	}
 
 	@Override
@@ -51,5 +72,23 @@ public class NodeLeaveMessage implements ClusterMessage {
 
 	@Override
 	public void fromClusterData(ClusterDataMessage message) {
+		this.nodeId = message.getHeader(ClusterMessageSerializer.HEADER_NODE_ID);
+		this.failover = Boolean.parseBoolean(message.getHeader(ClusterMessageSerializer.HEADER_FAILOVER));
+	}
+
+	public String getNodeId() {
+		return nodeId;
+	}
+
+	public void setNodeId(String nodeId) {
+		this.nodeId = nodeId;
+	}
+
+	public boolean isFailover() {
+		return failover;
+	}
+
+	public void setFailover(boolean failover) {
+		this.failover = failover;
 	}
 }

@@ -294,15 +294,16 @@ class ClusterClientTakeoverTest {
 	@Test
 	void 遗嘱添加与清理乱序时保留最新状态() {
 		ClusterMqttMessageStore store = new ClusterMqttMessageStore(new InMemoryMqttMessageStore(), new RecordingManager("local"));
+		long baseVersion = System.currentTimeMillis();
 		WillMessageNotifyMessage oldAdd = new WillMessageNotifyMessage();
 		oldAdd.setClientId("device");
 		oldAdd.setWillToken("old");
-		oldAdd.setWillVersion(1);
+		oldAdd.setWillVersion(baseVersion);
 		oldAdd.setWillMessage(new Message());
 		WillMessageNotifyMessage newAdd = new WillMessageNotifyMessage();
 		newAdd.setClientId("device");
 		newAdd.setWillToken("new");
-		newAdd.setWillVersion(2);
+		newAdd.setWillVersion(baseVersion + 1);
 		Message newWill = new Message();
 		newAdd.setWillMessage(newWill);
 		store.applyWillMessageLocal(oldAdd);
@@ -312,7 +313,7 @@ class ClusterClientTakeoverTest {
 		WillMessageNotifyMessage clear = new WillMessageNotifyMessage();
 		clear.setClientId("device");
 		clear.setWillToken("new");
-		clear.setWillVersion(2);
+		clear.setWillVersion(baseVersion + 1);
 		clear.setClear(true);
 		store.applyWillMessageLocal(clear);
 		store.applyWillMessageLocal(newAdd);

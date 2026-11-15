@@ -58,16 +58,21 @@ class ClusterStorageTest {
 			.clusterConfig(new MqttClusterConfig().enabled(true).clusterHost("127.0.0.1")
 				.clusterPort(clusterPort).storageConfig(storageConfig));
 		MqttServer server = creator.build();
-		assertSame(server, creator.build());
-		assertSame(server, creator.start());
-		creator.getClusterManager().getClusterStorage().getEngine().put("test", new byte[]{1});
-		server.stop();
-		ClusterStorage reopened = new ClusterStorage(storageConfig);
-		assertTrue(reopened.start());
 		try {
-			assertArrayEquals(new byte[]{1}, reopened.getEngine().get("test"));
+			assertSame(server, creator.build());
+			assertSame(server, creator.start());
+			creator.getClusterManager().getClusterStorage().getEngine().put("test", new byte[]{1});
+			server.stop();
+			ClusterStorage reopened = new ClusterStorage(storageConfig);
+			assertTrue(reopened.start());
+			try {
+				assertArrayEquals(new byte[]{1}, reopened.getEngine().get("test"));
+			} finally {
+				reopened.stop();
+			}
 		} finally {
-			reopened.stop();
+			// 断言失败时也要释放集群线程和 H2 文件锁
+			server.stop();
 		}
 	}
 

@@ -43,6 +43,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -60,6 +62,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class MqttClusterManager {
 	private static final Logger logger = LoggerFactory.getLogger(MqttClusterManager.class);
+	private static final int WILL_DELIVERY_ATTEMPTS = 3;
 
 	private ClusterApi cluster;
 	private MqttServer mqttServer;
@@ -70,6 +73,18 @@ public class MqttClusterManager {
 	private ClusterMqttSessionManager sessionManager;
 	private final ClusterMetrics metrics = new ClusterMetrics();
 	private final AtomicBoolean stopped = new AtomicBoolean();
+	/**
+	 * 最近一次观察到节点在线的时间，用于故障检测（nodeId:host:port -> 时间戳）。
+	 */
+	private final Map<String, Long> nodeLastSeen = new ConcurrentHashMap<>();
+	/**
+	 * 节点存活监控是否已启动，避免重复 schedule。
+	 */
+	private final AtomicBoolean nodeMonitorStarted = new AtomicBoolean();
+	/**
+	 * 已调度故障遗嘱代发的下线节点，避免重复调度。
+	 */
+	private final Set<String> willFailoverScheduled = ConcurrentHashMap.newKeySet();
 
 	/**
 	 * Constructs a new cluster manager with the specified configuration.
@@ -197,6 +212,84 @@ public class MqttClusterManager {
 		StateSyncRequestMessage syncRequest = new StateSyncRequestMessage();
 		broadcast(syncRequest);
 		logger.info("Sent state sync request to cluster");
+
+		// 节点存活监控：t-io 的成员链接断开不会回调业务层，这里按配置的
+		// heartbeatInterval/nodeTimeout 主动巡检，发现失联节点后清理其客户端
+		// 并代发备份遗嘱。
+		startNodeMonitor();
+		startWillTombstoneCleaner();
+	}
+
+	/**
+	 * 周期性清理遗嘱墓碑，保证只接收通知的副本节点在长时间空闲时也能回收。
+	 */
+	private void startWillTombstoneCleaner() {
+		if (mqttServer == null) {
+			return;
+		}
+		IMqttMessageStore messageStore = getMessageStore();
+		if (!(messageStore instanceof ClusterMqttMessageStore)) {
+			return;
+		}
+		ClusterApi currentCluster = this.cluster;
+		if (currentCluster == null) {
+			return;
+		}
+		currentCluster.schedule(() -> {
+			try {
+				((ClusterMqttMessageStore) messageStore).pruneWillVersions();
+			} catch (Throwable e) {
+				logger.error("Failed to prune will version tombstones", e);
+			}
+		}, TimeUnit.MINUTES.toMillis(1));
+	}
+
+	private void startNodeMonitor() {
+		if (!nodeMonitorStarted.compareAndSet(false, true)) {
+			return;
+		}
+		long interval = Math.max(1000L, config.getHeartbeatInterval());
+		cluster.schedule(() -> {
+			try {
+				checkNodeLiveness();
+			} catch (Throwable e) {
+				logger.error("Failed to check cluster node liveness", e);
+			}
+		}, interval);
+	}
+
+	/**
+	 * 巡检在线节点：节点从「见过在线」变为「持续不可见」超过 nodeTimeout 后，
+	 * 视为故障下线，清理其客户端/订阅并触发备份遗嘱代发。
+	 */
+	void checkNodeLiveness() {
+		ClusterApi currentCluster = this.cluster;
+		if (currentCluster == null || stopped.get()) {
+			return;
+		}
+		long now = System.currentTimeMillis();
+		Set<String> online = new HashSet<>();
+		for (Node node : currentCluster.getOnlineMembers()) {
+			String nodeId = node.getPeerHost();
+			online.add(nodeId);
+			nodeLastSeen.put(nodeId, now);
+		}
+		long timeout = Math.max(config.getNodeTimeout(), config.getHeartbeatInterval());
+		for (Map.Entry<String, Long> entry : nodeLastSeen.entrySet()) {
+			String nodeId = entry.getKey();
+			if (online.contains(nodeId) || now - entry.getValue() <= timeout) {
+				continue;
+			}
+			if (nodeLastSeen.remove(nodeId, entry.getValue())) {
+				logger.warn("Cluster node {} unreachable for {}ms, treating as left", nodeId, now - entry.getValue());
+				handleNodeLeave(nodeId, true);
+				// 广播出去，让尚未完成检测的节点也清理该节点状态并代发备份遗嘱
+				NodeLeaveMessage leaveMessage = new NodeLeaveMessage();
+				leaveMessage.setNodeId(nodeId);
+				leaveMessage.setFailover(true);
+				broadcast(leaveMessage);
+			}
+		}
 	}
 
 	private void handleClusterMessage(ClusterDataMessage message) {
@@ -288,8 +381,15 @@ public class MqttClusterManager {
 				break;
 			}
 			case NODE_LEAVE: {
-				sessionManager.clearNodeClientsAndSubscriptions(sourceNode);
-				logger.info("Node {} left cluster, cleaned up its clients and subscriptions", sourceNode);
+				NodeLeaveMessage leaveMessage = (NodeLeaveMessage) clusterMsg;
+				// 正常下线时 nodeId 为空，以消息来源为准；故障代播时显式携带真正失效的节点
+				String leavingNode = leaveMessage.getNodeId();
+				if (leavingNode == null || leavingNode.isEmpty()) {
+					leavingNode = sourceNode;
+				}
+				nodeLastSeen.remove(leavingNode);
+				handleNodeLeave(leavingNode, leaveMessage.isFailover());
+				logger.info("Node {} left cluster, cleaned up its clients and subscriptions", leavingNode);
 				break;
 			}
 			case WILL_MESSAGE: {
@@ -377,6 +477,15 @@ public class MqttClusterManager {
 	}
 
 	/**
+	 * 重新处理本地共享订阅投递，失败时按原分组选择其他客户端。
+	 *
+	 * @param message 共享订阅投递消息
+	 */
+	public void retrySharedDispatch(SharedDispatchToClientMessage message) {
+		handleSharedDispatchToClient(message, sessionManager);
+	}
+
+	/**
 	 * Handles a SHARED_DISPATCH_TO_CLIENT message received from another node.
 	 * <p>
 	 * The publisher's node has already selected this client as the single recipient
@@ -389,15 +498,6 @@ public class MqttClusterManager {
 	 * and delivers to a still-active subscriber (plan B from the design doc).
 	 * </p>
 	 */
-	/**
-	 * 重新处理本地共享订阅投递，失败时按原分组选择其他客户端。
-	 *
-	 * @param message 共享订阅投递消息
-	 */
-	public void retrySharedDispatch(SharedDispatchToClientMessage message) {
-		handleSharedDispatchToClient(message, sessionManager);
-	}
-
 	private void handleSharedDispatchToClient(SharedDispatchToClientMessage sdm,
 											  ClusterMqttSessionManager sessionManager) {
 		String clientId = sdm.getClientId();
@@ -498,6 +598,175 @@ public class MqttClusterManager {
 		}
 	}
 
+	/**
+	 * 处理节点下线：清理该节点的客户端/订阅，并在故障下线时按节点顺序延迟代发备份遗嘱。
+	 * <p>
+	 * 所有存活节点都会收到 NODE_LEAVE，并各自持有该节点客户端的备份遗嘱。为兼顾
+	 * 「不重复」和「代发节点失败后可接手」，这里不做一次性的选主，而是按 nodeId
+	 * 排序计算固定间隔的延迟：rank 0 最先发布并广播 clear，后续节点醒来时本地
+	 * 遗嘱通常已被清除，直接跳过；若 rank 0 在发布前失败，rank 1 的定时任务
+	 * 仍会执行并接手。网络分区导致成员视图不一致时退化为 at-least-once
+	 * （可能重复发布）；重试有上限，全部失败时保留备份并记录错误，不承诺
+	 * 无限期必达。这是无共识集群下的明确取舍。
+	 * </p>
+	 *
+	 * @param leavingNode 实际离开集群的节点
+	 * @param failover    是否为故障下线；正常下线时由离开节点自行投递遗嘱
+	 */
+	private void handleNodeLeave(String leavingNode, boolean failover) {
+		ClusterMqttSessionManager sessionManager = this.sessionManager != null
+			? this.sessionManager
+			: (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
+		List<String> orphanedClients = sessionManager.clearNodeClientsAndSubscriptions(leavingNode);
+		if (!failover || orphanedClients.isEmpty()) {
+			return;
+		}
+		// 捕获当前的遗嘱对象：重试期间客户端可能重连并写入新遗嘱，
+		// 只能继续处理这次下线对应的旧对象，不能把新遗嘱当成故障遗嘱发布。
+		IMqttMessageStore messageStore = getMessageStore();
+		Map<String, Message> wills = new LinkedHashMap<>();
+		for (String clientId : orphanedClients) {
+			Message willMessage = messageStore.getWillMessage(clientId);
+			if (willMessage != null && willMessage.getTopic() != null) {
+				wills.put(clientId, willMessage);
+			}
+		}
+		if (!wills.isEmpty()) {
+			scheduleFailoverWillPublish(leavingNode, wills);
+		}
+	}
+
+	/**
+	 * 按 rank 延迟调度故障遗嘱代发。rank 越小越早执行；更晚的节点作为接管者。
+	 */
+	private void scheduleFailoverWillPublish(String leavingNode, Map<String, Message> wills) {
+		if (!willFailoverScheduled.add(leavingNode)) {
+			return;
+		}
+		int rank = failoverRank(leavingNode);
+		long step = Math.max(1000L, config.getHeartbeatInterval());
+		long delay = rank * step;
+		logger.info("Scheduled failover will publish for node {} rank {} delay {}ms", leavingNode, rank, delay);
+		scheduleFailoverTask(() -> publishOrphanedWills(leavingNode, wills, 1), delay);
+	}
+
+	/**
+	 * 计算本节点在剩余存活节点中的排序，用于错开遗嘱代发时间。
+	 * 离开节点本身不参与比较。
+	 *
+	 * @param leavingNode 下线节点
+	 * @return 从 0 开始的 rank
+	 */
+	int failoverRank(String leavingNode) {
+		Set<String> members = new HashSet<>();
+		ClusterApi currentCluster = this.cluster;
+		if (currentCluster != null) {
+			// 使用配置/发现到的成员（而非瞬时在线视图）计算 rank，减少视图抖动
+			for (Node node : currentCluster.getRemoteMembers()) {
+				members.add(node.getPeerHost());
+			}
+		}
+		return failoverRank(localNodeId, leavingNode, members);
+	}
+
+	/**
+	 * 按 nodeId 排序计算 rank。所有节点使用同一排序规则，视图一致时得到相同顺序。
+	 *
+	 * @param localNodeId 本节点
+	 * @param leavingNode 下线节点
+	 * @param onlineNodeIds 本节点看到的在线节点
+	 * @return 从 0 开始的 rank
+	 */
+	static int failoverRank(String localNodeId, String leavingNode, Collection<String> onlineNodeIds) {
+		Set<String> candidates = new TreeSet<>();
+		candidates.add(localNodeId);
+		if (onlineNodeIds != null) {
+			for (String nodeId : onlineNodeIds) {
+				if (nodeId != null && !nodeId.equals(leavingNode)) {
+					candidates.add(nodeId);
+				}
+			}
+		}
+		int rank = 0;
+		for (String nodeId : candidates) {
+			if (nodeId.equals(localNodeId)) {
+				return rank;
+			}
+			rank++;
+		}
+		return rank;
+	}
+
+	private void publishOrphanedWills(String leavingNode, Map<String, Message> wills, int attempt) {
+		if (stopped.get()) {
+			willFailoverScheduled.remove(leavingNode);
+			return;
+		}
+		IMqttMessageStore messageStore = getMessageStore();
+		Map<String, Message> failed = new LinkedHashMap<>();
+		for (Map.Entry<String, Message> entry : wills.entrySet()) {
+			String clientId = entry.getKey();
+			Message willMessage = entry.getValue();
+			// 已被其他节点发布/清除，或客户端已重连写入新遗嘱：本次下线不再处理
+			if (messageStore.getWillMessage(clientId) != willMessage) {
+				continue;
+			}
+			if (!publishFailoverWill(clientId, willMessage)) {
+				failed.put(clientId, willMessage);
+			}
+		}
+		if (!failed.isEmpty() && attempt < WILL_DELIVERY_ATTEMPTS) {
+			scheduleFailoverTask(() -> publishOrphanedWills(leavingNode, failed, attempt + 1), 1000L);
+			return;
+		}
+		if (!failed.isEmpty()) {
+			logger.error("Failed to publish failover wills for clients:{} after {} attempts", failed.keySet(), attempt);
+		}
+		willFailoverScheduled.remove(leavingNode);
+	}
+
+	/**
+	 * 发布一条故障遗嘱；走与正常遗嘱相同的 message pipeline，
+	 * 只有确认投递成功（或没有订阅者这种正常空操作）时才清除备份。
+	 *
+	 * @param clientId 客户端标识
+	 * @param willMessage 遗嘱
+	 * @return 是否已成功处理
+	 */
+	private boolean publishFailoverWill(String clientId, Message willMessage) {
+		String topic = willMessage.getTopic();
+		try {
+			willMessage.setMessageType(MessageType.DOWN_STREAM);
+			// 与 MqttServerAioListener 的遗嘱路径保持一致：经过 message pipeline，
+			// 后置 handler 的异常不会造成重复投递；投递 handler 抛异常则返回 false 重试。
+			boolean delivered = mqttServer.getServerCreator().getMessagePipeline().handle(willMessage);
+			if (!delivered) {
+				logger.warn("Failover will delivery failed, will retry clientId:{} topic:{}", clientId, topic);
+				return false;
+			}
+			getMessageStore().clearWillMessage(clientId, willMessage);
+			logger.info("Published failover will for clientId:{} topic:{}", clientId, topic);
+			return true;
+		} catch (Throwable e) {
+			logger.error("Failed to publish failover will for clientId:{} topic:{}", clientId, topic, e);
+			return false;
+		}
+	}
+
+	private IMqttMessageStore getMessageStore() {
+		return mqttServer.getServerCreator().getMessageStore();
+	}
+
+	private void scheduleFailoverTask(Runnable task, long delay) {
+		ClusterApi currentCluster = this.cluster;
+		if (currentCluster == null) {
+			task.run();
+			return;
+		}
+		// 即使 rank 0 也交给时间轮执行，避免在集群消息处理线程里同步发布大量遗嘱
+		currentCluster.scheduleOnce(task, Math.max(1L, delay));
+	}
+
 	private void handleStateSyncRequest(String requestNodeId) {
 		ClusterMqttSessionManager sessionManager = this.sessionManager != null
 			? this.sessionManager
@@ -559,9 +828,13 @@ public class MqttClusterManager {
 	}
 
 	public void stop() {
-		if (mqttServer != null) {
-			mqttServer.stop();
-		} else {
+		try {
+			if (mqttServer != null) {
+				mqttServer.stop();
+			}
+		} finally {
+			// MqttServer.stop 会通过 stopListener 调用 stopCluster；若其内部提前抛异常
+			// （如 executor shutdown 失败），这里兜底释放集群连接和持久化存储。
 			stopCluster();
 		}
 	}
@@ -573,6 +846,7 @@ public class MqttClusterManager {
 		if (!stopped.compareAndSet(false, true)) {
 			return;
 		}
+		nodeLastSeen.clear();
 		try {
 			if (cluster != null) {
 				NodeLeaveMessage leaveMsg = new NodeLeaveMessage();

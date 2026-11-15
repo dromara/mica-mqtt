@@ -35,7 +35,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Cluster-aware session manager that decorates an underlying {@link IMqttSessionManager}.
@@ -57,6 +56,10 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	private final IMqttSessionManager delegate;
 	private final MqttClusterManager clusterManager;
 	private final ConcurrentHashMap<String, String> clientNodeMap = new ConcurrentHashMap<>();
+	/**
+	 * 按 clientId 分片锁，保证「归属裁决 + 订阅清理/写入」是原子的。
+	 */
+	private final Object[] clientLocks = new Object[64];
 	private volatile SessionStore sessionStore;
 	private volatile SharedSubStore sharedSubStore;
 
@@ -69,6 +72,13 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public ClusterMqttSessionManager(IMqttSessionManager delegate, MqttClusterManager clusterManager) {
 		this.delegate = delegate;
 		this.clusterManager = clusterManager;
+		for (int i = 0; i < clientLocks.length; i++) {
+			clientLocks[i] = new Object();
+		}
+	}
+
+	private Object clientLock(String clientId) {
+		return clientLocks[(clientId.hashCode() & Integer.MAX_VALUE) % clientLocks.length];
 	}
 
 	/**
@@ -88,7 +98,9 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @param nodeId the identifier of the node where the client is connected
 	 */
 	public void registerRemoteClient(String clientId, String nodeId) {
-		clientNodeMap.put(clientId, nodeId);
+		synchronized (clientLock(clientId)) {
+			clientNodeMap.put(clientId, nodeId);
+		}
 		logger.debug("[Cluster] Registered remote client: {} -> node: {}", clientId, nodeId);
 	}
 
@@ -114,16 +126,17 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @param nodeId the node sending the disconnect
 	 */
 	public void removeRemoteClient(String clientId, String nodeId) {
-		clientNodeMap.computeIfPresent(clientId, (id, owner) -> {
-			if (!owner.equals(nodeId)) {
-				return owner;
+		synchronized (clientLock(clientId)) {
+			String owner = clientNodeMap.get(clientId);
+			if (owner == null || !owner.equals(nodeId)) {
+				return;
 			}
 			// A new local CONNECT may precede its asynchronous online notification.
 			if (!clusterManager.hasLocalClient(clientId)) {
 				delegate.remove(clientId);
 			}
-			return null;
-		});
+			clientNodeMap.remove(clientId, nodeId);
+		}
 	}
 
 	/**
@@ -133,7 +146,9 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @return the previous remote node
 	 */
 	public String registerLocalClient(String clientId) {
-		return clientNodeMap.remove(clientId);
+		synchronized (clientLock(clientId)) {
+			return clientNodeMap.remove(clientId);
+		}
 	}
 
 	/**
@@ -157,14 +172,19 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 *
 	 * @param nodeId the identifier of the node that has left the cluster
 	 */
-	public void clearNodeClientsAndSubscriptions(String nodeId) {
-		clientNodeMap.entrySet().removeIf(entry -> {
-			if (entry.getValue().equals(nodeId)) {
-				delegate.remove(entry.getKey());
-				return true;
+	public List<String> clearNodeClientsAndSubscriptions(String nodeId) {
+		List<String> removedClients = new ArrayList<>();
+		for (String clientId : new ArrayList<>(clientNodeMap.keySet())) {
+			synchronized (clientLock(clientId)) {
+				// 只有归属仍然是该下线节点时才清理；客户端若已迁移，remove(key, value)
+				// 会失败，delegate 里的新订阅也不能被误删。
+				if (clientNodeMap.remove(clientId, nodeId)) {
+					delegate.remove(clientId);
+					removedClients.add(clientId);
+				}
 			}
-			return false;
-		});
+		}
+		return removedClients;
 	}
 
 	/**
@@ -179,14 +199,17 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @param subscriptions the list of subscriptions to synchronize
 	 */
 	public void syncRemoteSubscriptions(String clientId, String nodeId, List<Subscribe> subscriptions) {
-		registerRemoteClient(clientId, nodeId);
-		if (subscriptions == null || subscriptions.isEmpty()) {
-			return;
-		}
-		for (Subscribe sub : subscriptions) {
-			delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), clientId, sub.getMqttQoS(), sub.isNoLocal());
-			logger.debug("[Cluster] Synced remote subscription: client={}, topic={}, node={}",
-				clientId, sub.getTopicFilter(), nodeId);
+		// 归属更新与订阅写入必须作为一个原子操作，避免被并发的节点下线清理拆开
+		synchronized (clientLock(clientId)) {
+			clientNodeMap.put(clientId, nodeId);
+			if (subscriptions == null || subscriptions.isEmpty()) {
+				return;
+			}
+			for (Subscribe sub : subscriptions) {
+				delegate.addSubscribe(new TopicFilter(sub.getTopicFilter()), clientId, sub.getMqttQoS(), sub.isNoLocal());
+				logger.debug("[Cluster] Synced remote subscription: client={}, topic={}, node={}",
+					clientId, sub.getTopicFilter(), nodeId);
+			}
 		}
 	}
 
@@ -560,27 +583,21 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void remove(String clientId) {
-		// 用 compute 原子地裁决归属，避免与并发的 registerRemoteClient 抢跑；
-		// lambda 内只记录结论，真正的清理放到锁外执行（sessionStore.delete 可能落盘）。
-		AtomicBoolean remoteOwned = new AtomicBoolean(false);
-		clientNodeMap.compute(clientId, (id, owner) -> {
+		synchronized (clientLock(clientId)) {
+			String owner = clientNodeMap.get(clientId);
 			// The old local socket can finish closing after a remote CONNECT took over.
 			if (owner != null && !owner.equals(clusterManager.getLocalNodeId())) {
-				remoteOwned.set(true);
-				return owner;
+				// 归属已移交远端：本地连接态失效，但订阅副本要留着——
+				// V1 全量复制下，它正是本节点把消息转发给新 owner 的依据。
+				delegate.removeSessionState(clientId);
+				return;
 			}
-			return null;
-		});
-		if (remoteOwned.get()) {
-			// 归属已移交远端：本地连接态失效，但订阅副本要留着——
-			// V1 全量复制下，它正是本节点把消息转发给新 owner 的依据。
-			delegate.removeSessionState(clientId);
-			return;
-		}
-		delegate.remove(clientId);
-		// V3 session persistence: clear the persistent record on disconnect.
-		if (sessionStore != null) {
-			sessionStore.delete(clientId);
+			clientNodeMap.remove(clientId);
+			delegate.remove(clientId);
+			// V3 session persistence: clear the persistent record on disconnect.
+			if (sessionStore != null) {
+				sessionStore.delete(clientId);
+			}
 		}
 	}
 

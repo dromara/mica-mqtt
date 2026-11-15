@@ -145,6 +145,7 @@ public class MqttClusterBrokerCreator {
 			ClusterMqttMessageStore clusterMessageStore = new ClusterMqttMessageStore(
 				delegateStore, clusterManager
 			);
+			clusterMessageStore.setWillVersionTtlMs(clusterConfig.getWillTombstoneTtlMs());
 			if (clusterStorage != null) {
 				clusterMessageStore.setRetainIndex(clusterStorage.getRetainIndex());
 			}
@@ -160,18 +161,28 @@ public class MqttClusterBrokerCreator {
 		ClusterPublishHandler publishHandler = new ClusterPublishHandler(clusterManager);
 		serverCreator.addPublishPipelineHandler(publishHandler);
 
-		mqttServer = serverCreator.build();
-		clusterManager.setMqttServer(mqttServer);
-		mqttServer.setStopListener(clusterManager::stopCluster);
+		MqttServer server = serverCreator.build();
+		try {
+			clusterManager.setMqttServer(server);
+			server.setStopListener(clusterManager::stopCluster);
 
-		SharedSubscriptionStrategy strategy = createStrategy(clusterConfig, clusterSessionManager);
-		clusterManager.setSharedStrategy(strategy);
+			SharedSubscriptionStrategy strategy = createStrategy(clusterConfig, clusterSessionManager);
+			clusterManager.setSharedStrategy(strategy);
 
-		ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(mqttServer, clusterManager, clusterSessionManager, strategy);
-		publishHandler.setDispatcher(dispatcher);
-		mqttServer.setPublishAllRouter(dispatcher::routePublishAll);
-
-		return mqttServer;
+			ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(server, clusterManager, clusterSessionManager, strategy);
+			publishHandler.setDispatcher(dispatcher);
+			server.setPublishAllRouter(dispatcher::routePublishAll);
+		} catch (RuntimeException e) {
+			// 装配失败时不要把半成品暴露给后续 build()/start()，并释放已创建的 server
+			try {
+				server.stop();
+			} catch (Throwable stopError) {
+				e.addSuppressed(stopError);
+			}
+			throw e;
+		}
+		this.mqttServer = server;
+		return server;
 	}
 
 	/**
