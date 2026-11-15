@@ -19,10 +19,12 @@ package org.dromara.mica.mqtt.codec;
 import net.dreamlu.mica.net.client.ClientChannelContext;
 import net.dreamlu.mica.net.client.TioClientConfig;
 import net.dreamlu.mica.net.core.ChannelContext;
+import org.dromara.mica.mqtt.codec.codes.MqttSubAckReasonCode;
 import org.dromara.mica.mqtt.codec.message.MqttConnectMessage;
 import org.dromara.mica.mqtt.codec.message.MqttMessage;
 import org.dromara.mica.mqtt.codec.message.MqttPublishMessage;
 import org.dromara.mica.mqtt.codec.message.MqttSubscribeMessage;
+import org.dromara.mica.mqtt.codec.message.MqttSubAckMessage;
 import org.dromara.mica.mqtt.codec.message.MqttUnSubscribeMessage;
 import org.dromara.mica.mqtt.codec.message.builder.MqttTopicSubscription;
 import org.junit.jupiter.api.Test;
@@ -48,6 +50,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class MqttCodecRoundTripTest {
 	private static final TioClientConfig TIO_CONFIG = new TioClientConfig(null, null);
+
+	@Test
+	void mqtt311SubAckNormalizesV5ReasonCode() {
+		ChannelContext context = new ClientChannelContext(TIO_CONFIG);
+		MqttCodecUtil.setMqttVersion(context, MqttVersion.MQTT_3_1_1);
+		MqttSubAckMessage message = MqttSubAckMessage.builder().packetId(1)
+			.addReasonCode(MqttSubAckReasonCode.NOT_AUTHORIZED).build();
+		ByteBuffer encoded = MqttEncoder.INSTANCE.doEncode(context, message);
+		assertArrayEquals(new byte[]{(byte) 0x90, 0x03, 0x00, 0x01, (byte) 0x80}, encoded.array());
+	}
 
 	@Test
 	void connectRoundTrip() {
