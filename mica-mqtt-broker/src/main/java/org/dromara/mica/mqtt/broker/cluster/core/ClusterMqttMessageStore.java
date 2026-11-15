@@ -150,7 +150,7 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 		delegate.addRetainMessage(topic, timeout, message);
 		// V3 persistence: mirror to durable retain index when storage is enabled
 		if (retainIndex != null) {
-			retainIndex.put(topic, message);
+			retainIndex.put(topic, message, timeout);
 		}
 		if (clusterManager.isClusterEnabled()) {
 			RetainMessageNotifyMessage retainMsg = new RetainMessageNotifyMessage();
@@ -261,7 +261,7 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 		boolean ok = delegate.addRetainMessage(topic, timeout, message);
 		// V3 persistence: also write to durable index when receiving retain from peer
 		if (retainIndex != null && ok && message != null) {
-			retainIndex.put(topic, message);
+			retainIndex.put(topic, message, timeout);
 		}
 		return ok;
 	}

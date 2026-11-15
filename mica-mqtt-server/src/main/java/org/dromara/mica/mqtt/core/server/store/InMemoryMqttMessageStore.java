@@ -89,8 +89,10 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 	@Override
 	public boolean addRetainMessage(String topic, int timeout, Message message) {
 		if (timeout <= 0) {
+			timedRetainStore.remove(topic);
 			retainStore.put(topic, message);
 		} else {
+			retainStore.remove(topic);
 			timedRetainStore.put(topic, message, TimeUnit.SECONDS.toMillis(timeout));
 		}
 		return true;

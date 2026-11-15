@@ -120,6 +120,24 @@ class RetainIndexTest {
 	}
 
 	@Test
+	void timedMessageExpiresAcrossRestart() throws InterruptedException {
+		retainIndex.put("timed", msg("timed", "value", 1), 1);
+		engine.close();
+		engine = new H2MvStoreImpl();
+		engine.open(tempDir);
+		retainIndex = new RetainIndex(engine);
+		retainIndex.loadFromStore();
+		Thread.sleep(1200);
+		assertTrue(retainIndex.match("timed").isEmpty());
+		engine.close();
+		engine = new H2MvStoreImpl();
+		engine.open(tempDir);
+		retainIndex = new RetainIndex(engine);
+		retainIndex.loadFromStore();
+		assertTrue(retainIndex.match("timed").isEmpty());
+	}
+
+	@Test
 	void rejectsOversizedPayload() {
 		Message huge = new Message();
 		huge.setTopic("big");

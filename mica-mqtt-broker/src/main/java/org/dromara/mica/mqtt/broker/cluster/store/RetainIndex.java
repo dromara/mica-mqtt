@@ -21,6 +21,9 @@ import org.dromara.mica.mqtt.core.server.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -69,6 +72,7 @@ public class RetainIndex {
 	 * when answering wildcard queries.
 	 */
 	private final ConcurrentSkipListMap<String, Message> index = new ConcurrentSkipListMap<>();
+	private final Map<String, Long> expiresAt = new ConcurrentSkipListMap<>();
 
 	public RetainIndex(LocalKvStore store) {
 		this(store, DEFAULT_MAX_PAYLOAD_BYTES);
@@ -83,14 +87,22 @@ public class RetainIndex {
 	 * Rebuilds the in-memory index by scanning the durable store.  Call this
 	 * once at broker startup, before the MQTT listener accepts connections.
 	 */
-	public void loadFromStore() {
+	public synchronized void loadFromStore() {
 		List<LocalKvStore.KeyValue> entries = store.scan("retain:");
 		int count = 0;
 		for (LocalKvStore.KeyValue kv : entries) {
 			String topic = kv.getKey().substring("retain:".length());
 			Message msg = deserializeMessage(topic, kv.getValue());
 			if (msg != null) {
+				long expiry = readExpiry(kv.getValue());
+				if (expiry > 0 && expiry <= System.currentTimeMillis()) {
+					store.delete(kv.getKey());
+					continue;
+				}
 				index.put(topic, msg);
+				if (expiry > 0) {
+					expiresAt.put(topic, expiry);
+				}
 				count++;
 			}
 		}
@@ -106,6 +118,18 @@ public class RetainIndex {
 	 *         {@link #maxPayloadBytes}
 	 */
 	public boolean put(String topic, Message message) {
+		return put(topic, message, 0);
+	}
+
+	/**
+	 * 保存保留消息及其有效期。
+	 *
+	 * @param topic 主题
+	 * @param message 消息
+	 * @param timeout 有效期，单位秒，非正数表示永久
+	 * @return 是否保存成功
+	 */
+	public synchronized boolean put(String topic, Message message, int timeout) {
 		if (topic == null || topic.isEmpty() || message == null) {
 			return false;
 		}
@@ -114,13 +138,19 @@ public class RetainIndex {
 				topic, message.getPayload().length, maxPayloadBytes);
 			return false;
 		}
-		byte[] bytes = serializeMessage(message);
+		long expiry = timeout > 0 ? System.currentTimeMillis() + timeout * 1000L : 0;
+		byte[] bytes = serializeMessage(message, expiry);
 		// Order: write durable store first, then update in-memory index.  If the
 		// in-memory update fails (e.g. JVM crash between the two), we may serve
 		// stale data on next startup — but the durable store remains the truth
 		// and will be re-loaded by {@link #loadFromStore()}.
 		store.put(buildKey(topic), bytes);
 		index.put(topic, message);
+		if (expiry > 0) {
+			expiresAt.put(topic, expiry);
+		} else {
+			expiresAt.remove(topic);
+		}
 		return true;
 	}
 
@@ -129,12 +159,13 @@ public class RetainIndex {
 	 *
 	 * @param topic the topic whose retained message should be cleared
 	 */
-	public void remove(String topic) {
+	public synchronized void remove(String topic) {
 		if (topic == null || topic.isEmpty()) {
 			return;
 		}
 		store.delete(buildKey(topic));
 		index.remove(topic);
+		expiresAt.remove(topic);
 	}
 
 	/**
@@ -144,7 +175,8 @@ public class RetainIndex {
 	 * @param topicFilter the topic filter to match
 	 * @return matching retained messages; never {@code null}, may be empty
 	 */
-	public List<Message> match(String topicFilter) {
+	public synchronized List<Message> match(String topicFilter) {
+		removeExpired();
 		if (topicFilter == null || topicFilter.isEmpty()) {
 			return Collections.emptyList();
 		}
@@ -167,15 +199,25 @@ public class RetainIndex {
 	 *
 	 * @return the number of retained messages held in the in-memory index
 	 */
-	public int size() {
+	public synchronized int size() {
+		removeExpired();
 		return index.size();
+	}
+
+	private void removeExpired() {
+		long now = System.currentTimeMillis();
+		for (Map.Entry<String, Long> entry : expiresAt.entrySet()) {
+			if (entry.getValue() <= now) {
+				remove(entry.getKey());
+			}
+		}
 	}
 
 	private static String buildKey(String topic) {
 		return "retain:" + topic;
 	}
 
-	private static byte[] serializeMessage(Message msg) {
+	private static byte[] serializeMessage(Message msg, long expiry) {
 		// For simplicity we use the DefaultMessageSerializer from the core module
 		// via a defensive copy in the kafka-style envelope:
 		//   [4 bytes] payload length
@@ -194,10 +236,30 @@ public class RetainIndex {
 			byte[] topicBytes = (msg.getTopic() == null ? "" : msg.getTopic()).getBytes(java.nio.charset.StandardCharsets.UTF_8);
 			dos.writeInt(topicBytes.length);
 			dos.write(topicBytes);
+			dos.writeLong(expiry);
 			dos.flush();
 			return baos.toByteArray();
 		} catch (java.io.IOException e) {
 			throw new RuntimeException("Failed to serialize retain message", e);
+		}
+	}
+
+	private static long readExpiry(byte[] value) {
+		try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(value))) {
+			int payloadLength = input.readInt();
+			if (payloadLength < 0 || payloadLength > input.available() - 5) {
+				return 0;
+			}
+			input.skipBytes(payloadLength);
+			input.readByte();
+			int topicLength = input.readInt();
+			if (topicLength < 0 || topicLength > input.available()) {
+				return 0;
+			}
+			input.skipBytes(topicLength);
+			return input.available() >= Long.BYTES ? input.readLong() : 0;
+		} catch (IOException e) {
+			return 0;
 		}
 	}
 
