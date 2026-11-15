@@ -83,6 +83,8 @@ public final class MqttPendingPublish {
 		pubRetryProcessor.stop();
 		pubRelRetryProcessor.stop();
 		if (sessionPresent && pubRelMessage != null) {
+			// PUBREL 固定头 bit3 是保留位，协议要求 0010（0x62），不能像 PUBLISH 那样置 DUP；
+			// 编码器 MqttFixedHeader#isDupEffected 已保证不会写出 0x6A。
 			startPubRelRetransmissionTimer(taskService, context);
 			Tio.send(context, pubRelMessage);
 		} else {
