@@ -56,6 +56,10 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 	private final IMqttSessionManager sessionManager;
 	private final IMqttSessionListener sessionListener;
 	private final IMqttMessageStore messageStore;
+	/**
+	 * 服务端支持的最大 QoS，授予的 QoS 不能超过它。
+	 */
+	private final int maximumQos;
 
 	public MqttSubscribeHandler(MqttServerCreator serverCreator,
 							ExecutorService executor,
@@ -65,6 +69,7 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 		this.sessionManager = serverCreator.getSessionManager();
 		this.sessionListener = serverCreator.getSessionListener();
 		this.messageStore = serverCreator.getMessageStore();
+		this.maximumQos = serverCreator.getMqttServerProperties().getMaximumQos();
 	}
 
 	@Override
@@ -101,7 +106,9 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 				logger.error("Subscribe - clientId:{} username:{} topicFilter:{} invalid packetId:{}", clientId, context.getUserId(), topicFilter, packetId, e);
 				continue;
 			}
-			MqttQoS mqttQoS = subscription.qualityOfService();
+			MqttQoS requestedQos = subscription.qualityOfService();
+			// MQTT-3.8.4-8：授予的 QoS 不能超过请求值，也不能超过服务端最大值
+			MqttQoS mqttQoS = MqttQoS.valueOf(Math.min(requestedQos.value(), maximumQos));
 			boolean noLocal = subscription.option().isNoLocal();
 			if (enableSubscribeValidator && !subscribeValidator.verifyTopicFilter(context, clientId, topicFilter, mqttQoS)) {
 				// 仅拒绝当前 topic filter，其他合法订阅仍继续处理并在同一个 SUBACK 中逐项返回结果。
@@ -142,7 +149,8 @@ public class MqttSubscribeHandler extends AbstractMqttMessageHandler {
 		}
 		String clientId = context.getBsId();
 		for (Message retainMessage : retainMessageList) {
-			MqttQoS mqttQoS = MqttQoS.valueOf(Math.min(retainMessage.getQos(), subscriptionQos.value()));
+			MqttQoS mqttQoS = MqttQoS.valueOf(Math.min(
+				Math.min(retainMessage.getQos(), subscriptionQos.value()), maximumQos));
 			boolean isHighLevelQoS = MqttQoS.QOS1 == mqttQoS || MqttQoS.QOS2 == mqttQoS;
 			int messageId = isHighLevelQoS ? sessionManager.getPacketId(clientId) : -1;
 			MqttPublishMessage publishMessage = MqttPublishMessage.builder()

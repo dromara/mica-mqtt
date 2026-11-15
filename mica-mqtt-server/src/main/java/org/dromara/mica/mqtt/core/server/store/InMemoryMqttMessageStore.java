@@ -40,14 +40,14 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 	 */
 	private final ConcurrentMap<String, Message> willStore = new ConcurrentHashMap<>();
 	/**
-	 * 保持消息 topic: Message
-	 * 带有有效期的保持消息 topic: Message
+	 * 保留消息 topic: Message。
+	 * <p>
+	 * 永久保留消息和带 TTL 的保留消息共用同一个 TimedCache：单 map 的 put/remove
+	 * 是原子的，避免此前「先删另一个 map 再写当前 map」在并发更新同一 topic 时
+	 * 两个 map 各留一份、订阅者收到重复 retained 的问题。timeout=0 的条目永不过期。
+	 * </p>
 	 */
-	private final ConcurrentMap<String, Message> retainStore = new ConcurrentHashMap<>();
-	/**
-	 * 带有有效期的保持消息 topic: Message
-	 */
-	private final TimedCache<String, Message> timedRetainStore = new TimedCache<>(
+	private final TimedCache<String, Message> retainStore = new TimedCache<>(
 		TimeUnit.HOURS.toMillis(2),   // 默认 2 小时缓存
 		TimeUnit.SECONDS.toMillis(1), // 定时 1s 清理一次缓存
 		new ConcurrentHashMap<>()
@@ -88,20 +88,18 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 
 	@Override
 	public boolean addRetainMessage(String topic, int timeout, Message message) {
-		if (timeout <= 0) {
-			timedRetainStore.remove(topic);
-			retainStore.put(topic, message);
-		} else {
-			retainStore.remove(topic);
-			timedRetainStore.put(topic, message, TimeUnit.SECONDS.toMillis(timeout));
+		if (topic == null || message == null) {
+			return false;
 		}
+		// timeout <= 0 表示永久保留（CacheObj ttl=0 永不过期）
+		long ttl = timeout > 0 ? TimeUnit.SECONDS.toMillis(timeout) : 0;
+		retainStore.put(topic, message, ttl);
 		return true;
 	}
 
 	@Override
 	public boolean clearRetainMessage(String topic) {
 		retainStore.remove(topic);
-		timedRetainStore.remove(topic);
 		return true;
 	}
 
@@ -110,12 +108,11 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 		List<Message> retainMessageList = new ArrayList<>();
 		for (String topic : retainStore.keySet()) {
 			if (TopicUtil.match(topicFilter, topic)) {
-				retainMessageList.add(retainStore.get(topic));
-			}
-		}
-		for (String topic : timedRetainStore.keySet()) {
-			if (TopicUtil.match(topicFilter, topic)) {
-				retainMessageList.add(timedRetainStore.get(topic));
+				Message message = retainStore.get(topic);
+				// keySet 与 get 之间可能刚好过期
+				if (message != null) {
+					retainMessageList.add(message);
+				}
 			}
 		}
 		return retainMessageList;
@@ -125,8 +122,7 @@ public class InMemoryMqttMessageStore implements IMqttMessageStore {
 	public void clean() throws IOException {
 		this.willStore.clear();
 		this.retainStore.clear();
-		this.timedRetainStore.clear();
-		this.timedRetainStore.close();
+		this.retainStore.close();
 	}
 
 }
