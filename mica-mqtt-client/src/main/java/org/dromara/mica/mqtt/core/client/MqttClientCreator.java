@@ -219,6 +219,15 @@ public final class MqttClientCreator {
 	 */
 	private boolean taskServiceOwner;
 	/**
+	 * 当前活跃的客户端。
+	 * <p>
+	 * creator 会复用 clientSession / mqttExecutor，两个 client 同时存活会共享状态：
+	 * 停掉其中一个就会关闭另一个的线程池和 session。这里限制同一 creator 同时只能
+	 * 有一个未 stop 的 client；上一实例 stop 后可以重新 connect（会重建被关闭的资源）。
+	 * </p>
+	 */
+	private volatile MqttClient activeClient;
+	/**
 	 * TioConfig 自定义配置
 	 */
 	private Consumer<TioConfig> tioConfigCustomize;
@@ -896,7 +905,12 @@ public final class MqttClientCreator {
 	 * @return TioClient
 	 */
 	public MqttClient connect() {
-		return this.build().start(false);
+		synchronized (this) {
+			ensureNoActiveClient();
+			MqttClient client = this.build().start(false);
+			this.activeClient = client;
+			return client;
+		}
 	}
 
 	/**
@@ -905,7 +919,24 @@ public final class MqttClientCreator {
 	 * @return TioClient
 	 */
 	public MqttClient connectSync() {
-		return this.build().start(true);
+		synchronized (this) {
+			ensureNoActiveClient();
+			MqttClient client = this.build().start(true);
+			this.activeClient = client;
+			return client;
+		}
+	}
+
+	/**
+	 * 同一 creator 只允许一个未停止的 client。creator 复用 session 和线程池，
+	 * 并发创建会让两个 client 共享生命周期，stop 其中一个会破坏另一个。
+	 */
+	private void ensureNoActiveClient() {
+		MqttClient current = this.activeClient;
+		if (current != null && !current.isStopped()) {
+			throw new IllegalStateException("MqttClientCreator already has an active MqttClient; "
+				+ "stop it before calling connect() again, or create a new MqttClientCreator.");
+		}
 	}
 
 	/**

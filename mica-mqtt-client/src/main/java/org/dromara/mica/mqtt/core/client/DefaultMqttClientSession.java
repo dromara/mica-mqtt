@@ -84,6 +84,17 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 	}
 
 	@Override
+	public void restoreCancelledSubscriptions(List<String> topicFilters) {
+		// 必须与 processSubAck 持有同一把 pending 锁：否则 restore 可能落在
+		// 「读取取消集」与「发送补偿退订」之间，把新订阅意图退掉。
+		pendingSubscriptions.values().forEach(pendingSubscription -> {
+			synchronized (pendingSubscription) {
+				pendingSubscription.restoreCancelledSubscriptions(topicFilters);
+			}
+		});
+	}
+
+	@Override
 	public MqttPendingSubscription removePaddingSubscribe(int messageId) {
 		return pendingSubscriptions.remove(messageId);
 	}

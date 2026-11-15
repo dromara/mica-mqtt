@@ -73,6 +73,22 @@ class MqttClientReconnectChaosTest {
 	}
 
 	@Test
+	void creatorRejectsSecondActiveClient() throws Exception {
+		FakeBroker broker = FakeBroker.create().next(new ConnAckAndHoldHandler());
+		MqttClient client = null;
+		try {
+			MqttClientCreator creator = MqttClient.create().ip("127.0.0.1").port(broker.getPort())
+				.timeout(1).connAckTimeout(1);
+			client = creator.connectSync();
+			Assertions.assertThrows(IllegalStateException.class, creator::connectSync,
+				"creator 复用 session/线程池，不允许同时存在两个活跃 client");
+		} finally {
+			stop(client);
+			broker.close();
+		}
+	}
+
+	@Test
 	void shouldRemainDisconnectedWhenBrokerNeverSendsConnAck() throws Exception {
 		CountDownLatch connectReadLatch = new CountDownLatch(1);
 		CountingConnectListener listener = new CountingConnectListener();

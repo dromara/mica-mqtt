@@ -23,6 +23,7 @@ import net.dreamlu.mica.net.utils.hutool.CollUtil;
 import net.dreamlu.mica.net.utils.timer.TimerTaskService;
 import org.dromara.mica.mqtt.codec.MqttMessageType;
 import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.MqttVersion;
 import org.dromara.mica.mqtt.codec.codes.MqttConnectReasonCode;
 import org.dromara.mica.mqtt.codec.codes.MqttDisconnectReasonCode;
 import org.dromara.mica.mqtt.codec.message.*;
@@ -243,7 +244,13 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 
 	private void processPendingSubAck(ChannelContext context, MqttSubAckMessage message, int packetId,
 									  MqttPendingSubscription paddingSubscribe) {
+		// 重试与首次发送使用完全相同的 topic 顺序，因此无论收到哪一次 SUBACK，
+		// reason code 都能按原始订阅列表解释，不会因为部分退订而错位。
 		List<MqttClientSubscription> subscriptionList = new ArrayList<>(paddingSubscribe.getSubscriptionList());
+		// 只要收到该 pending 的 SUBACK，就处理部分退订的补偿退订：
+		// 即使本次 SUBACK 没有成功的 topic（或 reasonCodes 异常），重试仍可能
+		// 已把取消的 topic 重新订阅回来。
+		sendCompensatingUnsubscribe(context, paddingSubscribe.getCancelledTopicFilters());
 		MqttSubAckPayload subAckPayload = message.payload();
 		List<Short> reasonCodeList = subAckPayload.reasonCodes();
 		// reasonCodes 为空
@@ -254,8 +261,11 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 		int reasonCodeListSize = reasonCodeList.size();
 		// 找出订阅成功的数据
 		List<MqttClientSubscription> subscribedList = new ArrayList<>();
-		// MQTT 3.1.1 协议未明确规定批量订阅的返回格式，批量可能只返回一个 reasonCode
-		if (reasonCodeListSize == 1) {
+		// MQTT 3.1.1 协议未明确规定批量订阅的返回格式，部分 broker 批量只返回一个 reasonCode；
+		// MQTT 5.0 明确要求每个 topic 一个 code，不能复用该宽松分支。
+		boolean legacySingleCode = reasonCodeListSize == 1
+			&& !MqttVersion.MQTT_5.equals(mqttClientCreator.getVersion());
+		if (legacySingleCode) {
 			Short reasonCode = reasonCodeList.get(0);
 			// reasonCodes 范围，0 ~ 2
 			if (reasonCode != null && reasonCode >= 0 && reasonCode <= 2) {
@@ -266,7 +276,8 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			for (int i = 0; i < subscriptionList.size(); i++) {
 				MqttClientSubscription subscription = subscriptionList.get(i);
 				String topicFilter = subscription.getTopicFilter();
-				Short reasonCode = reasonCodeList.get(i);
+				// broker 返回的 code 数量不足时按失败处理，避免 IO 线程数组越界
+				Short reasonCode = i < reasonCodeListSize ? reasonCodeList.get(i) : null;
 				// reasonCodes 范围
 				if (reasonCode == null || reasonCode < 0 || reasonCode > 2) {
 					logger.error("MqttClient topicFilter:{} subscribe failed reasonCodes:{} packetId:{}", topicFilter, reasonCode, packetId);
@@ -299,6 +310,36 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 				}
 			});
 		});
+	}
+
+	/**
+	 * 为已取消的 topic 补发 UNSUBSCRIBE，抵消 SUBSCRIBE 重试造成的重新订阅。
+	 * <p>
+	 * 包级私有以便单测覆写记录（补偿必须发生在所有 early-return 之前，
+	 * 包括「剩余 topic 全部被拒绝」的路径）。
+	 * </p>
+	 *
+	 * @param context 连接上下文
+	 * @param cancelledTopicFilters 已取消的 topic 列表
+	 */
+	void sendCompensatingUnsubscribe(ChannelContext context, List<String> cancelledTopicFilters) {
+		if (context == null || cancelledTopicFilters.isEmpty()) {
+			return;
+		}
+		int messageId = clientSession.getPacketId();
+		MqttUnSubscribeMessage unSubscribeMessage = MqttUnSubscribeMessage.builder()
+			.addTopicFilters(cancelledTopicFilters)
+			.messageId(messageId)
+			.build();
+		if (taskService != null) {
+			MqttPendingUnSubscription pendingUnSubscription =
+				new MqttPendingUnSubscription(cancelledTopicFilters, unSubscribeMessage);
+			clientSession.addPaddingUnSubscribe(messageId, pendingUnSubscription);
+			pendingUnSubscription.startRetransmissionTimer(taskService, context);
+		}
+		boolean result = Tio.send(context, unSubscribeMessage);
+		logger.info("MqttClient compensating unsubscribe topics:{} messageId:{} result:{}",
+			cancelledTopicFilters, messageId, result);
 	}
 
 	@Override

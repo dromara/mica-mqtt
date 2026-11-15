@@ -63,6 +63,18 @@ public interface IMqttClientSession {
 	void removePaddingSubscribes(List<String> topicFilters);
 
 	/**
+	 * 新的订阅意图到达时，撤销对应 topic 的“已取消”标记。
+	 * <p>
+	 * 避免部分退订后、旧 SUBACK 到达时补发的 UNSUBSCRIBE 误删刚建立的新订阅。
+	 * 默认实现为空，便于外部自定义 session 保持兼容。
+	 * </p>
+	 *
+	 * @param topicFilters 重新订阅的 topic 集合
+	 */
+	default void restoreCancelledSubscriptions(List<String> topicFilters) {
+	}
+
+	/**
 	 * 删除过程订阅
 	 *
 	 * @param messageId messageId

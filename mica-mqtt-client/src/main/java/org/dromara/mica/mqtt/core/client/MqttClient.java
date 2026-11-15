@@ -66,6 +66,10 @@ public final class MqttClient implements IMqttClient {
 	private final ExecutorService mqttExecutor;
 	private final MqttSerializer mqttSerializer;
 	private ClientChannelContext context;
+	/**
+	 * 是否已停止，供 creator 判断能否复用（避免并发创建多个 client 共享 session/线程池）。
+	 */
+	private volatile boolean stopped;
 
 	public static MqttClientCreator create() {
 		return new MqttClientCreator();
@@ -240,6 +244,12 @@ public final class MqttClient implements IMqttClient {
 		if (needSubscriptionList.isEmpty()) {
 			return this;
 		}
+		// 新订阅意图优先于尚未完成的退订：撤销取消标记，避免旧 SUBACK 后的补偿退订误删它
+		List<String> restoredTopicFilters = new ArrayList<>(needSubscriptionList.size());
+		for (MqttClientSubscription subscription : needSubscriptionList) {
+			restoredTopicFilters.add(subscription.getTopicFilter());
+		}
+		clientSession.restoreCancelledSubscriptions(restoredTopicFilters);
 		List<MqttTopicSubscription> topicSubscriptionList = needSubscriptionList.stream()
 			.map(MqttClientSubscription::toTopicSubscription)
 			.collect(Collectors.toList());
@@ -610,22 +620,35 @@ public final class MqttClient implements IMqttClient {
 	 * @return 是否停止成功
 	 */
 	public boolean stop() {
-		// 1. 断开连接
-		if (config.isDisconnectBeforeStop()) {
-			this.disconnect();
+		try {
+			// 1. 断开连接
+			if (config.isDisconnectBeforeStop()) {
+				this.disconnect();
+			}
+			// 2. 停止 tio
+			boolean result = tioClient.stop();
+			// 仅关闭客户端创建的定时任务服务，外部传入的服务可能被共享
+			if (taskServiceOwner) {
+				taskService.stop();
+			}
+			// 3. 优雅停止 mqtt 工作线程
+			result &= ThreadUtils.shutdownExecutor(mqttExecutor, config.getShutdownTimeoutSec(), "mqttExecutor");
+			logger.info("MqttClient stop result:{}", result);
+			// 4. 清理 session
+			this.clientSession.clean();
+			return result;
+		} finally {
+			this.stopped = true;
 		}
-		// 2. 停止 tio
-		boolean result = tioClient.stop();
-		// 仅关闭客户端创建的定时任务服务，外部传入的服务可能被共享
-		if (taskServiceOwner) {
-			taskService.stop();
-		}
-		// 3. 优雅停止 mqtt 工作线程
-		result &= ThreadUtils.shutdownExecutor(mqttExecutor, config.getShutdownTimeoutSec(), "mqttExecutor");
-		logger.info("MqttClient stop result:{}", result);
-		// 4. 清理 session
-		this.clientSession.clean();
-		return result;
+	}
+
+	/**
+	 * 是否已经停止。
+	 *
+	 * @return true 表示 stop() 已执行
+	 */
+	public boolean isStopped() {
+		return stopped;
 	}
 
 	/**
