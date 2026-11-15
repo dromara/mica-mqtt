@@ -39,6 +39,7 @@ import java.util.concurrent.ExecutorService;
  */
 public class MqttServerAioListener extends DefaultTioServerListener {
 	private static final Logger logger = LoggerFactory.getLogger(MqttServerAioListener.class);
+	private static final int WILL_DELIVERY_ATTEMPTS = 3;
 	public static final String WILL_MESSAGE_KEY = MqttServerAioListener.class.getName() + ".will";
 	public static final String WILL_CLIENT_ID_KEY = MqttServerAioListener.class.getName() + ".clientId";
 	private final ExecutorService executor;
@@ -111,24 +112,38 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 	}
 
 	private void sendWillMessage(String clientId, Message willMessage) {
-		// 发送遗嘱消息
+		if (willMessage != null) {
+			dispatchWillMessage(clientId, willMessage, 1);
+		}
+	}
+
+	/**
+	 * 异步投递遗嘱，成功后仅清除原连接的遗嘱。
+	 *
+	 * @param clientId 客户端标识
+	 * @param willMessage 遗嘱消息
+	 * @param attempt 当前投递次数
+	 */
+	private void dispatchWillMessage(String clientId, Message willMessage, int attempt) {
 		try {
-			if (willMessage == null) {
-				return;
-			}
-			// 提交异步任务前清除当前遗嘱，避免任务执行时清除新连接的遗嘱
-			messageStore.clearWillMessage(clientId, willMessage);
-			// 异步处理遗嘱消息，避免阻塞断连流程和级联影响
 			executor.execute(() -> {
+				boolean delivered = false;
 				try {
-					boolean result = messagePipeline.handle(willMessage);
-					logger.debug("Mqtt server clientId:{} send willMessage result:{}.", clientId, result);
+					delivered = messagePipeline.handle(willMessage);
+					if (delivered) {
+						messageStore.clearWillMessage(clientId, willMessage);
+					}
 				} catch (Throwable e) {
 					logger.error("Mqtt server clientId:{} send willMessage async error.", clientId, e);
 				}
+				if (!delivered && attempt < WILL_DELIVERY_ATTEMPTS) {
+					dispatchWillMessage(clientId, willMessage, attempt + 1);
+				} else if (!delivered) {
+					logger.error("Mqtt server clientId:{} willMessage delivery failed after {} attempts.", clientId, attempt);
+				}
 			});
-		} catch (Throwable throwable) {
-			logger.error("Mqtt server clientId:{} send willMessage error.", clientId, throwable);
+		} catch (RuntimeException e) {
+			logger.error("Mqtt server clientId:{} cannot schedule willMessage delivery.", clientId, e);
 		}
 	}
 

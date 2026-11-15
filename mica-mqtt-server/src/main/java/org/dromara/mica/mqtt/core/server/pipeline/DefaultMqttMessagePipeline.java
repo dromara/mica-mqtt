@@ -54,8 +54,7 @@ public class DefaultMqttMessagePipeline implements IMqttMessagePipeline {
 			return false;
 		}
 		// 处理所有消息类型的处理器
-		processHandlers(handlers, message);
-		return true;
+		return processHandlers(handlers, message);
 	}
 
 	/**
@@ -64,7 +63,8 @@ public class DefaultMqttMessagePipeline implements IMqttMessagePipeline {
 	 * @param handlers 处理器列表
 	 * @param message 消息
 	 */
-	private void processHandlers(List<MqttMessageHandler> handlers, Message message) {
+	private boolean processHandlers(List<MqttMessageHandler> handlers, Message message) {
+		boolean success = true;
 		for (MqttMessageHandler handler : handlers) {
 			try {
 				boolean continueProcess = handler.handle(message);
@@ -74,11 +74,13 @@ public class DefaultMqttMessagePipeline implements IMqttMessagePipeline {
 					break;
 				}
 			} catch (Throwable e) {
+				success = false;
 				logger.error("Pipeline handler {} error for message type: {}",
 							 handler.getClass().getSimpleName(), message.getMessageType(), e);
 				// 继续处理下一个处理器，不中断流程
 			}
 		}
+		return success;
 	}
 
 }
