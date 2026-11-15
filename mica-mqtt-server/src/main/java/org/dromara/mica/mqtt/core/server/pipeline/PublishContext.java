@@ -24,6 +24,7 @@ import org.dromara.mica.mqtt.core.server.model.Subscribe;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 /**
  * 发布消息上下文，承载完整的发布消息信息（包括 MQTT5 properties）
@@ -97,6 +98,7 @@ public class PublishContext implements Serializable {
 	 * 集群已选定的本地订阅者；null 表示由默认处理器查询
 	 */
 	private transient List<Subscribe> selectedSubscribers;
+	private transient BiConsumer<Subscribe, MqttProperties> deliveryFailureHandler;
 
 	public PublishContext(MqttPublishMessage publishMessage,
 						  ChannelContext context,
@@ -210,6 +212,27 @@ public class PublishContext implements Serializable {
 	 */
 	public void setSelectedSubscribers(List<Subscribe> selectedSubscribers) {
 		this.selectedSubscribers = selectedSubscribers;
+	}
+
+	/**
+	 * 设置本地订阅投递失败时的回调。
+	 *
+	 * @param handler 失败回调
+	 */
+	public void setDeliveryFailureHandler(BiConsumer<Subscribe, MqttProperties> handler) {
+		this.deliveryFailureHandler = handler;
+	}
+
+	/**
+	 * 通知集群处理本地投递失败。
+	 *
+	 * @param subscribe 失败的订阅
+	 * @param properties 转发属性
+	 */
+	public void onDeliveryFailure(Subscribe subscribe, MqttProperties properties) {
+		if (deliveryFailureHandler != null) {
+			deliveryFailureHandler.accept(subscribe, properties);
+		}
 	}
 
 	/**

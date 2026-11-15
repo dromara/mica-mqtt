@@ -156,11 +156,14 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 				ChannelContext clientContext = Tio.getByBsId(tioConfig, clientId);
 				if (clientContext == null || clientContext.isClosed()) {
 					logger.warn("Mqtt Topic:{} publish to clientId:{} ChannelContext is null may be disconnected.", topic, clientId);
+					context.onDeliveryFailure(subscribe, properties);
 					continue;
 				}
 				// 发送消息
-				mqttServer.publish(clientContext, clientId, topic, context.getPayload(),
-					context.getQos(), subscribe.getMqttQoS(), false, properties);
+				if (!mqttServer.publish(clientContext, clientId, topic, context.getPayload(),
+					context.getQos(), subscribe.getMqttQoS(), false, properties)) {
+					context.onDeliveryFailure(subscribe, properties);
+				}
 			}
 		} catch (Throwable e) {
 			logger.error("Subscription forward error", e);

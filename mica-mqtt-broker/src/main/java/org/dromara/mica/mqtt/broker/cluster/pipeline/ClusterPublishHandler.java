@@ -66,6 +66,8 @@ public class ClusterPublishHandler implements MqttPublishPipelineHandler {
 		}
 
 		if (dispatcher != null) {
+			context.setDeliveryFailureHandler((subscription, properties) ->
+				dispatcher.retryLocalSubscriber(context, subscription, properties));
 			context.setSelectedSubscribers(dispatcher.selectLocalSubscribers(context));
 			return true;
 		}

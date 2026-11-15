@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Decorator for {@link IMqttMessageStore} that synchronizes will and retained messages across cluster nodes.
@@ -57,6 +58,8 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	private final IMqttMessageStore delegate;
 	private final MqttClusterManager clusterManager;
 	private final ConcurrentMap<String, String> willTokens = new ConcurrentHashMap<>();
+	private final ConcurrentMap<String, WillVersion> willVersions = new ConcurrentHashMap<>();
+	private final AtomicLong willClock = new AtomicLong();
 	// 按客户端分片，保证同一连接的保存和清理通知顺序
 	private final Object[] willLocks = new Object[64];
 	private volatile RetainIndex retainIndex;
@@ -88,8 +91,10 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 			boolean added = delegate.addWillMessage(clientId, message);
 			if (added) {
 				String token = UUID.randomUUID().toString();
+				long version = nextWillVersion();
 				willTokens.put(clientId, token);
-				broadcastWill(clientId, message, token, false);
+				willVersions.put(clientId, new WillVersion(version, token, false));
+				broadcastWill(clientId, message, token, version, false);
 			}
 			return added;
 		}
@@ -101,11 +106,12 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 			return false;
 		}
 		synchronized (willLock(clientId)) {
-			String token = willTokens.remove(clientId);
+			willTokens.remove(clientId);
 			boolean removed = delegate.clearWillMessage(clientId);
-			if (token != null) {
-				broadcastWill(clientId, null, token, true);
-			}
+			String token = UUID.randomUUID().toString();
+			long version = nextWillVersion();
+			willVersions.put(clientId, new WillVersion(version, token, true));
+			broadcastWill(clientId, null, token, version, true);
 			return removed;
 		}
 	}
@@ -120,7 +126,12 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 			if (removed) {
 				String token = willTokens.remove(clientId);
 				if (token != null) {
-					broadcastWill(clientId, null, token, true);
+					WillVersion version = willVersions.get(clientId);
+					long sequence = version == null ? 0 : version.sequence;
+					if (version != null && token.equals(version.token)) {
+						willVersions.put(clientId, new WillVersion(sequence, token, true));
+					}
+					broadcastWill(clientId, null, token, sequence, true);
 				}
 			}
 			return removed;
@@ -137,7 +148,11 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 		return willLocks[(clientId.hashCode() & Integer.MAX_VALUE) % willLocks.length];
 	}
 
-	private void broadcastWill(String clientId, Message message, String token, boolean clear) {
+	private long nextWillVersion() {
+		return willClock.updateAndGet(previous -> Math.max(previous + 1, System.currentTimeMillis()));
+	}
+
+	private void broadcastWill(String clientId, Message message, String token, long version, boolean clear) {
 		if (!clusterManager.isClusterEnabled()) {
 			return;
 		}
@@ -145,6 +160,7 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 		notification.setClientId(clientId);
 		notification.setWillMessage(message);
 		notification.setWillToken(token);
+		notification.setWillVersion(version);
 		notification.setClear(clear);
 		clusterManager.broadcast(notification);
 	}
@@ -237,6 +253,32 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 		}
 		String token = notification.getWillToken();
 		synchronized (willLock(clientId)) {
+			long sequence = notification.getWillVersion();
+			if (sequence > 0 && token != null) {
+				willClock.updateAndGet(previous -> Math.max(previous, sequence));
+				WillVersion current = willVersions.get(clientId);
+				if (current != null) {
+					int order = Long.compare(sequence, current.sequence);
+					if (order == 0) {
+						order = token.compareTo(current.token);
+					}
+					if (order < 0 || (order == 0 && (current.cleared || !notification.isClear()))) {
+						return;
+					}
+				}
+				willVersions.put(clientId, new WillVersion(sequence, token, notification.isClear()));
+				if (notification.isClear()) {
+					delegate.clearWillMessage(clientId);
+					willTokens.remove(clientId);
+				} else if (notification.getWillMessage() != null) {
+					delegate.addWillMessage(clientId, notification.getWillMessage());
+					willTokens.put(clientId, token);
+				}
+				return;
+			}
+			if (willVersions.containsKey(clientId)) {
+				return;
+			}
 			if (notification.isClear()) {
 				if (token != null && token.equals(willTokens.get(clientId))) {
 					delegate.clearWillMessage(clientId);
@@ -250,6 +292,18 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 					willTokens.put(clientId, token);
 				}
 			}
+		}
+	}
+
+	private static final class WillVersion {
+		private final long sequence;
+		private final String token;
+		private final boolean cleared;
+
+		private WillVersion(long sequence, String token, boolean cleared) {
+			this.sequence = sequence;
+			this.token = token;
+			this.cleared = cleared;
 		}
 	}
 

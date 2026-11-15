@@ -389,6 +389,15 @@ public class MqttClusterManager {
 	 * and delivers to a still-active subscriber (plan B from the design doc).
 	 * </p>
 	 */
+	/**
+	 * 重新处理本地共享订阅投递，失败时按原分组选择其他客户端。
+	 *
+	 * @param message 共享订阅投递消息
+	 */
+	public void retrySharedDispatch(SharedDispatchToClientMessage message) {
+		handleSharedDispatchToClient(message, sessionManager);
+	}
+
 	private void handleSharedDispatchToClient(SharedDispatchToClientMessage sdm,
 											  ClusterMqttSessionManager sessionManager) {
 		String clientId = sdm.getClientId();
@@ -464,11 +473,18 @@ public class MqttClusterManager {
 			boolean isLocal = rePickedNode == null || rePickedNode.equals(localNodeId);
 			if (isLocal) {
 				ChannelContext channel = mqttServer.getChannelContext(rePicked.getClientId());
-				if (channel != null && !channel.isClosed()) {
-					mqttServer.publish(channel, rePicked.getClientId(), topic, msg.getPayload(),
-						MqttQoS.valueOf(msg.getQos()), rePicked.getMqttQoS(), false, properties);
+				if (channel != null && !channel.isClosed() && mqttServer.publish(channel, rePicked.getClientId(), topic, msg.getPayload(),
+					MqttQoS.valueOf(msg.getQos()), rePicked.getMqttQoS(), false, properties)) {
+					logger.debug("[Cluster] Re-pick delivered to client={} topic={}", rePicked.getClientId(), topic);
+				} else {
+					SharedDispatchToClientMessage retry = new SharedDispatchToClientMessage();
+					retry.setClientId(rePicked.getClientId());
+					retry.setGroupKey(sdm.getGroupKey());
+					retry.setRetryCount(sdm.getRetryCount() + 1);
+					retry.setTopic(topic);
+					retry.setMessage(msg);
+					handleSharedDispatchToClient(retry, sessionManager);
 				}
-				logger.debug("[Cluster] Re-pick delivered to client={} topic={}", rePicked.getClientId(), topic);
 			} else {
 				SharedDispatchToClientMessage retry = new SharedDispatchToClientMessage();
 				retry.setClientId(rePicked.getClientId());

@@ -48,6 +48,7 @@ public class WillMessageNotifyMessage implements ClusterMessage {
 	 * 遗嘱版本标识，用于区分同一客户端的不同连接
 	 */
 	private String willToken;
+	private long willVersion;
 	/**
 	 * 是否为清理通知
 	 */
@@ -63,6 +64,9 @@ public class WillMessageNotifyMessage implements ClusterMessage {
 		headers.put(ClusterMessageSerializer.HEADER_CLIENT_ID, clientId);
 		if (willToken != null) {
 			headers.put("willToken", willToken);
+		}
+		if (willVersion > 0) {
+			headers.put("willVersion", Long.toString(willVersion));
 		}
 		if (clear) {
 			headers.put("willClear", "true");
@@ -81,6 +85,8 @@ public class WillMessageNotifyMessage implements ClusterMessage {
 	public void fromClusterData(ClusterDataMessage message) {
 		this.clientId = message.getHeader(ClusterMessageSerializer.HEADER_CLIENT_ID);
 		this.willToken = message.getHeader("willToken");
+		String version = message.getHeader("willVersion");
+		this.willVersion = version == null ? 0 : Long.parseLong(version);
 		this.clear = "true".equals(message.getHeader("willClear"));
 		byte[] payload = message.getPayload();
 		if (payload != null && payload.length > 0) {
@@ -104,6 +110,24 @@ public class WillMessageNotifyMessage implements ClusterMessage {
 	 */
 	public void setWillToken(String willToken) {
 		this.willToken = willToken;
+	}
+
+	/**
+	 * 获取遗嘱逻辑版本。
+	 *
+	 * @return 遗嘱版本
+	 */
+	public long getWillVersion() {
+		return willVersion;
+	}
+
+	/**
+	 * 设置遗嘱逻辑版本。
+	 *
+	 * @param willVersion 遗嘱版本
+	 */
+	public void setWillVersion(long willVersion) {
+		this.willVersion = willVersion;
 	}
 
 	/**

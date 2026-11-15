@@ -209,12 +209,47 @@ public class ClusterMessageDispatcher extends BaseMessageHandler {
 		}
 		for (Subscribe sub : selectLocalSubscribers(context)) {
 			ChannelContext channel = mqttServer.getChannelContext(sub.getClientId());
-			if (channel != null && !channel.isClosed()) {
-				mqttServer.publish(channel, sub.getClientId(), context.getTopic(), context.getPayload(),
-					context.getQos(), sub.getMqttQoS(), false, context.getProperties());
+			if (channel == null || channel.isClosed() || !mqttServer.publish(channel, sub.getClientId(), context.getTopic(), context.getPayload(),
+				context.getQos(), sub.getMqttQoS(), false, context.getProperties())) {
+				retryLocalSubscriber(context, sub, context.getProperties());
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * 本地共享订阅者投递失败时，在同一分组内重新选择。
+	 *
+	 * @param context 发布上下文
+	 * @param subscription 投递失败的订阅
+	 * @param properties 转发属性
+	 */
+	public void retryLocalSubscriber(PublishContext context, Subscribe subscription, MqttProperties properties) {
+		String filter = subscription.getTopicFilter();
+		String groupKey;
+		if (filter != null && filter.startsWith(TopicFilterType.SHARE_GROUP_PREFIX)) {
+			groupKey = TopicFilterType.SHARE_GROUP_PREFIX + TopicFilterType.getShareGroupName(filter);
+		} else if (filter != null && filter.startsWith(TopicFilterType.SHARE_QUEUE_PREFIX)) {
+			groupKey = TopicFilterType.SHARE_QUEUE_PREFIX;
+		} else {
+			return;
+		}
+		long now = System.currentTimeMillis();
+		Message message = new Message();
+		message.setMessageType(MessageType.UP_STREAM);
+		message.setFromClientId(context.getClientId());
+		message.setTopic(context.getTopic());
+		message.setPayload(context.getPayload());
+		message.setQos(context.getQos().value());
+		message.setProperties(properties);
+		message.setTimestamp(now);
+		message.setPublishReceivedAt(now);
+		SharedDispatchToClientMessage dispatch = new SharedDispatchToClientMessage();
+		dispatch.setClientId(subscription.getClientId());
+		dispatch.setGroupKey(groupKey);
+		dispatch.setTopic(context.getTopic());
+		dispatch.setMessage(message);
+		clusterManager.retrySharedDispatch(dispatch);
 	}
 
 	@Override

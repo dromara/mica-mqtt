@@ -149,9 +149,10 @@ mvn clean deploy -P release
 - Retained publishes preserve the `$retain/{ttl}/` lifetime, including across cluster storage restarts, and are delivered at no more than the subscription QoS.
 - Topic wildcards exclude `$` topics at the first level; `#` can match zero levels after `+`.
 - A connection retains its own will; conditional will removal must not clear a replacement connection’s will. Custom message stores should make conditional removal atomic.
-- Cluster will notifications carry a per-will token so a delayed clear only removes its matching replica.
+- Will delivery is retried up to three times on pipeline failure, and the connection's will is cleared only after the pipeline reports success. This is not a durable retry queue.
+- Cluster will notifications carry a per-will token and logical version; nodes retain clear tombstones to reject delayed notifications. Versions use local wall time and observed versions, so clock skew or partitions do not provide a globally consistent connection order.
 - In cluster mode the default message store is cluster-aware, and broker shutdown closes cluster storage.
-- In cluster mode, the publisher node selects one subscriber per shared group from the complete replicated candidate set; normal subscriptions are forwarded separately. Server broadcasts use the same routing path.
+- In cluster mode, the publisher node selects one subscriber per shared group from the complete replicated candidate set; normal subscriptions are forwarded separately. Server broadcasts use the same routing path. Failed local shared deliveries are retried within the same group.
 
 ### Thread Safety & Async I/O
 

@@ -28,10 +28,15 @@ import org.dromara.mica.mqtt.broker.cluster.message.ClientDisconnectMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.SharedDispatchToClientMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.WillMessageNotifyMessage;
+import org.dromara.mica.mqtt.broker.cluster.pipeline.ClusterMessageDispatcher;
+import org.dromara.mica.mqtt.codec.MqttQoS;
+import org.dromara.mica.mqtt.codec.properties.MqttProperties;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
+import org.dromara.mica.mqtt.core.server.model.Subscribe;
+import org.dromara.mica.mqtt.core.server.pipeline.PublishContext;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.InMemoryMqttMessageStore;
@@ -287,6 +292,34 @@ class ClusterClientTakeoverTest {
 	}
 
 	@Test
+	void 遗嘱添加与清理乱序时保留最新状态() {
+		ClusterMqttMessageStore store = new ClusterMqttMessageStore(new InMemoryMqttMessageStore(), new RecordingManager("local"));
+		WillMessageNotifyMessage oldAdd = new WillMessageNotifyMessage();
+		oldAdd.setClientId("device");
+		oldAdd.setWillToken("old");
+		oldAdd.setWillVersion(1);
+		oldAdd.setWillMessage(new Message());
+		WillMessageNotifyMessage newAdd = new WillMessageNotifyMessage();
+		newAdd.setClientId("device");
+		newAdd.setWillToken("new");
+		newAdd.setWillVersion(2);
+		Message newWill = new Message();
+		newAdd.setWillMessage(newWill);
+		store.applyWillMessageLocal(oldAdd);
+		store.applyWillMessageLocal(newAdd);
+		store.applyWillMessageLocal(oldAdd);
+		assertSame(newWill, store.getWillMessage("device"));
+		WillMessageNotifyMessage clear = new WillMessageNotifyMessage();
+		clear.setClientId("device");
+		clear.setWillToken("new");
+		clear.setWillVersion(2);
+		clear.setClear(true);
+		store.applyWillMessageLocal(clear);
+		store.applyWillMessageLocal(newAdd);
+		assertNull(store.getWillMessage("device"));
+	}
+
+	@Test
 	@Timeout(90)
 	void 跨节点无遗嘱重连后异常断开不发布旧遗嘱() throws Exception {
 		int mqtt1 = freePort(), mqtt2 = freePort(), cluster1 = freePort(), cluster2 = freePort();
@@ -415,6 +448,14 @@ class ClusterClientTakeoverTest {
 				assertEquals(1, readPublish(remote, 2000), "目标失效后应在原组重选");
 				assertEquals(0, readPublish(otherLocal, 300) + readPublish(otherRemote, 300)
 					+ readPublish(queueLocal, 300) + readPublish(queueRemote, 300), "重选不能投递到其他组");
+				ClusterMessageDispatcher dispatcher = new ClusterMessageDispatcher(first.build(), first.getClusterManager(),
+					first.getClusterSessionManager(), null);
+				PublishContext context = PublishContext.builder().clientId("publisher").topic("cluster/test")
+					.qos(MqttQoS.QOS0).payload(new byte[]{10}).build();
+				dispatcher.retryLocalSubscriber(context, new Subscribe("$share/group/cluster/test", "already-disconnected", 0),
+					MqttProperties.NO_PROPERTIES);
+				assertEquals(1, readPublish(local, 1500) + readPublish(remote, 1500), "本地目标失效后应在原组重选");
+				assertEquals(0, readPublish(otherLocal, 300) + readPublish(otherRemote, 300), "重选不能投递到其他组");
 			}
 		} finally {
 			if (second.getClusterManager() != null) second.getClusterManager().stop();
