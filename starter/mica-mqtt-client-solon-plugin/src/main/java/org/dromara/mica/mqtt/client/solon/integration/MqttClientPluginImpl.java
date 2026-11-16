@@ -197,6 +197,10 @@ public class MqttClientPluginImpl implements Plugin {
 		if (timeout != null && timeout > 0) {
 			clientCreator.timeout(timeout);
 		}
+		Integer connAckTimeout = properties.getConnAckTimeout();
+		if (connAckTimeout != null) {
+			clientCreator.connAckTimeout(connAckTimeout);
+		}
 		// tio 编解码等线程数
 		Integer tioExecutorSize = properties.getTioExecutorSize();
 		if (tioExecutorSize != null && tioExecutorSize > 0) {

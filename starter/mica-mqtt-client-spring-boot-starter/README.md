@@ -30,7 +30,8 @@ mqtt:
     username: mica              # 认证的用户名，注意：2.5.x 开始将 user-name 改成了 username
     password: 123456            # 认证的密码
     global-subscribe:           # 全局订阅的 topic，可被全局监听到，保留 session 停机重启，依然可以接受到消息。（2.2.9开始支持）
-    timeout: 5                  # 超时时间，单位：秒，默认：5秒
+    timeout: 5                  # TCP 连接超时时间，单位：秒，默认：5秒
+    conn-ack-timeout: 10        # 等待 MQTT CONNACK 的超时时间，单位：秒，默认：10 秒，小于等于 0 表示不等待
     reconnect: true             # 是否重连，默认：true
     re-interval: 5000           # 重连时间，默认 5000 毫秒
     version: mqtt_3_1_1         # mqtt 协议版本，可选 MQTT_3_1、mqtt_3_1_1、mqtt_5，默认：mqtt_3_1_1

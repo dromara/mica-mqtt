@@ -52,7 +52,8 @@ MqttClient client = MqttClient.create()
     .readBufferSize(512)            // 消息一起解析的长度，默认：为 8092 （mqtt 消息最大长度）
     .maxBytesInMessage(1024 * 10)   // 最大包体长度,如果包体过大需要设置此参数，默认为： 10M (10*1024*1024)
     .keepAliveSecs(120)             // 默认：60s
-    .timeout(10)                    // 超时时间，t-io 配置，可为 null，为 null 时，t-io 默认为 5
+    .timeout(10)                    // TCP 连接超时时间（秒），可为 null，仅同步连接生效，默认：5
+    .connAckTimeout(10)             // 等待 MQTT CONNACK 的超时时间（秒），默认：10，小于等于 0 表示不等待
     .reconnect(true)                // 是否重连，默认：true
     .reInterval(5000)               // 重连重试时间，reconnect 为 true 时有效，t-io 默认为：5000
     .willMessage(builder -> {

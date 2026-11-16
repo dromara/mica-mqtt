@@ -330,6 +330,16 @@ public class InMemoryMqttSessionManager implements IMqttSessionManager {
 		pubRecReceivedStore.remove(clientId);
 	}
 
+	/**
+	 * 只清除连接态数据，保留订阅关系（集群移交所有权时使用）。
+	 */
+	@Override
+	public void removeSessionState(String clientId) {
+		pendingPublishStore.remove(clientId);
+		pendingQos2PublishStore.remove(clientId);
+		messageIdStore.remove(clientId);
+	}
+
 	@Override
 	public void clean() {
 		topicManager.clear();

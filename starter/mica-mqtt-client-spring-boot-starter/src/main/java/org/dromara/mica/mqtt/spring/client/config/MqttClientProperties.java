@@ -77,6 +77,10 @@ public class MqttClientProperties {
 	 */
 	private Integer timeout;
 	/**
+	 * 等待 MQTT CONNACK 的超时时间，单位：秒，为 null 时使用默认值 10 秒，小于等于 0 表示不等待
+	 */
+	private Integer connAckTimeout;
+	/**
 	 * 绑定 ip，绑定网卡，用于多网卡，默认为 null
 	 */
 	private String bindIp;

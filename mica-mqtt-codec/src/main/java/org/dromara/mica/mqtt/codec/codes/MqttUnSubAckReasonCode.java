@@ -26,13 +26,13 @@ public enum MqttUnSubAckReasonCode implements MqttReasonCode {
 	/**
 	 * UnsubAck ReasonCode
 	 */
-	SUCCESS((byte) 0x0),
-	NO_SUBSCRIPTION_EXISTED((byte) 0x11),
-	UNSPECIFIED_ERROR((byte) 0x80),
-	IMPLEMENTATION_SPECIFIC_ERROR((byte) 0x83),
-	NOT_AUTHORIZED((byte) 0x87),
-	TOPIC_FILTER_INVALID((byte) 0x8F),
-	PACKET_IDENTIFIER_IN_USE((byte) 0x91);
+	SUCCESS((byte) 0x0, "成功"),
+	NO_SUBSCRIPTION_EXISTED((byte) 0x11, "订阅不存在"),
+	UNSPECIFIED_ERROR((byte) 0x80, "未指明的错误"),
+	IMPLEMENTATION_SPECIFIC_ERROR((byte) 0x83, "实现特定错误"),
+	NOT_AUTHORIZED((byte) 0x87, "未经授权"),
+	TOPIC_FILTER_INVALID((byte) 0x8F, "主题过滤器无效"),
+	PACKET_IDENTIFIER_IN_USE((byte) 0x91, "报文标识符已被占用");
 
 	private static final MqttUnSubAckReasonCode[] VALUES = new MqttUnSubAckReasonCode[0x92];
 
@@ -41,9 +41,11 @@ public enum MqttUnSubAckReasonCode implements MqttReasonCode {
 	}
 
 	private final byte byteValue;
+	private final String message;
 
-	MqttUnSubAckReasonCode(byte byteValue) {
+	MqttUnSubAckReasonCode(byte byteValue, String message) {
 		this.byteValue = byteValue;
+		this.message = message;
 	}
 
 	public static MqttUnSubAckReasonCode valueOf(byte b) {
@@ -53,6 +55,11 @@ public enum MqttUnSubAckReasonCode implements MqttReasonCode {
 	@Override
 	public byte value() {
 		return byteValue;
+	}
+
+	@Override
+	public String toString() {
+		return "[0x" + String.format("%02X", this.byteValue & 0xFF) + "] " + this.name().toLowerCase().replace('_', ' ') + " (" + this.message + ')';
 	}
 
 }

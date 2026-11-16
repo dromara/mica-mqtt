@@ -31,7 +31,8 @@ mqtt:
     clientId: 000001            # 客户端Id（非常重要，一般为设备 sn，不可重复）
     username: mica              # 认证的用户名，注意：2.5.x 开始将 user-name 改成了 username
     password: 123456            # 认证的密码
-    timeout: 5                  # 超时时间，单位：秒，默认：5秒
+    timeout: 5                  # TCP 连接超时时间，单位：秒，默认：5秒
+    conn-ack-timeout: 10        # 等待 MQTT CONNACK 的超时时间，单位：秒，默认：10 秒，小于等于 0 表示不等待
     reconnect: true             # 是否重连，默认：true
     re-interval: 5000           # 重连时间，默认 5000 毫秒
     version: mqtt_3_1_1         # mqtt 协议版本，可选 MQTT_3_1、mqtt_3_1_1、mqtt_5，默认：mqtt_3_1_1

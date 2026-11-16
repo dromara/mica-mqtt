@@ -18,14 +18,14 @@
         <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven-jar-plugin.version>3.5.1</maven-jar-plugin.version>
-        <maven-flatten.version>1.8.0</maven-flatten.version>
+        <maven-flatten.version>1.9.0</maven-flatten.version>
         <!-- mica-net version -->
-        <mica-net.version>2.0.16</mica-net.version>
+        <mica-net.version>2.0.18</mica-net.version>
         <mica-auto.version>2.3.5</mica-auto.version>
         <spring.boot.version>2.7.18</spring.boot.version>
-        <solon.version>4.1.0</solon.version>
+        <solon.version>4.1.1</solon.version>
         <jfinal.version>5.3.0</jfinal.version>
-        <tinylog.version>2.8.0</tinylog.version>
+        <tinylog.version>2.8.1</tinylog.version>
         <h2.version>2.2.224</h2.version>
         <aviator.version>5.4.4</aviator.version>
         <caffeine.version>2.9.3</caffeine.version>
@@ -198,6 +198,13 @@
 
     <build>
         <plugins>
+            <!-- 显式固定 surefire 版本：Maven 3.8 及更早默认绑定 2.12.4，不支持 JUnit 5，
+                 单元测试会被静默跳过；Maven 3.9+ 默认已是 3.x，统一声明避免各环境行为不一致。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.6.1</version>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -306,7 +313,7 @@
                 <plugin>
                     <groupId>org.sonatype.central</groupId>
                     <artifactId>central-publishing-maven-plugin</artifactId>
-                    <version>0.11.0</version>
+                    <version>0.12.0</version>
                     <extensions>true</extensions>
                     <configuration>
                         <publishingServerId>central</publishingServerId>

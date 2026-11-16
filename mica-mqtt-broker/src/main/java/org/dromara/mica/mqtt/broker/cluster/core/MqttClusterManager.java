@@ -174,6 +174,29 @@ public class MqttClusterManager {
 	}
 
 	/**
+	 * Looks up the local channel of a client by its MQTT client id.
+	 * <p>
+	 * The lookup goes through the t-io business id, which the server binds to the
+	 * {@code uniqueId} of the connection. With the default
+	 * {@code DefaultMqttServerUniqueIdServiceImpl} that value is the MQTT client id
+	 * itself, so the lookup resolves the client's own connection. A custom
+	 * {@code IMqttServerUniqueIdService} that maps the client id to something else
+	 * makes this lookup miss, and the displaced connection would then stay open.
+	 * </p>
+	 *
+	 * @param clientId the MQTT client id
+	 * @return the local channel context, or {@code null} when there is none
+	 */
+	private ChannelContext localClientContext(String clientId) {
+		return mqttServer == null ? null : Tio.getByBsId(mqttServer.getServerConfig(), clientId);
+	}
+
+	boolean hasLocalClient(String clientId) {
+		ChannelContext context = localClientContext(clientId);
+		return context != null && context.isAccepted() && !context.isClosed() && !context.isRemoved();
+	}
+
+	/**
 	 * Checks whether cluster mode is enabled in the configuration.
 	 *
 	 * @return true if clustering is enabled, false otherwise
@@ -305,7 +328,18 @@ public class MqttClusterManager {
 			}
 			case CLIENT_CONNECT: {
 				ClientConnectMessage ccm = (ClientConnectMessage) clusterMsg;
+				ChannelContext previous = localClientContext(ccm.getClientId());
 				sessionManager.registerRemoteClient(ccm.getClientId(), sourceNode);
+				if (previous != null && previous.isAccepted() && !previous.isClosed()) {
+					// Publish ownership before closing: the old socket's cleanup must not
+					// remove the new route or broadcast a disconnect for the replacement.
+					Tio.remove(previous, "MQTT session taken over by cluster node " + sourceNode,
+						ChannelContext.CloseCode.KICK_EACH_OTHER);
+					// 旧连接被踢时服务端会跳过 session 清理（避免误删刚订阅的 topic），
+					// 这里只清掉本地连接态；订阅副本要留着，它正是本节点把该 clientId
+					// 的消息转发给新 owner 的依据。
+					sessionManager.removeLocalSessionState(ccm.getClientId());
+				}
 				break;
 			}
 			case CLIENT_DISCONNECT: {
@@ -313,7 +347,7 @@ public class MqttClusterManager {
 				if (cdm.isPersistentSession()) {
 					sessionManager.markRemoteClientOffline(cdm.getClientId());
 				} else {
-					sessionManager.removeRemoteClient(cdm.getClientId());
+					sessionManager.removeRemoteClient(cdm.getClientId(), sourceNode);
 				}
 				break;
 			}
