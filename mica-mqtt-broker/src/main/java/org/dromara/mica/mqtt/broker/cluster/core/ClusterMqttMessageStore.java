@@ -87,10 +87,10 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	private final AtomicLong willClock = new AtomicLong();
 	private final AtomicLong willOps = new AtomicLong();
 	/**
-	 * 已被淘汰墓碑的最高版本。任何不高于该版本的 will add 都视为过期，
-	 * 即使对应 clientId 的墓碑已被 TTL 或容量策略移除。
+	 * 按 clientId 维度的淘汰水位。某个 clientId 的墓碑被淘汰时，只推进该 clientId
+	 * 的水位，不影响其他客户端。这样客户端 B 的墓碑淘汰不会拒绝客户端 A 的有效遗嘱。
 	 */
-	private final AtomicLong willVersionFloor = new AtomicLong();
+	private final ConcurrentMap<String, Long> willVersionFloors = new ConcurrentHashMap<>();
 	// 按客户端分片，保证同一连接的保存和清理通知顺序
 	private final Object[] willLocks = new Object[64];
 	private volatile RetainIndex retainIndex;
@@ -132,6 +132,8 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 		if (clientId == null || clientId.isEmpty()) {
 			return false;
 		}
+		// 清理在 willLock 外部触发，避免持有 A 锁清理时获取 B 锁导致死锁
+		pruneWillVersionsIfNeeded();
 		synchronized (willLock(clientId)) {
 			boolean added = delegate.addWillMessage(clientId, message);
 			if (added) {
@@ -168,6 +170,8 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 		if (clientId == null || clientId.isEmpty()) {
 			return false;
 		}
+		// 清理在 willLock 外部触发，避免持有 A 锁清理时获取 B 锁导致死锁
+		pruneWillVersionsIfNeeded();
 		synchronized (willLock(clientId)) {
 			// 每次「无遗嘱连接」都必须推进清理版本，即使本地已有 cleared 墓碑：
 			// 其他节点可能在本墓碑之后又产生了更高版本的 will add，且尚未到达。
@@ -239,7 +243,8 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	}
 
 	private long nextWillVersion() {
-		pruneWillVersionsIfNeeded();
+		// 清理已由调用方在 willLock 外部触发，此处不再递归调用，
+		// 避免「持有 clientId 锁 → 清理 → 获取其他 clientId 锁」的死锁路径。
 		return willClock.updateAndGet(previous -> Math.max(previous + 1, System.currentTimeMillis()));
 	}
 
@@ -284,17 +289,21 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 			}
 		}
 		candidates.sort(Comparator.comparingLong(entry -> entry.getValue().timestamp));
-		long maxRemoved = 0;
 		int removed = 0;
 		for (int i = 0; i < overflow && i < candidates.size(); i++) {
 			Map.Entry<String, WillVersion> entry = candidates.get(i);
-			if (willVersions.remove(entry.getKey(), entry.getValue())) {
-				maxRemoved = Math.max(maxRemoved, entry.getValue().sequence);
-				removed++;
+			String clientId = entry.getKey();
+			WillVersion version = entry.getValue();
+			// 在 willLock 下先推进水位再删除墓碑，保证 applyWillMessageLocal
+			// 不会观察到「墓碑已删、水位未推进」的中间状态而接受旧 add。
+			synchronized (willLock(clientId)) {
+				if (willVersions.containsKey(clientId) && willVersions.get(clientId) == version) {
+					advanceWillVersionFloor(clientId, version.sequence);
+					willVersions.remove(clientId, version);
+					removed++;
+				}
 			}
 		}
-		// 被淘汰的墓碑仍然要压制其版本以下的迟到 add
-		advanceWillVersionFloor(maxRemoved);
 		return removed;
 	}
 
@@ -314,24 +323,42 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	 * @return 清理的条目数
 	 */
 	int pruneWillVersions(long expireBefore) {
-		int[] removed = new int[1];
-		long[] maxRemoved = new long[1];
-		willVersions.entrySet().removeIf(entry -> {
+		List<String> toPrune = new ArrayList<>();
+		for (Map.Entry<String, WillVersion> entry : willVersions.entrySet()) {
 			WillVersion version = entry.getValue();
 			if (version.cleared && version.timestamp <= expireBefore) {
-				removed[0]++;
-				maxRemoved[0] = Math.max(maxRemoved[0], version.sequence);
-				return true;
+				toPrune.add(entry.getKey());
 			}
-			return false;
+		}
+		int removed = 0;
+		for (String clientId : toPrune) {
+			// 在 willLock 下先推进水位再删除墓碑，与 capWillVersions 保持一致。
+			synchronized (willLock(clientId)) {
+				WillVersion version = willVersions.get(clientId);
+				if (version != null && version.cleared && version.timestamp <= expireBefore) {
+					advanceWillVersionFloor(clientId, version.sequence);
+					willVersions.remove(clientId, version);
+					removed++;
+				}
+			}
+		}
+		// 清理已无墓碑且水位值已超出 TTL 的 per-clientId 水位条目，防止无界增长。
+		// 水位值是墓碑的版本号（约等于创建时的 currentTimeMillis），
+		// 水位值比 expireBefore 更旧时，时间上界检查已能拒绝对应 add，水位不再需要。
+		// 不按数量淘汰水位：TTL 内的水位必须保留，否则旧 add 可能绕过水位重新生效。
+		// 水位 map 的大小受墓碑数量上限（WILL_VERSION_MAX_ENTRIES）和 TTL 自然约束。
+		willVersionFloors.entrySet().removeIf(entry -> {
+			if (willVersions.containsKey(entry.getKey())) {
+				return false;
+			}
+			return entry.getValue() < expireBefore;
 		});
-		advanceWillVersionFloor(maxRemoved[0]);
-		return removed[0];
+		return removed;
 	}
 
-	private void advanceWillVersionFloor(long version) {
-		if (version > 0) {
-			willVersionFloor.accumulateAndGet(version, Math::max);
+	private void advanceWillVersionFloor(String clientId, long version) {
+		if (clientId != null && !clientId.isEmpty() && version > 0) {
+			willVersionFloors.merge(clientId, version, Math::max);
 		}
 	}
 
@@ -345,12 +372,15 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	}
 
 	/**
-	 * 已淘汰墓碑的版本水位，供监控和测试使用。
+	 * 指定 clientId 的淘汰水位。任何不高于该水位的 will add 都视为过期，
+	 * 即使该 clientId 的墓碑已被 TTL 或容量策略移除。
 	 *
-	 * @return 最低可接受的 will add 版本（含）
+	 * @param clientId 客户端标识
+	 * @return 最低可接受的 will add 版本（含）；无记录时返回 0
 	 */
-	long getWillVersionFloor() {
-		return willVersionFloor.get();
+	long getWillVersionFloor(String clientId) {
+		Long floor = willVersionFloors.get(clientId);
+		return floor == null ? 0 : floor;
 	}
 
 	/**
@@ -465,10 +495,9 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 		synchronized (willLock(clientId)) {
 			long sequence = notification.getWillVersion();
 			if (sequence > 0 && token != null) {
-				// 墓碑被 TTL/容量回收后，仍要拒绝不高于淘汰水位的 add；
-				// 再叠加时间上界，避免旧遗嘱在保留窗口之外复活。
 				if (!notification.isClear()) {
-					long floor = willVersionFloor.get();
+					// 按 clientId 维度检查淘汰水位：客户端 B 的墓碑淘汰不应影响客户端 A 的有效遗嘱
+					long floor = getWillVersionFloor(clientId);
 					if (sequence <= floor) {
 						logger.warn("Rejecting will add below eviction floor for clientId:{} version:{} floor:{}",
 							clientId, sequence, floor);

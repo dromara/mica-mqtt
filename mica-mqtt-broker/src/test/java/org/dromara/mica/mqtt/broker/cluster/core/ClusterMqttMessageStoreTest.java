@@ -167,7 +167,7 @@ class ClusterMqttMessageStoreTest {
 	}
 
 	/**
-	 * 容量淘汰后要推进全局版本水位，被淘汰墓碑以下的 add 仍必须被拒绝。
+	 * 容量淘汰后要推进对应 clientId 的版本水位，被淘汰墓碑以下的 add 仍必须被拒绝。
 	 */
 	@Test
 	void capacityEvictionAdvancesVersionFloor() {
@@ -181,7 +181,7 @@ class ClusterMqttMessageStoreTest {
 		// 压到 2 条，最旧的 a 被淘汰
 		assertEquals(1, store.capWillVersions(2));
 		assertEquals(2, store.getWillVersionCount());
-		assertTrue(store.getWillVersionFloor() >= evictedVersion);
+		assertTrue(store.getWillVersionFloor("a") >= evictedVersion);
 
 		// a 的迟到 add 版本与已淘汰墓碑相同，必须被水位拒绝
 		WillMessageNotifyMessage lateAdd = new WillMessageNotifyMessage();
@@ -200,6 +200,45 @@ class ClusterMqttMessageStoreTest {
 		freshAdd.setWillMessage(message("fresh/topic"));
 		store.applyWillMessageLocal(freshAdd);
 		assertSame(freshAdd.getWillMessage(), store.getWillMessage("fresh"));
+	}
+
+	/**
+	 * 客户端 B 的墓碑淘汰不能拒绝客户端 A 的有效遗嘱：水位按 clientId 隔离。
+	 */
+	@Test
+	void perClientFloorDoesNotAffectOtherClientsWillAdd() {
+		ClusterMqttMessageStore store = store();
+		// 设置较大 TTL，避免时间上界干扰版本比较测试
+		store.setWillVersionTtlMs(Long.MAX_VALUE / 2);
+
+		long now = System.currentTimeMillis();
+
+		// 副本节点收到 b 的清理通知（高版本）
+		WillMessageNotifyMessage bClear = new WillMessageNotifyMessage();
+		bClear.setClientId("b");
+		bClear.setWillToken("b-token");
+		bClear.setWillVersion(now + 100);
+		bClear.setClear(true);
+		store.applyWillMessageLocal(bClear);
+
+		// 回收 b 的墓碑 → b 的水位推进到 now+100
+		// 用 now+50 作为过期阈值：墓碑 timestamp(≈now) <= now+50 会被清理，
+		// 但水位值 now+100 > now+50 不会被同步清除。
+		store.pruneWillVersions(now + 50);
+		assertTrue(store.getWillVersionFloor("b") >= now + 100);
+		// a 的水位仍为 0
+		assertEquals(0, store.getWillVersionFloor("a"));
+
+		// a 的迟到 add（版本低于 b 的水位，但 a 是不同客户端）必须被接受
+		WillMessageNotifyMessage aAdd = new WillMessageNotifyMessage();
+		aAdd.setClientId("a");
+		aAdd.setWillToken("a-token");
+		aAdd.setWillVersion(now);
+		aAdd.setWillMessage(message("a/topic"));
+		store.applyWillMessageLocal(aAdd);
+
+		assertNotNull(store.getWillMessage("a"));
+		assertEquals(now, store.getWillVersion("a"));
 	}
 
 	@Test
