@@ -63,10 +63,10 @@ public class WillMessageNotifyMessage implements ClusterMessage {
 	public void toClusterData(Map<String, String> headers) {
 		headers.put(ClusterMessageSerializer.HEADER_CLIENT_ID, clientId);
 		if (willToken != null) {
-			headers.put("willToken", willToken);
+			headers.put(ClusterMessageSerializer.HEADER_WILL_TOKEN, willToken);
 		}
 		if (willVersion > 0) {
-			headers.put("willVersion", Long.toString(willVersion));
+			headers.put(ClusterMessageSerializer.HEADER_WILL_VERSION, Long.toString(willVersion));
 		}
 		if (clear) {
 			headers.put("willClear", "true");
@@ -84,8 +84,8 @@ public class WillMessageNotifyMessage implements ClusterMessage {
 	@Override
 	public void fromClusterData(ClusterDataMessage message) {
 		this.clientId = message.getHeader(ClusterMessageSerializer.HEADER_CLIENT_ID);
-		this.willToken = message.getHeader("willToken");
-		String version = message.getHeader("willVersion");
+		this.willToken = message.getHeader(ClusterMessageSerializer.HEADER_WILL_TOKEN);
+		String version = message.getHeader(ClusterMessageSerializer.HEADER_WILL_VERSION);
 		this.willVersion = version == null ? 0 : Long.parseLong(version);
 		this.clear = "true".equals(message.getHeader("willClear"));
 		byte[] payload = message.getPayload();

@@ -38,6 +38,15 @@ public class ClientConnectMessage implements ClusterMessage {
 	 * Unique identifier of the connected MQTT client.
 	 */
 	private String clientId;
+	/**
+	 * 新连接的清理屏障版本。仅当该连接未携带遗嘱时由服务端填写，
+	 * 接收方据此压制迟到的旧遗嘱 add，避免为无遗嘱连接单独广播 WILL_MESSAGE。
+	 */
+	private long willVersion;
+	/**
+	 * 与清理屏障版本配对的标识。
+	 */
+	private String willToken;
 
 	@Override
 	public ClusterMessageType getType() {
@@ -47,6 +56,10 @@ public class ClientConnectMessage implements ClusterMessage {
 	@Override
 	public void toClusterData(Map<String, String> headers) {
 		headers.put(ClusterMessageSerializer.HEADER_CLIENT_ID, clientId);
+		if (willVersion > 0 && willToken != null) {
+			headers.put(ClusterMessageSerializer.HEADER_WILL_VERSION, Long.toString(willVersion));
+			headers.put(ClusterMessageSerializer.HEADER_WILL_TOKEN, willToken);
+		}
 	}
 
 	@Override
@@ -57,6 +70,9 @@ public class ClientConnectMessage implements ClusterMessage {
 	@Override
 	public void fromClusterData(ClusterDataMessage message) {
 		this.clientId = message.getHeader(ClusterMessageSerializer.HEADER_CLIENT_ID);
+		String version = message.getHeader(ClusterMessageSerializer.HEADER_WILL_VERSION);
+		this.willVersion = version == null ? 0 : Long.parseLong(version);
+		this.willToken = message.getHeader(ClusterMessageSerializer.HEADER_WILL_TOKEN);
 	}
 
 	public String getClientId() {
@@ -65,5 +81,21 @@ public class ClientConnectMessage implements ClusterMessage {
 
 	public void setClientId(String clientId) {
 		this.clientId = clientId;
+	}
+
+	public long getWillVersion() {
+		return willVersion;
+	}
+
+	public void setWillVersion(long willVersion) {
+		this.willVersion = willVersion;
+	}
+
+	public String getWillToken() {
+		return willToken;
+	}
+
+	public void setWillToken(String willToken) {
+		this.willToken = willToken;
 	}
 }

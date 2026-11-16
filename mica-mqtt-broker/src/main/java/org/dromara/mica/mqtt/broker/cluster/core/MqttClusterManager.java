@@ -352,6 +352,7 @@ public class MqttClusterManager {
 			}
 			case CLIENT_CONNECT: {
 				ClientConnectMessage ccm = (ClientConnectMessage) clusterMsg;
+				applyConnectWillBarrier(ccm);
 				ChannelContext previous = localClientContext(ccm.getClientId());
 				sessionManager.registerRemoteClient(ccm.getClientId(), sourceNode);
 				if (previous != null && previous.isAccepted() && !previous.isClosed()) {
@@ -480,9 +481,10 @@ public class MqttClusterManager {
 	 * 重新处理本地共享订阅投递，失败时按原分组选择其他客户端。
 	 *
 	 * @param message 共享订阅投递消息
+	 * @return 是否投递成功
 	 */
-	public void retrySharedDispatch(SharedDispatchToClientMessage message) {
-		handleSharedDispatchToClient(message, sessionManager);
+	public boolean retrySharedDispatch(SharedDispatchToClientMessage message) {
+		return handleSharedDispatchToClient(message, sessionManager);
 	}
 
 	/**
@@ -498,20 +500,20 @@ public class MqttClusterManager {
 	 * and delivers to a still-active subscriber (plan B from the design doc).
 	 * </p>
 	 */
-	private void handleSharedDispatchToClient(SharedDispatchToClientMessage sdm,
-											  ClusterMqttSessionManager sessionManager) {
+	private boolean handleSharedDispatchToClient(SharedDispatchToClientMessage sdm,
+												 ClusterMqttSessionManager sessionManager) {
 		String clientId = sdm.getClientId();
 		String topic = sdm.getTopic();
 		Message msg = sdm.getMessage();
 
 		if (msg == null) {
 			logger.warn("[Cluster] Received SHARED_DISPATCH_TO_CLIENT with null message, clientId={}", clientId);
-			return;
+			return false;
 		}
 
 		MqttProperties properties = forwardedProperties(msg);
 		if (msg.getProperties() != null && properties == null) {
-			return;
+			return false;
 		}
 		// Try to deliver to the selected client locally.
 		ChannelContext target = mqttServer.getChannelContext(clientId);
@@ -522,7 +524,7 @@ public class MqttClusterManager {
 
 		if (delivered) {
 			logger.debug("[Cluster] Shared dispatch delivered to client={} topic={}", clientId, topic);
-			return;
+			return true;
 		}
 
 		// Target client is no longer local — re-pick from the local shared-subscription table.
@@ -532,13 +534,13 @@ public class MqttClusterManager {
 		if (sharedStrategy == null || sdm.getGroupKey() == null || sdm.getRetryCount() >= 3) {
 			logger.debug("[Cluster] Cannot re-pick shared subscriber, group={} retries={} topic={}",
 				sdm.getGroupKey(), sdm.getRetryCount(), topic);
-			return;
+			return false;
 		}
 
 		List<Subscribe> candidates = sessionManager.searchAllSubscribe(topic);
 		if (candidates == null || candidates.isEmpty()) {
 			logger.debug("[Cluster] No subscribers remain for topic={}, dropping", topic);
-			return;
+			return false;
 		}
 
 		// Narrow to shared subscribers only, group the same way the dispatcher does.
@@ -559,6 +561,7 @@ public class MqttClusterManager {
 			}
 		}
 
+		boolean anyDelivered = false;
 		for (Map.Entry<String, List<Subscribe>> entry : sharedGroups.entrySet()) {
 			if (!entry.getKey().equals(sdm.getGroupKey())) {
 				continue;
@@ -576,6 +579,7 @@ public class MqttClusterManager {
 				if (channel != null && !channel.isClosed() && mqttServer.publish(channel, rePicked.getClientId(), topic, msg.getPayload(),
 					MqttQoS.valueOf(msg.getQos()), rePicked.getMqttQoS(), false, properties)) {
 					logger.debug("[Cluster] Re-pick delivered to client={} topic={}", rePicked.getClientId(), topic);
+					anyDelivered = true;
 				} else {
 					SharedDispatchToClientMessage retry = new SharedDispatchToClientMessage();
 					retry.setClientId(rePicked.getClientId());
@@ -583,7 +587,7 @@ public class MqttClusterManager {
 					retry.setRetryCount(sdm.getRetryCount() + 1);
 					retry.setTopic(topic);
 					retry.setMessage(msg);
-					handleSharedDispatchToClient(retry, sessionManager);
+					anyDelivered |= handleSharedDispatchToClient(retry, sessionManager);
 				}
 			} else {
 				SharedDispatchToClientMessage retry = new SharedDispatchToClientMessage();
@@ -592,10 +596,11 @@ public class MqttClusterManager {
 				retry.setRetryCount(sdm.getRetryCount() + 1);
 				retry.setTopic(topic);
 				retry.setMessage(msg);
-				sendToNode(rePickedNode, retry);
+				anyDelivered |= sendToNode(rePickedNode, retry);
 				logger.debug("[Cluster] Re-pick forwarded to node={} client={} topic={}", rePickedNode, rePicked.getClientId(), topic);
 			}
 		}
+		return anyDelivered;
 	}
 
 	/**
@@ -753,7 +758,61 @@ public class MqttClusterManager {
 		}
 	}
 
-	private IMqttMessageStore getMessageStore() {
+	/**
+	 * 应用上线通知携带的遗嘱清理屏障。
+	 *
+	 * @param message 上线通知
+	 */
+	private void applyConnectWillBarrier(ClientConnectMessage message) {
+		if (message.getWillVersion() <= 0 || message.getWillToken() == null) {
+			return;
+		}
+		IMqttMessageStore messageStore = getMessageStore();
+		if (!(messageStore instanceof ClusterMqttMessageStore)) {
+			return;
+		}
+		WillMessageNotifyMessage barrier = new WillMessageNotifyMessage();
+		barrier.setClientId(message.getClientId());
+		barrier.setWillToken(message.getWillToken());
+		barrier.setWillVersion(message.getWillVersion());
+		barrier.setClear(true);
+		((ClusterMqttMessageStore) messageStore).applyWillMessageLocal(barrier);
+	}
+
+	/**
+	 * 把本节点当前的清理屏障附加到上线通知。
+	 *
+	 * @param message 上线通知
+	 */
+	void attachWillBarrier(ClientConnectMessage message) {
+		IMqttMessageStore messageStore = mqttServer == null ? null : getMessageStore();
+		if (!(messageStore instanceof ClusterMqttMessageStore)) {
+			return;
+		}
+		WillMessageNotifyMessage state = ((ClusterMqttMessageStore) messageStore).getClearedWillState(message.getClientId());
+		if (state != null) {
+			message.setWillVersion(state.getWillVersion());
+			message.setWillToken(state.getWillToken());
+		}
+	}
+
+	/**
+	 * 上线通知无法送达时，单独广播当前清理屏障，保证旧遗嘱仍能被压制。
+	 *
+	 * @param clientId 客户端标识
+	 */
+	void broadcastWillState(String clientId) {
+		IMqttMessageStore messageStore = mqttServer == null ? null : getMessageStore();
+		if (!(messageStore instanceof ClusterMqttMessageStore)) {
+			return;
+		}
+		WillMessageNotifyMessage state = ((ClusterMqttMessageStore) messageStore).getClearedWillState(clientId);
+		if (state != null) {
+			broadcast(state);
+		}
+	}
+
+	IMqttMessageStore getMessageStore() {
 		return mqttServer.getServerCreator().getMessageStore();
 	}
 
@@ -801,18 +860,21 @@ public class MqttClusterManager {
 		}
 	}
 
-	public void sendToNode(String nodeId, ClusterMessage clusterMsg) {
+	public boolean sendToNode(String nodeId, ClusterMessage clusterMsg) {
 		if (!config.isEnabled() || cluster == null) {
-			return;
+			return false;
 		}
 		try {
 			String[] parts = nodeId.split(":");
 			if (parts.length == 2) {
 				Node node = new Node(parts[0], Integer.parseInt(parts[1]));
-				cluster.send(node, ClusterMessageSerializer.toClusterData(clusterMsg, localNodeId));
+				return cluster.send(node, ClusterMessageSerializer.toClusterData(clusterMsg, localNodeId));
 			}
+			logger.warn("Invalid cluster node id: {}", nodeId);
+			return false;
 		} catch (Exception e) {
 			logger.error("Failed to send message to node: {}", nodeId, e);
+			return false;
 		}
 	}
 

@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -114,16 +115,17 @@ class ClusterMqttMessageStoreTest {
 
 	/**
 	 * 新连接不带遗嘱时必须留下清理版本：即使本节点还没收到旧遗嘱，
-	 * 迟到的旧 add 也不能复活。
+	 * 迟到的旧 add 也不能复活。屏障随上线通知传播，不单独广播。
 	 */
 	@Test
 	void clearWithoutLocalWillCreatesBarrierAndRejectsLateAdd() {
 		CountingManager manager = new CountingManager();
 		ClusterMqttMessageStore store = store(manager);
-		store.clearWillMessage("migrated-client");
+		store.clearWillMessageOnConnect("migrated-client");
 
 		assertEquals(1, store.getWillVersionCount());
-		assertEquals(1, manager.willBroadcasts.get());
+		assertEquals(0, manager.willBroadcasts.get());
+		assertNotNull(store.getClearedWillState("migrated-client"));
 
 		WillMessageNotifyMessage lateAdd = new WillMessageNotifyMessage();
 		lateAdd.setClientId("migrated-client");
@@ -136,20 +138,22 @@ class ClusterMqttMessageStoreTest {
 	}
 
 	/**
-	 * 每次无遗嘱连接都要推进清理版本，压制「旧墓碑之后、尚未到达」的更高版本 add。
+	 * 每次无遗嘱连接都要推进清理版本，压制「旧墓碑之后、尚未到达」的更高版本 add；
+	 * 重复连接不产生额外 WILL_MESSAGE 广播。
 	 */
 	@Test
 	void repeatedClearAdvancesBarrierAboveUnseenAdd() {
 		CountingManager manager = new CountingManager();
 		ClusterMqttMessageStore store = store(manager);
-		store.clearWillMessage("client");
+		store.clearWillMessageOnConnect("client");
 		long firstVersion = store.getWillVersion("client");
-		store.clearWillMessage("client");
+		store.clearWillMessageOnConnect("client");
 		long secondVersion = store.getWillVersion("client");
 
 		assertTrue(secondVersion > firstVersion);
-		assertEquals(2, manager.willBroadcasts.get());
+		assertEquals(0, manager.willBroadcasts.get());
 		assertEquals(1, store.getWillVersionCount());
+		assertEquals(secondVersion, store.getClearedWillState("client").getWillVersion());
 
 		// 模拟第一次 clear 之后另一节点产生的 add，直到第二次 clear 后才到达
 		WillMessageNotifyMessage lateAdd = new WillMessageNotifyMessage();
@@ -200,10 +204,12 @@ class ClusterMqttMessageStoreTest {
 
 	@Test
 	void anonymousClearsAreBoundedAndPrunable() {
-		ClusterMqttMessageStore store = store();
+		CountingManager manager = new CountingManager();
+		ClusterMqttMessageStore store = store(manager);
 		for (int i = 0; i < 10_000; i++) {
-			store.clearWillMessage("anonymous-" + i);
+			store.clearWillMessageOnConnect("anonymous-" + i);
 		}
+		assertEquals(0, manager.willBroadcasts.get());
 		assertEquals(10_000, store.getWillVersionCount());
 		assertEquals(10_000, store.pruneWillVersions(Long.MAX_VALUE));
 		assertEquals(0, store.getWillVersionCount());
@@ -218,7 +224,7 @@ class ClusterMqttMessageStoreTest {
 		store.clearWillMessage("client");
 		assertEquals(2, manager.willBroadcasts.get());
 		assertEquals(1, store.getWillVersionCount());
-		// 每次 clear 都要推进版本，重复连接同样需要广播
+		// 显式 clear（非连接路径）仍需立即广播
 		store.clearWillMessage("client");
 		assertEquals(3, manager.willBroadcasts.get());
 		assertEquals(1, store.getWillVersionCount());

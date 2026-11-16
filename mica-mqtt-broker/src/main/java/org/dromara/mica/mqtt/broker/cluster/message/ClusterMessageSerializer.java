@@ -66,6 +66,14 @@ public class ClusterMessageSerializer {
 	 */
 	public static final String HEADER_TIMEOUT = "timeout";
 	/**
+	 * Header key for will cleanup version carried by connect notifications.
+	 */
+	public static final String HEADER_WILL_VERSION = "willVersion";
+	/**
+	 * Header key for will cleanup token carried by connect notifications.
+	 */
+	public static final String HEADER_WILL_TOKEN = "willToken";
+	/**
 	 * Header key marking a NODE_LEAVE as detected by failure monitoring
 	 * (as opposed to a graceful shutdown of the leaving node).
 	 */

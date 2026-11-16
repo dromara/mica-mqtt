@@ -147,6 +147,24 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 
 	@Override
 	public boolean clearWillMessage(String clientId) {
+		return clearWillMessage(clientId, true);
+	}
+
+	@Override
+	public boolean clearWillMessageOnConnect(String clientId) {
+		// 版本屏障必须本地推进，但传播交给 CLIENT_CONNECT 上线通知：
+		// 每次无遗嘱连接都单独广播 WILL_MESSAGE 会造成 N-1 倍广播放大。
+		return clearWillMessage(clientId, false);
+	}
+
+	/**
+	 * 清理遗嘱并推进版本屏障。
+	 *
+	 * @param clientId  客户端标识
+	 * @param broadcast 是否立即广播清理通知
+	 * @return 是否清除了本地遗嘱
+	 */
+	private boolean clearWillMessage(String clientId, boolean broadcast) {
 		if (clientId == null || clientId.isEmpty()) {
 			return false;
 		}
@@ -159,9 +177,33 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 			String token = UUID.randomUUID().toString();
 			long version = nextWillVersion();
 			willVersions.put(clientId, new WillVersion(version, token, true, System.currentTimeMillis()));
-			broadcastWill(clientId, null, token, version, true);
+			if (broadcast) {
+				broadcastWill(clientId, null, token, version, true);
+			}
 			return removed;
 		}
+	}
+
+	/**
+	 * 返回当前尚未被新遗嘱覆盖的清理状态，供上线通知捎带。
+	 *
+	 * @param clientId 客户端标识
+	 * @return 清理通知，当前存在活跃遗嘱时返回 null
+	 */
+	WillMessageNotifyMessage getClearedWillState(String clientId) {
+		if (clientId == null || clientId.isEmpty()) {
+			return null;
+		}
+		WillVersion version = willVersions.get(clientId);
+		if (version == null || !version.cleared) {
+			return null;
+		}
+		WillMessageNotifyMessage notification = new WillMessageNotifyMessage();
+		notification.setClientId(clientId);
+		notification.setWillToken(version.token);
+		notification.setWillVersion(version.sequence);
+		notification.setClear(true);
+		return notification;
 	}
 
 	@Override
@@ -408,24 +450,6 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 	}
 
 	/**
-	 * 仅本地存储遗嘱消息，不广播到集群。
-	 * 用于处理从其他节点接收到的集群消息，避免无限广播。
-	 *
-	 * @param clientId 客户端标识
-	 * @param message  遗嘱消息
-	 * @return 是否成功
-	 */
-	public boolean addWillMessageLocal(String clientId, Message message) {
-		if (clientId == null || clientId.isEmpty()) {
-			return false;
-		}
-		synchronized (willLock(clientId)) {
-			willTokens.remove(clientId);
-			return delegate.addWillMessage(clientId, message);
-		}
-	}
-
-	/**
 	 * 应用远端遗嘱通知；清理时仅移除版本匹配的副本。
 	 *
 	 * @param notification 远端遗嘱通知
@@ -512,22 +536,6 @@ public class ClusterMqttMessageStore implements IMqttMessageStore {
 			this.token = token;
 			this.cleared = cleared;
 			this.timestamp = timestamp;
-		}
-	}
-
-	/**
-	 * 仅本地清除遗嘱消息，不广播到集群。
-	 *
-	 * @param clientId 客户端标识
-	 * @return 是否成功
-	 */
-	public boolean clearWillMessageLocal(String clientId) {
-		if (clientId == null || clientId.isEmpty()) {
-			return false;
-		}
-		synchronized (willLock(clientId)) {
-			willTokens.remove(clientId);
-			return delegate.clearWillMessage(clientId);
 		}
 	}
 

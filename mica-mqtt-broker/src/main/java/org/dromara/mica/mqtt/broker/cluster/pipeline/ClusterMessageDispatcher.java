@@ -120,10 +120,12 @@ public class ClusterMessageDispatcher {
 	 * Groups remote subscribers by node and sends one {@link PublishForwardMessage}
 	 * per distinct remote node.  Local delivery is handled by the caller.
 	 * </p>
+	 *
+	 * @return 成功发送到的远端节点数
 	 */
-	private void deliverNormal(String topic, Message message, String localNodeId, List<Subscribe> normalSubs) {
+	private int deliverNormal(String topic, Message message, String localNodeId, List<Subscribe> normalSubs) {
 		if (normalSubs.isEmpty()) {
-			return;
+			return 0;
 		}
 		Set<String> remoteNodes = new HashSet<>();
 		for (Subscribe sub : normalSubs) {
@@ -132,12 +134,16 @@ public class ClusterMessageDispatcher {
 				remoteNodes.add(nodeId);
 			}
 		}
+		int delivered = 0;
 		for (String nodeId : remoteNodes) {
 			logger.debug("[Cluster] Forwarding normal publish on topic: {} to remote node: {}", topic, nodeId);
 			PublishForwardMessage forward = new PublishForwardMessage();
 			forward.setMessage(message);
-			clusterManager.sendToNode(nodeId, forward);
+			if (clusterManager.sendToNode(nodeId, forward)) {
+				delivered++;
+			}
 		}
+		return delivered;
 	}
 
 	/**
@@ -147,6 +153,17 @@ public class ClusterMessageDispatcher {
 	 * @return 本节点需要投递的订阅
 	 */
 	public List<Subscribe> selectLocalSubscribers(PublishContext context) {
+		return selectLocalSubscribers(context, null);
+	}
+
+	/**
+	 * 选择本地订阅者，并记录远端转发结果。
+	 *
+	 * @param context 发布上下文
+	 * @param tracker 远端投递统计，可为 null
+	 * @return 本节点需要投递的订阅
+	 */
+	private List<Subscribe> selectLocalSubscribers(PublishContext context, DeliveryTracker tracker) {
 		String topic = context.getTopic();
 		MqttProperties properties = context.getProperties();
 		if (properties != null && !properties.isEmpty()) {
@@ -192,7 +209,8 @@ public class ClusterMessageDispatcher {
 		message.setProperties(properties);
 		message.setTimestamp(forwardedAt);
 		message.setPublishReceivedAt(forwardedAt);
-		deliverNormal(topic, message, localNodeId, normal);
+		int remoteDelivered = deliverNormal(topic, message, localNodeId, normal);
+		int remoteTargets = countRemoteTargets(normal, localNodeId);
 		for (Map.Entry<String, List<Subscribe>> entry : groups.entrySet()) {
 			String groupName = entry.getKey().equals(TopicFilterType.SHARE_QUEUE_PREFIX) ? "$queue"
 				: entry.getKey().substring(TopicFilterType.SHARE_GROUP_PREFIX.length());
@@ -204,6 +222,7 @@ public class ClusterMessageDispatcher {
 			if (node == null || node.equals(localNodeId)) {
 				local.add(selected);
 			} else {
+				remoteTargets++;
 				Message selectedMessage = new Message();
 				selectedMessage.setMessageType(MessageType.UP_STREAM);
 				selectedMessage.setFromClientId(context.getClientId());
@@ -218,30 +237,68 @@ public class ClusterMessageDispatcher {
 				dispatch.setGroupKey(entry.getKey());
 				dispatch.setTopic(topic);
 				dispatch.setMessage(selectedMessage);
-				clusterManager.sendToNode(node, dispatch);
+				if (clusterManager.sendToNode(node, dispatch)) {
+					remoteDelivered++;
+				}
 			}
 		}
+		if (tracker != null) {
+			tracker.remoteTargets += remoteTargets;
+			tracker.remoteDelivered += remoteDelivered;
+		}
 		return local;
+	}
+
+	private int countRemoteTargets(List<Subscribe> normalSubs, String localNodeId) {
+		int targets = 0;
+		for (Subscribe sub : normalSubs) {
+			String nodeId = clusterSessionManager.getClientNode(sub.getClientId());
+			if (nodeId != null && !nodeId.equals(localNodeId)) {
+				targets++;
+			}
+		}
+		return targets;
+	}
+
+	/**
+	 * 远端投递统计。
+	 */
+	private static final class DeliveryTracker {
+		private int remoteTargets;
+		private int remoteDelivered;
 	}
 
 	/**
 	 * 路由服务端主动广播的消息，复用客户端发布时的共享订阅选择规则。
 	 *
 	 * @param context 发布上下文
-	 * @return 是否存在匹配订阅
+	 * @return 投递结果
 	 */
-	public boolean routePublishAll(PublishContext context) {
+	public MqttServer.DeliveryResult routePublishAll(PublishContext context) {
 		if (clusterSessionManager.searchAllSubscribe(context.getTopic()).isEmpty()) {
-			return false;
+			return MqttServer.DeliveryResult.NO_SUBSCRIBERS;
 		}
-		for (Subscribe sub : selectLocalSubscribers(context)) {
+		DeliveryTracker tracker = new DeliveryTracker();
+		List<Subscribe> localSubscribers = selectLocalSubscribers(context, tracker);
+		boolean localDelivered = false;
+		int localTargets = localSubscribers.size();
+		for (Subscribe sub : localSubscribers) {
 			ChannelContext channel = mqttServer.getChannelContext(sub.getClientId());
-			if (channel == null || channel.isClosed() || !mqttServer.publish(channel, sub.getClientId(), context.getTopic(), context.getPayload(),
-				context.getQos(), sub.getMqttQoS(), false, context.getProperties())) {
-				retryLocalSubscriber(context, sub, context.getProperties());
+			boolean success = channel != null && !channel.isClosed()
+				&& mqttServer.publish(channel, sub.getClientId(), context.getTopic(), context.getPayload(),
+					context.getQos(), sub.getMqttQoS(), false, context.getProperties());
+			if (!success) {
+				// 共享订阅失败时在同一分组内重新选择，普通订阅没有补偿目标
+				success = retryLocalSubscriber(context, sub, context.getProperties());
 			}
+			localDelivered |= success;
 		}
-		return true;
+		if (localDelivered || tracker.remoteDelivered > 0) {
+			return MqttServer.DeliveryResult.DELIVERED;
+		}
+		// 有目标但全部发送失败才返回失败；属性过期等「没有可投递目标」的情况属于正常空操作
+		return localTargets > 0 || tracker.remoteTargets > 0
+			? MqttServer.DeliveryResult.FAILED : MqttServer.DeliveryResult.NO_SUBSCRIBERS;
 	}
 
 	/**
@@ -250,8 +307,9 @@ public class ClusterMessageDispatcher {
 	 * @param context 发布上下文
 	 * @param subscription 投递失败的订阅
 	 * @param properties 转发属性
+	 * @return 是否重新投递成功
 	 */
-	public void retryLocalSubscriber(PublishContext context, Subscribe subscription, MqttProperties properties) {
+	public boolean retryLocalSubscriber(PublishContext context, Subscribe subscription, MqttProperties properties) {
 		String filter = subscription.getTopicFilter();
 		String groupKey;
 		if (filter != null && filter.startsWith(TopicFilterType.SHARE_GROUP_PREFIX)) {
@@ -259,7 +317,7 @@ public class ClusterMessageDispatcher {
 		} else if (filter != null && filter.startsWith(TopicFilterType.SHARE_QUEUE_PREFIX)) {
 			groupKey = TopicFilterType.SHARE_QUEUE_PREFIX;
 		} else {
-			return;
+			return false;
 		}
 		long now = System.currentTimeMillis();
 		Message message = new Message();
@@ -276,7 +334,7 @@ public class ClusterMessageDispatcher {
 		dispatch.setGroupKey(groupKey);
 		dispatch.setTopic(context.getTopic());
 		dispatch.setMessage(message);
-		clusterManager.retrySharedDispatch(dispatch);
+		return clusterManager.retrySharedDispatch(dispatch);
 	}
 
 }

@@ -77,28 +77,39 @@ public class ClusterMqttConnectStatusListener implements IMqttConnectStatusListe
 		// 归属仍归远端时漏广播下线也是对的 —— 远端会在自己的客户端断开时广播下线。
 		if (context != null && (!context.isAccepted() || context.isClosed() || context.isRemoved())) {
 			logger.info("[Cluster] online() skipped, connection is not alive, clientId:{}", clientId);
+			// 无遗嘱连接的清理屏障原本随上线通知传播，连接已失效时退化为独立广播，
+			// 否则远端保留的旧遗嘱不会被压制。
+			clusterManager.broadcastWillState(clientId);
 			return;
 		}
 		// 接管本地归属：清掉 clientId 残留的远端归属，并记下原 owner 用于 session takeover。
 		// 先登记再回调 delegate，保证 delegate 抛异常时归属依然自洽。
 		String previousOwner = sessionManager == null ? null : sessionManager.registerLocalClient(clientId);
-		if (delegate != null) {
-			delegate.online(context, clientId, username);
-		}
+		try {
+			if (delegate != null) {
+				delegate.online(context, clientId, username);
+			}
 
-		// V3 takeover: if the clientId is already mapped to another node, request
-		// takeover before broadcasting the new connect.  The previous owner
-		// responds with a SessionTakeoverResponse carrying the persisted session
-		// bytes; the new owner then broadcasts SessionMigratedNotify to all
-		// peers to update routing.
-		if (previousOwner != null && !previousOwner.isEmpty()) {
-			logger.info("[Cluster] online() detected previous owner {} for client {}, requesting takeover",
-				previousOwner, clientId);
-			clusterManager.initiateSessionTakeover(clientId, previousOwner, DEFAULT_TAKEOVER_TIMEOUT_MS);
+			// V3 takeover: if the clientId is already mapped to another node, request
+			// takeover before broadcasting the new connect.  The previous owner
+			// responds with a SessionTakeoverResponse carrying the persisted session
+			// bytes; the new owner then broadcasts SessionMigratedNotify to all
+			// peers to update routing.
+			if (previousOwner != null && !previousOwner.isEmpty()) {
+				logger.info("[Cluster] online() detected previous owner {} for client {}, requesting takeover",
+					previousOwner, clientId);
+				clusterManager.initiateSessionTakeover(clientId, previousOwner, DEFAULT_TAKEOVER_TIMEOUT_MS);
+			}
+		} finally {
+			// 即使业务回调异常也要广播上线：它同时携带无遗嘱连接的清理屏障。
+			broadcastClientConnect(clientId);
 		}
+	}
 
+	private void broadcastClientConnect(String clientId) {
 		ClientConnectMessage msg = new ClientConnectMessage();
 		msg.setClientId(clientId);
+		clusterManager.attachWillBarrier(msg);
 		clusterManager.broadcast(msg);
 	}
 

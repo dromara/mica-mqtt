@@ -18,6 +18,7 @@ package org.dromara.mica.mqtt.broker.cluster.core;
 
 import net.dreamlu.mica.net.server.cluster.message.ClusterDataMessage;
 import org.dromara.mica.mqtt.broker.cluster.config.MqttClusterConfig;
+import org.dromara.mica.mqtt.broker.cluster.message.ClientConnectMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessage;
 import org.dromara.mica.mqtt.broker.cluster.message.ClusterMessageSerializer;
 import org.dromara.mica.mqtt.broker.cluster.message.NodeLeaveMessage;
@@ -26,6 +27,7 @@ import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.session.InMemoryMqttSessionManager;
 import org.dromara.mica.mqtt.core.server.store.IMqttMessageStore;
+import org.dromara.mica.mqtt.core.server.store.InMemoryMqttMessageStore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -33,6 +35,7 @@ import java.lang.reflect.Method;
 import java.net.ServerSocket;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -182,5 +185,38 @@ class ClusterNodeLeaveTest {
 
 		assertEquals("dead-node:9000", parsed.getNodeId());
 		assertTrue(parsed.isFailover());
+	}
+
+	/**
+	 * 无遗嘱连接的清理屏障随上线通知传输，接收方可据此压制迟到的旧遗嘱。
+	 */
+	@Test
+	void clientConnectCarriesWillBarrier() {
+		ClientConnectMessage message = new ClientConnectMessage();
+		message.setClientId("client");
+		message.setWillVersion(123L);
+		message.setWillToken("token");
+
+		ClusterDataMessage data = ClusterMessageSerializer.toClusterData(message, "local");
+		ClientConnectMessage parsed = ClusterMessageSerializer.fromClusterData(data);
+
+		assertEquals(123L, parsed.getWillVersion());
+		assertEquals("token", parsed.getWillToken());
+	}
+
+	@Test
+	void clearedWillStateCanBeAppliedOnReplica() {
+		ClusterMqttMessageStore source = new ClusterMqttMessageStore(
+			new InMemoryMqttMessageStore(),
+			new MqttClusterManager(new MqttClusterConfig().enabled(false), "source"));
+		source.clearWillMessageOnConnect("client");
+
+		ClusterMqttMessageStore replica = new ClusterMqttMessageStore(
+			new InMemoryMqttMessageStore(),
+			new MqttClusterManager(new MqttClusterConfig().enabled(false), "replica"));
+		replica.applyWillMessageLocal(source.getClearedWillState("client"));
+
+		assertEquals(source.getWillVersion("client"), replica.getWillVersion("client"));
+		assertNotNull(replica.getClearedWillState("client"));
 	}
 }
