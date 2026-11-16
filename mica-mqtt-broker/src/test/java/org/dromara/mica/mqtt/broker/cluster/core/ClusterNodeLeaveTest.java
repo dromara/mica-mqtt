@@ -33,6 +33,8 @@ import org.junit.jupiter.api.Timeout;
 
 import java.lang.reflect.Method;
 import java.net.ServerSocket;
+import java.util.List;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -47,6 +49,33 @@ class ClusterNodeLeaveTest {
 		try (ServerSocket server = new ServerSocket(0)) {
 			return server.getLocalPort();
 		}
+	}
+
+	@Test
+	void reconnectAfterOrphanCleanupKeepsReplacementWill() throws Exception {
+		MqttClusterManager manager = new MqttClusterManager(new MqttClusterConfig().enabled(false), "local");
+		InMemoryMqttMessageStore store = new InMemoryMqttMessageStore();
+		Message oldWill = new Message();
+		oldWill.setTopic("old/will");
+		Message newWill = new Message();
+		newWill.setTopic("new/will");
+		store.addWillMessage("client", oldWill);
+		ClusterMqttSessionManager sessions = new ClusterMqttSessionManager(new InMemoryMqttSessionManager(), manager) {
+			@Override
+			List<String> clearNodeClientsAndSubscriptions(String nodeId, Consumer<String> beforeRemove) {
+				List<String> removed = super.clearNodeClientsAndSubscriptions(nodeId, beforeRemove);
+				store.addWillMessage("client", newWill);
+				return removed;
+			}
+		};
+		manager.setSessionManager(sessions);
+		MqttServer server = MqttServer.create().enableMqtt(freePort()).sessionManager(sessions).messageStore(store).build();
+		manager.setMqttServer(server);
+		sessions.registerRemoteClient("client", "dead-node:9000");
+		Method handle = MqttClusterManager.class.getDeclaredMethod("handleNodeLeave", String.class, boolean.class);
+		handle.setAccessible(true);
+		handle.invoke(manager, "dead-node:9000", true);
+		assertSame(newWill, store.getWillMessage("client"));
 	}
 
 	/**
@@ -218,5 +247,60 @@ class ClusterNodeLeaveTest {
 
 		assertEquals(source.getWillVersion("client"), replica.getWillVersion("client"));
 		assertNotNull(replica.getClearedWillState("client"));
+	}
+
+	/**
+	 * 新连接已本地接管（ChannelContext 已建立）但 online 回调尚未将归属从
+	 * clientNodeMap 移除时，旧节点下线清理不能删除已迁移客户端的新订阅。
+	 */
+	@Test
+	void nodeLeaveDoesNotDeleteMigratedClientSubscriptions() {
+		// 使用可注入 hasLocalClient 的子类模拟「本地已接管」
+		MqttClusterManager manager = new MqttClusterManager(new MqttClusterConfig().enabled(false), "local") {
+			private final java.util.Set<String> localClients = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+			@Override
+			boolean hasLocalClient(String clientId) {
+				return localClients.contains(clientId);
+			}
+		};
+		ClusterMqttSessionManager sessions = new ClusterMqttSessionManager(new InMemoryMqttSessionManager(), manager);
+		manager.setSessionManager(sessions);
+
+		// 客户端原先在 old-node，本节点上有副本订阅
+		sessions.registerRemoteClient("client", "old-node:9000");
+		sessions.addSubscribe(new TopicFilter("data/topic"), "client", 1, false);
+		assertEquals(1, sessions.getSubscriptions("client").size());
+
+		// 模拟新连接已完成本地接管，但 online 回调尚未移除归属
+		// （clientNodeMap 仍为 old-node:9000）
+		// 通过反射注入 hasLocalClient = true
+		// 由于上面匿名子类没有暴露 markLocal，直接验证 clearNodeClientsAndSubscriptions
+		// 在 hasLocalClient=false 时仍然删除（对照组）
+		List<String> removed = sessions.clearNodeClientsAndSubscriptions("old-node:9000");
+		assertEquals(1, removed.size());
+		assertTrue(sessions.getSubscriptions("client").isEmpty());
+
+		// 重新设置：这次模拟 hasLocalClient=true
+		sessions.registerRemoteClient("client", "old-node:9000");
+		sessions.addSubscribe(new TopicFilter("data/topic"), "client", 1, false);
+
+		MqttClusterManager managerWithLocal = new MqttClusterManager(new MqttClusterConfig().enabled(false), "local") {
+			@Override
+			boolean hasLocalClient(String clientId) {
+				return "client".equals(clientId);
+			}
+		};
+		ClusterMqttSessionManager sessionsWithLocal = new ClusterMqttSessionManager(
+			new InMemoryMqttSessionManager(), managerWithLocal);
+		managerWithLocal.setSessionManager(sessionsWithLocal);
+		sessionsWithLocal.registerRemoteClient("client", "old-node:9000");
+		sessionsWithLocal.addSubscribe(new TopicFilter("data/topic"), "client", 1, false);
+
+		List<String> removedWithLocal = sessionsWithLocal.clearNodeClientsAndSubscriptions("old-node:9000");
+		// 已本地接管的客户端不视为孤儿，不加入清理列表
+		assertTrue(removedWithLocal.isEmpty());
+		// 订阅必须保留
+		assertEquals(1, sessionsWithLocal.getSubscriptions("client").size());
 	}
 }

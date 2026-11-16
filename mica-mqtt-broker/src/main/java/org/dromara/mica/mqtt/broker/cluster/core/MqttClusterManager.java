@@ -622,20 +622,21 @@ public class MqttClusterManager {
 		ClusterMqttSessionManager sessionManager = this.sessionManager != null
 			? this.sessionManager
 			: (ClusterMqttSessionManager) mqttServer.getServerCreator().getSessionManager();
-		List<String> orphanedClients = sessionManager.clearNodeClientsAndSubscriptions(leavingNode);
+		IMqttMessageStore messageStore = getMessageStore();
+		Map<String, Message> wills = new LinkedHashMap<>();
+		List<String> orphanedClients = sessionManager.clearNodeClientsAndSubscriptions(leavingNode, clientId -> {
+			if (failover) {
+				Message willMessage = messageStore.getWillMessage(clientId);
+				if (willMessage != null && willMessage.getTopic() != null && !hasLocalClient(clientId)) {
+					wills.put(clientId, willMessage);
+				}
+			}
+		});
 		if (!failover || orphanedClients.isEmpty()) {
 			return;
 		}
 		// 捕获当前的遗嘱对象：重试期间客户端可能重连并写入新遗嘱，
 		// 只能继续处理这次下线对应的旧对象，不能把新遗嘱当成故障遗嘱发布。
-		IMqttMessageStore messageStore = getMessageStore();
-		Map<String, Message> wills = new LinkedHashMap<>();
-		for (String clientId : orphanedClients) {
-			Message willMessage = messageStore.getWillMessage(clientId);
-			if (willMessage != null && willMessage.getTopic() != null) {
-				wills.put(clientId, willMessage);
-			}
-		}
 		if (!wills.isEmpty()) {
 			scheduleFailoverWillPublish(leavingNode, wills);
 		}

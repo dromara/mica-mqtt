@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
  * Cluster-aware session manager that decorates an underlying {@link IMqttSessionManager}.
@@ -169,19 +170,40 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 	/**
 	 * Clears all clients and their subscriptions associated with a departing node.
+	 * <p>
+	 * 新连接可能已完成本地接管（ChannelContext 已注册）但异步 online 回调
+	 * 尚未将归属从 {@code clientNodeMap} 移除：此时 {@code remove(key, value)}
+	 * 仍然匹配旧 owner 并成功。为避免误删已迁移客户端的新订阅，删除前必须
+	 * 检查 {@link MqttClusterManager#hasLocalClient} —— 已本地接管的客户端
+	 * 不删除 session，也不视为孤儿客户端。
+	 * </p>
 	 *
 	 * @param nodeId the identifier of the node that has left the cluster
 	 */
 	public List<String> clearNodeClientsAndSubscriptions(String nodeId) {
+		return clearNodeClientsAndSubscriptions(nodeId, clientId -> { });
+	}
+
+	List<String> clearNodeClientsAndSubscriptions(String nodeId, Consumer<String> beforeRemove) {
 		List<String> removedClients = new ArrayList<>();
 		for (String clientId : new ArrayList<>(clientNodeMap.keySet())) {
 			synchronized (clientLock(clientId)) {
-				// 只有归属仍然是该下线节点时才清理；客户端若已迁移，remove(key, value)
-				// 会失败，delegate 里的新订阅也不能被误删。
-				if (clientNodeMap.remove(clientId, nodeId)) {
-					delegate.remove(clientId);
-					removedClients.add(clientId);
+				if (!clientNodeMap.remove(clientId, nodeId)) {
+					continue;
 				}
+				// 新连接已本地接管但 online 回调尚未更新归属时，remove(key,value) 仍会成功。
+				// 此时不能删除 session（会误删刚建立的新订阅），也不应视为孤儿。
+				if (clusterManager.hasLocalClient(clientId)) {
+					logger.info("[Cluster] Skip cleanup for client {} — already taken over locally", clientId);
+					continue;
+				}
+				// 二次检查：在 clientLock 保护下，如果 addSubscribe 已被阻塞并
+				// 在此之前完成，本地连接的 ChannelContext 应已可被 hasLocalClient 检测到。
+				// 若仍然检测不到但 clientNodeMap 又被 registerLocalClient 移除过，
+				// 上面的 remove(key, value) 会失败，不会走到这里。
+				beforeRemove.accept(clientId);
+				delegate.remove(clientId);
+				removedClients.add(clientId);
 			}
 		}
 		return removedClients;
@@ -228,7 +250,11 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void addSubscribe(TopicFilter topicFilter, String clientId, int mqttQoS, boolean noLocal) {
-		delegate.addSubscribe(topicFilter, clientId, mqttQoS, noLocal);
+		// 订阅写入与节点下线清理使用同一把 clientLock，避免清理在订阅写入
+		// 和本地接管之间执行而误删新订阅。
+		synchronized (clientLock(clientId)) {
+			delegate.addSubscribe(topicFilter, clientId, mqttQoS, noLocal);
+		}
 
 		if (clusterManager.isClusterEnabled()) {
 			Subscribe subscribe = new Subscribe(topicFilter.getTopic(), clientId, mqttQoS, noLocal);
@@ -254,7 +280,9 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void removeSubscribe(String topicFilter, String clientId) {
-		delegate.removeSubscribe(topicFilter, clientId);
+		synchronized (clientLock(clientId)) {
+			delegate.removeSubscribe(topicFilter, clientId);
+		}
 
 		if (clusterManager.isClusterEnabled()) {
 			UnsubscribeNotifyMessage notifyMessage = new UnsubscribeNotifyMessage();
