@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -250,6 +251,147 @@ class DefaultMqttClientProcessorSubAckTest {
 			assertTrue(session.isSubscribed(subscriptions.get(1)));
 		} finally {
 			executor.shutdownNow();
+			session.clean();
+		}
+	}
+
+	/**
+	 * 全部取消后 pending 不立即移除：在途 SUBSCRIBE 的 SUBACK 到达时，
+	 * 必须仍能补发补偿退订，否则 broker 端会残留重新建立的订阅。
+	 */
+	@Test
+	void fullCancellationKeepsPendingUntilSubAckArrives() {
+		DefaultMqttClientSession session = new DefaultMqttClientSession();
+		ExecutorService executor = Executors.newSingleThreadExecutor();
+		try {
+			MqttClientCreator creator = MqttClient.create().clientSession(session).mqttExecutor(executor);
+			List<MqttClientSubscription> subscriptions = Collections.singletonList(subscription("a/1"));
+			MqttSubscribeMessage subscribe = MqttSubscribeMessage.builder().messageId(1)
+				.addSubscriptions(Collections.singletonList(subscriptions.get(0).toTopicSubscription()))
+				.build();
+			MqttPendingSubscription pending = new MqttPendingSubscription(subscriptions, subscribe);
+			session.addPaddingSubscribe(1, pending);
+
+			// 全部取消
+			session.removePaddingSubscribes(Collections.singletonList("a/1"));
+
+			// pending 必须仍然存在（等 SUBACK 补发补偿退订）
+			assertNotNull(session.getPaddingSubscribe(1));
+			assertTrue(pending.isFullyCancelled());
+
+			List<String> compensated = new ArrayList<>();
+			DefaultMqttClientProcessor processor = new DefaultMqttClientProcessor(creator) {
+				@Override
+				void sendCompensatingUnsubscribe(ChannelContext context, List<String> cancelledTopicFilters) {
+					compensated.addAll(cancelledTopicFilters);
+				}
+			};
+			MqttSubAckMessage subAck = MqttSubAckMessage.builder().packetId(1)
+				.addGrantedQos(MqttQoS.QOS0).build();
+			processor.processSubAck(null, subAck);
+
+			// 补偿退订已发出
+			assertEquals(Collections.singletonList("a/1"), compensated);
+			// pending 已清除
+			assertNull(session.getPaddingSubscribe(1));
+			// 本地订阅表中没有残留
+			assertFalse(session.isSubscribed(subscriptions.get(0)));
+		} finally {
+			executor.shutdownNow();
+			session.clean();
+		}
+	}
+
+	/**
+	 * 未收到 SUBACK 时保留 packetId，连接关闭后清理已取消的记录。
+	 */
+	@Test
+	void cancelledPendingReservesPacketIdUntilDisconnect() throws Exception {
+		DefaultMqttClientSession session = new DefaultMqttClientSession();
+		try {
+			List<MqttClientSubscription> subscriptions = Collections.singletonList(subscription("stale/topic"));
+			MqttSubscribeMessage subscribe = MqttSubscribeMessage.builder().messageId(1)
+				.addSubscriptions(Collections.singletonList(subscriptions.get(0).toTopicSubscription()))
+				.build();
+			MqttPendingSubscription pending = new MqttPendingSubscription(subscriptions, subscribe);
+			session.addPaddingSubscribe(1, pending);
+			session.removePaddingSubscribes(Collections.singletonList("stale/topic"));
+
+			// pending 仍然存在
+			assertNotNull(session.getPaddingSubscribe(1));
+
+			// 通过反射将 packetIdGen 推进到 0xFFFF，使下一次 getPacketId 返回 0xFFFF，
+			// 再下一次返回 1（回绕），触发陈旧 pending 清理
+			java.lang.reflect.Field f = DefaultMqttClientSession.class.getDeclaredField("packetIdGen");
+			f.setAccessible(true);
+			java.util.concurrent.atomic.AtomicInteger gen =
+				(java.util.concurrent.atomic.AtomicInteger) f.get(session);
+			gen.set(0xFFFF);
+
+			// 返回 0xFFFF，正常
+			assertEquals(0xFFFF, session.getPacketId());
+			assertEquals(2, session.getPacketId());
+			assertNotNull(session.getPaddingSubscribe(1));
+			session.onDisconnected();
+			assertNull(session.getPaddingSubscribe(1));
+		} finally {
+			session.clean();
+		}
+	}
+
+	/**
+	 * 全部取消后应用层重新订阅（restore）时，fullyCancelled 必须复位，
+	 * packetId 回绕不应清除已恢复的 pending。
+	 */
+	@Test
+	void restoredPendingIsNotCleanedOnPacketIdWrap() throws Exception {
+		DefaultMqttClientSession session = new DefaultMqttClientSession();
+		try {
+			List<MqttClientSubscription> subscriptions = Collections.singletonList(subscription("restore/topic"));
+			MqttSubscribeMessage subscribe = MqttSubscribeMessage.builder().messageId(1)
+				.addSubscriptions(Collections.singletonList(subscriptions.get(0).toTopicSubscription()))
+				.build();
+			MqttPendingSubscription pending = new MqttPendingSubscription(subscriptions, subscribe);
+			session.addPaddingSubscribe(1, pending);
+			// 全部取消
+			session.removePaddingSubscribes(Collections.singletonList("restore/topic"));
+			assertTrue(pending.isFullyCancelled());
+
+			// 应用层重新订阅：撤销取消标记，复位 fullyCancelled
+			session.restoreCancelledSubscriptions(Collections.singletonList("restore/topic"));
+			assertFalse(pending.isFullyCancelled());
+
+			// 推进 packetId 到回绕
+			java.lang.reflect.Field f = DefaultMqttClientSession.class.getDeclaredField("packetIdGen");
+			f.setAccessible(true);
+			java.util.concurrent.atomic.AtomicInteger gen =
+				(java.util.concurrent.atomic.AtomicInteger) f.get(session);
+			gen.set(0xFFFF);
+			assertEquals(0xFFFF, session.getPacketId());
+			assertEquals(2, session.getPacketId());
+
+			// 已恢复的 pending 不应被清除
+			assertNotNull(session.getPaddingSubscribe(1));
+		} finally {
+			session.clean();
+		}
+	}
+
+	@Test
+	void unrelatedSubscriptionDoesNotRestoreCancelledPending() {
+		DefaultMqttClientSession session = new DefaultMqttClientSession();
+		try {
+			MqttClientSubscription subscription = subscription("a/1");
+			MqttSubscribeMessage message = MqttSubscribeMessage.builder().messageId(1)
+				.addSubscriptions(Collections.singletonList(subscription.toTopicSubscription())).build();
+			MqttPendingSubscription pending = new MqttPendingSubscription(Collections.singletonList(subscription), message);
+			session.addPaddingSubscribe(1, pending);
+			session.removePaddingSubscribes(Collections.singletonList("a/1"));
+			session.restoreCancelledSubscriptions(Collections.singletonList("b/1"));
+			assertTrue(pending.isFullyCancelled());
+			session.onDisconnected();
+			assertNull(session.getPaddingSubscribe(1));
+		} finally {
 			session.clean();
 		}
 	}

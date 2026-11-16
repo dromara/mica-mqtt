@@ -40,6 +40,12 @@ public interface IMqttClientSession {
 	int getPacketId();
 
 	/**
+	 * 连接关闭时清理不能再收到确认的订阅记录。
+	 */
+	default void onDisconnected() {
+	}
+
+	/**
 	 * 添加订阅
 	 *
 	 * @param messageId           messageId

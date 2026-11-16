@@ -25,6 +25,13 @@ final class MqttPendingSubscription {
 	private final List<MqttClientSubscription> subscriptionList;
 	private final Set<String> cancelledTopicFilters = ConcurrentHashMap.newKeySet();
 	private final RetryProcessor<MqttSubscribeMessage> retryProcessor = new RetryProcessor<>();
+	/**
+	 * 全部 topic 已被取消、重试已停止、等待在途 SUBACK 到达后补发补偿退订。
+	 * <p>
+	 * 连接关闭后清理已取消的记录；连接存续时保留 packetId 以等待 SUBACK。
+	 * </p>
+	 */
+	private volatile boolean fullyCancelled;
 
 	MqttPendingSubscription(List<MqttClientSubscription> subscriptionList, MqttSubscribeMessage message) {
 		this.subscriptionList = new ArrayList<>(subscriptionList);
@@ -55,7 +62,11 @@ final class MqttPendingSubscription {
 	 * @return 是否全部取消
 	 */
 	boolean cancelSubscriptions(List<String> topicFilters) {
-		cancelledTopicFilters.addAll(topicFilters);
+		for (MqttClientSubscription subscription : subscriptionList) {
+			if (topicFilters.contains(subscription.getTopicFilter())) {
+				cancelledTopicFilters.add(subscription.getTopicFilter());
+			}
+		}
 		return subscriptionList.stream().allMatch(subscription -> isCancelled(subscription.getTopicFilter()));
 	}
 
@@ -64,12 +75,27 @@ final class MqttPendingSubscription {
 	}
 
 	/**
+	 * 标记为「全部取消、等待 SUBACK 补偿退订」状态。
+	 * 连接关闭后可安全移除该记录。
+	 */
+	void markFullyCancelled() {
+		this.fullyCancelled = true;
+	}
+
+	boolean isFullyCancelled() {
+		return fullyCancelled;
+	}
+
+	/**
 	 * 应用层重新订阅了这些 topic，撤销取消标记，避免补偿 UNSUBSCRIBE 误删新订阅。
+	 * 恢复后重新计算是否仍然全部取消。
 	 *
 	 * @param topicFilters 重新订阅的 topic 集合
 	 */
 	void restoreCancelledSubscriptions(List<String> topicFilters) {
-		cancelledTopicFilters.removeAll(topicFilters);
+		if (cancelledTopicFilters.removeAll(topicFilters)) {
+			this.fullyCancelled = subscriptionList.stream().allMatch(subscription -> isCancelled(subscription.getTopicFilter()));
+		}
 	}
 
 	void startRetransmitTimer(TimerTaskService taskService, ChannelContext context) {

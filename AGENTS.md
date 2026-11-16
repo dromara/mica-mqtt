@@ -146,6 +146,7 @@ mvn clean deploy -P release
 - The default client timer is shared with t-io and stopped with the client; a caller-provided timer remains caller-owned.
 - A full default pending-publish queue causes `publish` to return `false`.
 - On reconnect, the default client session retransmits unacknowledged QoS 1/2 publishes, resuming PUBREL when the broker reports an existing session. Custom client sessions must implement `getPendingPublishes()` to support this.
+- Cancelled pending subscriptions retain their packet identifiers until SUBACK or connection close; custom client sessions can implement `onDisconnected()` to release their own cancelled records.
 - Retained publishes preserve the `$retain/{ttl}/` lifetime, including across cluster storage restarts, and are delivered at no more than the subscription QoS.
 - Topic wildcards exclude `$` topics at the first level; `#` can match zero levels after `+`.
 - A connection retains its own will; conditional will removal must not clear a replacement connection’s will. Custom message stores should make conditional removal atomic.

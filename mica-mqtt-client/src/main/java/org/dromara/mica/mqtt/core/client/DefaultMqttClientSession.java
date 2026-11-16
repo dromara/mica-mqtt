@@ -58,7 +58,14 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 
 	@Override
 	public int getPacketId() {
-		return packetIdGen.getAndUpdate(current -> (current % 0xffff) == 0 ? 1 : current + 1);
+		for (int i = 0; i < 0xffff; i++) {
+			int packetId = packetIdGen.getAndUpdate(current -> (current % 0xffff) == 0 ? 1 : current + 1);
+			if (!pendingSubscriptions.containsKey(packetId) && !pendingUnSubscriptions.containsKey(packetId)
+				&& !pendingPublishData.containsKey(packetId)) {
+				return packetId;
+			}
+		}
+		throw new IllegalStateException("No MQTT packet identifier available");
 	}
 
 	@Override
@@ -76,8 +83,26 @@ public class DefaultMqttClientSession implements IMqttClientSession {
 		pendingSubscriptions.forEach((messageId, pendingSubscription) -> {
 			synchronized (pendingSubscription) {
 				if (pendingSubscription.cancelSubscriptions(topicFilters)) {
+					// 全部取消时只停止重试定时器，不立即移除 pending 记录：
+					// 在途的 SUBSCRIBE（首次发送或已触发的重试）可能尚未被 broker
+					// 处理，broker 仍可能据此重新建立订阅。如果这里移除 pending，
+					// 随后到达的 SUBACK 将找不到记录，无法补发补偿退订。
+					// 保留 pending 让 processPendingSubAck 在 SUBACK 到达时
+					// 补发 UNSUBSCRIBE 并清除记录。
+					// 连接关闭后由 onDisconnected 清除。
 					pendingSubscription.onSubAckReceived();
-					pendingSubscriptions.remove(messageId, pendingSubscription);
+					pendingSubscription.markFullyCancelled();
+				}
+			}
+		});
+	}
+
+	@Override
+	public void onDisconnected() {
+		pendingSubscriptions.forEach((messageId, pending) -> {
+			synchronized (pending) {
+				if (pending.isFullyCancelled()) {
+					pendingSubscriptions.remove(messageId, pending);
 				}
 			}
 		});

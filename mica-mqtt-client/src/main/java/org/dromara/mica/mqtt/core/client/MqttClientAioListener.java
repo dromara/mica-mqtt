@@ -114,6 +114,7 @@ public class MqttClientAioListener extends DefaultTioClientListener {
 	@Override
 	public void onBeforeClose(ChannelContext context, Throwable throwable, String remark, boolean isRemove) {
 		context.setAccepted(false);
+		clientCreator.getClientSession().onDisconnected();
 		// 先判断是否配置监听
 		if (connectListener == null) {
 			return;
