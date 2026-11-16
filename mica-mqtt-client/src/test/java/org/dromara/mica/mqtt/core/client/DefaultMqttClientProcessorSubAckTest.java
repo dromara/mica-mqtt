@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Timeout(10)
@@ -173,6 +174,38 @@ class DefaultMqttClientProcessorSubAckTest {
 			assertEquals(Collections.singletonList("a/1"), compensated);
 			assertFalse(session.isSubscribed(subscriptions.get(0)));
 			assertFalse(session.isSubscribed(subscriptions.get(1)));
+		} finally {
+			executor.shutdownNow();
+			session.clean();
+		}
+	}
+
+	/**
+	 * 服务端明确拒绝全部 topic 时，pending 必须结束，
+	 * 否则条目会永久滞留在 session 中并继续触发重试。
+	 */
+	@Test
+	void allTopicsDeniedRemovesPendingSubscription() {
+		DefaultMqttClientSession session = new DefaultMqttClientSession();
+		ExecutorService executor = Executors.newSingleThreadExecutor();
+		try {
+			MqttClientCreator creator = MqttClient.create().clientSession(session).mqttExecutor(executor);
+			List<MqttClientSubscription> subscriptions =
+				Collections.singletonList(subscription("denied/topic"));
+			MqttSubscribeMessage subscribe = MqttSubscribeMessage.builder().messageId(1)
+				.addSubscriptions(Collections.singletonList(subscriptions.get(0).toTopicSubscription()))
+				.build();
+			MqttPendingSubscription pending = new MqttPendingSubscription(subscriptions, subscribe);
+			session.addPaddingSubscribe(1, pending);
+
+			DefaultMqttClientProcessor processor = new DefaultMqttClientProcessor(creator);
+			MqttSubAckMessage subAck = MqttSubAckMessage.builder().packetId(1)
+				.addReasonCode(MqttSubAckReasonCode.UNSPECIFIED_ERROR)
+				.build();
+			processor.processSubAck(null, subAck);
+
+			assertFalse(session.isSubscribed(subscriptions.get(0)));
+			assertNull(session.getPaddingSubscribe(1));
 		} finally {
 			executor.shutdownNow();
 			session.clean();

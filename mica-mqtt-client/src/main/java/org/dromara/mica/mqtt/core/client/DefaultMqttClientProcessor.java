@@ -287,9 +287,12 @@ public class DefaultMqttClientProcessor implements IMqttClientProcessor {
 			}
 		}
 		subscribedList.removeIf(subscription -> paddingSubscribe.isCancelled(subscription.getTopicFilter()));
-		// 判断订阅结果，对于没有订阅成功的，使其触发重试
+		// 判断订阅结果，对于没有订阅成功的，结束本次 pending：
+		// 服务端已明确拒绝（或全部被取消），继续保留会永久滞留并持续重试。
 		if (subscribedList.isEmpty()) {
 			logger.error("MqttClient subscriptionList:{} subscribe failed packetId:{}", subscriptionList, packetId);
+			paddingSubscribe.onSubAckReceived();
+			clientSession.removePaddingSubscribe(packetId);
 			return;
 		} else {
 			logger.info("MQTT subscribed:{} successfully packetId:{}", subscribedList, packetId);
