@@ -70,6 +70,19 @@ public final class MqttClient implements IMqttClient {
 	 * 是否已停止，供 creator 判断能否复用（避免并发创建多个 client 共享 session/线程池）。
 	 */
 	private volatile boolean stopped;
+	/**
+	 * stop 完成后的回调，供 creator 释放对已停止 client 的引用。
+	 */
+	private volatile Runnable stopCallback;
+
+	/**
+	 * 设置停止回调（creator 内部使用）。
+	 *
+	 * @param stopCallback 停止回调
+	 */
+	void setStopCallback(Runnable stopCallback) {
+		this.stopCallback = stopCallback;
+	}
 
 	public static MqttClientCreator create() {
 		return new MqttClientCreator();
@@ -639,6 +652,14 @@ public final class MqttClient implements IMqttClient {
 			return result;
 		} finally {
 			this.stopped = true;
+			Runnable callback = this.stopCallback;
+			if (callback != null) {
+				try {
+					callback.run();
+				} catch (Throwable e) {
+					logger.warn("MqttClient stop callback error.", e);
+				}
+			}
 		}
 	}
 

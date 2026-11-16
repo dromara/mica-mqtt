@@ -909,6 +909,7 @@ public final class MqttClientCreator {
 			ensureNoActiveClient();
 			MqttClient client = this.build().start(false);
 			this.activeClient = client;
+			client.setStopCallback(() -> clearActiveClient(client));
 			return client;
 		}
 	}
@@ -923,7 +924,14 @@ public final class MqttClientCreator {
 			ensureNoActiveClient();
 			MqttClient client = this.build().start(true);
 			this.activeClient = client;
+			client.setStopCallback(() -> clearActiveClient(client));
 			return client;
+		}
+	}
+
+	private synchronized void clearActiveClient(MqttClient client) {
+		if (this.activeClient == client) {
+			this.activeClient = null;
 		}
 	}
 
