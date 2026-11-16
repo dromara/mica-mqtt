@@ -46,6 +46,21 @@ public interface IMqttMessageStore {
 	boolean clearWillMessage(String clientId);
 
 	/**
+	 * 新连接（未携带遗嘱）建立时清理旧遗嘱。
+	 * <p>
+	 * 集群实现必须仍在本地推进清理版本（压制迟到的旧遗嘱），但可以延迟传播：
+	 * 版本屏障随上线通知（CLIENT_CONNECT）一起同步，避免每次无遗嘱连接都额外
+	 * 广播一条 WILL_MESSAGE。单机实现等价于 {@link #clearWillMessage(String)}。
+	 * </p>
+	 *
+	 * @param clientId clientId
+	 * @return boolean
+	 */
+	default boolean clearWillMessageOnConnect(String clientId) {
+		return clearWillMessage(clientId);
+	}
+
+	/**
 	 * 仅当当前遗嘱仍属于指定连接时清除。并发存储实现应覆盖此方法以保证原子性。
 	 *
 	 * @param clientId 客户端标识

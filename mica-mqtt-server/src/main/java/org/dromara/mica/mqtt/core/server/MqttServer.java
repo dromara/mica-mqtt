@@ -73,8 +73,30 @@ public final class MqttServer {
 	private final IMqttSessionManager sessionManager;
 	private final IMqttMessageStore messageStore;
 	private final MqttSerializer mqttSerializer;
-	private volatile Function<PublishContext, Boolean> publishAllRouter;
+	private volatile Function<PublishContext, DeliveryResult> publishAllRouter;
 	private volatile Runnable stopListener;
+
+	/**
+	 * 投递结果。
+	 * <p>
+	 * 「没有订阅者」是正常空操作，「投递失败」才需要调用方重试。两者都返回 false
+	 * 会让遗嘱重试等上层无法区分，因此单独建模。
+	 * </p>
+	 */
+	public enum DeliveryResult {
+		/**
+		 * 没有匹配的订阅者，无需投递。
+		 */
+		NO_SUBSCRIBERS,
+		/**
+		 * 至少一个订阅者实际发送成功。
+		 */
+		DELIVERED,
+		/**
+		 * 存在订阅者，但没有任何一次发送成功。
+		 */
+		FAILED
+	}
 
 	MqttServer(MqttServerCreator serverCreator,
 	           TioServerConfig serverConfig,
@@ -93,7 +115,7 @@ public final class MqttServer {
 	 *
 	 * @param publishAllRouter 广播消息路由器，null 表示使用本地订阅查询
 	 */
-	public void setPublishAllRouter(Function<PublishContext, Boolean> publishAllRouter) {
+	public void setPublishAllRouter(Function<PublishContext, DeliveryResult> publishAllRouter) {
 		this.publishAllRouter = publishAllRouter;
 	}
 
@@ -283,6 +305,19 @@ public final class MqttServer {
 	 * @return 是否发送成功
 	 */
 	public boolean publishAll(String topic, Object payload, MqttQoS qos, boolean retain) {
+		return publishAllResult(topic, payload, qos, retain) == DeliveryResult.DELIVERED;
+	}
+
+	/**
+	 * 发布消息给所有的在线设备，并返回可区分「无订阅者」和「发送失败」的结果。
+	 *
+	 * @param topic   topic
+	 * @param payload 消息体
+	 * @param qos     MqttQoS
+	 * @param retain  是否在服务器上保留消息
+	 * @return 投递结果
+	 */
+	private DeliveryResult publishAllResult(String topic, Object payload, MqttQoS qos, boolean retain) {
 		// 校验 topic
 		TopicUtil.validateTopicName(topic);
 		// 存储保留消息
@@ -291,24 +326,26 @@ public final class MqttServer {
 			int timeOut = retainPair.getKey();
 			if (timeOut < 0) {
 				logger.error("MqttPublishMessage topic {} 不符合 $retain/${ttl}/topic 规则.", topic);
-				return false;
+				return DeliveryResult.FAILED;
 			}
 			topic = retainPair.getValue();
 			this.saveRetainMessage(topic, timeOut, qos, payload);
 		}
-		Function<PublishContext, Boolean> router = publishAllRouter;
+		Function<PublishContext, DeliveryResult> router = publishAllRouter;
 		if (router != null) {
 			byte[] bytes = payload instanceof byte[] ? (byte[]) payload : mqttSerializer.serialize(payload);
 			PublishContext context = PublishContext.builder().topic(topic).payload(bytes).qos(qos)
 				.timestamp(System.currentTimeMillis()).build();
-			return router.apply(context);
+			DeliveryResult result = router.apply(context);
+			return result == null ? DeliveryResult.FAILED : result;
 		}
 		// 查找订阅该 topic 的客户端
 		List<Subscribe> subscribeList = sessionManager.searchSubscribe(topic);
 		if (subscribeList.isEmpty()) {
 			logger.debug("Mqtt Topic:{} publishAll but subscribe client list is empty.", topic);
-			return false;
+			return DeliveryResult.NO_SUBSCRIBERS;
 		}
+		boolean delivered = false;
 		for (Subscribe subscribe : subscribeList) {
 			String clientId = subscribe.getClientId();
 			ChannelContext context = Tio.getByBsId(getServerConfig(), clientId);
@@ -316,9 +353,10 @@ public final class MqttServer {
 				logger.warn("Mqtt Topic:{} publish to clientId:{} channel is null may be disconnected.", topic, clientId);
 				continue;
 			}
-			publish(context, clientId, topic, payload, qos, subscribe.getMqttQoS(), false, null);
+			// 聚合逐订阅者的发送结果：全部失败时上层（如遗嘱重试）必须能感知
+			delivered |= publish(context, clientId, topic, payload, qos, subscribe.getMqttQoS(), false, null);
 		}
-		return true;
+		return delivered ? DeliveryResult.DELIVERED : DeliveryResult.FAILED;
 	}
 
 	/**
@@ -385,14 +423,29 @@ public final class MqttServer {
 	 * @return 是否成功
 	 */
 	public boolean sendToClient(String topic, Message message) {
+		return sendToClientWithResult(topic, message) == DeliveryResult.DELIVERED;
+	}
+
+	/**
+	 * 发送消息到客户端，并返回可区分「无订阅者」和「发送失败」的结果。
+	 *
+	 * @param topic   topic
+	 * @param message Message
+	 * @return 投递结果
+	 */
+	public DeliveryResult sendToClientWithResult(String topic, Message message) {
 		// 客户端id
 		String clientId = message.getClientId();
 		MqttQoS mqttQoS = MqttQoS.valueOf(message.getQos());
 		if (StrUtil.isBlank(clientId)) {
-			return publishAll(topic, message.getPayload(), mqttQoS, message.isRetain());
-		} else {
-			return publish(clientId, topic, message.getPayload(), mqttQoS, message.isRetain());
+			return publishAllResult(topic, message.getPayload(), mqttQoS, message.isRetain());
 		}
+		if (publish(clientId, topic, message.getPayload(), mqttQoS, message.isRetain())) {
+			return DeliveryResult.DELIVERED;
+		}
+		// 目标客户端未订阅时属于正常空操作，其余情况都是发送失败
+		return sessionManager.searchSubscribe(topic, clientId) == null
+			? DeliveryResult.NO_SUBSCRIBERS : DeliveryResult.FAILED;
 	}
 
 	/**

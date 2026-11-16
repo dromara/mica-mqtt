@@ -19,12 +19,9 @@ package org.dromara.mica.mqtt.core.server.pipeline.message;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
 import org.dromara.mica.mqtt.core.server.model.Message;
-import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.pipeline.MqttMessageDeliveryHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
 
 /**
  * 下行消息处理器
@@ -47,18 +44,14 @@ public class DownStreamMessageHandler extends BaseMessageHandler implements Mqtt
 		String topic = message.getTopic();
 
 		// 发送到客户端订阅者
-		boolean sent = mqttServer.sendToClient(topic, message);
-		if (sent) {
+		MqttServer.DeliveryResult result = mqttServer.sendToClientWithResult(topic, message);
+		if (result != MqttServer.DeliveryResult.FAILED) {
+			if (result == MqttServer.DeliveryResult.NO_SUBSCRIBERS) {
+				logger.debug("Down stream message on topic:{} has no subscribers.", topic);
+			}
 			return true;
 		}
-		// publishAll 在「没有订阅者」和「发送失败」时都返回 false：
-		// 前者是正常空操作，后者必须让遗嘱重试路径感知到失败。
-		List<Subscribe> subscribers = mqttServer.getServerCreator().getSessionManager().searchSubscribe(topic);
-		if (subscribers == null || subscribers.isEmpty()) {
-			logger.debug("Down stream message on topic:{} has no subscribers.", topic);
-			return true;
-		}
-		logger.warn("Down stream message on topic:{} failed to send to {} subscribers.", topic, subscribers.size());
+		logger.warn("Down stream message on topic:{} failed to reach any subscriber.", topic);
 		return false;
 	}
 

@@ -81,6 +81,10 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		}
 		// 2. 判断是否正常断开
 		boolean isNotNormalDisconnect = !context.isBizStatus();
+		ChannelContext.CloseCode closeCode = context.getCloseCode();
+		// MQTT-3.1.4-3：同一 clientId 被新连接接管时，旧连接没有发送 DISCONNECT，
+		// 其遗嘱仍应按异常断开发布。条件清除保证不会误删新连接刚写入的遗嘱。
+		boolean shouldSendWill = shouldPublishWillOnClose(context.isBizStatus(), closeCode);
 		context.setBizStatus(false);
 		if (isNotNormalDisconnect || throwable != null) {
 			// 避免网络异常时短期照成大量异常打印，会导致内存突增
@@ -96,14 +100,13 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		if (StrUtil.isBlank(clientId)) {
 			return;
 		}
-		// 4. 对于异常断开连接，处理遗嘱消息
-		if (isNotNormalDisconnect) {
+		// 4. 对于异常断开或被接管连接，处理遗嘱消息
+		if (shouldSendWill) {
 			Message willMessage = context.get(WILL_MESSAGE_KEY);
 			context.remove(WILL_MESSAGE_KEY);
 			sendWillMessage(clientId, willMessage);
 		}
 		// 5. 会话清理，互踢已清，不用再清（避免误删刚订阅的 topic）
-		ChannelContext.CloseCode closeCode = context.getCloseCode();
 		if (closeCode != ChannelContext.CloseCode.KICK_EACH_OTHER) {
 			cleanSession(clientId);
 		}
@@ -115,6 +118,21 @@ public class MqttServerAioListener extends DefaultTioServerListener {
 		if (willMessage != null) {
 			dispatchWillMessage(clientId, willMessage, 1);
 		}
+	}
+
+	/**
+	 * 判断连接关闭时是否应发布遗嘱。
+	 * <p>
+	 * 异常断开（未收到 DISCONNECT）以及同 clientId 接管（KICK_EACH_OTHER）
+	 * 都要发布；正常 DISCONNECT 不发布。
+	 * </p>
+	 *
+	 * @param bizStatus 连接关闭前是否处于正常业务状态
+	 * @param closeCode 关闭码
+	 * @return 是否发布遗嘱
+	 */
+	static boolean shouldPublishWillOnClose(boolean bizStatus, ChannelContext.CloseCode closeCode) {
+		return !bizStatus || ChannelContext.CloseCode.KICK_EACH_OTHER == closeCode;
 	}
 
 	/**

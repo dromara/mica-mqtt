@@ -158,7 +158,8 @@ public class MqttConnectHandler extends AbstractMqttMessageHandler {
 		// 8. 存储遗嘱消息
 		boolean willFlag = variableHeader.isWillFlag();
 		if (!willFlag) {
-			messageStore.clearWillMessage(uniqueId);
+			// 集群模式由上线通知携带清理版本，避免无遗嘱连接额外广播
+			messageStore.clearWillMessageOnConnect(uniqueId);
 		} else {
 			Message willMessage = new Message();
 			willMessage.setMessageType(MessageType.DOWN_STREAM);
