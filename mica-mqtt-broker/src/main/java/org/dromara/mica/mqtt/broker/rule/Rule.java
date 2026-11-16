@@ -33,14 +33,22 @@ import java.util.UUID;
  */
 public final class Rule {
 
+	/**
+	 * 整条规则执行超时（毫秒），默认 5000，小于等于 0 表示不限时。
+	 */
+	public static final long DEFAULT_TIMEOUT_MS = 5000L;
+
 	private final String id;
 	private final String name;
 	private final String topicFilter;
 	private final boolean enabled;
+	private final String codecType;
 	private final String matcherType;
 	private final Map<String, String> matcherProps;
+	private final String whenExpr;
 	private final List<ActionRef> actions;
 	private final boolean stopOnError;
+	private final long timeoutMs;
 	private final Map<String, String> labels;
 
 	private Rule(Builder b) {
@@ -48,13 +56,26 @@ public final class Rule {
 		this.name = b.name;
 		this.topicFilter = Objects.requireNonNull(b.topicFilter, "topicFilter is required");
 		this.enabled = b.enabled;
-		this.matcherType = b.matcherType;
-		this.matcherProps = b.matcherProps == null
+		this.codecType = b.codecType;
+		this.whenExpr = b.whenExpr;
+		String matcherType = b.matcherType;
+		Map<String, String> matcherProps = b.matcherProps;
+		// when(expr) 是 matcherType=aviator 的语法糖：表达式编译失败会在挂载期暴露
+		if (b.whenExpr != null && !b.whenExpr.isEmpty()) {
+			matcherType = "aviator";
+			matcherProps = new LinkedHashMap<>(matcherProps == null
+				? Collections.emptyMap()
+				: matcherProps);
+			matcherProps.put("when", b.whenExpr);
+		}
+		this.matcherType = matcherType;
+		this.matcherProps = matcherProps == null
 			? Collections.emptyMap()
-			: Collections.unmodifiableMap(new LinkedHashMap<>(b.matcherProps));
+			: Collections.unmodifiableMap(new LinkedHashMap<>(matcherProps));
 		List<ActionRef> actionList = new ArrayList<>(b.actions);
 		this.actions = Collections.unmodifiableList(actionList);
 		this.stopOnError = b.stopOnError;
+		this.timeoutMs = b.timeoutMs;
 		this.labels = b.labels == null
 			? Collections.emptyMap()
 			: Collections.unmodifiableMap(new LinkedHashMap<>(b.labels));
@@ -80,6 +101,13 @@ public final class Rule {
 		return enabled;
 	}
 
+	/**
+	 * @return payload codec 名称，为 {@code null} 表示不解码（原始字节）
+	 */
+	public String getCodecType() {
+		return codecType;
+	}
+
 	public String getMatcherType() {
 		return matcherType;
 	}
@@ -88,12 +116,26 @@ public final class Rule {
 		return matcherProps;
 	}
 
+	/**
+	 * @return 直接书写的条件表达式（{@code when(expr)}），未使用则为 {@code null}
+	 */
+	public String getWhenExpr() {
+		return whenExpr;
+	}
+
 	public List<ActionRef> getActions() {
 		return actions;
 	}
 
 	public boolean isStopOnError() {
 		return stopOnError;
+	}
+
+	/**
+	 * @return 整条规则执行超时（毫秒），小于等于 0 表示不限时
+	 */
+	public long getTimeoutMs() {
+		return timeoutMs;
 	}
 
 	public Map<String, String> getLabels() {
@@ -136,10 +178,13 @@ public final class Rule {
 		private String name;
 		private String topicFilter;
 		private boolean enabled = true;
+		private String codecType;
 		private String matcherType;
 		private Map<String, String> matcherProps;
+		private String whenExpr;
 		private final List<ActionRef> actions = new ArrayList<>();
 		private boolean stopOnError;
+		private long timeoutMs = DEFAULT_TIMEOUT_MS;
 		private Map<String, String> labels;
 
 		public Builder id(String id) {
@@ -169,6 +214,39 @@ public final class Rule {
 
 		public Builder matcherProps(Map<String, String> matcherProps) {
 			this.matcherProps = matcherProps;
+			return this;
+		}
+
+		/**
+		 * 指定 payload codec（{@code raw} / {@code string} / {@code json} 或 SPI 注册名）。
+		 *
+		 * @param codecType codec 名称，{@code null} 表示不解码
+		 * @return this builder
+		 */
+		public Builder codecType(String codecType) {
+			this.codecType = codecType;
+			return this;
+		}
+
+		/**
+		 * 直接书写条件表达式（等价于 {@code matcherType("aviator")}）。
+		 *
+		 * @param expr AviatorScript 表达式
+		 * @return this builder
+		 */
+		public Builder when(String expr) {
+			this.whenExpr = expr;
+			return this;
+		}
+
+		/**
+		 * 设置整条规则执行超时。
+		 *
+		 * @param timeoutMs 超时（毫秒），小于等于 0 表示不限时
+		 * @return this builder
+		 */
+		public Builder timeoutMs(long timeoutMs) {
+			this.timeoutMs = timeoutMs;
 			return this;
 		}
 

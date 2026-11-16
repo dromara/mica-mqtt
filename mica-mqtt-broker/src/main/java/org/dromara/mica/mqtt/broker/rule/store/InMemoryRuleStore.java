@@ -35,12 +35,17 @@ public class InMemoryRuleStore implements RuleStore {
 	private static final Logger logger = LoggerFactory.getLogger(InMemoryRuleStore.class);
 
 	private final ConcurrentMap<String, Rule> rules = new ConcurrentHashMap<>();
+	private volatile RuleStoreListener listener;
 
 	@Override
 	public void save(Rule rule) {
 		Rule prev = rules.put(rule.getId(), rule);
 		if (prev == null) {
 			logger.info("Rule saved: id={}, name={}", rule.getId(), rule.getName());
+		}
+		RuleStoreListener l = this.listener;
+		if (l != null) {
+			l.onSaved(rule);
 		}
 	}
 
@@ -49,6 +54,10 @@ public class InMemoryRuleStore implements RuleStore {
 		Rule prev = rules.remove(id);
 		if (prev != null) {
 			logger.info("Rule deleted: id={}", id);
+		}
+		RuleStoreListener l = this.listener;
+		if (l != null) {
+			l.onDeleted(id);
 		}
 	}
 
@@ -60,5 +69,10 @@ public class InMemoryRuleStore implements RuleStore {
 	@Override
 	public List<Rule> loadAll() {
 		return new ArrayList<>(rules.values());
+	}
+
+	@Override
+	public void setListener(RuleStoreListener listener) {
+		this.listener = listener;
 	}
 }

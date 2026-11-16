@@ -32,8 +32,11 @@ import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.StickyStrategy;
 import org.dromara.mica.mqtt.broker.rule.RuleEngine;
 import org.dromara.mica.mqtt.broker.rule.RuleManager;
 import org.dromara.mica.mqtt.broker.rule.action.ActionFactory;
+import org.dromara.mica.mqtt.broker.rule.action.MqttAction;
+import org.dromara.mica.mqtt.broker.rule.action.RuleActionExecutor;
 import org.dromara.mica.mqtt.broker.rule.codec.PayloadCodecFactory;
 import org.dromara.mica.mqtt.broker.rule.ext.template.AlertCenter;
+import org.dromara.mica.mqtt.broker.rule.ext.template.AlertNotifierFactory;
 import org.dromara.mica.mqtt.broker.rule.ext.template.TemplateActionFactory;
 import org.dromara.mica.mqtt.broker.rule.ext.template.TemplateServices;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcherFactory;
@@ -50,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.ServiceLoader;
 
@@ -94,6 +98,14 @@ public class MqttClusterBrokerCreator {
 	private final List<ActionFactory> actionFactories = new ArrayList<>();
 
 	/**
+	 * SPI 扫描结果缓存：避免多次 build() 重复扫盘。
+	 */
+	private static volatile List<Class<? extends ActionFactory>> CACHED_ACTION_FACTORIES;
+	private static volatile List<Class<? extends RuleMatcherFactory>> CACHED_MATCHER_FACTORIES;
+	private static volatile List<Class<? extends PayloadCodecFactory>> CACHED_CODEC_FACTORIES;
+	private static volatile List<Class<? extends AlertNotifierFactory>> CACHED_NOTIFIER_FACTORIES;
+
+	/**
 	 * 构造。
 	 *
 	 * @param serverCreator the underlying MQTT server creator
@@ -121,9 +133,17 @@ public class MqttClusterBrokerCreator {
 	 * 只会静默丢掉部分 action。需要程序化注册时可调用
 	 * {@link RuleManager#registerActionFactory(ActionFactory)}。
 	 * </p>
+	 * <p>
+	 * ServiceLoader 的扫描结果缓存在静态字段里，避免多次 {@code build()} 重复扫盘；
+	 * 但工厂实例每次新建 —— 模板 action 的依赖注入不能跨 broker 实例共享。
+	 * </p>
 	 */
 	private void loadRuleSpi(RuleManager rm) {
-		for (ActionFactory factory : ServiceLoader.load(ActionFactory.class)) {
+		for (Class<? extends ActionFactory> clazz : cachedActionFactories()) {
+			ActionFactory factory = newInstance(clazz);
+			if (factory == null) {
+				continue;
+			}
 			actionFactories.add(factory);
 			rm.registerActionFactory(factory);
 		}
@@ -132,17 +152,116 @@ public class MqttClusterBrokerCreator {
 				+ "Check META-INF/services/{}", ActionFactory.class.getName());
 		}
 		int matcherCount = 0;
-		for (RuleMatcherFactory factory : ServiceLoader.load(RuleMatcherFactory.class)) {
+		for (Class<? extends RuleMatcherFactory> clazz : cachedMatcherFactories()) {
+			RuleMatcherFactory factory = newInstance(clazz);
+			if (factory == null) {
+				continue;
+			}
 			rm.registerMatcherFactory(factory);
 			matcherCount++;
 		}
 		int codecCount = 0;
-		for (PayloadCodecFactory factory : ServiceLoader.load(PayloadCodecFactory.class)) {
+		for (Class<? extends PayloadCodecFactory> clazz : cachedCodecFactories()) {
+			PayloadCodecFactory factory = newInstance(clazz);
+			if (factory == null) {
+				continue;
+			}
 			rm.registerCodecFactory(factory);
 			codecCount++;
 		}
 		logger.debug("Rule factories loaded: actions={} matchers={} codecs={}",
 			actionFactories.size(), matcherCount, codecCount);
+	}
+
+	/**
+	 * 通过反射新建工厂实例，失败时告警并跳过（不中断 broker 启动）。
+	 */
+	private static <T> T newInstance(Class<? extends T> clazz) {
+		try {
+			return clazz.getDeclaredConstructor().newInstance();
+		} catch (Exception e) {
+			logger.error("Failed to instantiate rule factory: {}", clazz.getName(), e);
+			return null;
+		}
+	}
+
+	/**
+	 * 缓存的 ActionFactory 类型（扫描结果只做一次）。
+	 */
+	private static List<Class<? extends ActionFactory>> cachedActionFactories() {
+		List<Class<? extends ActionFactory>> cached = CACHED_ACTION_FACTORIES;
+		if (cached == null) {
+			synchronized (MqttClusterBrokerCreator.class) {
+				cached = CACHED_ACTION_FACTORIES;
+				if (cached == null) {
+					cached = scan(ActionFactory.class);
+					CACHED_ACTION_FACTORIES = cached;
+				}
+			}
+		}
+		return cached;
+	}
+
+	/**
+	 * 缓存的 RuleMatcherFactory 类型。
+	 */
+	private static List<Class<? extends RuleMatcherFactory>> cachedMatcherFactories() {
+		List<Class<? extends RuleMatcherFactory>> cached = CACHED_MATCHER_FACTORIES;
+		if (cached == null) {
+			synchronized (MqttClusterBrokerCreator.class) {
+				cached = CACHED_MATCHER_FACTORIES;
+				if (cached == null) {
+					cached = scan(RuleMatcherFactory.class);
+					CACHED_MATCHER_FACTORIES = cached;
+				}
+			}
+		}
+		return cached;
+	}
+
+	/**
+	 * 缓存的 PayloadCodecFactory 类型。
+	 */
+	private static List<Class<? extends PayloadCodecFactory>> cachedCodecFactories() {
+		List<Class<? extends PayloadCodecFactory>> cached = CACHED_CODEC_FACTORIES;
+		if (cached == null) {
+			synchronized (MqttClusterBrokerCreator.class) {
+				cached = CACHED_CODEC_FACTORIES;
+				if (cached == null) {
+					cached = scan(PayloadCodecFactory.class);
+					CACHED_CODEC_FACTORIES = cached;
+				}
+			}
+		}
+		return cached;
+	}
+
+	/**
+	 * 缓存的 AlertNotifierFactory 类型。
+	 */
+	private static List<Class<? extends AlertNotifierFactory>> cachedNotifierFactories() {
+		List<Class<? extends AlertNotifierFactory>> cached = CACHED_NOTIFIER_FACTORIES;
+		if (cached == null) {
+			synchronized (MqttClusterBrokerCreator.class) {
+				cached = CACHED_NOTIFIER_FACTORIES;
+				if (cached == null) {
+					cached = scan(AlertNotifierFactory.class);
+					CACHED_NOTIFIER_FACTORIES = cached;
+				}
+			}
+		}
+		return cached;
+	}
+
+	/**
+	 * 扫描 SPI，取出实现类的类型（只扫一次，结果缓存）。
+	 */
+	private static <T> List<Class<? extends T>> scan(Class<T> spi) {
+		List<Class<? extends T>> classes = new ArrayList<>();
+		for (T instance : ServiceLoader.load(spi)) {
+			classes.add(instance.getClass().asSubclass(spi));
+		}
+		return classes;
 	}
 
 	/**
@@ -177,7 +296,11 @@ public class MqttClusterBrokerCreator {
 		}
 		serverCreator.messageListener(new MqttFunctionMessageListener(fnMgr));
 
-		RuleEngine engine = new RuleEngine(rm, fnMgr, null);
+		RuleActionExecutor executor = new RuleActionExecutor(
+			clusterConfig == null ? 0 : clusterConfig.getActionPoolCoreSize(),
+			clusterConfig == null ? 0 : clusterConfig.getActionPoolMaxSize(),
+			clusterConfig == null ? 0 : clusterConfig.getActionPoolQueueSize());
+		RuleEngine engine = new RuleEngine(rm, fnMgr, null, executor);
 		engine.attach();
 		this.ruleEngine = engine;
 	}
@@ -194,7 +317,7 @@ public class MqttClusterBrokerCreator {
 		TemplateServices services = new TemplateServices(
 			(topic, payload, qos, retain) -> server.publishAll(topic, payload, MqttQoS.valueOf(qos), retain),
 			null,
-			new AlertCenter());
+			createAlertCenter());
 		this.templateServices = services;
 		for (ActionFactory factory : actionFactories) {
 			if (factory instanceof TemplateActionFactory) {
@@ -202,6 +325,25 @@ public class MqttClusterBrokerCreator {
 			}
 		}
 		serverCreator.addShutdownHook(this::shutdown);
+	}
+
+	/**
+	 * 创建告警中心并注册 SPI 提供的告警通知器（钉钉 / Slack / PagerDuty 等）。
+	 */
+	private AlertCenter createAlertCenter() {
+		AlertCenter center = new AlertCenter();
+		for (Class<? extends AlertNotifierFactory> clazz : cachedNotifierFactories()) {
+			AlertNotifierFactory factory = newInstance(clazz);
+			if (factory == null) {
+				continue;
+			}
+			try {
+				center.addNotifier(factory.create(Collections.emptyMap()));
+			} catch (Exception e) {
+				logger.error("Failed to create alert notifier: {}", clazz.getName(), e);
+			}
+		}
+		return center;
 	}
 
 	/**
@@ -214,6 +356,8 @@ public class MqttClusterBrokerCreator {
 		if (templateServices != null) {
 			templateServices.close();
 		}
+		// 释放规则动作缓存的 MQTT 客户端连接
+		MqttAction.clearClientCache();
 		ClusterStorage storage = this.clusterStorage;
 		if (storage != null) {
 			storage.stop();

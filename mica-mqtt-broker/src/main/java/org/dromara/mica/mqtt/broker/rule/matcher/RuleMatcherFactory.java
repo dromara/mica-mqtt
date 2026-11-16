@@ -37,4 +37,13 @@ public interface RuleMatcherFactory {
 	 * @return matcher
 	 */
 	RuleMatcher create(Map<String, String> props);
+
+	/**
+	 * 由 {@link MatcherRegistry} 在注册时回调，注入注册表本身。
+	 * <p>
+	 * 需要引用其它 matcher 的工厂（如 compound）可覆写此方法拿到注册表。
+	 * </p>
+	 */
+	default void setRegistry(MatcherRegistry registry) {
+	}
 }

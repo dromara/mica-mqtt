@@ -44,6 +44,7 @@ public class PublishTemplateAction implements Action {
 	private final String topicTemplate;
 	private final Integer qosProp;
 	private final boolean retain;
+	private final boolean retainOriginal;
 
 	public PublishTemplateAction(ActionRef ref, PublishFunction publisher) {
 		this.ref = ref;
@@ -51,6 +52,7 @@ public class PublishTemplateAction implements Action {
 		this.topicTemplate = requireTopic(ref);
 		this.qosProp = ref.getInt("qos");
 		this.retain = Boolean.TRUE.equals(ref.getBoolean("retain"));
+		this.retainOriginal = ref.getBoolean("retainOriginal", false);
 	}
 
 	private static String requireTopic(ActionRef ref) {
@@ -71,8 +73,10 @@ public class PublishTemplateAction implements Action {
 		if (publisher == null) {
 			throw new IllegalStateException("publish action is not wired with a PublishFunction");
 		}
+		// retainOriginal=true 时沿用原消息的 qos / retain 标记，只重整 topic
 		int qos = qosProp != null ? qosProp : (ctx.getQos() == null ? 0 : ctx.getQos().value());
-		publisher.publish(TemplateRenderer.render(topicTemplate, ctx), ctx.getPayload(), qos, retain);
+		boolean retainFlag = retainOriginal ? ctx.isRetain() : retain;
+		publisher.publish(TemplateRenderer.render(topicTemplate, ctx), ctx.getPayload(), qos, retainFlag);
 	}
 
 	@FunctionalInterface

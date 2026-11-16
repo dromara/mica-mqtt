@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2029, Dreamlu 卢春�?(596392912@qq.com & dreamlu.net).
+ * Copyright (c) 2019-2029, Dreamlu 卢春梦 (596392912@qq.com & dreamlu.net).
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Aviator 表达�?matcher 单测�? *
+ * Aviator 表达式 matcher 单测。
+ *
  * @author L.cm
  */
 class AviatorExprMatcherTest {
@@ -85,6 +86,44 @@ class AviatorExprMatcherTest {
 	void nullFieldSafe() {
 		AviatorExprMatcher matcher = new AviatorExprMatcher("payload.missing == nil");
 		RuleContext ctx = ctx("dev", "x", "{}".getBytes(StandardCharsets.UTF_8), MqttQoS.QOS0);
+		assertTrue(AviatorExprMatcher.asBool(matcher.execute(AviatorExprMatcher.envOf(ctx))));
+	}
+
+	/**
+	 * header(name) / header(name, default)：读取 MQTT5 user property。
+	 */
+	@Test
+	void headerFunctionReadsHeaders() {
+		RuleContext ctx = ctx("dev", "x", "{}".getBytes(StandardCharsets.UTF_8), MqttQoS.QOS0);
+		RuleContext withHeaders = new RuleContext(null,
+			new RuleChannelInfo("127.0.0.1", 0, "test-node"),
+			"dev", "x", MqttQoS.QOS0, "{}".getBytes(StandardCharsets.UTF_8), false,
+			Collections.singletonMap("region", "cn-east"), ctx.getRule());
+
+		AviatorExprMatcher matcher = new AviatorExprMatcher("header('region') == 'cn-east'");
+		assertTrue(AviatorExprMatcher.asBool(matcher.execute(AviatorExprMatcher.envOf(withHeaders))));
+
+		AviatorExprMatcher fallback = new AviatorExprMatcher("header('missing', 'fallback') == 'fallback'");
+		assertTrue(AviatorExprMatcher.asBool(fallback.execute(AviatorExprMatcher.envOf(withHeaders))));
+	}
+
+	/**
+	 * contains(a, b)：字符串包含。
+	 */
+	@Test
+	void containsFunctionWorks() {
+		RuleContext ctx = ctx("dev", "sensor/01/temp", "{}".getBytes(StandardCharsets.UTF_8), MqttQoS.QOS0);
+		AviatorExprMatcher matcher = new AviatorExprMatcher("contains(topic, 'sensor')");
+		assertTrue(AviatorExprMatcher.asBool(matcher.execute(AviatorExprMatcher.envOf(ctx))));
+	}
+
+	/**
+	 * now() 与 ts 环境变量：时间戳可用。
+	 */
+	@Test
+	void nowAndTsAvailable() {
+		RuleContext ctx = ctx("dev", "x", "{}".getBytes(StandardCharsets.UTF_8), MqttQoS.QOS0);
+		AviatorExprMatcher matcher = new AviatorExprMatcher("ts > 0 && now() > 0");
 		assertTrue(AviatorExprMatcher.asBool(matcher.execute(AviatorExprMatcher.envOf(ctx))));
 	}
 }

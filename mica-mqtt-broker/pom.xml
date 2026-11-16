@@ -35,8 +35,14 @@
             <artifactId>caffeine</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.googlecode.aviator</groupId>
+            <groupId>io.github.aviatorscript</groupId>
             <artifactId>aviator</artifactId>
+        </dependency>
+        <!-- YAML 规则加载：可选依赖，Spring Boot 已传递引入 SnakeYAML；纯 Java 用户需自行引入 -->
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

@@ -2,6 +2,18 @@
 
 ## 发行版本
 
+### v2.7.0 - 未发布
+
+- ✨ feat(broker): 新增 mica-mqtt-broker 规则引擎。规则按 `topicFilter`（支持 `+` / `#` 通配）命中消息后，在 action 线程池上顺序执行一组动作（日志、转发到另一台 MQTT、HTTP 回调、重新发布、持久化、告警、webhook），规则支持运行时增删改查与按 topic 匹配调试，动作、匹配器、payload 编解码器、规则来源、规则存储五类扩展点均以 JDK SPI 方式接入。
+- ✨ feat(broker): 规则动作在独立线程池 `rule-action-pool` 中执行，t-io 的 IO 线程只负责提交任务，慢后端不再阻塞消息分发；线程池的核心数、最大线程数与队列容量可通过 `MqttClusterConfig` 的 `actionPoolCoreSize` / `actionPoolMaxSize` / `actionPoolQueueSize` 调整。
+- ✨ feat(broker): 规则支持 `timeoutMs` 超时控制（默认 5 秒，小于等于 0 表示不限时），超时后中断当前动作并跳过该规则剩余动作，同时记一次失败指标，不影响其它规则的执行。
+- ✨ feat(broker): 规则支持用 `codecType` 指定 payload 解码器（`raw` / `string` / `json`），解码结果缓存到规则上下文供匹配器与动作共享，每条消息每条规则只解码一次；内置匹配器补齐 `header` / `jsonPath` / `compound` 三种声明式写法，并可直接用 `Rule#when(expr)` 书写 AviatorScript 条件表达式。
+- ✨ feat(broker): 条件表达式升级到 AviatorScript 5.9.0，沙箱模式下注册 `header()` / `contains()` / `now()` / `env()` 函数，求值环境补充 `ts` 变量；表达式编译结果走 LRU 缓存，编译失败在规则挂载期即暴露。
+- ✨ feat(broker): 新增 JSON / YAML 规则文件加载器，支持按文件修改时间热加载；规则存储新增变更监听接口，外部（配置中心等）改动存储后本地自动同步挂载与摘除，无需重启 broker。
+- ✨ feat(broker): `MqttAction` 按连接键复用 MQTT 客户端连接（默认由 `host:port + clientId + username` 组成，可用 `connectionName` 显式覆盖，避免同 host 不同账号串号），连接在 broker 关闭时统一释放；`store` 模板新增 `file` 存储后端与 `maxAge` 过期策略，`publish` 模板新增 `retainOriginal` 沿用原消息的 qos 与 retain 标记。
+- ✨ feat(broker): SPI 加载结果静态缓存，broker 多次构建不再重复扫描服务文件；新增告警通知器 SPI，告警中心自动注册用户提供的钉钉 / Slack / PagerDuty 等通道，用户实现一个工厂类即可对接。
+- 📝 docs(broker): 规则引擎设计稿补充「实现现状与偏差」章节，明确线程池执行模型、存储后端选择与 SPI 位置的调整；`mica-mqtt-broker/README.md` 补充规则引擎用法示例。
+
 ### v2.6.15 - 2026-11-11
 - ♻️ chore(build): 显式声明 `maven-surefire-plugin` 3.5.2，避免低版本 Maven（3.8 及更早默认绑定 2.12.4，不支持 JUnit 5）静默跳过单元测试。(github #225) 感谢 @wjpdream 贡献。
 - ℹ️ 说明: PR #225 未采纳 —— 服务端互踢下发 `DISCONNECT(0x8E Session taken over)`、客户端被顶号后自动重建 clientId、`uniqueId` 追加来源地址三项均未合入本分支：前者收益依赖客户端配套改造、集群跨节点接管场景也覆盖不到，后两者与「clientId 唯一、为空时由服务端兜底分配」的设计冲突。提交与贡献记录保留在 git 历史中。

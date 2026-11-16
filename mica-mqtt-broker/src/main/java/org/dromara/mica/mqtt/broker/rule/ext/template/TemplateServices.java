@@ -42,6 +42,11 @@ public final class TemplateServices implements AutoCloseable {
 	 */
 	public static final String MEMORY_STORE = "memory";
 
+	/**
+	 * 内置文件 store 的注册名。
+	 */
+	public static final String FILE_STORE = "file";
+
 	private final PublishTemplateAction.PublishFunction publisher;
 	private final Map<String, StoreTemplateAction.StoreFunction> stores;
 	private final AlertCenter alertCenter;
@@ -78,6 +83,7 @@ public final class TemplateServices implements AutoCloseable {
 			copy.putAll(stores);
 		}
 		copy.putIfAbsent(MEMORY_STORE, new StoreTemplateAction.MemoryStoreFunction());
+		copy.putIfAbsent(FILE_STORE, new StoreTemplateAction.FileStoreFunction());
 		this.stores = Collections.unmodifiableMap(copy);
 		this.alertCenter = alertCenter;
 		this.sslSocketFactory = sslSocketFactory;
