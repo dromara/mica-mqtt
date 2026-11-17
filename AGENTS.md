@@ -203,7 +203,8 @@ Two modes for load balancing:
 ### Clustering & Message Dispatching
 
 The `mica-mqtt-broker` module provides clustering via t-io cluster for node-to-node communication:
-- `MqttBroker.create()` as entry point with fluent API: `MqttClusterConfig.enabled(true).clusterPort(9001)`
+- `MqttBroker.create()` as entry point with fluent API: `new MqttClusterConfig().enabled(true).clusterPort(9001)`
+- **集群模式必须用 `MqttClusterBrokerCreator#start()`**：`build()` 只装配集群装饰器，不建立集群连接（集群端口绑定、节点发现、心跳、状态同步都在 `MqttClusterManager#start()` 内）。集群模式下调用 `build()` 会抛 `IllegalStateException` —— 此前它会静默退化成单机（MQTT 正常、跨节点消息全不投递、无任何报错）。`build()` 与 `start()` 均幂等。
 - Session state synchronized across nodes via `ClusterMqttSessionManager`
 - Cluster messages implement the `ClusterMessage` interface
 - `ClusterMessageDispatcher` routes messages across broker instances using pluggable dispatch strategies
