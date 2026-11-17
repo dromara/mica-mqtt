@@ -83,7 +83,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
-                        <version>3.5.6</version>
+                        <version>3.6.1</version>
                         <configuration>
                             <includes>
                                 <include>**/*ChaosIT.java</include>
@@ -100,7 +100,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
-                        <version>3.5.6</version>
+                        <version>3.6.1</version>
                         <configuration>
                             <includes>
                                 <include>**/*BenchmarkIT.java</include>
@@ -117,7 +117,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
-                        <version>3.5.6</version>
+                        <version>3.6.1</version>
                         <configuration>
                             <includes>
                                 <include>**/*MqttIT.java</include>
