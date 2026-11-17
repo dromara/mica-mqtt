@@ -47,7 +47,6 @@ import java.util.Map;
  *         topic: device-events
  * </pre>
  * action 的属性既支持平铺，也支持 {@code props:} 嵌套（两者可混用）。
- * </p>
  *
  * @author L.cm
  */

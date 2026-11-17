@@ -12,7 +12,13 @@
 - ✨ feat(broker): 新增 JSON / YAML 规则文件加载器，支持按文件修改时间热加载；规则存储新增变更监听接口，外部（配置中心等）改动存储后本地自动同步挂载与摘除，无需重启 broker。
 - ✨ feat(broker): `MqttAction` 按连接键复用 MQTT 客户端连接（默认由 `host:port + clientId + username` 组成，可用 `connectionName` 显式覆盖，避免同 host 不同账号串号），连接在 broker 关闭时统一释放；`store` 模板新增 `file` 存储后端与 `maxAge` 过期策略，`publish` 模板新增 `retainOriginal` 沿用原消息的 qos 与 retain 标记。
 - ✨ feat(broker): SPI 加载结果静态缓存，broker 多次构建不再重复扫描服务文件；新增告警通知器 SPI，告警中心自动注册用户提供的钉钉 / Slack / PagerDuty 等通道，用户实现一个工厂类即可对接。
-- 📝 docs(broker): 规则引擎设计稿补充「实现现状与偏差」章节，明确线程池执行模型、存储后端选择与 SPI 位置的调整；`mica-mqtt-broker/README.md` 补充规则引擎用法示例。
+- 🐛 fix(broker): 集群模式下 `MqttClusterBrokerCreator#build()` 改为抛出 `IllegalStateException`。此前 `build()` 只装配集群装饰器、不建立集群连接，调用方若接着调 `MqttServer#start()`，节点会静默退化成单机——集群端口不监听、无节点发现、跨节点消息全部不投递且不报任何错。集群模式请统一改用 `start()`。
+- 🐛 fix(broker): 关闭 MQTT 服务端时同步停止集群管理器。此前关闭钩子没有停集群，集群端口不释放（同端口重启绑不上），心跳继续广播使对端无法判死本节点，集群里残留僵尸节点且其 client→node 映射仍被路由命中；现在停止时先广播 `NODE_LEAVE`，再释放集群端口。
+- 🐛 fix(broker): `MqttClusterBrokerCreator#build()` 与 `start()` 改为幂等，重复调用返回同一实例。此前重复 `build()` 会重复注册流水线处理器，导致上行报文被处理两遍、本地订阅者收两遍、规则引擎每条消息触发两遍。
+- 🐛 fix(broker): 修复规则配置解析器 javadoc 中的非法闭合标签，`mvn package -P release` 此前因该错误无法生成发布产物。
+- 🧪 test(broker): 新增 Broker 生命周期回归测试，覆盖集群模式入口约束、构建与启动幂等、关闭后集群端口释放；并修正规则引擎共享 sink 用例的断言方式，消除因跨规则执行顺序不确定导致的偶发失败。
+- 📝 docs(broker): 规则引擎设计稿补充「实现现状与偏差」章节，明确线程池执行模型、存储后端选择与 SPI 位置的调整；`mica-mqtt-broker/README.md` 补充规则引擎用法示例并修正为可直接编译的写法（端口配置、集群配置构造、集群模式入口），集群管理器方法清单按实际 API 重写，测试章节改为列出实际存在的测试类并标注三个 `*IT` 类需显式激活 Maven profile 才能执行。
+- 📝 docs(broker): 文档与实现现状对齐 —— `docs/todo/README.md` 收录规则引擎设计稿，补齐阅读顺序、问题索引与版本状态表；`docs/todo/mqtt-server-cluster-tasks.md` 的 21 个任务清单新增状态列，逐项标注完成 / 部分完成 / 未做。
 
 ### v2.6.15 - 2026-11-11
 - ♻️ chore(build): 显式声明 `maven-surefire-plugin` 3.5.2，避免低版本 Maven（3.8 及更早默认绑定 2.12.4，不支持 JUnit 5）静默跳过单元测试。(github #225) 感谢 @wjpdream 贡献。

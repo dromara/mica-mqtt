@@ -30,7 +30,9 @@ import org.dromara.mica.mqtt.core.server.func.MqttFunctionManager;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -186,8 +188,11 @@ class RuleEngineTest {
 		invokeFunctionManager(fnMgr, "b/y", "2".getBytes(), false);
 		awaitSize(events, 2);
 		assertEquals(2, events.size());
-		assertEquals("shared:1", events.get(0));
-		assertEquals("shared:2", events.get(1));
+		// 两条规则链是两个独立任务，各自提交到 action 线程池后并发执行，
+		// 跨规则的完成顺序没有保证（顺序保证只存在于单条规则内的 action 链之间）。
+		// 本用例断言的是「两条规则共用同一个 action 实例，共享 sink 收到两条内容正确的消息」，
+		// 因此按集合断言而不是按下标断言。
+		assertEquals(new HashSet<>(Arrays.asList("shared:1", "shared:2")), new HashSet<>(events));
 	}
 
 	@Test
