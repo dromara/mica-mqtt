@@ -12,6 +12,7 @@
         "^net.dreamlu:mica-bom$",
         "^net.dreamlu:mica-auto$",
         "^org.moditect:moditect-maven-plugin$",
+        "^com.github.ben-manes.caffeine:caffeine$",
         "^org.springframework.boot:spring-boot-dependencies$",
         "^org.springframework.boot:spring-boot-maven-plugin$"
       ],
