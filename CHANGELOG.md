@@ -2,9 +2,12 @@
 
 ## 发行版本
 
+### v2.5.14 - 2026-11-20
+- ⬆️ mica-net 升级到 1.3.8，解决 死连接不释放导致OOM
+
 ### v2.5.13 - 2026-07-01
 - 🐛 mqtt-server 优化客户端互踢时的会话清理逻辑，感谢 `@十年` 反馈。
-- ⬆️ mica-net 升级到 2.0.8，修复重连后 TcpSendRunnable.writing 未复位，可能导致 MQTT CONNECT 无法发送的问题 (gitee #IJVOZ7)，感谢 `@weibin268` 反馈。
+- ⬆️ mica-net 升级到 1.3.7，修复重连后 TcpSendRunnable.writing 未复位，可能导致 MQTT CONNECT 无法发送的问题 (gitee #IJVOZ7)，感谢 `@weibin268` 反馈。
 
 ### v2.5.12 - 2026-02-10
 - ✨ 在 Solon 和 Spring Boot 配置中新增多线程池大小配置，包括 group-executor-size、tio-executor-size、mqtt-executor-size、

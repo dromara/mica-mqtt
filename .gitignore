@@ -30,6 +30,7 @@ nbdist/
 
 ### vscode ###
 .vscode
+.workbuddy
 
 ### maven ###
 target/
