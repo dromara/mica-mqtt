@@ -170,10 +170,28 @@ mqtt:
 | IMqttSessionManager           | 否          | session 管理                                    |
 | IMqttSessionListener          | 否          | session 监听                                    |
 | IMqttMessageStore             | 集群是，单机否    | 遗嘱和保留消息存储                                     |
-| AbstractMqttMessageDispatcher | 集群是，单机否    | 消息转发，（遗嘱、保留消息转发）                              |
 | IMqttMessageInterceptor       | 否          | 消息拦截器，1.3.9 新增                                |
 | HttpFilter                    | 否（2.6.10+）  | 自定义 HTTP API 认证过滤器,优先级最高,完全接管              |
 | ITokenValidator               | 否（2.6.10+）  | 自定义 Token 校验器,scheme/header 走配置文件                |
+
+> **消息处理管线（2.6.0+）**
+>
+> 服务端已改为消息管线架构，旧的 `AbstractMqttMessageDispatcher` 已移除，不再需要（也无法）自行实现消息转发器。
+>
+> | 管线 | 接口 | 注册入口 | 用途 |
+> |---|---|---|---|
+> | 内部消息管线 | `IMqttMessagePipeline` | `MqttServerCreator#addMessagePipelineHandler` | 按 `MessageType` 分发 CONNECT / SUBSCRIBE / UNSUBSCRIBE / UP_STREAM / DOWN_STREAM / HTTP_API / DISCONNECT |
+> | 发布消息管线 | `IMqttPublishPipeline` | `MqttServerCreator#addPublishPipelineHandler` | 保留消息 → 消息监听 → 订阅转发 |
+>
+> 集群的跨节点转发由 `mica-mqtt-broker` 模块内置的 `ClusterPublishHandler` 完成（注册在发布管线上）。
+> 管线处理器不会自动装配成 Spring Bean，需要通过 `MqttServerCustomizer` Bean 显式注册：
+>
+> ```java
+> @Bean
+> public MqttServerCustomizer mqttServerCustomizer() {
+>     return creator -> creator.addPublishPipelineHandler(new MyPublishPipelineHandler());
+> }
+> ```
 
 ### 2.3 IMqttMessageListener (用于监听客户端上传的消息) 使用示例
 

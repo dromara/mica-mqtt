@@ -121,6 +121,8 @@ mvn clean deploy -P release
 - `IMqttMessageStore` / `InMemoryMqttMessageStore`: Retained messages and will messages storage
 - `MqttServerAioHandler` / `MqttServerAioListener`: t-io integration layer
 - `MqttHttpApiListener` / `MqttMcp`: HTTP REST API and MCP interface
+- Message pipelines under `core/server/pipeline`: `IMqttMessagePipeline` / `DefaultMqttMessagePipeline` (internal `Message` routed by `MessageType`, same-type handlers chained by `getOrder()`) and `IMqttPublishPipeline` / `DefaultMqttPublishPipeline` (retain → listener → subscription forward)
+- Pipeline handlers: internal-message handlers under `pipeline/message` (base `BaseMessageHandler`), publish handlers under `pipeline/handler`; extend via `MqttServerCreator#addMessagePipelineHandler` / `#addPublishPipelineHandler`
 
 **Broker/Cluster Side (mica-mqtt-broker, package `org.dromara.mica.mqtt.broker.cluster`):**
 - `MqttBroker`: Entry point for cluster brokers (`MqttBroker.create()`)
@@ -128,7 +130,7 @@ mvn clean deploy -P release
 - `MqttClusterConfig` / `MqttClusterBrokerCreator` / `MqttStorageConfig`: Fluent configuration
 - `ClusterMqttSessionManager`: Session synchronization across nodes (decorator wrapping `IMqttSessionManager`)
 - `ClusterMqttMessageStore` / `ClusterMqttConnectStatusListener`: Cluster-aware store and listener
-- `ClusterMessageDispatcher`: Routes messages across broker instances (t-io pipeline handler)
+- `ClusterPublishHandler`: Cross-node forwarding on publish (registered on the publish pipeline)
 - Dispatch strategies under `pipeline/strategy`: `LocalFirstStrategy`, `RoundRobinStrategy`, `RandomStrategy`, `HashClientStrategy`, `StickyStrategy`, `SharedSubscriptionStrategy`
 - Cluster messages implement the `ClusterMessage` interface; `ClusterMessageSerializer` handles wire encoding
 - Storage abstraction under `store/`: `SessionStore`, `SharedSubStore`, `InflightStore`, `RetainIndex`, with in-memory (`LocalKvStoreImpl`, `MemoryKvStoreImpl`) and H2 MVStore (`H2MvStoreImpl`, `H2SessionStore`, `H2SharedSubStore`, `H2InflightStore`) implementations
@@ -195,7 +197,7 @@ The `mica-mqtt-broker` module provides clustering via t-io cluster for node-to-n
 - `MqttBroker.create()` as entry point with fluent API: `MqttClusterConfig.enabled(true).clusterPort(9001)`
 - Session state synchronized across nodes via `ClusterMqttSessionManager`
 - Cluster messages implement the `ClusterMessage` interface
-- `ClusterMessageDispatcher` routes messages across broker instances using pluggable dispatch strategies
+- `ClusterPublishHandler` routes published messages across broker instances using pluggable dispatch strategies
 
 ### HTTP API
 

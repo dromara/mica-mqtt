@@ -29,7 +29,7 @@
 - 集群消息类型定义（`ClusterMessage` 系列）
 - 消息编解码（`ClusterMessageSerializer`）
 - 集群会话管理（`ClusterMqttSessionManager`）
-- 消息路由与转发（`ClusterMessageDispatcher`、`ClusterPublishHandler`）
+- 消息路由与转发（`ClusterPublishHandler`）
 
 **优势：**
 - 无需额外依赖（Redis、Kafka 等）
@@ -102,8 +102,7 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
     │   ├── RetainQueryMessage.java             # [V3] Retain 远程查询 (code=20)
     │   └── HeartbeatMessage.java               # [control] 业务层探活 (code=21)
     ├── pipeline/                          # 消息管道
-    │   ├── ClusterMessageDispatcher.java   # V2 集群消息分发器 (dispatcher 模型)
-    │   ├── ClusterPublishHandler.java      # 发布消息处理器
+    │   ├── ClusterPublishHandler.java      # V2 集群消息分发器 (dispatcher 模型，注册在发布管线上)
     │   └── strategy/                      # 共享订阅策略
     │       ├── SharedSubscriptionStrategy.java # 策略接口
     │       ├── RandomStrategy.java
@@ -153,7 +152,7 @@ Client A (Node1)  ─publish─→  Node1  ─cluster forward─→  Node2  ─l
 ```
 **处理步骤：**
 1. Node1 收到 Client A 的 PUBLISH 消息
-2. ClusterMessageDispatcher 拦截消息，查询全局订阅表
+2. ClusterPublishHandler 拦截消息，查询全局订阅表
 3. 发现 Node2 上有客户端订阅了该 topic
 4. 向 Node2 发送 PublishForwardMessage
 5. Node2 收到后，在本地查询订阅表并分发给客户端
@@ -301,16 +300,16 @@ SESSION_MIGRATED_NOTIFY(16),    // 新节点 -> 全集群: { clientId, newNode }
 SESSION_DELETE_NOTIFY(17);      // 任何节点 -> 全集群: { clientId }
 ```
 
-### 3.4 消息分发器（ClusterMessageDispatcher）
+### 3.4 消息分发器（ClusterPublishHandler）
 
 ```java
-public class ClusterMessageDispatcher extends BaseMessageHandler {
+public class ClusterPublishHandler implements MqttPublishPipelineHandler {
     private final MqttClusterManager clusterManager;
     private final ClusterMqttSessionManager clusterSessionManager;
     private final SharedSubscriptionStrategy sharedStrategy;
 
     @Override
-    public boolean handle(Message message) {
+    public boolean handle(PublishContext context) {
         // V2 dispatcher 模型：
         //   1. 分离普通订阅 vs 共享订阅
         //   2. 普通订阅: 按节点分组，每个远程节点发一次 PublishForwardMessage
@@ -444,10 +443,10 @@ mqtt:
 **全量复制方案**：所有订阅（普通订阅 + 共享订阅）都被同步到每个节点的 TrieTopicManager，`searchAllSubscribe()` 返回全量订阅者。
 
 **路由流程**：
-1. 发布消息时，`ClusterMessageDispatcher` 拦截，调用 `searchAllSubscribe(topic)` 查到所有订阅者
+1. 发布消息时，`ClusterPublishHandler` 拦截，调用 `searchAllSubscribe(topic)` 查到所有订阅者
 2. 通过 `clientNodeMap` 判断每个订阅者在哪个节点
 3. 向所有**远程节点**（有订阅者的非本节点）转发消息
-4. 本地订阅者由 Pipeline 后面的 `UpStreamMessageHandler` 本地投递
+4. 本地订阅者由发布管线后面的 `SubscriptionForwardHandler` 本地投递
 
 **已知问题**：当同一 `$share/<group>/` 订阅的客户端分布在不同节点时，消息会被多次转发（每个节点都收到并投递）。这是 V1 全量复制方案的固有局限。
 

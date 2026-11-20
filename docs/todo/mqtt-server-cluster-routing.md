@@ -117,8 +117,7 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
     │   ├── PublishForwardMessage.java           # 普通转发
     │   └── SharedDispatchToClientMessage.java   # [已实现] dispatcher -> 目标节点
     ├── pipeline/
-    │   ├── ClusterMessageDispatcher.java        # [已重写] dispatcher 模型
-    │   ├── ClusterPublishHandler.java           # 发布消息处理器
+    │   ├── ClusterPublishHandler.java           # [已重写] dispatcher 模型，注册在发布管线上
     │   └── strategy/                            # [已实现] 策略目录
     │       ├── SharedSubscriptionStrategy.java  # 策略接口
     │       ├── RandomStrategy.java              # 随机
@@ -141,7 +140,7 @@ mica-mqtt-broker/src/main/java/org/dromara/mica/mqtt/broker/
 ```
 Client A (Node1) publish "sensor/temp"
   |
-  |- Node1: ClusterMessageDispatcher.handle()
+  |- Node1: ClusterPublishHandler.handle()
   |   |- searchAllSubscribe("sensor/temp") -> 普通订阅者
   |   |   {clientB@Node1, clientC@Node2}
   |   |
@@ -158,7 +157,7 @@ Client A (Node1) publish "sensor/temp"
 ```
 Client A (Node1) publish "sensor/temp"
   |
-  |- Node1: ClusterMessageDispatcher.handle()
+  |- Node1: ClusterPublishHandler.handle()
   |   |
   |   |- 分离普通订阅 (本地投递或转发)
   |   |
@@ -217,22 +216,22 @@ TrieTopicManager {
 
 集群通过 SUBSCRIBE_NOTIFY / UNSUBSCRIBE_NOTIFY 广播到所有节点，保持一致。
 
-### 3.2 ClusterMessageDispatcher 重构
+### 3.2 ClusterPublishHandler 重构
 
 #### 接口签名
 
 ```java
-public class ClusterMessageDispatcher extends BaseMessageHandler {
+public class ClusterPublishHandler implements MqttPublishPipelineHandler {
 
     private final SharedSubscriptionStrategy strategy;  // 注入
 
     @Override
-    public boolean handle(MqttPublishMessage msg, String topic) {
+    public boolean handle(PublishContext context) {
         // 1. 普通订阅: 原有逻辑
-        deliverNormal(topic, msg);
+        deliverNormal(context);
 
         // 2. 共享订阅: 全新 dispatcher 模型
-        deliverShared(topic, msg);
+        deliverShared(context);
 
         return true;
     }
@@ -668,7 +667,7 @@ MqttClusterManager.updateGroupStrategy("g1", new RoundRobinStrategy());
 
 ### 阶段 1：Dispatcher 重构（5 天）
 
-- [x] MQTT publish pipeline 与 `ClusterMessageDispatcher.handle()` 改造
+- [x] MQTT publish pipeline 与 `ClusterPublishHandler.handle()` 改造
   - [x] 分离普通投递 / 共享投递
   - [x] 实现 strategy 选择
   - [x] 跨节点 `SharedDispatchToClientMessage` 发送

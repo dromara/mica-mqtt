@@ -17,6 +17,62 @@
 
 如果你项目中直接引用过上述 `org.tio.*` 包，**推荐做法是直接删除代码里的旧 `import` 语句**，然后将鼠标停在报红的类名上，使用 IDEA 的 `Alt + Enter`（或快捷键）触发 “Add import for ...”，由 IDE 自动选择并导入 `net.dreamlu.mica.net.*` 下对应的类，比手动全局替换更安全（避免误改字符串、注释等）。
 
+## 迁移到 mica-mqtt 2.6.0
+
+### 2.6.0 不兼容变更
+
+服务端消息处理架构重构为**消息管线**，`AbstractMqttMessageDispatcher`（内部消息转发抽象）已移除。
+
+**老用法：** 集群场景继承 `AbstractMqttMessageDispatcher`，覆写 `sendAll` 把消息转发到其他节点。
+
+```java
+// 老用法（2.6.0 已移除）
+public class MyDispatcher extends AbstractMqttMessageDispatcher {
+    @Override
+    public void sendAll(Message message) {
+        // 转发到其他节点
+    }
+}
+```
+
+**新用法：** 消息处理拆成两条管线，按需注册处理器即可。
+
+| 管线 | 接口 | 注册入口 | 用途 |
+|---|---|---|---|
+| 内部消息管线 | `IMqttMessagePipeline` | `MqttServerCreator#addMessagePipelineHandler` | 按 `MessageType` 分发 CONNECT / SUBSCRIBE / UNSUBSCRIBE / UP_STREAM / DOWN_STREAM / HTTP_API / DISCONNECT |
+| 发布消息管线 | `IMqttPublishPipeline` | `MqttServerCreator#addPublishPipelineHandler` | 保留消息 → 消息监听 → 订阅转发 |
+
+集群的跨节点转发由 `mica-mqtt-broker` 模块内置的 `ClusterPublishHandler` 完成（注册在发布管线上），业务无需再自行实现转发器。
+
+```java
+// 新用法：注册自定义处理器
+MqttServer.create()
+    .port(1883)
+    .addMessagePipelineHandler(new MqttMessagePipelineHandler() {
+        @Override
+        public MessageType[] messageTypes() {
+            return new MessageType[]{MessageType.UP_STREAM};
+        }
+
+        @Override
+        public boolean handle(Message message) {
+            // 自定义处理
+            return true;
+        }
+
+        @Override
+        public int getOrder() {
+            return 50;
+        }
+    })
+    .start();
+```
+
+注意：
+- 处理器返回 `false` 会中断同类型的后续处理器；`getOrder()` 数字越小越先执行。
+- 内部消息管线处理的是服务端内部 `Message`，MQTT 协议报文仍由 `MqttServerProcessor` 分发到 `handler` 包下的协议处理器。
+- Spring Boot / Solon 下管线处理器不会自动装配，需要通过 `MqttServerCustomizer` Bean 显式注册。
+
 ## 迁移到 mica-mqtt 2.5.x
 
 ### 2.5.4 不兼容变更

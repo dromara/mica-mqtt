@@ -48,7 +48,7 @@ MqttServer mqttServer = MqttServer.create()
         }
     })
     // 自定义消息处理可用 .addInterceptor(IMqttMessageInterceptor) 扩展
-    // 集群消息转发（跨节点分发）见 mica-mqtt-broker 模块的 ClusterMessageDispatcher
+    // 集群消息转发（跨节点分发）见 mica-mqtt-broker 模块的 ClusterPublishHandler
     .debug() // 开启 debug 信息日志
     .start();
 
@@ -61,6 +61,57 @@ mqttServer.publishAll("/test/123", "mica最牛皮".getBytes(StandardCharsets.UTF
 // 停止服务
 mqttServer.stop();
 ```
+
+## 消息处理管线（2.6.0+）
+
+服务端的消息处理拆成两条管线（`org.dromara.mica.mqtt.core.server.pipeline` 包）：
+
+| 管线 | 接口 | 默认处理器 | 用途 |
+|---|---|---|---|
+| 内部消息管线 | `IMqttMessagePipeline` | `ConnectMessageHandler`、`SubscribeMessageHandler`、`UnsubscribeMessageHandler`、`UpStreamMessageHandler`、`DownStreamMessageHandler`、`HttpApiMessageHandler`、`DisconnectMessageHandler` | 按 `MessageType` 分发服务端内部消息，同类型多个处理器按 `getOrder()` 串联 |
+| 发布消息管线 | `IMqttPublishPipeline` | `RetainMessageHandler`(100)、`MessageListenerHandler`(200)、`SubscriptionForwardHandler`(300) | 发布消息处理：保留消息 → 消息监听 → 订阅转发 |
+
+MQTT 协议报文本身仍由 `MqttServerProcessor` 分发到 `handler` 包下的协议处理器（`MqttConnectHandler`、`MqttPublishHandler` 等），
+处理完再转成内部 `Message` 交给内部消息管线。
+
+自定义处理通过 `MqttServerCreator` 注册：
+
+```java
+MqttServer.create()
+    .port(1883)
+    // 内部消息管线：按 MessageType 注册
+    .addMessagePipelineHandler(new MqttMessagePipelineHandler() {
+        @Override
+        public MessageType[] messageTypes() {
+            return new MessageType[]{MessageType.UP_STREAM};
+        }
+
+        @Override
+        public boolean handle(Message message) {
+            // 自定义处理
+            return true;
+        }
+
+        @Override
+        public int getOrder() {
+            return 50;
+        }
+    })
+    // 发布消息管线：保留消息、订阅转发、消息监听
+    .addPublishPipelineHandler(new MqttPublishPipelineHandler() {
+        @Override
+        public boolean handle(PublishContext context) {
+            // 自定义处理
+            return true;
+        }
+    })
+    .start();
+```
+
+处理器返回 `false` 会中断同类型的后续处理器；`getOrder()` 数字越小越先执行。
+
+集群的跨节点转发由 `mica-mqtt-broker` 模块内置的 `ClusterPublishHandler` 完成（注册在发布管线上），
+无需自行实现转发器。老版本基于 `AbstractMqttMessageDispatcher` 的实现请参考 [升级指南](../docs/update.md)。
 
 ## 持久会话与离线消息（2.7.0）
 

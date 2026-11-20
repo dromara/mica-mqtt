@@ -212,7 +212,7 @@ public interface SharedSubscriptionStrategy {
 | 依赖 | P1.0 |
 | 风险 | **高**（涉及消息分发核心路径） |
 | 验收 | 普通订阅走 V1 行为不变；共享订阅走 strategy + 跨节点单点转发；5 节点集成测试无重复投递 |
-| 涉及文件 | `cluster/pipeline/ClusterMessageDispatcher.java`（重写） |
+| 涉及文件 | `cluster/pipeline/ClusterPublishHandler.java`（重写） |
 | 设计参考 | routing v1.2 §3.5 / §4 |
 
 **子任务拆分**：
@@ -240,7 +240,7 @@ public interface SharedSubscriptionStrategy {
 | 依赖 | P1.1 |
 | 风险 | 中 |
 | 验收 | routing v1.2 §7 阶段 2 全部覆盖 |
-| 涉及文件 | `cluster/pipeline/ClusterMessageDispatcher.java` 等 |
+| 涉及文件 | `cluster/pipeline/ClusterPublishHandler.java` 等 |
 
 **测试用例清单**：
 - [x] 目标订阅者掉线 → dispatcher 节点重选
