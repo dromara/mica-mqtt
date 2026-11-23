@@ -39,6 +39,7 @@ import org.dromara.mica.mqtt.codec.message.builder.MqttDisconnectBuilder;
 import org.dromara.mica.mqtt.codec.message.properties.MqttDisconnectProperties;
 import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
+import org.dromara.mica.mqtt.codec.properties.MqttProperty;
 import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
 import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
@@ -425,23 +426,185 @@ public final class MqttServer {
 	 */
 	public boolean deliverLocal(String topic, Object payload, MqttQoS qos,
 							 boolean publishedRetain, MqttProperties properties) {
+		Message message = new Message();
+		message.setMessageType(MessageType.UP_STREAM);
+		message.setTopic(topic);
+		message.setPayload(payload instanceof byte[]
+			? (byte[]) payload
+			: mqttSerializer.serialize(payload));
+		message.setQos(qos.value());
+		message.setRetain(publishedRetain);
+		message.setProperties(properties);
+		message.setTimestamp(System.currentTimeMillis());
+		return deliverLocal(message);
+	}
+
+	/**
+	 * 把一条已发布的消息投递给本地订阅者。
+	 * <p>
+	 * 语义与本节点直接发布保持一致：
+	 * <ul>
+	 *     <li>遵循 No Local（规范 3.8.3.1）：订阅者即发布者时跳过；</li>
+	 *     <li>MQTT 5.0 属性重写（规范 3.3.2.3）：过期丢弃、剥离 Topic Alias 与
+	 *         Subscription Identifier、递减 Message Expiry Interval；</li>
+	 *     <li>订阅者离线时按会话持久性入离线队列，重连后回放。</li>
+	 * </ul>
+	 * 集群跨节点转发走的就是这条路径：不做这三件事，
+	 * 跨节点的消息会绕过 No Local、带着过期的有效期、并丢掉离线订阅者的消息。
+	 *
+	 * @param message 已发布的消息快照
+	 * @return 是否有在线订阅者收到消息
+	 */
+	public boolean deliverLocal(Message message) {
+		if (message == null || message.getTopic() == null) {
+			return false;
+		}
+		String topic = message.getTopic();
 		List<Subscribe> subscribeList = sessionManager.searchSubscribe(topic);
 		if (subscribeList == null || subscribeList.isEmpty()) {
 			return false;
 		}
+		MqttProperties properties = rewriteProperties(topic, message.getProperties(),
+			message.getPublishReceivedAt(), message.getTimestamp());
+		if (properties == null) {
+			// 消息已过期，整条丢弃
+			return false;
+		}
+		MqttQoS qos = MqttQoS.valueOf(message.getQos());
+		String publisherClientId = message.getFromClientId();
 		boolean delivered = false;
 		for (Subscribe subscribe : subscribeList) {
-			ChannelContext context = Tio.getByBsId(getServerConfig(), subscribe.getClientId());
-			if (context == null || context.isClosed()) {
+			String clientId = subscribe.getClientId();
+			// MQTT 5.0 No Local（规范 3.8.3.1）: 订阅者即发布者时跳过
+			if (subscribe.isNoLocal() && clientId.equals(publisherClientId)) {
+				logger.debug("Mqtt Topic:{} skip forwarding to clientId:{} due to No Local flag", topic, clientId);
 				continue;
 			}
-			boolean retain = publishedRetain && subscribe.isRetainAsPublished();
+			ChannelContext context = Tio.getByBsId(getServerConfig(), clientId);
+			if (context == null || context.isClosed()) {
+				// 离线订阅者不再直接丢弃：持久会话按 QoS 进入离线队列，重连后回放
+				queueOfflineMessage(copyForOffline(message), clientId, subscribe.getMqttQoS());
+				continue;
+			}
+			boolean retain = message.isRetain() && subscribe.isRetainAsPublished();
 			MqttProperties effectiveProperties = resolveSubscriptionProperties(
 				context, properties, subscribe.getSubscriptionId());
-			delivered |= publish(context, subscribe.getClientId(), topic, payload, qos,
+			delivered |= publish(context, clientId, topic, message.getPayload(), qos,
 				subscribe.getMqttQoS(), retain, effectiveProperties);
 		}
 		return delivered;
+	}
+
+	/**
+	 * 订阅者离线时按会话持久性决定入队或丢弃。
+	 * <p>
+	 * QoS1/2 消息始终尝试入队（由 {@link IMqttSessionManager} 判定会话是否持久、容量与 TTL）；
+	 * QoS0 消息默认丢弃，可通过 {@code mqueueStoreQos0} 打开。
+	 *
+	 * @param message            离线消息快照
+	 * @param subscriberClientId 订阅者 clientId
+	 * @param subMqttQoS         订阅 QoS
+	 * @return 是否入队成功
+	 */
+	public boolean queueOfflineMessage(Message message, String subscriberClientId, int subMqttQoS) {
+		// spec 4.3.2：实际投递 QoS 取发布 QoS 与订阅 QoS 的较小值
+		int qosValue = Math.min(message.getQos(), subMqttQoS);
+		if (qosValue == 0 && !serverCreator.isMqueueStoreQos0()) {
+			logger.debug("Mqtt Topic:{} subscriber clientId:{} offline, QoS0 message dropped.",
+				message.getTopic(), subscriberClientId);
+			return false;
+		}
+		message.setQos(qosValue);
+		if (sessionManager.addOfflineMessage(subscriberClientId, message)) {
+			logger.debug("Mqtt Topic:{} subscriber clientId:{} offline, message queued qos:{}.",
+				message.getTopic(), subscriberClientId, qosValue);
+			return true;
+		}
+		logger.debug("Mqtt Topic:{} subscriber clientId:{} offline and session not persistent, message dropped.",
+			message.getTopic(), subscriberClientId);
+		return false;
+	}
+
+	/**
+	 * MQTT 5.0 属性重写（规范 3.3.2.3）。
+	 * <p>
+	 * 规则：
+	 * <ul>
+	 *     <li>检查 Message Expiry Interval，若已过期则返回 null 表示丢弃消息；</li>
+	 *     <li>移除 Topic Alias（服务端转发时不携带发布者的 Topic Alias）；</li>
+	 *     <li>移除 Subscription Identifier（发布者的订阅标识符不转发给订阅者）；</li>
+	 *     <li>递减 Message Expiry Interval 为剩余有效时间。</li>
+	 * </ul>
+	 *
+	 * @param topic             topic
+	 * @param properties        原始 MQTT 5.0 属性
+	 * @param publishReceivedAt 消息到达 broker 的时间戳，可为 {@code null}
+	 * @param timestamp         消息时间戳
+	 * @return 重写后的属性；null 表示消息已过期，应丢弃
+	 */
+	public MqttProperties rewriteProperties(String topic, MqttProperties properties,
+											Long publishReceivedAt, long timestamp) {
+		if (properties == null || properties.isEmpty()) {
+			return properties;
+		}
+		long receivedAt = publishReceivedAt == null ? timestamp : publishReceivedAt;
+		long elapsedSeconds = (System.currentTimeMillis() - receivedAt) / 1000;
+		// 检查消息过期
+		Integer expiryInterval = properties.getPropertyValue(MqttPropertyType.MESSAGE_EXPIRY_INTERVAL);
+		long remaining = -1;
+		if (expiryInterval != null) {
+			remaining = expiryInterval - elapsedSeconds;
+			if (remaining <= 0) {
+				logger.debug("Mqtt Topic:{} message expired, skip forwarding", topic);
+				return null;
+			}
+		}
+		// O(1) 属性查找判断是否需要重写，避免不必要的遍历和对象分配
+		boolean needsRewrite = properties.getProperty(MqttPropertyType.TOPIC_ALIAS) != null
+			|| properties.getProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER) != null
+			|| (expiryInterval != null && elapsedSeconds > 0);
+		if (!needsRewrite) {
+			return properties;
+		}
+		MqttProperties newProperties = new MqttProperties();
+		for (MqttProperty property : properties.listAll()) {
+			int propertyId = property.propertyId();
+			// MQTT 5.0 规范: 服务端转发时不携带发布者的 Topic Alias 和 Subscription Identifier
+			if (propertyId == MqttPropertyType.TOPIC_ALIAS.value()
+				|| propertyId == MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value()) {
+				continue;
+			}
+			if (propertyId == MqttPropertyType.MESSAGE_EXPIRY_INTERVAL.value()
+				&& expiryInterval != null && elapsedSeconds > 0) {
+				// remaining 已在上方计算且保证 > 0
+				newProperties.add(new IntegerProperty(propertyId, (int) remaining));
+			} else {
+				newProperties.add(property);
+			}
+		}
+		return newProperties;
+	}
+
+	/**
+	 * 复制一份离线消息快照：不同订阅者的实际投递 QoS 可能不同，不能共用同一个对象。
+	 */
+	private static Message copyForOffline(Message source) {
+		Message copy = new Message();
+		copy.setMessageType(MessageType.UP_STREAM);
+		copy.setNode(source.getNode());
+		copy.setId(source.getId());
+		copy.setFromClientId(source.getFromClientId());
+		copy.setFromUsername(source.getFromUsername());
+		copy.setTopic(source.getTopic());
+		copy.setPayload(source.getPayload());
+		copy.setQos(source.getQos());
+		copy.setRetain(false);
+		copy.setDup(false);
+		copy.setPeerHost(source.getPeerHost());
+		copy.setTimestamp(source.getTimestamp());
+		copy.setPublishReceivedAt(source.getPublishReceivedAt());
+		copy.setProperties(source.getProperties());
+		return copy;
 	}
 
 	/** Delivers to one already-selected subscriber without mutating retained state. */

@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 内置 MqttAction：复用 mica-mqtt-client 转发到另一台 MQTT broker。
@@ -47,27 +48,47 @@ public class MqttAction implements Action, AutoCloseable {
 	 */
 	private static final ConcurrentMap<String, MqttClient> CLIENT_CACHE = new ConcurrentHashMap<>();
 
+	/**
+	 * 连接键 -> 引用计数：同一连接当前被多少个 action 持有。
+	 * <p>
+	 * 计数归零时才真正断开连接：规则删除 / 更新会关闭对应 action，
+	 * 但同一连接键可能仍被其它规则使用，直接断开会打断它们的转发。
+	 * </p>
+	 */
+	private static final ConcurrentMap<String, AtomicInteger> CLIENT_REFS = new ConcurrentHashMap<>();
+
 	private final String name;
 	private final MqttClient client;
 	private final String topicTemplate;
 	private final MqttQoS qos;
 	private final boolean retain;
 	private final boolean ownsClient;
+	/**
+	 * 共享连接的连接键；{@code null} 表示客户端不由连接缓存托管。
+	 */
+	private final String connectionKey;
 	private final AtomicBoolean closed = new AtomicBoolean(false);
 
 	public MqttAction(String name, MqttClient client,
 					String topicTemplate, MqttQoS qos, boolean retain) {
-		this(name, client, topicTemplate, qos, retain, false);
+		this(name, client, topicTemplate, qos, retain, false, null);
 	}
 
 	public MqttAction(String name, MqttClient client,
 					String topicTemplate, MqttQoS qos, boolean retain, boolean ownsClient) {
+		this(name, client, topicTemplate, qos, retain, ownsClient, null);
+	}
+
+	public MqttAction(String name, MqttClient client,
+					String topicTemplate, MqttQoS qos, boolean retain, boolean ownsClient,
+					String connectionKey) {
 		this.name = name == null || name.isEmpty() ? "mqtt" : name;
 		this.client = client;
 		this.topicTemplate = topicTemplate;
 		this.qos = qos == null ? MqttQoS.QOS0 : qos;
 		this.retain = retain;
 		this.ownsClient = ownsClient;
+		this.connectionKey = connectionKey;
 	}
 
 	@Override
@@ -94,8 +115,9 @@ public class MqttAction implements Action, AutoCloseable {
 	@Override
 	public void close() {
 		if (closed.compareAndSet(false, true)) {
-			// 共享连接的释放由 broker 关闭流程统一处理
 			if (!ownsClient) {
+				// 共享连接：释放本 action 的引用，最后一个引用者离开时才真正断开
+				releaseClient(connectionKey);
 				return;
 			}
 			try {
@@ -118,6 +140,48 @@ public class MqttAction implements Action, AutoCloseable {
 			}
 		}
 		CLIENT_CACHE.clear();
+		CLIENT_REFS.clear();
+	}
+
+	/**
+	 * 共享连接的引用计数加一。
+	 */
+	private static void retainClient(String key) {
+		if (key == null) {
+			return;
+		}
+		CLIENT_REFS.computeIfAbsent(key, k -> new AtomicInteger()).incrementAndGet();
+	}
+
+	/**
+	 * 共享连接的引用计数减一；归零时断开连接并移出缓存。
+	 * <p>
+	 * 引用计数归零说明已经没有规则再用这条连接（规则被删除或更新），
+	 * 继续留着会一直占着 TCP 连接与远端的会话。
+	 * </p>
+	 */
+	private static void releaseClient(String key) {
+		if (key == null) {
+			return;
+		}
+		AtomicInteger refs = CLIENT_REFS.get(key);
+		if (refs == null) {
+			return;
+		}
+		int remaining = refs.decrementAndGet();
+		if (remaining > 0) {
+			return;
+		}
+		CLIENT_REFS.remove(key);
+		MqttClient cached = CLIENT_CACHE.remove(key);
+		if (cached == null) {
+			return;
+		}
+		try {
+			cached.stop();
+		} catch (Exception e) {
+			logger.warn("Failed to stop cached mqtt client: {}", key, e);
+		}
 	}
 
 	/**
@@ -178,9 +242,12 @@ public class MqttAction implements Action, AutoCloseable {
 		String key = connectionKey(ref);
 		MqttClient cached = CLIENT_CACHE.get(key);
 		if (cached != null) {
+			retainClient(key);
 			return cached;
 		}
-		return CLIENT_CACHE.computeIfAbsent(key, k -> createClient(ref, k));
+		MqttClient client = CLIENT_CACHE.computeIfAbsent(key, k -> createClient(ref, k));
+		retainClient(key);
+		return client;
 	}
 
 	private static MqttClient createClient(ActionRef ref, String key) {

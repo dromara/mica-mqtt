@@ -299,10 +299,13 @@ public class MqttClusterManager {
 			case PUBLISH_FORWARD: {
 				PublishForwardMessage pfm = (PublishForwardMessage) clusterMsg;
 				// retain 存储由 RETAIN_MESSAGE 单独同步，此处仅投递给本地订阅者，避免通过
-				// ClusterMqttMessageStore 再次广播导致无限循环
+				// ClusterMqttMessageStore 再次广播导致无限循环。
+				// 走 MqttServer#deliverLocal(Message)：与本节点直接发布同一套语义 ——
+				// No Local、MQTT 5.0 属性重写、离线订阅者入离线队列。
 				Message fwdMsg = pfm.getMessage();
-				mqttServer.deliverLocal(fwdMsg.getTopic(), fwdMsg.getPayload(),
-					MqttQoS.valueOf(fwdMsg.getQos()), fwdMsg.isRetain(), fwdMsg.getProperties());
+				if (fwdMsg != null) {
+					mqttServer.deliverLocal(fwdMsg);
+				}
 				break;
 			}
 			case SESSION_TAKEOVER_REQUEST: {
@@ -804,16 +807,24 @@ public class MqttClusterManager {
 		}
 		IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
 		for (String clientId : clientIds) {
-			Message will = messageStore.getWillMessage(clientId);
-			if (will == null) {
-				continue;
-			}
 			mqttServer.getServerCreator().getMqttExecutor().execute(() -> {
 				try {
+					// 取遗嘱与发布放在同一个任务里：同一节点上的并发离场事件不会重复发布
+					Message will = messageStore.getWillMessage(clientId);
+					if (will == null) {
+						return;
+					}
 					mqttServer.getServerCreator().getMessagePipeline().handle(will);
-					messageStore.clearWillMessage(clientId);
 				} catch (Throwable e) {
 					logger.error("[Cluster] Failed to publish will for departed node client={}", clientId, e);
+				} finally {
+					// 无论发布成功与否都要清掉遗嘱：MQTT 规定遗嘱只发布一次，
+					// 留在库里会被后续的离场事件重复发布
+					try {
+						messageStore.clearWillMessage(clientId);
+					} catch (Throwable e) {
+						logger.error("[Cluster] Failed to clear will for departed node client={}", clientId, e);
+					}
 				}
 			});
 		}

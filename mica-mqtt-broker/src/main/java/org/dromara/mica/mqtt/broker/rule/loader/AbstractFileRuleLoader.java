@@ -112,6 +112,7 @@ public abstract class AbstractFileRuleLoader implements RuleLoader {
 	/**
 	 * 停止热加载轮询。
 	 */
+	@Override
 	public void stop() {
 		ScheduledExecutorService svc = this.watcher;
 		if (svc != null) {

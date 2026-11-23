@@ -105,13 +105,25 @@ public final class TemplateServices implements AutoCloseable {
 
 	/**
 	 * 按 {@code storage} 属性取 store 函数，未注册时回退到内存实现。
+	 * <p>
+	 * 回退不是静默的：规则里写了 {@code storage: file} 而 file store 没注册时，
+	 * 数据会被写进内存并在重启后消失，日志里必须留痕。
+	 * </p>
 	 *
 	 * @param type store 类型名；{@code null} 等价于 {@link #MEMORY_STORE}
 	 * @return store 函数，永不为 {@code null}
 	 */
 	public StoreTemplateAction.StoreFunction getStore(String type) {
-		StoreTemplateAction.StoreFunction fn = type == null ? null : stores.get(type);
-		return fn != null ? fn : stores.get(MEMORY_STORE);
+		if (type == null) {
+			return stores.get(MEMORY_STORE);
+		}
+		StoreTemplateAction.StoreFunction fn = stores.get(type);
+		if (fn != null) {
+			return fn;
+		}
+		logger.warn("Store type '{}' is not registered, falling back to '{}'. "
+			+ "Data written by this rule will not survive a restart.", type, MEMORY_STORE);
+		return stores.get(MEMORY_STORE);
 	}
 
 	public AlertCenter getAlertCenter() {

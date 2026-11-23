@@ -65,10 +65,12 @@ public class AlertTemplateAction implements Action {
 			throw new IllegalStateException("alert action is not wired with an AlertCenter");
 		}
 		String severity = ref.getString("severity", "warning");
-		String title = TemplateExpressions.interpolate(
-			TemplateRenderer.render(ref.getString("title", ctx.getRule().getName()), ctx), ctx);
-		String message = TemplateExpressions.interpolate(
-			TemplateRenderer.render(ref.getString("message", ""), ctx), ctx);
+		// 顺序：先求值 ${expr}，再替换 {topic} 等占位符——后者替换进来的 topic 来自消息，
+		// 若先替换再求值，topic 里的 ${...} 会被当作表达式执行（详见 renderWithExpressions）。
+		String title = TemplateRenderer.renderWithExpressions(
+			ref.getString("title", ctx.getRule().getName()), ctx);
+		String message = TemplateRenderer.renderWithExpressions(
+			ref.getString("message", ""), ctx);
 		List<String> tags = parseTags(ctx);
 		String dedupeKey = TemplateRenderer.render(ref.getString("dedupeKey", ""), ctx);
 		Map<String, Object> extra = parseExtra(ctx);

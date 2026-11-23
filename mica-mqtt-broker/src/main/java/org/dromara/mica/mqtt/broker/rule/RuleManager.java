@@ -328,6 +328,14 @@ public class RuleManager {
 		actionRegistry.clear();
 		matcherRegistry.clear();
 		codecRegistry.clear();
+		// 停止加载器的热加载轮询，否则文件监听线程会一直活着
+		for (RuleLoader loader : loaders) {
+			try {
+				loader.stop();
+			} catch (Exception e) {
+				logger.warn("Failed to stop rule loader: {}", loader.getSource(), e);
+			}
+		}
 		// 清空加载器引用，便于 GC
 		loaders.clear();
 	}
@@ -337,7 +345,11 @@ public class RuleManager {
 			try {
 				l.onRuleEvent(event);
 			} catch (Exception e) {
-				logger.warn("RuleEventListener failed: {}", e.getMessage(), e);
+				// 日志带上规则 id，否则出问题只能靠猜是哪条规则
+				logger.warn("RuleEventListener failed on rule:{}, event:{}, error:{}",
+					event == null ? null : event.getRuleId(),
+					event == null ? null : event.getType(),
+					e.getMessage(), e);
 			}
 		}
 	}

@@ -292,10 +292,17 @@ public class RetainIndex {
 			int first = dis.readInt();
 			long expireAt = first == FORMAT_MAGIC ? dis.readLong() : 0L;
 			int payloadLen = first == FORMAT_MAGIC ? dis.readInt() : first;
+			// 长度来自磁盘，可能已损坏：先校验再分配，避免负长度或超大数组
+			if (payloadLen < 0 || payloadLen > value.length) {
+				throw new IOException("invalid retain payload length: " + payloadLen);
+			}
 			byte[] payload = new byte[payloadLen];
 			dis.readFully(payload);
 			int qos = dis.readByte() & 0xFF;
 			int topicLen = dis.readInt();
+			if (topicLen < 0 || topicLen > value.length) {
+				throw new IOException("invalid retain topic length: " + topicLen);
+			}
 			byte[] topicBytes = new byte[topicLen];
 			dis.readFully(topicBytes);
 			String innerTopic = new String(topicBytes, StandardCharsets.UTF_8);

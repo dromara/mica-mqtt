@@ -27,6 +27,7 @@ import com.googlecode.aviator.runtime.type.AviatorNil;
 import com.googlecode.aviator.runtime.type.AviatorObject;
 import com.googlecode.aviator.runtime.type.AviatorRuntimeJavaType;
 import com.googlecode.aviator.runtime.type.AviatorString;
+import org.dromara.mica.mqtt.broker.rule.Rule;
 import org.dromara.mica.mqtt.broker.rule.RuleContext;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcher;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcherFactory;
@@ -90,6 +91,13 @@ public class AviatorExprMatcher {
 
 	/**
 	 * 组装表达式求值环境。
+	 * <p>
+	 * {@code rule} 变量只暴露规则的身份信息（id / name / topicFilter），
+	 * 刻意不放入 {@link org.dromara.mica.mqtt.broker.rule.Rule} 对象本身：
+	 * 规则的动作属性里可能带有 MQTT 账号、webhook token 等凭据，
+	 * 而沙箱模式并不禁止对 env 中的对象做实例方法调用，
+	 * 放进完整对象等于把凭据暴露给任何能求值到它的表达式。
+	 * </p>
 	 *
 	 * @param ctx 规则上下文
 	 * @return 环境变量
@@ -109,8 +117,25 @@ public class AviatorExprMatcher {
 		env.put("retain", ctx.isRetain());
 		env.put("headers", ctx.getHeaders());
 		env.put("ts", System.currentTimeMillis());
-		env.put("rule", ctx.getRule());
+		env.put("rule", ruleView(ctx));
 		return env;
+	}
+
+	/**
+	 * 规则的只读视图：只含身份信息，不含动作定义。
+	 *
+	 * @param ctx 规则上下文
+	 * @return 规则视图，{@code ctx.getRule()} 为 {@code null} 时返回空视图
+	 */
+	private static Map<String, Object> ruleView(RuleContext ctx) {
+		Map<String, Object> view = new HashMap<>(4);
+		Rule rule = ctx.getRule();
+		if (rule != null) {
+			view.put("id", rule.getId());
+			view.put("name", rule.getName());
+			view.put("topicFilter", rule.getTopicFilter());
+		}
+		return view;
 	}
 
 	public static boolean asBool(Object result) {
