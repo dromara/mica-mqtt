@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         java: [ '8', '21' ]
-    name: Java ${{ matrix.Java }} build
+    name: Java ${{ matrix.java }} build
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
@@ -19,9 +19,15 @@ jobs:
           cache: 'maven'
           cache-dependency-path: 'pom.xml'
       - name: Build with Maven
-        # develop profile 默认激活，example 模块要一起编译；
-        # 用 -P !develop 把它关掉等于把示例从 reactor 里摘掉，示例编译不过也没人发现
-        run: mvn clean package -U
+        # example 模块用的是 Spring Boot 4，最低要求 Java 17，Java 8 的 job 编译不了；
+        # 把它从 reactor 里摘掉（-P !develop）跳过，其余模块两个 job 都编译，
+        # 避免示例编译不过没人发现
+        run: |
+          if [ "${{ matrix.java }}" = "8" ]; then
+            mvn clean package -U -P '!develop'
+          else
+            mvn clean package -U
+          fi
       - name: Cluster integration tests
         # *IT 类不匹配 surefire 的默认 includes（默认只跑 *Test / Test* / *Tests / *TestCase），
         # 需要显式激活 profile 才会执行

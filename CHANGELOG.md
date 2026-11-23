@@ -29,8 +29,9 @@
 - 🐛 fix(broker): `webhook` 动作对 4xx 响应不再重试（请求本身不合法，重试只会持续打爆对端），可重试的失败之间加入退避。
 - 🐛 fix(broker): 存储层补上参数与数据校验：清理周期非法时在装配阶段就报错，不再拖到启动时才炸；retained 消息长度先校验再分配，损坏数据不再触发超大数组分配。
 - 🐛 fix(client): 修复握手超时用例的偶发失败。用例里的服务端在回完 CONNACK 后立即断开连接，与 `isConnected()` 的断言形成竞态，表现为 CI 上时红时绿；现在服务端回完 CONNACK 继续持有连接，断言不再依赖竞态。
+- 🐛 fix(build): JDK 21 及以上显式开启注解处理。JDK 23 之后 javac 不再隐式执行 classpath 上的注解处理器，Lombok 与 mica-auto 静默失效，starter 模块编译时 getter、log、构造器全部报找不到符号；现在按 JDK 版本启用 `-proc:full`（JDK 8 不支持该参数，故不全局开启）。
 - ♻️ chore(broker): 补全 `module-info.java` —— 导出 `rule.ext.aviator` / `rule.ext.template` 两个包，声明 aviator 与 caffeine 依赖，snakeyaml 按可选依赖声明。
-- ♻️ chore(ci): CI 不再关闭 develop profile，example 模块参与编译；新增集群集成测试步骤，`*IT` 类不再只靠本地手工执行。
+- ♻️ chore(ci): CI 按 JDK 分支构建 —— Java 8 跳过需要 Java 17+ 的 example 模块，Java 21 编译全部模块（含 example），示例编译失败不再无人察觉；job 名正确显示 JDK 版本；新增集群集成测试步骤，`*IT` 类不再只靠本地手工执行。
 - ♻️ chore(deps): dependabot 与 renovate 不再排除 caffeine，该直接依赖恢复自动升级。
 - 🧪 test(broker): 新增 Broker 生命周期回归测试，覆盖集群模式入口约束、构建与启动幂等、关闭后集群端口释放；并修正规则引擎共享 sink 用例的断言方式，消除因跨规则执行顺序不确定导致的偶发失败。
 - 🧪 test(broker): 新增集群持久会话离线消息回归测试与规则模板注入安全测试，覆盖离线消息入队与回放、topic 内容不被求值、规则凭据不被表达式读取、替换值不被二次扫描。

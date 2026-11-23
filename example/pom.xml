@@ -68,4 +68,29 @@
         </dependencies>
     </dependencyManagement>
 
+    <profiles>
+        <!-- JDK 21 起 javac 才支持 -proc:full；JDK 23 之后 javac 默认不再隐式执行 classpath 上的
+             注解处理器，Lombok 会静默失效（getter、log、构造器全部报找不到符号）。
+             JDK 8 不认识 -proc:full（报「无效的标记」），所以按 JDK 版本启用。
+             该 profile 不能放在根 pom：根 pom 里 develop 是 activeByDefault，同一 pom 中只要有别的
+             profile 被激活，develop 就会被连带关掉，example 模块会从 reactor 里消失。 -->
+        <profile>
+            <id>jdk-annotation-processing</id>
+            <activation>
+                <jdk>[21,)</jdk>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <proc>full</proc>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>
