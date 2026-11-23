@@ -16,4 +16,3 @@ updates:
       - dependency-name: "io.undertow.*"
       - dependency-name: "org.springframework.*"
       - dependency-name: "net.dreamlu:mica-bom"
-      - dependency-name: "com.github.ben-manes.caffeine:caffeine"

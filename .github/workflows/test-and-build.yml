@@ -19,4 +19,10 @@ jobs:
           cache: 'maven'
           cache-dependency-path: 'pom.xml'
       - name: Build with Maven
-        run: mvn clean package -U -P !develop
+        # develop profile 默认激活，example 模块要一起编译；
+        # 用 -P !develop 把它关掉等于把示例从 reactor 里摘掉，示例编译不过也没人发现
+        run: mvn clean package -U
+      - name: Cluster integration tests
+        # *IT 类不匹配 surefire 的默认 includes（默认只跑 *Test / Test* / *Tests / *TestCase），
+        # 需要显式激活 profile 才会执行
+        run: mvn -B -pl mica-mqtt-broker -am test -P cluster-integration
