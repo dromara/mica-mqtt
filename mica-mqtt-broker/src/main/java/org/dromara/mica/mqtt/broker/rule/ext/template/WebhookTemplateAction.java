@@ -60,6 +60,7 @@ public class WebhookTemplateAction implements Action {
 	private final String contentType;
 	private final int timeoutMs;
 	private final int retry;
+	private final int retryDelayMs;
 	private final Map<String, String> headers;
 	private final String template;
 	private final SSLSocketFactory sslSocketFactory;
@@ -72,6 +73,7 @@ public class WebhookTemplateAction implements Action {
 		this.contentType = ref.getString("contentType", "application/json");
 		this.timeoutMs = ref.getInt("timeoutMs", 3000);
 		this.retry = Math.max(0, ref.getInt("retry", 0));
+		this.retryDelayMs = Math.max(0, ref.getInt("retryDelayMs", 200));
 		Object hdr = ref.getProps().get("headers");
 		this.headers = hdr instanceof Map ? (Map<String, String>) hdr : Collections.<String, String>emptyMap();
 		this.template = ref.getString("template");
@@ -100,18 +102,46 @@ public class WebhookTemplateAction implements Action {
 		int attempts = retry + 1;
 		Exception last = null;
 		for (int i = 0; i < attempts; i++) {
+			int code;
 			try {
-				sendOnce(body);
-				return;
+				code = sendOnce(body);
 			} catch (Exception e) {
+				// 网络异常 / 超时：可以重试
 				last = e;
 				logger.warn("webhook attempt {}/{} failed: {}", i + 1, attempts, e.getMessage());
+				backoff(i);
+				continue;
 			}
+			if (code < 400) {
+				return;
+			}
+			if (code < 500) {
+				// 4xx 是请求本身不合法（地址错、鉴权失败、报文格式错），重试没有意义
+				throw new IllegalStateException("webhook HTTP " + code + " (client error, not retried)");
+			}
+			// 5xx 是服务端错误，重试有意义
+			last = new IllegalStateException("webhook HTTP " + code);
+			logger.warn("webhook attempt {}/{} failed: HTTP {}", i + 1, attempts, code);
+			backoff(i);
 		}
 		throw new IllegalStateException("webhook all attempts failed", last);
 	}
 
-	private void sendOnce(String body) throws Exception {
+	/**
+	 * 重试间隔：随重试次数线性拉长，避免连续打爆对端。
+	 */
+	private void backoff(int attempt) {
+		if (retryDelayMs <= 0) {
+			return;
+		}
+		try {
+			Thread.sleep(retryDelayMs * (attempt + 1L));
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	private int sendOnce(String body) throws Exception {
 		byte[] data = body.getBytes(StandardCharsets.UTF_8);
 		HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
 		try {
@@ -131,10 +161,7 @@ public class WebhookTemplateAction implements Action {
 			try (OutputStream os = conn.getOutputStream()) {
 				os.write(data);
 			}
-			int code = conn.getResponseCode();
-			if (code >= 400) {
-				throw new IllegalStateException("webhook HTTP " + code);
-			}
+			return conn.getResponseCode();
 		} finally {
 			conn.disconnect();
 		}

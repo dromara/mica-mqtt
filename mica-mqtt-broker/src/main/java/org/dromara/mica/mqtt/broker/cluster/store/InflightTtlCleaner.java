@@ -94,6 +94,15 @@ public class InflightTtlCleaner {
 	 * @param periodMs cleanup interval in milliseconds; must be positive
 	 */
 	public InflightTtlCleaner(InflightStore store, long periodMs) {
+		if (store == null) {
+			throw new IllegalArgumentException("inflight store must not be null");
+		}
+		if (periodMs <= 0) {
+			// 不在构造期拦下的话，非法值会等到 start() 里 scheduleAtFixedRate 才炸，
+			// 报错现场离配置项太远
+			throw new IllegalArgumentException(
+				"inflight cleanup period must be positive, but was " + periodMs);
+		}
 		this.store = store;
 		this.periodMs = periodMs;
 	}

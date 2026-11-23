@@ -22,6 +22,7 @@ import org.dromara.mica.mqtt.codec.MqttQoS;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 规则执行上下文。
@@ -29,6 +30,11 @@ import java.util.Map;
  * @author L.cm
  */
 public final class RuleContext {
+
+	/**
+	 * 解码后的 payload 在 {@link #getAttributes()} 中的键名。
+	 */
+	public static final String PAYLOAD_ATTR = "payload";
 
 	private final ChannelContext channelContext;
 	private final RuleChannelInfo channel;
@@ -59,7 +65,8 @@ public final class RuleContext {
 		this.retain = retain;
 		this.headers = headers == null ? Collections.emptyMap() : Collections.unmodifiableMap(new HashMap<>(headers));
 		this.rule = rule;
-		this.attributes = new HashMap<>();
+		// actions 在 action 线程池线程上执行，用并发 Map 承载 action 之间的中间结果
+		this.attributes = new ConcurrentHashMap<>();
 	}
 
 	public ChannelContext getChannelContext() {

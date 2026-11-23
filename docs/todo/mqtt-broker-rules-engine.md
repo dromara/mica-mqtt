@@ -1,6 +1,6 @@
 # mica-mqtt-broker 规则引擎设计
 
-> 状态：设计稿（待评审）
+> 状态：v1 已实现（本文保留设计推导，与最终实现的差异见 [16. 实现现状与偏差](#16-实现现状与偏差)）
 > 模块：`mica-mqtt-broker`
 > 依赖基础：`MqttFunctionManager`（位于 `mica-mqtt-server`）
 
@@ -1200,22 +1200,22 @@ broker 启动时 `ServiceLoader` 自动加载，业务代码无需改动。
 
 ## 13. 落地步骤
 
-| Step | 内容 | 涉及模块 |
-|------|------|----------|
-| 1 | 在 `mica-mqtt-server` 给 `MqttFunctionManager` 加 `unregister`（含空 listener trie 节点回收） | server |
-| 2 | broker 内新增抽象接口：`Action` / `ActionRef` / `ActionFactory` / `ActionRegistry` / `RuleMatcher` / `PayloadCodec` / `RuleLoader` / `RuleStore` / `RuleStoreListener` / `RuleManager` / `RuleEventListener` / `RuleEngine` / `Rule` / `RuleContext` / `RuleChannelInfo` | broker |
-| 2.1 | 条件表达式基于 [AviatorScript](https://github.com/aviatorscript/aviatorscript) 5.9.x：`AviatorExprMatcher`，封装 `AviatorEvaluatorInstance`、提供 `Rule.when(expr)` 入口与内置上下文变量 | broker |
-| 2.2 | 内置 `header` / `jsonPath` / `compound` / `topic` 等 `RuleMatcherFactory` | broker |
-| 3 | 内置补充 Action 工厂：`LogAction` / `MqttAction` / `HttpAction`（默认异步 + action 线程池） | broker |
-| 3.1 | 内置 Java Action 模板：`PublishTemplateAction` / `StoreTemplateAction` / `AlertTemplateAction` + `AlertCenter` / `WebhookTemplateAction` | broker |
-| 4 | 内置 `TopicRuleMatcher` / `RawPayloadCodec` / `StringPayloadCodec` / `JsonPayloadCodec` 及 `*Factory` | broker |
-| 5 | 内置 `InMemoryRuleStore` / `JsonRuleLoader`；`YamlRuleLoader` 放 starter 层 | broker + starter |
-| 6 | 内置 `RuleMetrics` / `RuleMetricsRecorder` | broker |
-| 7 | **修改 `MqttClusterBrokerCreator.build()`：在 `serverCreator.build()` 之前装配 `RuleEngine.attachToServerCreator()`，覆盖集群 + 非集群两分支；SPI 静态缓存加载；暴露 `getRuleManager()` / `getRuleEngine()`** | broker |
-| 8 | 单测：规则增删、topic 匹配、action 顺序执行、失败继续、SPI 加载、运行时增删、action 缓存共享、timeout、HttpAction 异步 | broker |
-| 9 | （可选）Kafka action 单独放 starter 模块 | starter（新） |
-| 10 | （可选）HTTP 管理 API：在 `HttpApiMessageHandler` 内加 `/rule/*` 分支 | server + broker |
-| 11 | （可选）集群规则同步：改 `ClusterMessageType` enum + `ClusterMessageSerializer`，新增 `RuleEventClusterMessage` | broker |
+| Step | 内容 | 涉及模块 | 状态 |
+|------|------|----------|------|
+| 1 | 在 `mica-mqtt-server` 给 `MqttFunctionManager` 加 `unregister`（含空 listener trie 节点回收） | server | ✅ 完成 |
+| 2 | broker 内新增抽象接口：`Action` / `ActionRef` / `ActionFactory` / `ActionRegistry` / `RuleMatcher` / `PayloadCodec` / `RuleLoader` / `RuleStore` / `RuleStoreListener` / `RuleManager` / `RuleEventListener` / `RuleEngine` / `Rule` / `RuleContext` / `RuleChannelInfo` | broker | ✅ 完成 |
+| 2.1 | 条件表达式基于 AviatorScript：`AviatorExprMatcher`，封装 `AviatorEvaluatorInstance`、提供 `Rule.when(expr)` 入口与内置上下文变量 | broker | ✅ 完成 |
+| 2.2 | 内置 `header` / `jsonPath` / `compound` / `topic` 等 `RuleMatcherFactory` | broker | ✅ 完成 |
+| 3 | 内置补充 Action 工厂：`LogAction` / `MqttAction` / `HttpAction`（默认异步 + action 线程池） | broker | ✅ 完成 |
+| 3.1 | 内置 Java Action 模板：`PublishTemplateAction` / `StoreTemplateAction` / `AlertTemplateAction` + `AlertCenter` / `WebhookTemplateAction` | broker | ✅ 完成 |
+| 4 | 内置 `TopicRuleMatcher` / `RawPayloadCodec` / `StringPayloadCodec` / `JsonPayloadCodec` 及 `*Factory` | broker | ✅ 完成 |
+| 5 | 内置 `InMemoryRuleStore` / `JsonRuleLoader`；`YamlRuleLoader` 放 starter 层 | broker + starter | ⚠️ 完成（Yaml 放 broker，可选依赖） |
+| 6 | 内置 `RuleMetrics` / `RuleMetricsRecorder` | broker | ✅ 完成 |
+| 7 | **修改 `MqttClusterBrokerCreator.build()`：在 `serverCreator.build()` 之前装配 `RuleEngine.attachToServerCreator()`，覆盖集群 + 非集群两分支；SPI 静态缓存加载；暴露 `getRuleManager()` / `getRuleEngine()`** | broker | ✅ 完成 |
+| 8 | 单测：规则增删、topic 匹配、action 顺序执行、失败继续、SPI 加载、运行时增删、action 缓存共享、timeout、HttpAction 异步 | broker | ✅ 完成（59 个用例） |
+| 9 | （可选）Kafka action 单独放 starter 模块 | starter（新） | ⏸ 暂不做 |
+| 10 | （可选）HTTP 管理 API：在 `HttpApiMessageHandler` 内加 `/rule/*` 分支 | server + broker | ⏸ 暂不做 |
+| 11 | （可选）集群规则同步：改 `ClusterMessageType` enum + `ClusterMessageSerializer`，新增 `RuleEventClusterMessage` | broker | ⏸ 暂不做 |
 
 ---
 
@@ -1226,3 +1226,119 @@ broker 启动时 `ServiceLoader` 自动加载，业务代码无需改动。
 - **指标与告警**：与现有 `ClusterMetrics` 对齐，输出 Micrometer 风格指标。
 - **规则版本**：每条 rule 增加 `revision`，冲突时按最后写胜出升级为 revision 比较。
 - **可视化编排**：通过 HTTP API + YAML 实现低代码规则配置。
+
+---
+
+## 16. 实现现状与偏差
+
+> 本章记录 v1 落地后的实际情况，与上文设计推导的差异集中在此，便于对照。
+
+### 16.1 落地范围
+
+Step 1 ~ 8 全部完成；Step 9（Kafka starter）、Step 10（HTTP 管理 API）、Step 11（集群规则同步）暂不做。
+
+### 16.2 包结构与设计稿的差异
+
+实际实现把「第三方依赖相关」与「内置能力」分开：
+
+| 设计稿位置 | 实际位置 | 原因 |
+|---|---|---|
+| `rule/matcher/TopicRuleMatcher.java` | `rule/matcher/TopicRuleMatcherFactory.java` | 只需要工厂 |
+| `rule/matcher/RuleMatcherFactory` + `AviatorExprMatcher` | `rule/ext/aviator/AviatorExprMatcher.java` | Aviator 属三方能力，放 `ext` 包 |
+| `rule/ext/template/XxxTemplateActionFactory`（4 个） | `rule/ext/template/XxxTemplateAction$Factory`（嵌套类） | 合并到模板自身，共享 `TemplateActionFactory` 接口 |
+| `rule/ext/aviator` / `rule/ext/template` | 同名 `ext` 包 | 第三方扩展与内置模板隔离，便于后续下沉到 `ext` 模块 |
+
+### 16.3 执行模型：从「IO 线程同步执行」改为「action 线程池执行」
+
+设计稿 4.4.9 的伪码是 IO 线程内同步跑 actions，6.3 / 12 节又要求「HTTP 默认异步、走 action 线程池」，二者冲突。落地取**规则链整体异步**：
+
+- IO 线程只做「构造 `RuleContext` + 提交任务」，**不执行任何 action**；
+- 整条规则的 action 链作为**一个任务**在 `rule-action-pool` 上**串行执行** —— 这样同时保住了 12 节要求的「actions 顺序执行」、`stopOnError` 语义，和 6.3 要求的「IO 线程不被慢后端阻塞」；
+- 线程池默认 `core = 2*CPU`、`max = 32*CPU`、队列 1024、拒绝策略 `CallerRuns`（队列满时由提交线程执行，天然背压且不丢任务）；
+- 线程池规格可通过 `MqttClusterConfig#actionPoolCoreSize` / `actionPoolMaxSize` / `actionPoolQueueSize` 调整。
+
+因此 `HttpAction` / `WebhookTemplateAction` **不再自行二次异步**（否则会打断顺序语义），它们本身是同步 HTTP 调用，靠「运行在 action 线程池上」达到不阻塞 IO 线程的效果。
+
+### 16.4 超时：`timeoutMs` + 看门狗 + 取消标志
+
+设计稿 9 节写的是「`Future.get(timeout)` 实现，超时后取消当前 action」。落地改为三件套，避免同池嵌套提交导致死锁：
+
+1. 规则任务提交后，**看门狗**（单线程 `ScheduledExecutorService`）在 `timeoutMs` 后检查任务是否完成；
+2. 未完成则置位**取消标志** + `future.cancel(true)` 中断任务，并记一次失败指标；
+3. action 链在每个 action 前检查取消标志与中断位 —— 跳过剩余 action。
+
+`timeoutMs` 默认 5000ms，小于等于 0 表示不限时。规则本身超时不影响其它规则。
+
+### 16.5 payload 解码接入
+
+设计稿 4.1 的 `Rule` 补齐了 `codecType` 字段，并在规则执行链的第一步按 codec 解码 payload，结果写入 `RuleContext` 的 `payload` 属性：
+
+- 解码每条消息每条规则**只做一次**，matcher 与所有 action 共享；
+- 解码失败时保留原始字节并记 warn，不影响后续 action；
+- `Rule#when(expr)` 是 `matcherType=aviator` + `matcherProps{when}` 的语法糖。
+
+### 16.6 Aviator 细节修正
+
+| 设计稿 | 实际 |
+|---|---|
+| 坐标 `io.github.aviatorscript:aviator:5.9.0` | ✅ 一致 |
+| `INSTANCE.enableSandbox()` | 实际方法名是 `enableSandboxMode()`（5.4.3 起） |
+| `INSTANCE.useLRUResourceCache(1024)` | 实际方法名是 `useLRUExpressionCache(1024)` |
+| 自定义函数 `header` / `contains` / `now` / `env` | ✅ 已注册（`contains` 与 `now` 不是 Aviator 内置函数，必须自己注册） |
+| env 变量表 | ✅ 全部提供，并补上 `ts` |
+
+沙箱模式下 `EVAL_TIMEOUT_MS` 被 Aviator 固定为 1 秒，表达式求值本身另有上限。
+
+### 16.7 存储后端：`store` 模板只做 memory / file
+
+设计稿 4.5.3 提到复用集群的 `H2MvStoreImpl`。实际未做：broker 已有的 H2 组件是 **KV 型**（会话、共享订阅、inflight、retain 索引），与「按时间顺序追加消息记录」的时序表语义不匹配，硬套会得到别扭的数据模型。
+
+落地提供两个后端：
+
+- `memory`：环形缓冲，`maxRows` 控制条数，新增 `maxAge` 过期清理；
+- `file`：JSON Lines 追加写，`path` 指定目录，`maxRows` 超出后滚动裁剪，`maxAge` 过滤过期记录。
+
+需要 H2 / 数据库时通过 `StoreTemplateAction.StoreFunction` 扩展点自行实现（`TemplateServices` 的 store 注册表即为此预留）。
+
+`GET /rule/store/{name}/query` 查询接口随 Step 10 一起暂不做。
+
+### 16.8 SPI 清单落地情况
+
+| 接口 | 文件名 | 状态 |
+|---|---|---|
+| `ActionFactory` | `org.dromara.mica.mqtt.broker.rule.action.ActionFactory` | ✅ |
+| `RuleMatcherFactory` | `org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcherFactory` | ✅ |
+| `PayloadCodecFactory` | `org.dromara.mica.mqtt.broker.rule.codec.PayloadCodecFactory` | ✅ |
+| `RuleLoaderFactory` | `org.dromara.mica.mqtt.broker.rule.loader.RuleLoaderFactory` | ✅ |
+| `RuleStoreFactory` | `org.dromara.mica.mqtt.broker.rule.store.RuleStoreFactory` | ✅ |
+| `AlertNotifierFactory` | `org.dromara.mica.mqtt.broker.rule.ext.template.AlertNotifierFactory` | ✅（设计稿未列，实现需要） |
+
+SPI 扫描结果按**类型**静态缓存（避免 broker 多次构建重复扫盘），但工厂**实例每次新建** —— 模板 action 的依赖注入不能跨 broker 实例共享。
+
+### 16.9 `YamlRuleLoader` 的位置
+
+设计稿 6.5 要求 YAML 加载器放 starter 层。落地放在 broker 模块的 `rule/loader` 包，但把 `snakeyaml` 声明为 **optional 依赖**：
+
+- broker 主 jar 不硬依赖 SnakeYAML，不传递到使用者；
+- Spring Boot 应用已传递引入 SnakeYAML，开箱可用；
+- 纯 Java 用户需自行引入 `org.yaml:snakeyaml`（缺失时只有使用 `YamlRuleLoader` 才会报错）。
+
+这样既避免给 starter 增加对 broker 的依赖，也不让 broker 主 jar 变重。
+
+### 16.10 `ActionRef` 的构建方式
+
+设计稿 4.2 的示例是 `ActionRef.of("http").prop("url", ...)` 链式写法。实际实现中 `ActionRef` 是**不可变**的（它同时是 `ActionRegistry` 缓存的 key，可变 key 会导致 hash 漂移），链式写法改为：
+
+```java
+ActionRef.of("http")                                  // 不可变实例
+ActionRef.builder("http").prop("url", "...").build()  // 需要链式时用 builder
+```
+
+两种写法都可用，规则配置文件解析器两种都接受。
+
+### 16.11 其它补充
+
+- `RuleManager#match(String topic)`：按 topic 通配符匹配规则，供调试使用；
+- `RuleStoreListener` + `RuleStore#setListener`：存储侧变更（配置中心 / 其它节点）可驱动本地挂载与摘除；管理器自身发起的写入做了标记，不会重复派发事件；
+- `MqttAction` 连接复用：连接键默认 `host:port + clientId + username`，可用 `connectionName` 显式覆盖；连接在 broker 关闭时统一释放；
+- `publish` 模板新增 `retainOriginal`：为 `true` 时沿用原消息的 qos 与 retain 标记（只重整 topic）。

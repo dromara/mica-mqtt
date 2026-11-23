@@ -20,6 +20,14 @@ import com.googlecode.aviator.AviatorEvaluator;
 import com.googlecode.aviator.AviatorEvaluatorInstance;
 import com.googlecode.aviator.Expression;
 import com.googlecode.aviator.Options;
+import com.googlecode.aviator.runtime.function.AbstractFunction;
+import com.googlecode.aviator.runtime.function.FunctionUtils;
+import com.googlecode.aviator.runtime.type.AviatorBoolean;
+import com.googlecode.aviator.runtime.type.AviatorNil;
+import com.googlecode.aviator.runtime.type.AviatorObject;
+import com.googlecode.aviator.runtime.type.AviatorRuntimeJavaType;
+import com.googlecode.aviator.runtime.type.AviatorString;
+import org.dromara.mica.mqtt.broker.rule.Rule;
 import org.dromara.mica.mqtt.broker.rule.RuleContext;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcher;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcherFactory;
@@ -31,17 +39,38 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Aviator 表达式 matcher。
+ * AviatorScript 条件匹配器。
+ * <p>
+ * 表达式在构造期编译一次（{@code compile(expr, true)} 走 Aviator 的 LRU 表达式缓存），
+ * 匹配期只求值。求值环境由 {@link #envOf(RuleContext)} 组装，包含 payload / topic /
+ * clientId / headers / ts 等内置变量，并注册 {@code header()}、{@code contains()}、
+ * {@code now()}、{@code env()} 等便捷函数。
+ * </p>
  *
  * @author L.cm
  */
 public class AviatorExprMatcher {
 
+	/**
+	 * 表达式缓存容量。
+	 */
+	private static final int EXPRESSION_CACHE_SIZE = 1024;
+
+	/**
+	 * 单次求值的最大循环次数，防止表达式死循环。
+	 */
+	private static final int MAX_LOOP_COUNT = 1000;
+
 	private static final AviatorEvaluatorInstance EVAL = AviatorEvaluator.newInstance();
 
 	static {
+		// 沙箱模式：禁用 Module / NewInstance / StaticMethods / InternalVars 与反射，
+		// 同时把求值超时限制在 1 秒
 		EVAL.enableSandboxMode();
-		EVAL.setOption(Options.MAX_LOOP_COUNT, 1000);
+		EVAL.setOption(Options.MAX_LOOP_COUNT, MAX_LOOP_COUNT);
+		// 编译结果常驻内存，避免每条消息重复编译
+		EVAL.useLRUExpressionCache(EXPRESSION_CACHE_SIZE);
+		registerFunctions(EVAL);
 	}
 
 	private final String expression;
@@ -60,9 +89,22 @@ public class AviatorExprMatcher {
 		return compiled.execute(env);
 	}
 
+	/**
+	 * 组装表达式求值环境。
+	 * <p>
+	 * {@code rule} 变量只暴露规则的身份信息（id / name / topicFilter），
+	 * 刻意不放入 {@link org.dromara.mica.mqtt.broker.rule.Rule} 对象本身：
+	 * 规则的动作属性里可能带有 MQTT 账号、webhook token 等凭据，
+	 * 而沙箱模式并不禁止对 env 中的对象做实例方法调用，
+	 * 放进完整对象等于把凭据暴露给任何能求值到它的表达式。
+	 * </p>
+	 *
+	 * @param ctx 规则上下文
+	 * @return 环境变量
+	 */
 	public static Map<String, Object> envOf(RuleContext ctx) {
 		Map<String, Object> env = new HashMap<>();
-		Object payload = ctx.getAttributes().get("payload");
+		Object payload = ctx.attr(RuleContext.PAYLOAD_ATTR);
 		if (payload == null) {
 			payload = ctx.getPayload();
 		}
@@ -74,8 +116,26 @@ public class AviatorExprMatcher {
 		env.put("qos", ctx.getQos() == null ? 0 : ctx.getQos().value());
 		env.put("retain", ctx.isRetain());
 		env.put("headers", ctx.getHeaders());
-		env.put("rule", ctx.getRule());
+		env.put("ts", System.currentTimeMillis());
+		env.put("rule", ruleView(ctx));
 		return env;
+	}
+
+	/**
+	 * 规则的只读视图：只含身份信息，不含动作定义。
+	 *
+	 * @param ctx 规则上下文
+	 * @return 规则视图，{@code ctx.getRule()} 为 {@code null} 时返回空视图
+	 */
+	private static Map<String, Object> ruleView(RuleContext ctx) {
+		Map<String, Object> view = new HashMap<>(4);
+		Rule rule = ctx.getRule();
+		if (rule != null) {
+			view.put("id", rule.getId());
+			view.put("name", rule.getName());
+			view.put("topicFilter", rule.getTopicFilter());
+		}
+		return view;
 	}
 
 	public static boolean asBool(Object result) {
@@ -90,6 +150,127 @@ public class AviatorExprMatcher {
 			return Collections.emptyList();
 		}
 		return Arrays.asList(topic.split("/"));
+	}
+
+	/**
+	 * 注册 broker 自定义函数。
+	 */
+	private static void registerFunctions(AviatorEvaluatorInstance evaluator) {
+		evaluator.addFunction(new HeaderFunction());
+		evaluator.addFunction(new ContainsFunction());
+		evaluator.addFunction(new NowFunction());
+		evaluator.addFunction(new EnvFunction());
+	}
+
+	/**
+	 * 把 Java 值转成 Aviator 可用对象。
+	 */
+	private static AviatorObject wrap(Object value) {
+		if (value == null) {
+			return AviatorNil.NIL;
+		}
+		if (value instanceof String) {
+			return new AviatorString((String) value);
+		}
+		if (value instanceof Boolean) {
+			return (Boolean) value ? AviatorBoolean.TRUE : AviatorBoolean.FALSE;
+		}
+		return AviatorRuntimeJavaType.valueOf(value);
+	}
+
+	/**
+	 * {@code header(name)} / {@code header(name, defaultValue)}：读取消息头。
+	 */
+	private static final class HeaderFunction extends AbstractFunction {
+		@Override
+		public AviatorObject call(Map<String, Object> env, AviatorObject arg1) {
+			String name = FunctionUtils.getStringValue(arg1, env);
+			return wrap(headerValue(env, name, null));
+		}
+
+		@Override
+		public AviatorObject call(Map<String, Object> env, AviatorObject arg1, AviatorObject arg2) {
+			String name = FunctionUtils.getStringValue(arg1, env);
+			String defaultValue = FunctionUtils.getStringValue(arg2, env);
+			return wrap(headerValue(env, name, defaultValue));
+		}
+
+		@Override
+		public String getName() {
+			return "header";
+		}
+	}
+
+	/**
+	 * {@code contains(haystack, needle)}：字符串包含。
+	 */
+	private static final class ContainsFunction extends AbstractFunction {
+		@Override
+		public AviatorObject call(Map<String, Object> env, AviatorObject arg1, AviatorObject arg2) {
+			String haystack = FunctionUtils.getStringValue(arg1, env);
+			String needle = FunctionUtils.getStringValue(arg2, env);
+			boolean result = haystack != null && needle != null && haystack.contains(needle);
+			return result ? AviatorBoolean.TRUE : AviatorBoolean.FALSE;
+		}
+
+		@Override
+		public String getName() {
+			return "contains";
+		}
+	}
+
+	/**
+	 * {@code now()}：当前时间戳（毫秒）。
+	 */
+	private static final class NowFunction extends AbstractFunction {
+		@Override
+		public AviatorObject call(Map<String, Object> env) {
+			return AviatorRuntimeJavaType.valueOf(System.currentTimeMillis());
+		}
+
+		@Override
+		public String getName() {
+			return "now";
+		}
+	}
+
+	/**
+	 * {@code env(key)} / {@code env(key, defaultValue)}：读取环境变量。
+	 * <p>
+	 * 沙箱模式下系统属性访问受限，读不到时返回默认值。
+	 * </p>
+	 */
+	private static final class EnvFunction extends AbstractFunction {
+		@Override
+		public AviatorObject call(Map<String, Object> env, AviatorObject arg1) {
+			String key = FunctionUtils.getStringValue(arg1, env);
+			return wrap(System.getenv(key));
+		}
+
+		@Override
+		public AviatorObject call(Map<String, Object> env, AviatorObject arg1, AviatorObject arg2) {
+			String key = FunctionUtils.getStringValue(arg1, env);
+			String defaultValue = FunctionUtils.getStringValue(arg2, env);
+			String value = System.getenv(key);
+			return wrap(value == null ? defaultValue : value);
+		}
+
+		@Override
+		public String getName() {
+			return "env";
+		}
+	}
+
+	private static String headerValue(Map<String, Object> env, String name, String defaultValue) {
+		if (name == null) {
+			return defaultValue;
+		}
+		Object headers = env.get("headers");
+		if (headers instanceof Map) {
+			Object value = ((Map<?, ?>) headers).get(name);
+			return value == null ? defaultValue : String.valueOf(value);
+		}
+		return defaultValue;
 	}
 
 	/**

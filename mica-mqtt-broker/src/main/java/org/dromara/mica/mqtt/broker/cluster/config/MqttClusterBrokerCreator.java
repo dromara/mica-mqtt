@@ -32,8 +32,11 @@ import org.dromara.mica.mqtt.broker.cluster.pipeline.strategy.StickyStrategy;
 import org.dromara.mica.mqtt.broker.rule.RuleEngine;
 import org.dromara.mica.mqtt.broker.rule.RuleManager;
 import org.dromara.mica.mqtt.broker.rule.action.ActionFactory;
+import org.dromara.mica.mqtt.broker.rule.action.MqttAction;
+import org.dromara.mica.mqtt.broker.rule.action.RuleActionExecutor;
 import org.dromara.mica.mqtt.broker.rule.codec.PayloadCodecFactory;
 import org.dromara.mica.mqtt.broker.rule.ext.template.AlertCenter;
+import org.dromara.mica.mqtt.broker.rule.ext.template.AlertNotifierFactory;
 import org.dromara.mica.mqtt.broker.rule.ext.template.TemplateActionFactory;
 import org.dromara.mica.mqtt.broker.rule.ext.template.TemplateServices;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcherFactory;
@@ -50,8 +53,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.ServiceLoader;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Builder for creating MQTT broker instances with cluster mode support.
@@ -89,9 +94,30 @@ public class MqttClusterBrokerCreator {
 	private TemplateServices templateServices;
 
 	/**
+	 * 已装配好的服务端：保证 {@link #build()} 幂等，重复调用不会重复注册流水线处理器。
+	 */
+	private volatile MqttServer builtServer;
+	/**
+	 * 是否已启动：保证 {@link #start()} 幂等。
+	 */
+	private final AtomicBoolean started = new AtomicBoolean(false);
+	/**
+	 * 是否已关闭：保证关闭钩子幂等。
+	 */
+	private final AtomicBoolean closed = new AtomicBoolean(false);
+
+	/**
 	 * SPI 加载的工厂（每次 build 的元素为该实例独有，模板 action 的依赖注入不能跨实例共享）。
 	 */
 	private final List<ActionFactory> actionFactories = new ArrayList<>();
+
+	/**
+	 * SPI 扫描结果缓存：避免多次 build() 重复扫盘。
+	 */
+	private static volatile List<Class<? extends ActionFactory>> CACHED_ACTION_FACTORIES;
+	private static volatile List<Class<? extends RuleMatcherFactory>> CACHED_MATCHER_FACTORIES;
+	private static volatile List<Class<? extends PayloadCodecFactory>> CACHED_CODEC_FACTORIES;
+	private static volatile List<Class<? extends AlertNotifierFactory>> CACHED_NOTIFIER_FACTORIES;
 
 	/**
 	 * 构造。
@@ -121,9 +147,17 @@ public class MqttClusterBrokerCreator {
 	 * 只会静默丢掉部分 action。需要程序化注册时可调用
 	 * {@link RuleManager#registerActionFactory(ActionFactory)}。
 	 * </p>
+	 * <p>
+	 * ServiceLoader 的扫描结果缓存在静态字段里，避免多次 {@code build()} 重复扫盘；
+	 * 但工厂实例每次新建 —— 模板 action 的依赖注入不能跨 broker 实例共享。
+	 * </p>
 	 */
 	private void loadRuleSpi(RuleManager rm) {
-		for (ActionFactory factory : ServiceLoader.load(ActionFactory.class)) {
+		for (Class<? extends ActionFactory> clazz : cachedActionFactories()) {
+			ActionFactory factory = newInstance(clazz);
+			if (factory == null) {
+				continue;
+			}
 			actionFactories.add(factory);
 			rm.registerActionFactory(factory);
 		}
@@ -132,17 +166,116 @@ public class MqttClusterBrokerCreator {
 				+ "Check META-INF/services/{}", ActionFactory.class.getName());
 		}
 		int matcherCount = 0;
-		for (RuleMatcherFactory factory : ServiceLoader.load(RuleMatcherFactory.class)) {
+		for (Class<? extends RuleMatcherFactory> clazz : cachedMatcherFactories()) {
+			RuleMatcherFactory factory = newInstance(clazz);
+			if (factory == null) {
+				continue;
+			}
 			rm.registerMatcherFactory(factory);
 			matcherCount++;
 		}
 		int codecCount = 0;
-		for (PayloadCodecFactory factory : ServiceLoader.load(PayloadCodecFactory.class)) {
+		for (Class<? extends PayloadCodecFactory> clazz : cachedCodecFactories()) {
+			PayloadCodecFactory factory = newInstance(clazz);
+			if (factory == null) {
+				continue;
+			}
 			rm.registerCodecFactory(factory);
 			codecCount++;
 		}
 		logger.debug("Rule factories loaded: actions={} matchers={} codecs={}",
 			actionFactories.size(), matcherCount, codecCount);
+	}
+
+	/**
+	 * 通过反射新建工厂实例，失败时告警并跳过（不中断 broker 启动）。
+	 */
+	private static <T> T newInstance(Class<? extends T> clazz) {
+		try {
+			return clazz.getDeclaredConstructor().newInstance();
+		} catch (Exception e) {
+			logger.error("Failed to instantiate rule factory: {}", clazz.getName(), e);
+			return null;
+		}
+	}
+
+	/**
+	 * 缓存的 ActionFactory 类型（扫描结果只做一次）。
+	 */
+	private static List<Class<? extends ActionFactory>> cachedActionFactories() {
+		List<Class<? extends ActionFactory>> cached = CACHED_ACTION_FACTORIES;
+		if (cached == null) {
+			synchronized (MqttClusterBrokerCreator.class) {
+				cached = CACHED_ACTION_FACTORIES;
+				if (cached == null) {
+					cached = scan(ActionFactory.class);
+					CACHED_ACTION_FACTORIES = cached;
+				}
+			}
+		}
+		return cached;
+	}
+
+	/**
+	 * 缓存的 RuleMatcherFactory 类型。
+	 */
+	private static List<Class<? extends RuleMatcherFactory>> cachedMatcherFactories() {
+		List<Class<? extends RuleMatcherFactory>> cached = CACHED_MATCHER_FACTORIES;
+		if (cached == null) {
+			synchronized (MqttClusterBrokerCreator.class) {
+				cached = CACHED_MATCHER_FACTORIES;
+				if (cached == null) {
+					cached = scan(RuleMatcherFactory.class);
+					CACHED_MATCHER_FACTORIES = cached;
+				}
+			}
+		}
+		return cached;
+	}
+
+	/**
+	 * 缓存的 PayloadCodecFactory 类型。
+	 */
+	private static List<Class<? extends PayloadCodecFactory>> cachedCodecFactories() {
+		List<Class<? extends PayloadCodecFactory>> cached = CACHED_CODEC_FACTORIES;
+		if (cached == null) {
+			synchronized (MqttClusterBrokerCreator.class) {
+				cached = CACHED_CODEC_FACTORIES;
+				if (cached == null) {
+					cached = scan(PayloadCodecFactory.class);
+					CACHED_CODEC_FACTORIES = cached;
+				}
+			}
+		}
+		return cached;
+	}
+
+	/**
+	 * 缓存的 AlertNotifierFactory 类型。
+	 */
+	private static List<Class<? extends AlertNotifierFactory>> cachedNotifierFactories() {
+		List<Class<? extends AlertNotifierFactory>> cached = CACHED_NOTIFIER_FACTORIES;
+		if (cached == null) {
+			synchronized (MqttClusterBrokerCreator.class) {
+				cached = CACHED_NOTIFIER_FACTORIES;
+				if (cached == null) {
+					cached = scan(AlertNotifierFactory.class);
+					CACHED_NOTIFIER_FACTORIES = cached;
+				}
+			}
+		}
+		return cached;
+	}
+
+	/**
+	 * 扫描 SPI，取出实现类的类型（只扫一次，结果缓存）。
+	 */
+	private static <T> List<Class<? extends T>> scan(Class<T> spi) {
+		List<Class<? extends T>> classes = new ArrayList<>();
+		for (T instance : ServiceLoader.load(spi)) {
+			classes.add(instance.getClass().asSubclass(spi));
+		}
+		return classes;
 	}
 
 	/**
@@ -177,7 +310,11 @@ public class MqttClusterBrokerCreator {
 		}
 		serverCreator.messageListener(new MqttFunctionMessageListener(fnMgr));
 
-		RuleEngine engine = new RuleEngine(rm, fnMgr, null);
+		RuleActionExecutor executor = new RuleActionExecutor(
+			clusterConfig == null ? 0 : clusterConfig.getActionPoolCoreSize(),
+			clusterConfig == null ? 0 : clusterConfig.getActionPoolMaxSize(),
+			clusterConfig == null ? 0 : clusterConfig.getActionPoolQueueSize());
+		RuleEngine engine = new RuleEngine(rm, fnMgr, null, executor);
 		engine.attach();
 		this.ruleEngine = engine;
 	}
@@ -194,7 +331,7 @@ public class MqttClusterBrokerCreator {
 		TemplateServices services = new TemplateServices(
 			(topic, payload, qos, retain) -> server.publishAll(topic, payload, MqttQoS.valueOf(qos), retain),
 			null,
-			new AlertCenter());
+			createAlertCenter());
 		this.templateServices = services;
 		for (ActionFactory factory : actionFactories) {
 			if (factory instanceof TemplateActionFactory) {
@@ -205,15 +342,50 @@ public class MqttClusterBrokerCreator {
 	}
 
 	/**
-	 * broker 关闭：释放规则引擎、模板 action 依赖与 V3 存储。
+	 * 创建告警中心并注册 SPI 提供的告警通知器（钉钉 / Slack / PagerDuty 等）。
+	 */
+	private AlertCenter createAlertCenter() {
+		AlertCenter center = new AlertCenter();
+		for (Class<? extends AlertNotifierFactory> clazz : cachedNotifierFactories()) {
+			AlertNotifierFactory factory = newInstance(clazz);
+			if (factory == null) {
+				continue;
+			}
+			try {
+				center.addNotifier(factory.create(Collections.emptyMap()));
+			} catch (Exception e) {
+				logger.error("Failed to create alert notifier: {}", clazz.getName(), e);
+			}
+		}
+		return center;
+	}
+
+	/**
+	 * broker 关闭：释放集群连接、规则引擎、模板 action 依赖与 V3 存储。
+	 * <p>
+	 * 顺序说明：先停集群，让本节点在其它节点侧立即下线（广播 {@code NODE_LEAVE}）
+	 * 并释放集群端口；否则停掉的节点会继续被路由命中，且同端口重启会绑不上。
+	 * </p>
+	 * <p>
+	 * 本方法幂等：{@code MqttServer#stop()} 可被多次调用，关闭钩子只执行一次。
+	 * </p>
 	 */
 	private void shutdown() {
+		if (!closed.compareAndSet(false, true)) {
+			return;
+		}
+		// 先停集群：释放集群端口并通知对端本节点下线（不触碰 MQTT 服务端，避免递归）
+		if (clusterManager != null) {
+			clusterManager.stopCluster();
+		}
 		if (ruleEngine != null) {
 			ruleEngine.stop();
 		}
 		if (templateServices != null) {
 			templateServices.close();
 		}
+		// 释放规则动作缓存的 MQTT 客户端连接
+		MqttAction.clearClientCache();
 		ClusterStorage storage = this.clusterStorage;
 		if (storage != null) {
 			storage.stop();
@@ -221,11 +393,43 @@ public class MqttClusterBrokerCreator {
 	}
 
 	/**
-	 * Builds the MQTT server, applying cluster decorations if cluster mode is enabled.
+	 * 构建 Broker：只完成装配，<b>不启动</b>任何服务。
+	 * <p>
+	 * 集群模式下请改用 {@link #start()}。{@code build()} 只装配集群装饰器
+	 * （会话管理器、消息存储、发布管线），<b>不会建立集群连接</b>：
+	 * 集群端口的绑定、节点发现、心跳与状态同步都在
+	 * {@link MqttClusterManager#start()} 里完成。
+	 * </p>
+	 * <p>
+	 * 若在集群模式下调用本方法后再自行调用 {@code MqttServer#start()}，
+	 * 节点会静默退化成单机（集群端口不监听、无节点发现、跨节点消息不投递），
+	 * 且不会有任何异常或告警。因此这里直接拒绝该组合，把误用暴露在启动阶段。
+	 * </p>
 	 *
-	 * @return the configured {@link MqttServer} instance
+	 * @return 已装配但未启动的 {@link MqttServer}
+	 * @throws IllegalStateException 集群模式下调用了本方法
 	 */
 	public MqttServer build() {
+		if (clusterConfig != null && clusterConfig.isEnabled()) {
+			throw new IllegalStateException(
+				"集群模式请使用 start()：build() 只完成装配，不会建立集群连接。"
+					+ "若调用 build() 后再 MqttServer#start()，节点会静默退化为单机。");
+		}
+		return this.buildInternal();
+	}
+
+	/**
+	 * 装配 Broker（幂等）。
+	 * <p>
+	 * 重复调用返回同一个实例，避免流水线处理器被重复注册
+	 * （那会导致上行报文被处理两遍、本地订阅者收两遍、规则引擎每条消息触发两遍）。
+	 * </p>
+	 */
+	private MqttServer buildInternal() {
+		MqttServer cached = this.builtServer;
+		if (cached != null) {
+			return cached;
+		}
 		// 0. 规则引擎装配必须最先做：替换 serverCreator 的 messageListener（关键时序）
 		setupRuleEngine();
 
@@ -233,6 +437,7 @@ public class MqttClusterBrokerCreator {
 			MqttServer server = serverCreator.build();
 			installRuntimeServices(server);
 			ruleEngine.start();
+			this.builtServer = server;
 			return server;
 		}
 
@@ -307,17 +512,28 @@ public class MqttClusterBrokerCreator {
 		// 启动规则引擎：把已加载规则挂到 functionManager
 		ruleEngine.start();
 
+		this.builtServer = mqttServer;
 		return mqttServer;
 	}
 
 	/**
-	 * Builds and starts the MQTT server.
+	 * 构建并启动 Broker：<b>这是集群模式下唯一正确的入口</b>。
+	 * <p>
+	 * 集群模式下会建立集群连接（绑定集群端口、节点发现、心跳、状态同步），
+	 * 非集群模式下只启动 MQTT 服务端。
+	 * </p>
+	 * <p>
+	 * 本方法幂等：重复调用返回已启动的实例，不会重复绑定集群端口。
+	 * </p>
 	 *
 	 * @return the started {@link MqttServer} instance
 	 * @throws RuntimeException if startup fails
 	 */
 	public MqttServer start() {
-		MqttServer mqttServer = this.build();
+		MqttServer mqttServer = this.buildInternal();
+		if (!started.compareAndSet(false, true)) {
+			return mqttServer;
+		}
 		try {
 			if (clusterManager != null) {
 				clusterManager.start();
@@ -325,6 +541,7 @@ public class MqttClusterBrokerCreator {
 				mqttServer.start();
 			}
 		} catch (Exception e) {
+			started.set(false);
 			throw new RuntimeException("Failed to start MqttClusterBroker", e);
 		}
 		return mqttServer;

@@ -38,6 +38,7 @@ import org.dromara.mica.mqtt.core.common.MqttPendingPublish;
 import org.dromara.mica.mqtt.core.common.MqttPendingQos2Publish;
 import org.dromara.mica.mqtt.core.common.TopicFilter;
 import org.dromara.mica.mqtt.core.common.TopicFilterType;
+import org.dromara.mica.mqtt.core.server.model.Message;
 import org.dromara.mica.mqtt.core.server.model.Subscribe;
 import org.dromara.mica.mqtt.core.server.session.IMqttSessionManager;
 import org.slf4j.Logger;
@@ -73,8 +74,17 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	private static final Logger logger = LoggerFactory.getLogger(ClusterMqttSessionManager.class);
 	private final IMqttSessionManager delegate;
 	private final MqttClusterManager clusterManager;
+	/**
+	 * clientId → 归属节点 id。
+	 * <p>
+	 * 本地客户端的归属就是本节点 id；查不到表示「路由未知」。
+	 * 归属只存在这一张表里：早先用「远程表 + 本地集合」两张表，
+	 * 两张表必须成对更新，中间任何一瞬都可能同时命中或同时落空 ——
+	 * 同时命中会把本地客户端误判成远程，消息被转发到别的节点；
+	 * 同时落空则形成短暂的路由盲区。单表一次写入即可原子生效。
+	 * </p>
+	 */
 	private final ConcurrentHashMap<String, String> clientNodeMap = new ConcurrentHashMap<>();
-	private final Set<String> localClientIds = ConcurrentHashMap.newKeySet();
 	/**
 	 * 全量复制（V1）的订阅路由表。
 	 * <p>
@@ -137,11 +147,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		if (clientId == null) {
 			return null;
 		}
-		String node = clientNodeMap.get(clientId);
-		if (node != null) {
-			return node;
-		}
-		return localClientIds.contains(clientId) ? clusterManager.getLocalNodeId() : null;
+		return clientNodeMap.get(clientId);
 	}
 
 	/**
@@ -156,26 +162,34 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	}
 
 	/**
+	 * 客户端是否连接在其它节点。
+	 *
+	 * @param clientId the client identifier
+	 * @return {@code true} 表示已知该客户端属于其它节点
+	 */
+	public boolean isRemoteClient(String clientId) {
+		String node = getClientNode(clientId);
+		return node != null && !node.equals(clusterManager.getLocalNodeId());
+	}
+
+	/**
 	 * Registers a remote client as being connected to a specific cluster node.
 	 *
 	 * @param clientId the client identifier
 	 * @param nodeId the identifier of the node where the client is connected
 	 */
 	public void registerRemoteClient(String clientId, String nodeId) {
-		localClientIds.remove(clientId);
 		clientNodeMap.put(clientId, nodeId);
 		logger.debug("[Cluster] Registered remote client: {} -> node: {}", clientId, nodeId);
 	}
 
 	/**
-	 * Marks a client as locally owned. Local clients are represented by the
-	 * absence of an entry in {@link #clientNodeMap}.
+	 * Marks a client as locally owned.
 	 *
 	 * @param clientId the client that connected to this node
 	 */
 	public void markLocalClient(String clientId) {
-		clientNodeMap.remove(clientId);
-		localClientIds.add(clientId);
+		clientNodeMap.put(clientId, clusterManager.getLocalNodeId());
 	}
 
 	public boolean isPersistentSession(String clientId) {
@@ -214,7 +228,6 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 */
 	@Deprecated
 	public void removeRemoteClient(String clientId) {
-		localClientIds.remove(clientId);
 		String node = clientNodeMap.remove(clientId);
 		Map<String, TrackedRoute> removed = routeSubscriptions.remove(clientId);
 		delegate.remove(clientId);
@@ -243,7 +256,6 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		if (!owned.get()) {
 			return;
 		}
-		localClientIds.remove(clientId);
 		// 订阅副本要随会话一起失效：留在路由表里的话，本机发布时会把它当成本地订阅者投递。
 		Map<String, TrackedRoute> removed = routeSubscriptions.remove(clientId);
 		removeSharedMembership(removed, clientId);
@@ -260,7 +272,13 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @return the previous remote node
 	 */
 	public String registerLocalClient(String clientId) {
-		return clientNodeMap.remove(clientId);
+		String previous = clientNodeMap.get(clientId);
+		// 只在归属确实换人时返回远端属主：本地客户端的归属本来就是本节点
+		if (previous != null && previous.equals(clusterManager.getLocalNodeId())) {
+			return null;
+		}
+		markLocalClient(clientId);
+		return previous;
 	}
 
 	/**
@@ -285,6 +303,10 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @param nodeId the identifier of the node that has left the cluster
 	 */
 	public void clearNodeClientsAndSubscriptions(String nodeId) {
+		if (nodeId == null || nodeId.equals(clusterManager.getLocalNodeId())) {
+			// 本节点的客户端不随「节点离开」清理：本地连接还活着
+			return;
+		}
 		clientNodeMap.entrySet().removeIf(entry -> {
 			if (entry.getValue().equals(nodeId)) {
 				Map<String, TrackedRoute> removed = routeSubscriptions.remove(entry.getKey());
@@ -540,7 +562,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 			return;
 		}
 		String ownerNode = clientNodeMap.get(clientId);
-		if (ownerNode != null) {
+		if (ownerNode != null && !ownerNode.equals(clusterManager.getLocalNodeId())) {
 			// Remote client — do not persist; its state lives on the owning node.
 			return;
 		}
@@ -591,6 +613,10 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	/**
 	 * Returns the live clientId→node mapping.  Used by the cluster manager to
 	 * find the previous owner of a session during takeover.
+	 * <p>
+	 * 包含本地客户端（归属为本节点 id）与远程客户端（归属为属主节点 id）；
+	 * 查不到的客户端表示「路由未知」。
+	 * </p>
 	 *
 	 * @return the live mapping of clientId to its owning node id
 	 */
@@ -681,7 +707,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		List<Subscribe> matches = new ArrayList<>();
 		for (Map.Entry<String, ConcurrentHashMap<String, TrackedRoute>> entry : routeSubscriptions.entrySet()) {
 			String clientId = entry.getKey();
-			if (!includeRemote && clientNodeMap.containsKey(clientId)) {
+			if (!includeRemote && isRemoteClient(clientId)) {
 				continue;
 			}
 			for (TrackedRoute route : entry.getValue().values()) {
@@ -750,12 +776,7 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * @return a snapshot of the client-to-node mapping
 	 */
 	public Map<String, String> getStateClientNodeMap() {
-		Map<String, String> state = new HashMap<>(clientNodeMap);
-		String localNodeId = clusterManager.getLocalNodeId();
-		for (String clientId : localClientIds) {
-			state.put(clientId, localNodeId);
-		}
-		return state;
+		return new HashMap<>(clientNodeMap);
 	}
 
 	/**
@@ -763,6 +784,11 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	 * <p>
 	 * This populates the remote client registry and recreates all subscriptions
 	 * from the synchronized state data.
+	 * </p>
+	 * <p>
+	 * 对端给的归属只是参考：本节点此刻正连着的客户端，归属以本节点为准。
+	 * 否则一次滞后的状态同步就会把本地连接改判成远程 —— 消息被转发到别的节点，
+	 * 本地持久会话记录也会被删掉。
 	 * </p>
 	 *
 	 * @param clientNodeMap the client-to-node mapping to synchronize
@@ -772,14 +798,24 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 		if (clientNodeMap == null) {
 			return;
 		}
+		String localNodeId = clusterManager.getLocalNodeId();
 		for (Map.Entry<String, String> entry : clientNodeMap.entrySet()) {
-			if (clusterManager.getLocalNodeId().equals(entry.getValue())) {
-				markLocalClient(entry.getKey());
-			} else {
-				registerRemoteClient(entry.getKey(), entry.getValue());
-				if (sessionStore != null) {
-					sessionStore.delete(entry.getKey());
+			String clientId = entry.getKey();
+			String owner = entry.getValue();
+			if (localNodeId.equals(owner)) {
+				// 对端认为这个客户端归本节点：本地没记录时补登记为本地
+				if (!localNodeId.equals(clientNodeMap.get(clientId))) {
+					markLocalClient(clientId);
 				}
+				continue;
+			}
+			if (localNodeId.equals(clientNodeMap.get(clientId))) {
+				// 本节点正连着这个客户端，归属以本节点为准，不接受对端的覆盖
+				continue;
+			}
+			registerRemoteClient(clientId, owner);
+			if (sessionStore != null) {
+				sessionStore.delete(clientId);
 			}
 		}
 		if (subscriptionMap == null) {
@@ -1023,7 +1059,40 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public boolean hasSession(String clientId) {
-		return delegate.hasSession(clientId) || clientNodeMap.containsKey(clientId);
+		return delegate.hasSession(clientId) || isRemoteClient(clientId);
+	}
+
+	/**
+	 * 离线消息入队，转调本地会话管理器。
+	 * <p>
+	 * {@link IMqttSessionManager} 的默认实现直接返回 {@code false}，本类若不重写，
+	 * 集群模式下持久会话的离线消息会被静默丢弃（{@code SubscriptionForwardHandler}
+	 * 拿到的入队结果永远是 false）。离线队列本身只属于持有该会话的节点，
+	 * 因此转调本地实现即可；远程节点上的离线投递由消息转发到属主节点后处理。
+	 * </p>
+	 *
+	 * @param clientId 客户端 id
+	 * @param message  离线消息快照
+	 * @return 是否入队成功
+	 */
+	@Override
+	public boolean addOfflineMessage(String clientId, Message message) {
+		return delegate.addOfflineMessage(clientId, message);
+	}
+
+	@Override
+	public Message pollOfflineMessage(String clientId) {
+		return delegate.pollOfflineMessage(clientId);
+	}
+
+	@Override
+	public void pushOfflineMessageFirst(String clientId, Message message) {
+		delegate.pushOfflineMessageFirst(clientId, message);
+	}
+
+	@Override
+	public int getOfflineMessageCount(String clientId) {
+		return delegate.getOfflineMessageCount(clientId);
 	}
 
 	@Override
@@ -1038,7 +1107,6 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 
 	@Override
 	public void remove(String clientId) {
-		localClientIds.remove(clientId);
 		// 用 compute 原子地裁决归属，避免与并发的 registerRemoteClient 抢跑；
 		// lambda 内只记录结论，真正的清理放到锁外执行（sessionStore.delete 可能落盘）。
 		AtomicBoolean remoteOwned = new AtomicBoolean(false);
@@ -1078,7 +1146,6 @@ public class ClusterMqttSessionManager implements IMqttSessionManager {
 	public void clean() {
 		delegate.clean();
 		clientNodeMap.clear();
-		localClientIds.clear();
 		routeSubscriptions.clear();
 	}
 }

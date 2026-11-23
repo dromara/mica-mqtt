@@ -14,7 +14,8 @@ docs/todo/
 ├── mqtt-server-cluster-storage.md     # [3] 存储 (v1.2): V3 H2 MVStore 持久化层
 ├── mqtt-server-cluster-tasks.md       # [4] 任务清单 (v1.1): V2/V3 实施分解
 ├── mqtt-server-cluster-monitoring.md  # [5] 监控: 指标、告警、运维手册
-└── mqtt5-features.md                  # [6] MQTT 5.0 特性梳理与待实现清单 (v1.0)
+├── mqtt-broker-rules-engine.md        # [6] 规则引擎 (v1.0): topic 命中后执行动作链
+└── mqtt5-features.md                  # [7] MQTT 5.0 特性梳理与待实现清单 (v1.0)
 ```
 
 ## 阅读顺序
@@ -28,21 +29,24 @@ docs/todo/
 | 3 | `mqtt-server-cluster-storage.md` | 30 min | 节点宕机后状态怎么恢复 |
 | 4 | `mqtt-server-cluster-tasks.md` | 20 min | 怎么把 V2/V3 排进迭代 |
 | 5 | `mqtt-server-cluster-monitoring.md` | 15 min | 指标采集、Prometheus 告警、运维 Runbook |
-| 6 | `mqtt5-features.md` | 20 min | MQTT 5.0 协议特性梳理、哪些已实现、哪些待办、优先级与工作量 |
+| 6 | `mqtt-broker-rules-engine.md` | 30 min | 规则引擎怎么挂载、动作怎么执行、扩展点怎么接 |
+| 7 | `mqtt5-features.md` | 20 min | MQTT 5.0 协议特性梳理、哪些已实现、哪些待办、优先级与工作量 |
+
+> 规则引擎是**独立于集群演进线**的一条线：它挂在 `mica-mqtt-broker` 上，单节点与集群模式都能用，不需要先读集群文档。
 
 ### 按角色阅读
 
 | 角色 | 重点文档 |
 |---|---|
-| **架构师** | 全读，重点 cluster §1 §2 §3、routing §3、storage §3-§4、mqtt5 §4 §6 |
-| **后端开发** | cluster §3, routing §3, storage §3-§4, tasks §2-§6, mqtt5 §5 §6 |
+| **架构师** | 全读，重点 cluster §1 §2 §3、routing §3、storage §3-§4、rules-engine §2 §4 §16、mqtt5 §4 §6 |
+| **后端开发** | cluster §3, routing §3, storage §3-§4, tasks §2-§6, rules-engine §4 §11, mqtt5 §5 §6 |
 | **运维** | cluster §5, storage §6 §8, tasks §6, monitoring 全文 |
 | **测试** | cluster §6, routing §7, storage §7, tasks §3-§5, mqtt5 §7 §8 |
 | **PM / TL** | tasks 全文、mqtt5 §5 |
 
 ---
 
-## 四份文档的依赖关系
+## 集群四份文档的依赖关系
 
 ```
 mqtt-server-cluster.md          (基础, v3.0, V1+V2 已实现)
@@ -64,6 +68,7 @@ mqtt-server-cluster-routing.md  mqtt-server-cluster-storage.md
 
 - **routing** 与 **storage** 是**正交**的两条演进线：可以只做 routing（V2 共享订阅去重），也可以只做 storage（V3 节点宕机恢复），推荐两个都做
 - **tasks** 依赖前三份设计文档，是排期与执行视图
+- **rules-engine** 不在这条依赖链上：它只依赖 `mica-mqtt-broker` 模块本身
 
 ---
 
@@ -84,6 +89,9 @@ mqtt-server-cluster-routing.md  mqtt-server-cluster-storage.md
 | MQTT 5.0 哪些特性已实现？ | `mqtt5-features.md` §3 |
 | MQTT 5.0 哪些待实现？优先级如何？ | `mqtt5-features.md` §4 §5 |
 | 怎么补齐 Reason Code / Receive Maximum / AUTH？ | `mqtt5-features.md` §6 |
+| 规则引擎怎么挂到 broker 上？ | `mqtt-broker-rules-engine.md` §7.1 |
+| 规则命中后动作怎么执行、怎么超时？ | `mqtt-broker-rules-engine.md` §4.8 §16.3 §16.4 |
+| 怎么自定义动作 / 匹配器 / 规则来源？ | `mqtt-broker-rules-engine.md` §10 §11.3 |
 
 ---
 
@@ -135,7 +143,8 @@ V1 (cluster 文档, 已实现)
 | V3 storage 持久化层 | storage §7 | ~3.5 周 | tasks P2.0-P2.4 |
 | V2+V3 集成测试 | tasks §5 | ~1 周 | tasks P3.x |
 | 生产就绪 + 灰度 | tasks §6 | ~1 周 | tasks P4.x |
-| **总计** | | **~8 周**（2 人并行）| 21 个任务 |
+| 规则引擎 v1 | rules-engine §13 | 已完成 | rules-engine Step 1-8 |
+| **集群线总计** | | **~8 周**（2 人并行）| 21 个任务 |
 
 MVP 路径（1 人 / 2 周）：tasks §9
 
@@ -150,8 +159,9 @@ MVP 路径（1 人 / 2 周）：tasks §9
 | `mqtt-server-cluster-storage.md` | v1.2 | V3 主链路与离线 Session 恢复完成；10 万 Retain 基线、告警和 3/5 JVM H2 恢复已验收 | 2026-07-17 |
 | `mqtt-server-cluster-tasks.md` | v1.1 | 当前版本设计与仓库内验收完成；V4+ 与目标硬件容量门禁已明确分界 | 2026-07-17 |
 | `mqtt-server-cluster-monitoring.md` | v1.1 | 指标、全互联拓扑告警与 Runbook 已实现 | 2026-07-17 |
+| `mqtt-broker-rules-engine.md` | v1.0 | Step 1-8 已落地（59 个用例）；HTTP 管理 API、集群规则同步、Kafka starter 暂不做 | 2026-11-16 |
 | `mqtt5-features.md` | v1.0 | 初稿 | 2026-07-06 |
-| `README.md` | v1.4 | 索引与实现状态校准 | 2026-07-17 |
+| `README.md` | v1.5 | 索引收录规则引擎文档，任务状态与实现对齐 | 2026-11-16 |
 
 ---
 
@@ -162,3 +172,4 @@ MVP 路径（1 人 / 2 周）：tasks §9
 - 部署问题: 参考各文档的"注意事项"小节
 - 排期问题: 参考 `mqtt-server-cluster-tasks.md` §7, §8
 - MQTT 5.0 协议兼容问题: 参考 `mqtt5-features.md` §7 §8
+- 规则引擎的扩展点与执行语义问题: 参考 `mqtt-broker-rules-engine.md` §4, §16

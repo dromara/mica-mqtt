@@ -3,10 +3,39 @@
 ## 发行版本
 
 ### v2.7.0 - 未发布
+- ✨ feat(broker): 新增 mica-mqtt-broker 规则引擎。规则按 `topicFilter`（支持 `+` / `#` 通配）命中消息后，在 action 线程池上顺序执行一组动作（日志、转发到另一台 MQTT、HTTP 回调、重新发布、持久化、告警、webhook），规则支持运行时增删改查与按 topic 匹配调试，动作、匹配器、payload 编解码器、规则来源、规则存储五类扩展点均以 JDK SPI 方式接入。
+- ✨ feat(broker): 规则动作在独立线程池 `rule-action-pool` 中执行，t-io 的 IO 线程只负责提交任务，慢后端不再阻塞消息分发；线程池的核心数、最大线程数与队列容量可通过 `MqttClusterConfig` 的 `actionPoolCoreSize` / `actionPoolMaxSize` / `actionPoolQueueSize` 调整。
+- ✨ feat(broker): 规则支持 `timeoutMs` 超时控制（默认 5 秒，小于等于 0 表示不限时），超时后中断当前动作并跳过该规则剩余动作，同时记一次失败指标，不影响其它规则的执行。
+- ✨ feat(broker): 规则支持用 `codecType` 指定 payload 解码器（`raw` / `string` / `json`），解码结果缓存到规则上下文供匹配器与动作共享，每条消息每条规则只解码一次；内置匹配器补齐 `header` / `jsonPath` / `compound` 三种声明式写法，并可直接用 `Rule#when(expr)` 书写 AviatorScript 条件表达式。
+- ✨ feat(broker): 条件表达式升级到 AviatorScript 5.9.0，沙箱模式下注册 `header()` / `contains()` / `now()` / `env()` 函数，求值环境补充 `ts` 变量；表达式编译结果走 LRU 缓存，编译失败在规则挂载期即暴露。
+- ✨ feat(broker): 新增 JSON / YAML 规则文件加载器，支持按文件修改时间热加载；规则存储新增变更监听接口，外部（配置中心等）改动存储后本地自动同步挂载与摘除，无需重启 broker。
+- ✨ feat(broker): `MqttAction` 按连接键复用 MQTT 客户端连接（默认由 `host:port + clientId + username` 组成，可用 `connectionName` 显式覆盖，避免同 host 不同账号串号），连接在 broker 关闭时统一释放；`store` 模板新增 `file` 存储后端与 `maxAge` 过期策略，`publish` 模板新增 `retainOriginal` 沿用原消息的 qos 与 retain 标记。
+- ✨ feat(broker): SPI 加载结果静态缓存，broker 多次构建不再重复扫描服务文件；新增告警通知器 SPI，告警中心自动注册用户提供的钉钉 / Slack / PagerDuty 等通道，用户实现一个工厂类即可对接。
+- 🐛 fix(broker): 集群模式下 `MqttClusterBrokerCreator#build()` 改为抛出 `IllegalStateException`。此前 `build()` 只装配集群装饰器、不建立集群连接，调用方若接着调 `MqttServer#start()`，节点会静默退化成单机——集群端口不监听、无节点发现、跨节点消息全部不投递且不报任何错。集群模式请统一改用 `start()`。
+- 🐛 fix(broker): 关闭 MQTT 服务端时同步停止集群管理器。此前关闭钩子没有停集群，集群端口不释放（同端口重启绑不上），心跳继续广播使对端无法判死本节点，集群里残留僵尸节点且其 client→node 映射仍被路由命中；现在停止时先广播 `NODE_LEAVE`，再释放集群端口。
+- 🐛 fix(broker): `MqttClusterBrokerCreator#build()` 与 `start()` 改为幂等，重复调用返回同一实例。此前重复 `build()` 会重复注册流水线处理器，导致上行报文被处理两遍、本地订阅者收两遍、规则引擎每条消息触发两遍。
+- 🐛 fix(broker): 修复规则配置解析器 javadoc 中的非法闭合标签，`mvn package -P release` 此前因该错误无法生成发布产物。
+- 🐛 fix(broker): 集群模式下持久会话的离线消息不再丢失。此前集群会话管理器没有接管离线消息方法，入队恒失败、队列长度恒为 0，QoS1/2 的离线消息被静默丢弃且不报错；现在持久会话的离线投递与单机模式行为一致。
+- 🐛 fix(broker): 规则模板不再被消息内容注入表达式。此前模板先替换 `{topic}` 等占位符、再求值 `${...}`，发布者只要把表达式写进 topic 就能让 broker 代为求值；现在先求值表达式再替换占位符，替换进来的消息内容不会再被当作表达式扫描。
+- 🐛 fix(broker): 表达式环境里的规则对象不再暴露动作属性，`rule` 只提供 id / name / topicFilter，规则动作里配置的 MQTT 账号与 webhook 凭据无法再被表达式读到。
+- 🐛 fix(broker): 集群归属登记改为单表维护。此前「远程表 + 本地集合」两张表要成对更新，中间可能同时命中（本地客户端被误判成远程，消息被转发到别的节点）或同时落空（短暂路由盲区）。
+- 🐛 fix(broker): 状态同步不再覆盖本节点的本地归属。滞后的同步此前会把本节点正连着的客户端改判成远程，并删掉它的本地持久会话记录。
+- 🐛 fix(broker): 跨节点转发的消息与本节点发布遵循同一套语义。此前集群转发绕过了 No Local 判定与 MQTT 5.0 属性重写（有效期不递减、Topic Alias 不剥离），离线订阅者的消息也被直接丢弃；现在跨节点转发同样遵循 No Local、重写属性并把离线消息放入持久会话的离线队列。
+- 🐛 fix(broker): 节点离场后的遗嘱发布改为「取遗嘱 → 发布 → 清除」在同一任务内完成。发布失败不再把遗嘱留在库里被后续离场事件重复发布。
+- 🐛 fix(broker): 规则删除或更新后，`mqtt` 动作持有的共享连接按引用计数释放，最后一个引用者离开时才断开，不再一直占着连接。
+- 🐛 fix(broker): 关闭规则引擎时同步停止文件规则加载器的热加载轮询；规则事件监听器抛异常时日志带上规则 id。
+- 🐛 fix(broker): `store` 模板指定的存储类型未注册时，回退到内存实现会打印告警，不再静默地把数据写进内存。
+- 🐛 fix(broker): `webhook` 动作对 4xx 响应不再重试（请求本身不合法，重试只会持续打爆对端），可重试的失败之间加入退避。
+- 🐛 fix(broker): 存储层补上参数与数据校验：清理周期非法时在装配阶段就报错，不再拖到启动时才炸；retained 消息长度先校验再分配，损坏数据不再触发超大数组分配。
+- 🐛 fix(client): 修复握手超时用例的偶发失败。用例里的服务端在回完 CONNACK 后立即断开连接，与 `isConnected()` 的断言形成竞态，表现为 CI 上时红时绿；现在服务端回完 CONNACK 继续持有连接，断言不再依赖竞态。
+- ♻️ chore(broker): 补全 `module-info.java` —— 导出 `rule.ext.aviator` / `rule.ext.template` 两个包，声明 aviator 与 caffeine 依赖，snakeyaml 按可选依赖声明。
+- ♻️ chore(ci): CI 不再关闭 develop profile，example 模块参与编译；新增集群集成测试步骤，`*IT` 类不再只靠本地手工执行。
+- ♻️ chore(deps): dependabot 与 renovate 不再排除 caffeine，该直接依赖恢复自动升级。
+- 🧪 test(broker): 新增 Broker 生命周期回归测试，覆盖集群模式入口约束、构建与启动幂等、关闭后集群端口释放；并修正规则引擎共享 sink 用例的断言方式，消除因跨规则执行顺序不确定导致的偶发失败。
+- 🧪 test(broker): 新增集群持久会话离线消息回归测试与规则模板注入安全测试，覆盖离线消息入队与回放、topic 内容不被求值、规则凭据不被表达式读取、替换值不被二次扫描。
+- 📝 docs(broker): 规则引擎设计稿补充「实现现状与偏差」章节，明确线程池执行模型、存储后端选择与 SPI 位置的调整；`mica-mqtt-broker/README.md` 补充规则引擎用法示例并修正为可直接编译的写法（端口配置、集群配置构造、集群模式入口），集群管理器方法清单按实际 API 重写，测试章节改为列出实际存在的测试类并标注三个 `*IT` 类需显式激活 Maven profile 才能执行。
+- 📝 docs(broker): 文档与实现现状对齐 —— `docs/todo/README.md` 收录规则引擎设计稿，补齐阅读顺序、问题索引与版本状态表；`docs/todo/mqtt-server-cluster-tasks.md` 的 21 个任务清单新增状态列，逐项标注完成 / 部分完成 / 未做。
 - 📝 docs: 服务端消息处理架构已改为消息管线，README、升级指南中失效的 `AbstractMqttMessageDispatcher`、`ClusterMessageDispatcher` 引用同步为双管线（`IMqttMessagePipeline` / `IMqttPublishPipeline`）与集群 `ClusterPublishHandler` 的实际用法，并补充 2.6.0 迁移章节。
-
-### v2.5.14 - 2026-11-20
-- ⬆️ mica-net 升级到 1.3.8，解决 死连接不释放导致OOM
 
 ### v2.6.15 - 2026-11-11
 - ♻️ chore(build): 显式声明 `maven-surefire-plugin` 3.5.2，避免低版本 Maven（3.8 及更早默认绑定 2.12.4，不支持 JUnit 5）静默跳过单元测试。(github #225) 感谢 @wjpdream 贡献。
@@ -129,6 +158,9 @@
 
 - feat(mqtt-server): 支持 MQTT 5.0 订阅的 No Local 标志功能，gitee #IDB1DN 感谢 `@rocker` 反馈。
 - feat(mqtt-server): 重构消息处理架构引入消息处理管线，消息转发携带 mqtt 5.0 properties 属性。
+
+### v2.5.14 - 2026-11-20
+- ⬆️ mica-net 升级到 1.3.8，解决 死连接不释放导致OOM
 
 ### v2.5.13 - 2026-07-01
 - 🐛 mqtt-server 优化客户端互踢时的会话清理逻辑，感谢 `@十年` 反馈。

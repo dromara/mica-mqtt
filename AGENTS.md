@@ -135,6 +135,17 @@ mvn clean deploy -P release
 - Cluster messages implement the `ClusterMessage` interface; `ClusterMessageSerializer` handles wire encoding
 - Storage abstraction under `store/`: `SessionStore`, `SharedSubStore`, `InflightStore`, `RetainIndex`, with in-memory (`LocalKvStoreImpl`, `MemoryKvStoreImpl`) and H2 MVStore (`H2MvStoreImpl`, `H2SessionStore`, `H2SharedSubStore`, `H2InflightStore`) implementations
 
+**Rule Engine Side (mica-mqtt-broker, package `org.dromara.mica.mqtt.broker.rule`):**
+- `RuleEngine`: Mounts rules onto `MqttFunctionManager`; a matched rule submits its whole action chain as **one task** to `RuleActionExecutor` (`rule-action-pool`), so the t-io IO thread never runs actions
+- `RuleManager`: Rule CRUD + store/loader orchestration + change events; `Rule` is immutable (builder) and holds `codecType` / `matcherType` / `whenExpr` / `timeoutMs`
+- `RuleContext` / `RuleChannelInfo`: Execution context handed to actions (`ChannelContext` is wrapped, not exposed raw)
+- `action/`: `Action`, `ActionRef` (immutable, used as cache key — chain props via `ActionRef.builder(...)`), `ActionFactory`, `ActionRegistry` (caches by full ActionRef), `RuleActionExecutor`; built-ins `LogAction` / `MqttAction` / `HttpAction`
+- `ext/template/`: Built-in action templates `publish` / `store` / `alert` / `webhook` plus `AlertCenter` (Caffeine dedupe) and `AlertNotifier`
+- `ext/aviator/`: `AviatorExprMatcher` — sandboxed AviatorScript conditions with `header()` / `contains()` / `now()` / `env()` functions
+- `matcher/`: `RuleMatcher` + factories (`topic`, `header`, `jsonPath`, `compound`); `codec/`: `raw` / `string` / `json` codecs; `loader/`: JSON + YAML file loaders with mtime hot reload; `store/`: `RuleStore` + `InMemoryRuleStore`
+- All extension points use JDK SPI (`META-INF/services`): `ActionFactory`, `RuleMatcherFactory`, `PayloadCodecFactory`, `RuleLoaderFactory`, `RuleStoreFactory`, `AlertNotifierFactory`
+- Design doc: `docs/todo/mqtt-broker-rules-engine.md` (implementation reality in its section 16)
+
 ### Design Patterns
 
 1. **Builder Pattern**: `MqttClient.create()`, `MqttServer.create()`, `MqttPublishMessage.builder()`
@@ -194,7 +205,8 @@ Two modes for load balancing:
 ### Clustering & Message Dispatching
 
 The `mica-mqtt-broker` module provides clustering via t-io cluster for node-to-node communication:
-- `MqttBroker.create()` as entry point with fluent API: `MqttClusterConfig.enabled(true).clusterPort(9001)`
+- `MqttBroker.create()` as entry point with fluent API: `new MqttClusterConfig().enabled(true).clusterPort(9001)`
+- **集群模式必须用 `MqttClusterBrokerCreator#start()`**：`build()` 只装配集群装饰器，不建立集群连接（集群端口绑定、节点发现、心跳、状态同步都在 `MqttClusterManager#start()` 内）。集群模式下调用 `build()` 会抛 `IllegalStateException` —— 此前它会静默退化成单机（MQTT 正常、跨节点消息全不投递、无任何报错）。`build()` 与 `start()` 均幂等。
 - Session state synchronized across nodes via `ClusterMqttSessionManager`
 - Cluster messages implement the `ClusterMessage` interface
 - `ClusterPublishHandler` routes published messages across broker instances using pluggable dispatch strategies

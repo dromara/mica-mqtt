@@ -30,19 +30,33 @@ import org.dromara.mica.mqtt.core.server.func.MqttFunctionManager;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * RuleEngine 单测：action 顺序执行 / 失败继续 / 运行时增删 / 缓存共享。
+ * RuleEngine 单测：action 顺序执行 / 失败继续 / 运行时增删 / 缓存共享 / 超时 / 解码。
+ * <p>
+ * 规则命中后整条 action 链在 action 线程池内串行执行，因此断言需要等待任务完成。
+ * </p>
  *
  * @author L.cm
  */
 class RuleEngineTest {
+
+	/**
+	 * 等待异步 action 执行完成的超时时间（毫秒）。
+	 */
+	private static final long AWAIT_TIMEOUT_MS = 5000L;
 
 	private static MqttPublishMessage publishMessage(String topic, byte[] payload, boolean retain) {
 		MqttFixedHeader header = new MqttFixedHeader(
@@ -84,9 +98,27 @@ class RuleEngineTest {
 		return rm;
 	}
 
+	/**
+	 * 等待事件列表达到期望条数。
+	 *
+	 * @param events  事件列表
+	 * @param expect 期望条数
+	 */
+	private static void awaitSize(List<String> events, int expect) {
+		long deadline = System.currentTimeMillis() + AWAIT_TIMEOUT_MS;
+		while (events.size() < expect && System.currentTimeMillis() < deadline) {
+			try {
+				Thread.sleep(10L);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				return;
+			}
+		}
+	}
+
 	@Test
 	void sinkOrderAndRuntimeAddRemove() {
-		List<String> events = new ArrayList<>();
+		List<String> events = Collections.synchronizedList(new ArrayList<>());
 		RuleManager rm = newRuleManager(events);
 		MqttFunctionManager fnMgr = new MqttFunctionManager();
 		RuleEngine engine = new RuleEngine(rm, fnMgr, null);
@@ -106,6 +138,7 @@ class RuleEngineTest {
 		rm.addRule(r1);
 		// 触发一次消息
 		invokeFunctionManager(fnMgr, "sensor/room1/temp", "hello".getBytes(), false);
+		awaitSize(events, 2);
 		assertEquals(2, events.size());
 		assertEquals("s1:hello", events.get(0));
 		assertEquals("s2:hello", events.get(1));
@@ -114,6 +147,7 @@ class RuleEngineTest {
 		rm.removeRule("r1");
 		events.clear();
 		invokeFunctionManager(fnMgr, "sensor/room1/temp", "x".getBytes(), false);
+		awaitSize(events, 0);
 		assertTrue(events.isEmpty());
 
 		// 重新添加
@@ -124,13 +158,14 @@ class RuleEngineTest {
 			.addAction(ActionRef.of("seq", "s3"))
 			.build());
 		invokeFunctionManager(fnMgr, "sensor/room1/temp", "y".getBytes(), false);
+		awaitSize(events, 1);
 		assertEquals(1, events.size());
 		assertEquals("s3:y", events.get(0));
 	}
 
 	@Test
 	void sinkCacheSharedAcrossRules() {
-		List<String> events = new ArrayList<>();
+		List<String> events = Collections.synchronizedList(new ArrayList<>());
 		RuleManager rm = newRuleManager(events);
 		MqttFunctionManager fnMgr = new MqttFunctionManager();
 		RuleEngine engine = new RuleEngine(rm, fnMgr, null);
@@ -151,14 +186,18 @@ class RuleEngineTest {
 
 		invokeFunctionManager(fnMgr, "a/x", "1".getBytes(), false);
 		invokeFunctionManager(fnMgr, "b/y", "2".getBytes(), false);
+		awaitSize(events, 2);
 		assertEquals(2, events.size());
-		assertEquals("shared:1", events.get(0));
-		assertEquals("shared:2", events.get(1));
+		// 两条规则链是两个独立任务，各自提交到 action 线程池后并发执行，
+		// 跨规则的完成顺序没有保证（顺序保证只存在于单条规则内的 action 链之间）。
+		// 本用例断言的是「两条规则共用同一个 action 实例，共享 sink 收到两条内容正确的消息」，
+		// 因此按集合断言而不是按下标断言。
+		assertEquals(new HashSet<>(Arrays.asList("shared:1", "shared:2")), new HashSet<>(events));
 	}
 
 	@Test
 	void failedActionDoesNotStopOthersByDefault() {
-		List<String> events = new ArrayList<>();
+		List<String> events = Collections.synchronizedList(new ArrayList<>());
 		RuleManager rm = new RuleManager();
 		rm.setRuleStore(new InMemoryRuleStore());
 		AtomicInteger counter = new AtomicInteger();
@@ -202,13 +241,14 @@ class RuleEngineTest {
 			.build());
 
 		invokeFunctionManager(fnMgr, "a/x", "".getBytes(), false);
+		awaitSize(events, 1);
 		assertEquals(1, events.size());
 		assertEquals("mix-2", events.get(0));
 	}
 
 	@Test
 	void stopOnErrorStopsSubsequent() {
-		List<String> events = new ArrayList<>();
+		List<String> events = Collections.synchronizedList(new ArrayList<>());
 		RuleManager rm = new RuleManager();
 		rm.setRuleStore(new InMemoryRuleStore());
 		AtomicInteger counter = new AtomicInteger();
@@ -252,12 +292,13 @@ class RuleEngineTest {
 			.build());
 
 		invokeFunctionManager(fnMgr, "a/x", "".getBytes(), false);
+		awaitSize(events, 0);
 		assertTrue(events.isEmpty(), "stopOnError should stop subsequent actions");
 	}
 
 	@Test
 	void disabledRuleDoesNotExecute() {
-		List<String> events = new ArrayList<>();
+		List<String> events = Collections.synchronizedList(new ArrayList<>());
 		RuleManager rm = newRuleManager(events);
 		MqttFunctionManager fnMgr = new MqttFunctionManager();
 		RuleEngine engine = new RuleEngine(rm, fnMgr, null);
@@ -271,12 +312,13 @@ class RuleEngineTest {
 			.addAction(ActionRef.of("seq", "x"))
 			.build());
 		invokeFunctionManager(fnMgr, "a/x", "1".getBytes(), false);
+		awaitSize(events, 0);
 		assertTrue(events.isEmpty());
 	}
 
 	@Test
 	void unregisterRemovesRule() {
-		List<String> events = new ArrayList<>();
+		List<String> events = Collections.synchronizedList(new ArrayList<>());
 		RuleManager rm = newRuleManager(events);
 		MqttFunctionManager fnMgr = new MqttFunctionManager();
 		RuleEngine engine = new RuleEngine(rm, fnMgr, null);
@@ -290,12 +332,132 @@ class RuleEngineTest {
 			.build();
 		rm.addRule(r1);
 		invokeFunctionManager(fnMgr, "a/x", "1".getBytes(), false);
+		awaitSize(events, 1);
 		assertEquals(1, events.size());
 
 		rm.removeRule("r1");
 		events.clear();
 		invokeFunctionManager(fnMgr, "a/x", "1".getBytes(), false);
+		awaitSize(events, 0);
 		assertTrue(events.isEmpty());
+	}
+
+	/**
+	 * 规则超时：超时后剩余 action 不再执行，并记一次失败。
+	 */
+	@Test
+	void timeoutCancelsRemainingActions() throws Exception {
+		List<String> events = Collections.synchronizedList(new ArrayList<>());
+		CountDownLatch started = new CountDownLatch(1);
+		RuleManager rm = new RuleManager();
+		rm.setRuleStore(new InMemoryRuleStore());
+		ActionFactory slow = new ActionFactory() {
+			@Override
+			public String getType() {
+				return "slow";
+			}
+
+			@Override
+			public Action create(ActionRef ref) {
+				return new Action() {
+					@Override
+					public String getName() {
+						return "slow-1";
+					}
+
+					@Override
+					public void send(RuleContext ctx) throws Exception {
+						started.countDown();
+						Thread.sleep(3000L);
+						events.add("slow-done");
+					}
+				};
+			}
+		};
+		rm.getActionRegistry().registerFactory(slow);
+		rm.getActionRegistry().registerFactory(new ActionFactory() {
+			@Override
+			public String getType() {
+				return "seq";
+			}
+
+			@Override
+			public Action create(ActionRef ref) {
+				return new Action() {
+					@Override
+					public String getName() {
+						return "after";
+					}
+
+					@Override
+					public void send(RuleContext ctx) {
+						events.add("after");
+					}
+				};
+			}
+		});
+		MqttFunctionManager fnMgr = new MqttFunctionManager();
+		RuleEngine engine = new RuleEngine(rm, fnMgr, null);
+		engine.attach();
+		engine.start();
+
+		rm.addRule(Rule.builder()
+			.id("slow-rule")
+			.topicFilter("slow/#")
+			.timeoutMs(300L)
+			.addAction(ActionRef.of("slow", "s1"))
+			.addAction(ActionRef.of("seq", "after"))
+			.build());
+
+		invokeFunctionManager(fnMgr, "slow/x", "1".getBytes(), false);
+		assertTrue(started.await(2, TimeUnit.SECONDS), "slow action should start");
+		// 超时后剩余 action 不应执行
+		Thread.sleep(800L);
+		assertFalse(events.contains("after"), "remaining action must be skipped after timeout");
+		assertTrue(engine.getMetrics().snapshot().values().stream()
+			.anyMatch(stat -> stat.getFailureCount() > 0), "timeout should record a failure");
+	}
+
+	/**
+	 * codec 解码：规则配置 json codec 后，matcher 能拿到结构化 payload。
+	 */
+	@Test
+	void codecDecodesPayloadForMatcher() throws Exception {
+		List<String> events = Collections.synchronizedList(new ArrayList<>());
+		RuleManager rm = newRuleManager(events);
+		rm.registerMatcherFactory(new org.dromara.mica.mqtt.broker.rule.ext.aviator.AviatorExprMatcher.Factory());
+		rm.getCodecRegistry().registerFactory(new org.dromara.mica.mqtt.broker.rule.codec.PayloadCodecFactory() {
+			@Override
+			public String getName() {
+				return "json";
+			}
+
+			@Override
+			public org.dromara.mica.mqtt.broker.rule.codec.PayloadCodec create() {
+				return new org.dromara.mica.mqtt.broker.rule.codec.JsonPayloadCodec();
+			}
+		});
+		MqttFunctionManager fnMgr = new MqttFunctionManager();
+		RuleEngine engine = new RuleEngine(rm, fnMgr, null);
+		engine.attach();
+		engine.start();
+
+		rm.addRule(Rule.builder()
+			.id("json-rule")
+			.topicFilter("json/#")
+			.codecType("json")
+			.when("payload.temperature > 80")
+			.addAction(ActionRef.of("seq", "hot"))
+			.build());
+
+		invokeFunctionManager(fnMgr, "json/x", "{\"temperature\":90}".getBytes(), false);
+		awaitSize(events, 1);
+		assertEquals(1, events.size(), "json matcher should hit and run the action");
+
+		events.clear();
+		invokeFunctionManager(fnMgr, "json/x", "{\"temperature\":10}".getBytes(), false);
+		Thread.sleep(200L);
+		assertTrue(events.isEmpty(), "json matcher should not hit below threshold");
 	}
 
 	/**

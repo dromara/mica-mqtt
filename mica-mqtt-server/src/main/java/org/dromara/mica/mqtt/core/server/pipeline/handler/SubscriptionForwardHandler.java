@@ -19,11 +19,7 @@ package org.dromara.mica.mqtt.core.server.pipeline.handler;
 import net.dreamlu.mica.net.core.ChannelContext;
 import net.dreamlu.mica.net.core.Tio;
 import net.dreamlu.mica.net.core.TioConfig;
-import org.dromara.mica.mqtt.codec.MqttQoS;
-import org.dromara.mica.mqtt.codec.properties.IntegerProperty;
 import org.dromara.mica.mqtt.codec.properties.MqttProperties;
-import org.dromara.mica.mqtt.codec.properties.MqttProperty;
-import org.dromara.mica.mqtt.codec.properties.MqttPropertyType;
 import org.dromara.mica.mqtt.core.server.MqttServer;
 import org.dromara.mica.mqtt.core.server.MqttServerCreator;
 import org.dromara.mica.mqtt.core.server.enums.MessageType;
@@ -55,15 +51,10 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 	private static final Logger logger = LoggerFactory.getLogger(SubscriptionForwardHandler.class);
 	private final IMqttSessionManager sessionManager;
 	private final MqttServer mqttServer;
-	/**
-	 * QoS0 消息是否也进入离线队列
-	 */
-	private final boolean mqueueStoreQos0;
 
 	public SubscriptionForwardHandler(MqttServerCreator serverCreator, MqttServer mqttServer) {
 		this.sessionManager = serverCreator.getSessionManager();
 		this.mqttServer = mqttServer;
-		this.mqueueStoreQos0 = serverCreator.isMqueueStoreQos0();
 	}
 
 	@Override
@@ -86,58 +77,16 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 	}
 
 	/**
-	 * MQTT 5.0 属性重写（规范 3.3.2.3）：
-	 * <ul>
-	 *   <li>检查 Message Expiry Interval，若已过期则返回 null 表示丢弃消息</li>
-	 *   <li>移除 Topic Alias（服务端转发时不携带发布者的 Topic Alias）</li>
-	 *   <li>移除 Subscription Identifier（发布者的订阅标识符不转发给订阅者）</li>
-	 *   <li>递减 Message Expiry Interval 为剩余有效时间</li>
-	 * </ul>
+	 * MQTT 5.0 属性重写（规范 3.3.2.3）：由 {@link MqttServer#rewriteProperties} 统一实现，
+	 * 集群跨节点转发走同一条路径，两边语义保持一致。
 	 *
 	 * @param context    发布上下文
 	 * @param properties 原始 MQTT 5.0 属性（非 null 且非空）
 	 * @return 重写后的属性；null 表示消息已过期，应丢弃
 	 */
 	private MqttProperties rewriteProperties(PublishContext context, MqttProperties properties) {
-		Long receivedAt = context.getPublishReceivedAt();
-		if (receivedAt == null) {
-			receivedAt = context.getTimestamp();
-		}
-		long elapsedSeconds = (System.currentTimeMillis() - receivedAt) / 1000;
-		// 检查消息过期
-		Integer expiryInterval = properties.getPropertyValue(MqttPropertyType.MESSAGE_EXPIRY_INTERVAL);
-		long remaining = -1;
-		if (expiryInterval != null) {
-			remaining = expiryInterval - elapsedSeconds;
-			if (remaining <= 0) {
-				logger.debug("Mqtt Topic:{} message expired, skip forwarding", context.getTopic());
-				return null;
-			}
-		}
-		// O(1) 属性查找判断是否需要重写，避免不必要的遍历和对象分配
-		boolean needsRewrite = properties.getProperty(MqttPropertyType.TOPIC_ALIAS) != null
-			|| properties.getProperty(MqttPropertyType.SUBSCRIPTION_IDENTIFIER) != null
-			|| (expiryInterval != null && elapsedSeconds > 0);
-		if (!needsRewrite) {
-			return properties;
-		}
-		MqttProperties newProperties = new MqttProperties();
-		for (MqttProperty property : properties.listAll()) {
-			int propertyId = property.propertyId();
-			// MQTT 5.0 规范: 服务端转发时不携带发布者的 Topic Alias 和 Subscription Identifier
-			if (propertyId == MqttPropertyType.TOPIC_ALIAS.value()
-				|| propertyId == MqttPropertyType.SUBSCRIPTION_IDENTIFIER.value()) {
-				continue;
-			}
-			if (propertyId == MqttPropertyType.MESSAGE_EXPIRY_INTERVAL.value()
-				&& expiryInterval != null && elapsedSeconds > 0) {
-				// remaining 已在上方计算且保证 > 0
-				newProperties.add(new IntegerProperty(propertyId, (int) remaining));
-			} else {
-				newProperties.add(property);
-			}
-		}
-		return newProperties;
+		return mqttServer.rewriteProperties(context.getTopic(), properties,
+			context.getPublishReceivedAt(), context.getTimestamp());
 	}
 
 	/**
@@ -182,19 +131,11 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 	 * QoS0 消息默认丢弃，可通过 {@code mqueueStoreQos0} 打开。
 	 */
 	private void queueOfflineMessage(PublishContext context, String subscriberClientId, int subMqttQoS, MqttProperties properties) {
-		// spec 4.3.2：实际投递 QoS 取发布 QoS 与订阅 QoS 的较小值
-		int qosValue = Math.min(context.getQos().value(), subMqttQoS);
-		MqttQoS mqttQoS = MqttQoS.valueOf(qosValue);
-		if (MqttQoS.QOS0 == mqttQoS && !mqueueStoreQos0) {
-			logger.debug("Mqtt Topic:{} subscriber clientId:{} offline, QoS0 message dropped.",
-				context.getTopic(), subscriberClientId);
-			return;
-		}
 		Message offlineMessage = new Message();
 		offlineMessage.setMessageType(MessageType.UP_STREAM);
 		offlineMessage.setTopic(context.getTopic());
 		offlineMessage.setPayload(context.getPayload());
-		offlineMessage.setQos(mqttQoS.value());
+		offlineMessage.setQos(context.getQos().value());
 		offlineMessage.setRetain(false);
 		offlineMessage.setDup(false);
 		offlineMessage.setFromClientId(context.getClientId());
@@ -204,13 +145,7 @@ public class SubscriptionForwardHandler implements MqttPublishPipelineHandler {
 		offlineMessage.setTimestamp(context.getTimestamp());
 		offlineMessage.setPublishReceivedAt(context.getPublishReceivedAt());
 		offlineMessage.setProperties(properties);
-		if (sessionManager.addOfflineMessage(subscriberClientId, offlineMessage)) {
-			logger.debug("Mqtt Topic:{} subscriber clientId:{} offline, message queued qos:{}.",
-				context.getTopic(), subscriberClientId, mqttQoS);
-		} else {
-			logger.debug("Mqtt Topic:{} subscriber clientId:{} offline and session not persistent, message dropped.",
-				context.getTopic(), subscriberClientId);
-		}
+		mqttServer.queueOfflineMessage(offlineMessage, subscriberClientId, subMqttQoS);
 	}
 
 	@Override

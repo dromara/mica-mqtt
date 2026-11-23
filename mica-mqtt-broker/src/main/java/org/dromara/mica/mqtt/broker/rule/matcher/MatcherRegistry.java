@@ -36,6 +36,7 @@ public class MatcherRegistry {
 
 	private final ConcurrentMap<String, RuleMatcherFactory> factories = new ConcurrentHashMap<>();
 	private final ConcurrentMap<String, RuleMatcher> cache = new ConcurrentHashMap<>();
+	private final ConcurrentMap<String, RuleMatcher> named = new ConcurrentHashMap<>();
 
 	/**
 	 * 注册工厂。
@@ -57,10 +58,39 @@ public class MatcherRegistry {
 		if (prev != null && prev.getClass() != factory.getClass()) {
 			logger.warn("Duplicate RuleMatcherFactory type={}, keep existing {}", type, prev.getClass().getName());
 		}
+		// 注入注册表：compound 之类的工厂需要按名字查其它 matcher
+		factory.setRegistry(this);
+	}
+
+	/**
+	 * 注册一个具名 matcher 实例，多条规则可通过 {@code matcherType} 共享。
+	 *
+	 * @param name    名称
+	 * @param matcher matcher 实例
+	 */
+	public void registerMatcher(String name, RuleMatcher matcher) {
+		if (StrUtil.isBlank(name) || matcher == null) {
+			logger.warn("Ignore blank matcher name or null matcher");
+			return;
+		}
+		named.put(name, matcher);
+	}
+
+	/**
+	 * 按名称取具名 matcher。
+	 *
+	 * @param name 名称
+	 * @return matcher；未注册时返回 {@code null}
+	 */
+	public RuleMatcher getNamed(String name) {
+		return name == null ? null : named.get(name);
 	}
 
 	/**
 	 * 物化 matcher。
+	 * <p>
+	 * 优先返回具名注册的 matcher（{@link #registerMatcher}），其次按 type 走工厂。
+	 * </p>
 	 *
 	 * @param type  类型名（null 表示仅 topic 命中）
 	 * @param props 属性
@@ -69,6 +99,10 @@ public class MatcherRegistry {
 	public RuleMatcher get(String type, Map<String, String> props) {
 		if (type == null || type.isEmpty()) {
 			return null;
+		}
+		RuleMatcher namedMatcher = named.get(type);
+		if (namedMatcher != null) {
+			return namedMatcher;
 		}
 		// 用 TreeMap 排序 key 后再 toString，避免 HashMap 顺序不确定导致缓存 key 不一致
 		Map<String, String> ordered = props == null ? null : new TreeMap<>(props);
@@ -89,5 +123,6 @@ public class MatcherRegistry {
 	 */
 	public void clear() {
 		cache.clear();
+		named.clear();
 	}
 }

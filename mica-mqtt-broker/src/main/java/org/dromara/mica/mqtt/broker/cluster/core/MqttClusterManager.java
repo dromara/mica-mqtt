@@ -56,6 +56,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -103,6 +104,10 @@ public class MqttClusterManager {
 	private final Map<String, PendingRetainQuery> pendingRetainQueries = new ConcurrentHashMap<>();
 	private final AtomicLong retainQuerySequence = new AtomicLong();
 	private final AtomicInteger stateSyncResponses = new AtomicInteger();
+	/**
+	 * 集群是否已停止：保证 {@link #stopCluster()} 幂等，避免重复关闭与递归。
+	 */
+	private final AtomicBoolean stopped = new AtomicBoolean(false);
 	private volatile long clusterStartedAtMillis;
 	private final RetainShardRouter retainShardRouter = new RetainShardRouter();
 	private final Set<String> knownRemoteNodes = ConcurrentHashMap.newKeySet();
@@ -294,10 +299,13 @@ public class MqttClusterManager {
 			case PUBLISH_FORWARD: {
 				PublishForwardMessage pfm = (PublishForwardMessage) clusterMsg;
 				// retain 存储由 RETAIN_MESSAGE 单独同步，此处仅投递给本地订阅者，避免通过
-				// ClusterMqttMessageStore 再次广播导致无限循环
+				// ClusterMqttMessageStore 再次广播导致无限循环。
+				// 走 MqttServer#deliverLocal(Message)：与本节点直接发布同一套语义 ——
+				// No Local、MQTT 5.0 属性重写、离线订阅者入离线队列。
 				Message fwdMsg = pfm.getMessage();
-				mqttServer.deliverLocal(fwdMsg.getTopic(), fwdMsg.getPayload(),
-					MqttQoS.valueOf(fwdMsg.getQos()), fwdMsg.isRetain(), fwdMsg.getProperties());
+				if (fwdMsg != null) {
+					mqttServer.deliverLocal(fwdMsg);
+				}
 				break;
 			}
 			case SESSION_TAKEOVER_REQUEST: {
@@ -799,16 +807,24 @@ public class MqttClusterManager {
 		}
 		IMqttMessageStore messageStore = mqttServer.getServerCreator().getMessageStore();
 		for (String clientId : clientIds) {
-			Message will = messageStore.getWillMessage(clientId);
-			if (will == null) {
-				continue;
-			}
 			mqttServer.getServerCreator().getMqttExecutor().execute(() -> {
 				try {
+					// 取遗嘱与发布放在同一个任务里：同一节点上的并发离场事件不会重复发布
+					Message will = messageStore.getWillMessage(clientId);
+					if (will == null) {
+						return;
+					}
 					mqttServer.getServerCreator().getMessagePipeline().handle(will);
-					messageStore.clearWillMessage(clientId);
 				} catch (Throwable e) {
 					logger.error("[Cluster] Failed to publish will for departed node client={}", clientId, e);
+				} finally {
+					// 无论发布成功与否都要清掉遗嘱：MQTT 规定遗嘱只发布一次，
+					// 留在库里会被后续的离场事件重复发布
+					try {
+						messageStore.clearWillMessage(clientId);
+					} catch (Throwable e) {
+						logger.error("[Cluster] Failed to clear will for departed node client={}", clientId, e);
+					}
 				}
 			});
 		}
@@ -924,7 +940,26 @@ public class MqttClusterManager {
 		}
 	}
 
-	public void stop() {
+	/**
+	 * 停止集群连接（不触碰 MQTT 服务端）。
+	 * <p>
+	 * 与 {@link #stop()} 的区别：这里<b>不</b>调用 {@code mqttServer.stop()}。
+	 * broker 的关闭钩子运行在 {@code MqttServer#stop()} 内部，若在此再停一次
+	 * 服务端会形成递归，因此关闭钩子必须调用本方法。
+	 * </p>
+	 * <p>
+	 * 停止顺序：先广播 {@code NODE_LEAVE} 让对端立即摘除本节点，再关闭集群连接，
+	 * 最后释放定时器。否则对端只能等心跳超时（默认 15s）才发现本节点已下线，
+	 * 期间本节点会作为「僵尸节点」继续被路由命中。
+	 * </p>
+	 * <p>
+	 * 本方法幂等：重复调用直接返回。
+	 * </p>
+	 */
+	public void stopCluster() {
+		if (!stopped.compareAndSet(false, true)) {
+			return;
+		}
 		takeoverTimeoutExecutor.shutdownNow();
 		membershipMonitorExecutor.shutdownNow();
 		pendingTakeovers.clear();
@@ -934,12 +969,23 @@ public class MqttClusterManager {
 		stateSyncResponses.set(0);
 		clusterStartedAtMillis = 0L;
 		if (cluster != null) {
+			// 集群连接还在，先通知对端本节点即将下线
 			NodeLeaveMessage leaveMsg = new NodeLeaveMessage();
 			broadcast(leaveMsg);
 
 			cluster.stop();
+			cluster = null;
 			logger.info("Mqtt cluster manager stopped");
 		}
+	}
+
+	/**
+	 * 停止集群管理器与 MQTT 服务端。
+	 *
+	 * @see #stopCluster()
+	 */
+	public void stop() {
+		stopCluster();
 
 		if (mqttServer != null) {
 			mqttServer.stop();

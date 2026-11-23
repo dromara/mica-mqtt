@@ -30,8 +30,9 @@ import java.util.Map;
 /**
  * 内置 HttpAction：JDK HttpURLConnection 同步调用（无三方依赖）。
  * <p>
- * MVP 阶段使用同步实现。后续会替换为 action 线程池 + 异步 HttpClient
- * （避免在 t-io IO 线程上阻塞慢 HTTP 后端）。
+ * 本 action 本身是同步的，但它运行在 {@link RuleActionExecutor} 的 action 线程池上
+ * （规则命中后整条 action 链作为一个任务提交），因此慢后端不会阻塞 t-io 的 IO 线程。
+ * 单次调用的连接与读取超时由 {@code timeoutMs} 属性控制。
  * </p>
  *
  * @author L.cm

@@ -47,4 +47,13 @@ public interface RuleLoader {
 	 */
 	default void setListener(RuleChangeListener listener) {
 	}
+
+	/**
+	 * 停止加载器的后台资源（热加载轮询等）。
+	 * <p>
+	 * broker 关闭时会调用：不实现则表示没有需要释放的资源。
+	 * </p>
+	 */
+	default void stop() {
+	}
 }

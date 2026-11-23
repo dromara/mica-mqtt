@@ -55,4 +55,12 @@ public interface RuleStore {
 	 * @return 规则列表
 	 */
 	List<Rule> loadAll();
+
+	/**
+	 * 注册存储变更监听器，用于热加载场景；默认实现为空操作。
+	 *
+	 * @param listener 监听器
+	 */
+	default void setListener(RuleStoreListener listener) {
+	}
 }

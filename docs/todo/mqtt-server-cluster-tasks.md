@@ -495,33 +495,44 @@ public interface SharedSubscriptionStrategy {
 
 ---
 
-## 7. 任务清单总览（甘特图 + 责任人）
+## 7. 任务清单总览（甘特图 + 责任人 + 状态）
 
-| ID | 任务 | 工作量 | 依赖 | 责任人 | 起始 | 结束 |
-|---|---|---|---|---|---|---|
-| P0.1 | ClusterMessageType 扩展 | 0.5d | - | A | W1D1 | W1D1 |
-| P0.2 | LocalKvStore 接口 | 1d | - | A | W1D2 | W1D3 |
-| P0.3 | 配置扩展 | 0.5d | P0.1, P0.2 | A | W1D4 | W1D4 |
-| P0.4 | ClusterMetrics 埋点 | 1d | - | A | W1D4 | W1D5 |
-| P0.5 | MqttBroker 入口集成 | 1d | P0.1~P0.4 | A | W1D5 | W1D5 |
-| P1.0 | strategy 接口 + 5 实现 | 2d | P0.1, P0.4 | A | W2D1 | W2D2 |
-| P1.1 | dispatcher 重构 | 5d | P1.0 | A | W2D3 | W3D2 |
-| P1.2 | 边界场景 | 3d | P1.1 | A | W3D3 | W4D1 |
-| P1.3 | 性能压测 | 2d | P1.2 | A | W4D2 | W4D3 |
-| P2.0 | H2 引擎基础 | 5d | P0.2, P0.5 | B | W1D1 | W1D5 |
-| P2.1 | Session 跨节点接管 | 5d | P2.0 | B | W2D1 | W2D5 |
-| P2.2 | Shared Sub 持久化 | 5d | P2.0 | B | W3D1 | W3D5 |
-| P2.3 | QoS 飞行 + TTL 清理 | 2.5d | P2.0 | B | W4D1 | W4D3 |
-| P2.4 | Retain 持久化 + 内存索引 | 5d | P2.0, P2.1 | B | W4D3 | W5D2 |
-| P2.5 | Retain 分片复制（可选） | 5d | P2.4 | B | W5D3 | W6D2 |
-| P3.1 | 集成测试用例 | 3d | P1.3, P2.4 | A+B | W6D3 | W7D1 |
-| P3.2 | 性能基线 | 1d | P3.1 | A+B | W7D2 | W7D2 |
-| P3.3 | 兼容性测试 | 1d | P3.2 | A+B | W7D3 | W7D3 |
-| P4.1 | 监控告警 | 1d | P3.3 | A | W8D1 | W8D1 |
-| P4.2 | 文档迁移指南 | 2d | P3.3 | A 或 B | W8D2 | W8D3 |
-| P4.3 | 发布策略与灰度 | 2d | P4.1, P4.2 | A 或 B | W8D4 | W8D5 |
+| ID | 任务 | 工作量 | 依赖 | 责任人 | 起始 | 结束 | 状态 |
+|---|---|---|---|---|---|---|---|
+| P0.1 | ClusterMessageType 扩展 | 0.5d | - | A | W1D1 | W1D1 | ✅ 完成 |
+| P0.2 | LocalKvStore 接口 | 1d | - | A | W1D2 | W1D3 | ✅ 完成 |
+| P0.3 | 配置扩展 | 0.5d | P0.1, P0.2 | A | W1D4 | W1D4 | ✅ 完成 |
+| P0.4 | ClusterMetrics 埋点 | 1d | - | A | W1D4 | W1D5 | ✅ 完成 |
+| P0.5 | MqttBroker 入口集成 | 1d | P0.1~P0.4 | A | W1D5 | W1D5 | ✅ 完成 |
+| P1.0 | strategy 接口 + 5 实现 | 2d | P0.1, P0.4 | A | W2D1 | W2D2 | ✅ 完成 |
+| P1.1 | dispatcher 重构 | 5d | P1.0 | A | W2D3 | W3D2 | ✅ 完成 |
+| P1.2 | 边界场景 | 3d | P1.1 | A | W3D3 | W4D1 | ✅ 完成 |
+| P1.3 | 性能压测 | 2d | P1.2 | A | W4D2 | W4D3 | ⚠️ 部分 |
+| P2.0 | H2 引擎基础 | 5d | P0.2, P0.5 | B | W1D1 | W1D5 | ✅ 完成 |
+| P2.1 | Session 跨节点接管 | 5d | P2.0 | B | W2D1 | W2D5 | ✅ 完成 |
+| P2.2 | Shared Sub 持久化 | 5d | P2.0 | B | W3D1 | W3D5 | ✅ 完成 |
+| P2.3 | QoS 飞行 + TTL 清理 | 2.5d | P2.0 | B | W4D1 | W4D3 | ✅ 完成 |
+| P2.4 | Retain 持久化 + 内存索引 | 5d | P2.0, P2.1 | B | W4D3 | W5D2 | ✅ 完成 |
+| P2.5 | Retain 分片复制（可选） | 5d | P2.4 | B | W5D3 | W6D2 | ✅ 完成 |
+| P3.1 | 集成测试用例 | 3d | P1.3, P2.4 | A+B | W6D3 | W7D1 | ✅ 完成 |
+| P3.2 | 性能基线 | 1d | P3.1 | A+B | W7D2 | W7D2 | ⚠️ 部分 |
+| P3.3 | 兼容性测试 | 1d | P3.2 | A+B | W7D3 | W7D3 | ❌ 未做 |
+| P4.1 | 监控告警 | 1d | P3.3 | A | W8D1 | W8D1 | ✅ 完成 |
+| P4.2 | 文档迁移指南 | 2d | P3.3 | A 或 B | W8D2 | W8D3 | ✅ 完成 |
+| P4.3 | 发布策略与灰度 | 2d | P4.1, P4.2 | A 或 B | W8D4 | W8D5 | ⚠️ 部分 |
 
 **总计**：8 周（2 人并行）
+
+**状态口径**（2026-11-16 按仓库实现核对，非计划值）：
+
+- ✅ **完成**（17 项）：已落地并有对应测试用例。
+- ⚠️ **部分**（3 项）：
+  - `P1.3` / `P3.2` —— 压测只覆盖 10w 级热路径微基准（`ClusterPerformanceBenchmarkIT`），缺全链路容量基线；且该类挂在 `cluster-benchmark` profile 下，`mvn test` 不执行，CI 也不覆盖。
+  - `P4.3` —— 灰度与回滚只有 `mqtt-server-cluster-monitoring.md` §4 的文字方案（5% → 25% → 50% → 100%），无自动化发布脚本。
+- ❌ **未做**（1 项）：
+  - `P3.3` —— 没有跨版本 / 混合版本的兼容性测试用例，`clusterName` 隔离目前只靠 INV-7 约束与部署规范兜底。
+
+> 三个 `*IT` 集成测试类（`ClusterMqttIT` / `ClusterProcessChaosIT` / `ClusterPerformanceBenchmarkIT`）均需显式激活 `cluster-integration` / `cluster-chaos` / `cluster-benchmark` profile，CI 的 `mvn clean package` 不会执行它们。
 
 ---
 
@@ -612,6 +623,7 @@ public interface SharedSubscriptionStrategy {
 | 维度 | 数值 |
 |---|---|
 | 任务总数 | 21 个（含 P0/P1/P2/P3/P4） |
+| 落地状态 | 17 项完成 / 3 项部分 / 1 项未做（详见 §7 状态列） |
 | 总工作量 | 8 周（2 人并行）/ 14 周（1 人串行） |
 | MVP 路径 | 2 周（1 人） |
 | 关键路径 | P0.5 → P1.0 → P1.1 → P3.1 → P4.3 |
@@ -629,9 +641,14 @@ public interface SharedSubscriptionStrategy {
 
 ---
 
-**文档版本**：v1.1
-**更新日期**：2026-06-22
-**状态**：当前 V1/V2/V3 设计与仓库内可复现验收已完成；V4+ 脑裂/全局协调限流及目标硬件容量门禁不计入当前版本完成条件
+**文档版本**：v1.2
+**更新日期**：2026-11-16
+**状态**：当前 V1/V2/V3 设计与仓库内可复现验收已完成；21 个任务中 17 项完成、3 项部分、1 项未做（详见 §7 状态列）；V4+ 脑裂/全局协调限流及目标硬件容量门禁不计入当前版本完成条件
+
+**v1.2 变更摘要**（按仓库实现补齐任务落地状态，不改动原排期与依赖关系）：
+- §7 任务清单新增「状态」列，逐项标注完成 / 部分完成 / 未做，并给出状态口径说明
+- 补记三个 `*IT` 集成测试类需显式激活 Maven profile、CI 默认不覆盖的事实
+- §12 总结补充「落地状态」维度
 
 **v1.1 变更摘要**（以代码实现为准全面对齐 cluster v3.0）：
 - P0.1 代码示例修正：协议号 9-11 → 11-13，补充 WILL_MESSAGE(9)/RETAIN_MESSAGE(10)，移除不存在的 SHARED_SUBSCRIBE_FORWARD/SHARED_PUBLISH_FORWARD

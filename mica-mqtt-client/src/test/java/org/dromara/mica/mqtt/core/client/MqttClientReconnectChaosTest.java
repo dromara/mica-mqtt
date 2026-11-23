@@ -151,11 +151,7 @@ class MqttClientReconnectChaosTest {
 		CountDownLatch allowConnAck = new CountDownLatch(1);
 		FakeBroker broker = FakeBroker.create()
 			.next(new ConnAckThenResetHandler(100))
-			.next(socket -> {
-				reconnectRead.countDown();
-				allowConnAck.await(3, TimeUnit.SECONDS);
-				writeConnAck(socket.getOutputStream());
-			});
+			.next(new DelayedConnAckHoldHandler(reconnectRead, allowConnAck));
 		MqttClient client = null;
 		try {
 			client = newClient(broker.getPort(), listener);
@@ -203,11 +199,7 @@ class MqttClientReconnectChaosTest {
 		CountDownLatch allowConnAck = new CountDownLatch(1);
 		FakeBroker broker = FakeBroker.create()
 			.next(new ConnAckThenResetHandler(500))
-			.next(socket -> {
-				reconnectRead.countDown();
-				allowConnAck.await(3, TimeUnit.SECONDS);
-				writeConnAck(socket.getOutputStream());
-			});
+			.next(new DelayedConnAckHoldHandler(reconnectRead, allowConnAck));
 		MqttClient client = null;
 		try {
 			client = newClient(broker.getPort(), listener);
@@ -613,6 +605,33 @@ class MqttClientReconnectChaosTest {
 	private static final class ConnAckAndHoldHandler implements SocketHandler {
 		@Override
 		public void handle(Socket socket) throws Exception {
+			writeConnAck(socket.getOutputStream());
+			Thread.sleep(TimeUnit.SECONDS.toMillis(30));
+		}
+	}
+
+	/**
+	 * 第二个连接：读到 CONNECT 后先挂起，等放行信号到了才回 CONNACK，
+	 * 回完继续持有连接。
+	 * <p>
+	 * 回完就返回是不行的：服务端随即断开连接，客户端被置为未连接，
+	 * 后面 {@code isConnected()} 的断言就变成「断言与服务端关连接的竞态」——
+	 * 表现为偶发失败（CI 上已经出现过）。
+	 * </p>
+	 */
+	private static final class DelayedConnAckHoldHandler implements SocketHandler {
+		private final CountDownLatch connectReadLatch;
+		private final CountDownLatch allowConnAck;
+
+		private DelayedConnAckHoldHandler(CountDownLatch connectReadLatch, CountDownLatch allowConnAck) {
+			this.connectReadLatch = connectReadLatch;
+			this.allowConnAck = allowConnAck;
+		}
+
+		@Override
+		public void handle(Socket socket) throws Exception {
+			connectReadLatch.countDown();
+			allowConnAck.await(3, TimeUnit.SECONDS);
 			writeConnAck(socket.getOutputStream());
 			Thread.sleep(TimeUnit.SECONDS.toMillis(30));
 		}

@@ -40,6 +40,7 @@ public class MqttActionFactory implements ActionFactory {
 		String template = ref.getString("topicTemplate");
 		MqttQoS qos = MqttQoS.valueOf(ref.getInt("qos", 0));
 		boolean retain = ref.getBoolean("retain", false);
-		return new MqttAction(name, client, template, qos, retain);
+		// 带上连接键：action 关闭时释放对共享连接的引用，最后一个引用者离开才断连
+		return new MqttAction(name, client, template, qos, retain, false, MqttAction.connectionKey(ref));
 	}
 }

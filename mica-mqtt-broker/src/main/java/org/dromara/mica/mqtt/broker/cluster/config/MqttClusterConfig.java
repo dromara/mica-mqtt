@@ -121,6 +121,21 @@ public class MqttClusterConfig {
 	/** Maximum wait for remote retain-query responses during SUBSCRIBE. */
 	private long retainQueryTimeoutMs = 2_000L;
 
+	/**
+	 * 规则引擎 action 线程池的核心线程数，小于等于 0 表示自动（2 * CPU）。
+	 */
+	private int actionPoolCoreSize;
+
+	/**
+	 * 规则引擎 action 线程池的最大线程数，小于等于 0 表示自动（32 * CPU）。
+	 */
+	private int actionPoolMaxSize;
+
+	/**
+	 * 规则引擎 action 线程池的队列容量，小于等于 0 表示自动（1024）。
+	 */
+	private int actionPoolQueueSize;
+
 	public boolean isEnabled() {
 		return enabled;
 	}
@@ -274,6 +289,45 @@ public class MqttClusterConfig {
 
 	public MqttClusterConfig retainQueryTimeoutMs(long retainQueryTimeoutMs) {
 		setRetainQueryTimeoutMs(retainQueryTimeoutMs);
+		return this;
+	}
+
+	public int getActionPoolCoreSize() {
+		return actionPoolCoreSize;
+	}
+
+	public void setActionPoolCoreSize(int actionPoolCoreSize) {
+		this.actionPoolCoreSize = actionPoolCoreSize;
+	}
+
+	public MqttClusterConfig actionPoolCoreSize(int actionPoolCoreSize) {
+		setActionPoolCoreSize(actionPoolCoreSize);
+		return this;
+	}
+
+	public int getActionPoolMaxSize() {
+		return actionPoolMaxSize;
+	}
+
+	public void setActionPoolMaxSize(int actionPoolMaxSize) {
+		this.actionPoolMaxSize = actionPoolMaxSize;
+	}
+
+	public MqttClusterConfig actionPoolMaxSize(int actionPoolMaxSize) {
+		setActionPoolMaxSize(actionPoolMaxSize);
+		return this;
+	}
+
+	public int getActionPoolQueueSize() {
+		return actionPoolQueueSize;
+	}
+
+	public void setActionPoolQueueSize(int actionPoolQueueSize) {
+		this.actionPoolQueueSize = actionPoolQueueSize;
+	}
+
+	public MqttClusterConfig actionPoolQueueSize(int actionPoolQueueSize) {
+		setActionPoolQueueSize(actionPoolQueueSize);
 		return this;
 	}
 }

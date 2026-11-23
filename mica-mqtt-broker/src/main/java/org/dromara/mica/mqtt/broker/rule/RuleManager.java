@@ -20,11 +20,14 @@ import org.dromara.mica.mqtt.broker.rule.codec.PayloadCodecFactory;
 import org.dromara.mica.mqtt.broker.rule.codec.PayloadCodecRegistry;
 import org.dromara.mica.mqtt.broker.rule.loader.RuleLoader;
 import org.dromara.mica.mqtt.broker.rule.matcher.MatcherRegistry;
+import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcher;
 import org.dromara.mica.mqtt.broker.rule.matcher.RuleMatcherFactory;
 import org.dromara.mica.mqtt.broker.rule.action.ActionFactory;
 import org.dromara.mica.mqtt.broker.rule.action.ActionRegistry;
 import org.dromara.mica.mqtt.broker.rule.store.RuleEvent;
 import org.dromara.mica.mqtt.broker.rule.store.RuleStore;
+import org.dromara.mica.mqtt.broker.rule.store.RuleStoreListener;
+import org.dromara.mica.mqtt.core.util.TopicUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +55,11 @@ public class RuleManager {
 	private final AtomicBoolean started = new AtomicBoolean();
 
 	/**
+	 * 标记「本次写入由本管理器发起」，避免 store 监听器重复派发事件。
+	 */
+	private final ThreadLocal<Boolean> internalWrite = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
+	/**
 	 * 注册 action 工厂。
 	 *
 	 * @param factory 工厂
@@ -67,6 +75,16 @@ public class RuleManager {
 	 */
 	public void registerMatcherFactory(RuleMatcherFactory factory) {
 		matcherRegistry.registerFactory(factory);
+	}
+
+	/**
+	 * 注册具名 matcher 实例，多条规则可通过 {@code matcherType} 共享同一条件。
+	 *
+	 * @param name    名称
+	 * @param matcher matcher 实例
+	 */
+	public void registerMatcher(String name, RuleMatcher matcher) {
+		matcherRegistry.registerMatcher(name, matcher);
 	}
 
 	/**
@@ -127,7 +145,7 @@ public class RuleManager {
 		if (ruleStore == null) {
 			throw new IllegalStateException("RuleStore is not set");
 		}
-		ruleStore.save(rule);
+		saveToStore(rule);
 		fireEvent(RuleEvent.added(rule));
 		return rule;
 	}
@@ -151,7 +169,7 @@ public class RuleManager {
 		if (next == null) {
 			throw new IllegalArgumentException("Updater returned null for rule " + id);
 		}
-		ruleStore.save(next);
+		saveToStore(next);
 		fireEvent(RuleEvent.updated(next, prev.getId()));
 		return next;
 	}
@@ -169,9 +187,33 @@ public class RuleManager {
 		if (ruleStore.find(id) == null) {
 			return false;
 		}
-		ruleStore.delete(id);
+		deleteFromStore(id);
 		fireEvent(RuleEvent.removed(id));
 		return true;
+	}
+
+	/**
+	 * 写入存储（标记为内部写入，store 监听器不再重复派发）。
+	 */
+	private void saveToStore(Rule rule) {
+		internalWrite.set(Boolean.TRUE);
+		try {
+			ruleStore.save(rule);
+		} finally {
+			internalWrite.set(Boolean.FALSE);
+		}
+	}
+
+	/**
+	 * 从存储删除（标记为内部写入）。
+	 */
+	private void deleteFromStore(String id) {
+		internalWrite.set(Boolean.TRUE);
+		try {
+			ruleStore.delete(id);
+		} finally {
+			internalWrite.set(Boolean.FALSE);
+		}
 	}
 
 	public Rule getRule(String id) {
@@ -180,6 +222,28 @@ public class RuleManager {
 
 	public List<Rule> listRules() {
 		return ruleStore == null ? new ArrayList<>() : ruleStore.loadAll();
+	}
+
+	/**
+	 * 按 topic 匹配规则（调试用）。
+	 * <p>
+	 * 只做 topic 层面的通配匹配，不涉及 matcher 条件与 enabled 开关。
+	 * </p>
+	 *
+	 * @param topic 完整 topic
+	 * @return 命中的规则列表
+	 */
+	public List<Rule> match(String topic) {
+		List<Rule> matched = new ArrayList<>();
+		if (topic == null) {
+			return matched;
+		}
+		for (Rule rule : listRules()) {
+			if (TopicUtil.match(rule.getTopicFilter(), topic)) {
+				matched.add(rule);
+			}
+		}
+		return matched;
 	}
 
 	/**
@@ -198,6 +262,25 @@ public class RuleManager {
 			for (Rule r : ruleStore.loadAll()) {
 				fireEvent(RuleEvent.added(r));
 			}
+			// 存储侧热加载：外部（配置中心 / 其它节点）改动存储后，本地同步挂载
+			ruleStore.setListener(new RuleStoreListener() {
+				@Override
+				public void onSaved(Rule rule) {
+					if (Boolean.TRUE.equals(internalWrite.get())) {
+						// 本管理器自身发起的写入，已由调用点派发事件
+						return;
+					}
+					fireEvent(RuleEvent.added(rule));
+				}
+
+				@Override
+				public void onDeleted(String ruleId) {
+					if (Boolean.TRUE.equals(internalWrite.get())) {
+						return;
+					}
+					fireEvent(RuleEvent.removed(ruleId));
+				}
+			});
 		}
 		// 执行 loader
 		for (RuleLoader loader : loaders) {
@@ -205,7 +288,7 @@ public class RuleManager {
 				List<Rule> rules = loader.loadAll();
 				for (Rule r : rules) {
 					if (ruleStore != null) {
-						ruleStore.save(r);
+						saveToStore(r);
 					}
 					fireEvent(RuleEvent.added(r));
 				}
@@ -213,7 +296,7 @@ public class RuleManager {
 					@Override
 					public void onSaved(Rule rule) {
 						if (ruleStore != null) {
-							ruleStore.save(rule);
+							saveToStore(rule);
 						}
 						fireEvent(RuleEvent.added(rule));
 					}
@@ -221,7 +304,7 @@ public class RuleManager {
 					@Override
 					public void onDeleted(String ruleId) {
 						if (ruleStore != null) {
-							ruleStore.delete(ruleId);
+							deleteFromStore(ruleId);
 						}
 						fireEvent(RuleEvent.removed(ruleId));
 					}
@@ -245,6 +328,14 @@ public class RuleManager {
 		actionRegistry.clear();
 		matcherRegistry.clear();
 		codecRegistry.clear();
+		// 停止加载器的热加载轮询，否则文件监听线程会一直活着
+		for (RuleLoader loader : loaders) {
+			try {
+				loader.stop();
+			} catch (Exception e) {
+				logger.warn("Failed to stop rule loader: {}", loader.getSource(), e);
+			}
+		}
 		// 清空加载器引用，便于 GC
 		loaders.clear();
 	}
@@ -254,7 +345,11 @@ public class RuleManager {
 			try {
 				l.onRuleEvent(event);
 			} catch (Exception e) {
-				logger.warn("RuleEventListener failed: {}", e.getMessage(), e);
+				// 日志带上规则 id，否则出问题只能靠猜是哪条规则
+				logger.warn("RuleEventListener failed on rule:{}, event:{}, error:{}",
+					event == null ? null : event.getRuleId(),
+					event == null ? null : event.getType(),
+					e.getMessage(), e);
 			}
 		}
 	}

@@ -1,0 +1,48 @@
+/*
+ * Copyright (c) 2019-2029, Dreamlu 卢春梦 (596392912@qq.com & dreamlu.net).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.dromara.mica.mqtt.broker.rule.loader;
+
+import net.dreamlu.mica.net.utils.json.JsonUtil;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+/**
+ * JSON 规则文件加载器（复用 server 模块的 {@code JsonAdapter}，broker 不新增 JSON 依赖）。
+ *
+ * @author L.cm
+ */
+public class JsonRuleLoader extends AbstractFileRuleLoader {
+
+	public JsonRuleLoader(Path path) {
+		super(path);
+	}
+
+	public JsonRuleLoader(Path path, long watchIntervalMs) {
+		super(path, watchIntervalMs);
+	}
+
+	@Override
+	protected Object readConfig() throws IOException {
+		byte[] content = Files.readAllBytes(path);
+		if (content.length == 0) {
+			return null;
+		}
+		return JsonUtil.readValue(content, Object.class);
+	}
+}
